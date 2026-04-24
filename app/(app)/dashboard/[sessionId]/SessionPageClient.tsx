@@ -201,6 +201,9 @@ export default function SessionPageClient({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   /** Tracks the newest ticket id for the highlight animation; cleared after animation ends. */
   const [newTicketId, setNewTicketId] = useState<string | null>(null);
+  /** Tracks which pin comment should pulse its ring animation; cleared after animation ends. */
+  const [animatingPinId, setAnimatingPinId] = useState<string | null>(null);
+  const [animatingCommentId, setAnimatingCommentId] = useState<string | null>(null);
 
   const sessionRef = useRef<Session | null>(null);
   sessionRef.current = session;
@@ -619,6 +622,11 @@ export default function SessionPageClient({
   );
   const stableCanonicalFeedback = stableScopedFeedback;
 
+  const ticketTitleMap = useMemo(
+    () => new Map(stableScopedFeedback.map((f) => [f.id, f.title ?? "Untitled"])),
+    [stableScopedFeedback]
+  );
+
   useEffect(() => {
     if (process.env.NODE_ENV !== "development") return;
     const legacyScreenshotUrlKey = `screenshot${"Url"}`;
@@ -656,6 +664,8 @@ export default function SessionPageClient({
     return null;
   }, [ticketIdFromUrl, stableScopedFeedback, selectedId, sessionId]);
 
+  const selectedTicketTitle = ticketTitleMap.get(effectiveSelectedId ?? "") ?? "Untitled";
+
   if (stableScopedFeedback.length > 0 && selectedId === null) {
     const url = ticketIdFromUrl;
     if (url && stableScopedFeedback.some((f) => f.id === url)) {
@@ -670,6 +680,7 @@ export default function SessionPageClient({
 
   const [isTicketNavigatorOpen, setIsTicketNavigatorOpen] = useState(false);
   const [isCommentMode, setIsCommentMode] = useState(false);
+  const [isCommentPanelOpen, setIsCommentPanelOpen] = useState(false);
   const [isImageExpanded, setIsImageExpanded] = useState(false);
   const [openImageInEditMode, setOpenImageInEditMode] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -680,10 +691,13 @@ export default function SessionPageClient({
 
   const preloadedScreenshotUrlsRef = useRef<Set<string>>(new Set());
 
-  /* Escape exits comment mode (canvas-native: no panel open by default). */
+  /* Escape exits comment mode and closes comment panel. */
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setIsCommentMode(false);
+      if (e.key === "Escape") {
+        setIsCommentMode(false);
+        setIsCommentPanelOpen(false);
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -1403,6 +1417,11 @@ export default function SessionPageClient({
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   /** Pin whose inline thread popover is open (does not open right panel). */
   const [activePinIdForPopover, setActivePinIdForPopover] = useState<string | null>(null);
+
+  const triggerPinAnimation = useCallback((commentId: string) => {
+    setAnimatingPinId(commentId);
+    setTimeout(() => setAnimatingPinId(null), 900);
+  }, []);
 
   /* ================= SAVE TITLE (optimistic update, then PATCH) ================= */
 
@@ -2216,15 +2235,28 @@ export default function SessionPageClient({
         }}
         canEdit={isWorkspaceMember && Boolean(selectedItem?.screenshotId)}
         isCommentMode={isCommentMode}
-        onOpenComment={() => setIsCommentMode(true)}
-        onCloseCommentMode={() => setIsCommentMode(false)}
+        onOpenComment={() => {
+          setIsCommentMode(true);
+          setIsCommentPanelOpen(true);
+          showToast("Tap anywhere on the image to leave a comment");
+        }}
+        onCloseCommentMode={() => {
+          setIsCommentMode(false);
+          setIsCommentPanelOpen(false);
+          setActiveThreadId(null);
+        }}
         impactScore={(selectedItem as { impactScore?: number } | null)?.impactScore}
         comments={comments}
         sendPinComment={sendPinComment}
         sendReply={sendReply}
         activePinIdForPopover={activePinIdForPopover}
         activeThreadId={activeThreadId}
-        onPinClick={setActivePinIdForPopover}
+        onPinClick={(commentId: string) => {
+          setActivePinIdForPopover(null);
+          setActiveThreadId(commentId);
+          setAnimatingCommentId(commentId);
+          setTimeout(() => setAnimatingCommentId(null), 1100);
+        }}
         onOpenThreadPanel={(id) => {
           setActiveThreadId(id);
           setActivePinIdForPopover(null);
@@ -2232,7 +2264,13 @@ export default function SessionPageClient({
         onCloseInlinePopover={() => setActivePinIdForPopover(null)}
         updateComment={updateComment}
         sendTextComment={sendTextComment}
-        onCommentPlaced={() => setIsCommentMode(false)}
+        onCommentPlaced={(newCommentId?: string) => {
+          if (newCommentId) {
+            setActiveThreadId(newCommentId);
+            setAnimatingCommentId(newCommentId);
+            setTimeout(() => setAnimatingCommentId(null), 1100);
+          }
+        }}
         updatePinPosition={updatePinPosition}
         onDelete={
           canDeleteSelectedTicket ? () => setShowDeleteModal(true) : undefined
@@ -2272,6 +2310,7 @@ export default function SessionPageClient({
         onSaveStateChange={setActionToastState}
         canAssignTicket={sessionAccess?.canResolve === true}
         isWorkspaceMember={isWorkspaceMember}
+        animatingPinId={animatingPinId}
       />
     );
   };
@@ -2342,7 +2381,14 @@ export default function SessionPageClient({
                 })}
             items={stableScopedFeedback}
             selectedId={effectiveSelectedId}
-            onSelect={setSelectedId}
+            onSelect={(id: string) => {
+              setSelectedId(id);
+              const url = new URL(window.location.href);
+              if (url.searchParams.has("ticket")) {
+                url.searchParams.delete("ticket");
+                window.history.replaceState({}, "", url.pathname + url.search);
+              }
+            }}
             newTicketId={newTicketId}
             loadingMore={isSearchMode ? false : feedbackLoadingMore}
             hasMore={isSearchMode ? false : hasMoreFeedback}
@@ -2399,23 +2445,27 @@ export default function SessionPageClient({
                   </button>
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
-                  <div className="max-w-[1000px] mx-auto w-full px-6 py-6 flex-1 min-h-0 flex flex-col">
+                  <div className="max-w-[800px] mx-auto w-full px-6 py-6 flex-1 min-h-0 flex flex-col">
                     {renderExecutionContent()}
                   </div>
                 </div>
               </div>
             </main>
 
-            {/* Comment panel: only when a pin/thread is opened (Google Docs style). No permanent sidebar. */}
+            {/* Comment panel: opens when comment mode is active or a thread is selected. */}
             <div
               className="shrink-0 flex flex-col min-h-0 bg-[var(--canvas-base)] shadow-[-8px_0_24px_-12px_rgba(15,23,42,0.12)] transition-[width] duration-200 ease-out overflow-hidden"
-              style={{ width: activeThreadId != null ? 380 : 0 }}
+              style={{ width: (isCommentPanelOpen || activeThreadId != null) ? 380 : 0 }}
             >
-              {activeThreadId != null && (
+              {(isCommentPanelOpen || activeThreadId != null) && (
                 <CommentPanel
                   variant="sidebar"
                   isOpen
-                  onClose={() => setActiveThreadId(null)}
+                  onClose={() => {
+                    setActiveThreadId(null);
+                    setIsCommentPanelOpen(false);
+                    setIsCommentMode(false);
+                  }}
                   comments={comments}
                   loading={loadingComments}
                   threadCounts={displayCommentThreadCounts}
@@ -2433,6 +2483,11 @@ export default function SessionPageClient({
                   onReactionsChanged={handleReactionsChanged}
                   participants={participants}
                   showToast={showToast}
+                  ticketTitleMap={ticketTitleMap}
+                  selectedTicketTitle={selectedTicketTitle}
+                  onNavigateToTicket={(fid: string) => setSelectedId(fid)}
+                  onAnimatePin={triggerPinAnimation}
+                  animatingCommentId={animatingCommentId}
                 />
               )}
             </div>
@@ -2483,9 +2538,14 @@ export default function SessionPageClient({
                   })}
               items={stableScopedFeedback}
               selectedId={effectiveSelectedId}
-              onSelect={(id) => {
+              onSelect={(id: string) => {
                 setSelectedId(id);
                 setIsTicketNavigatorOpen(false);
+                const url = new URL(window.location.href);
+                if (url.searchParams.has("ticket")) {
+                  url.searchParams.delete("ticket");
+                  window.history.replaceState({}, "", url.pathname + url.search);
+                }
               }}
               newTicketId={newTicketId}
               loadingMore={isSearchMode ? false : feedbackLoadingMore}
@@ -2504,7 +2564,7 @@ export default function SessionPageClient({
               isSearchMode={isSearchMode}
               searchResults={searchResults}
               searchLoading={searchLoading}
-            />
+              />
           </div>
         </div>
       )}

@@ -68,6 +68,7 @@ export interface ExecutionViewProps {
   onSaveStateChange?: (state: 'saving' | 'saved' | 'error' | 'hidden') => void;
   canAssignTicket?: boolean;
   isWorkspaceMember?: boolean;
+  animatingPinId?: string | null;
 }
 
 export function ExecutionView({
@@ -113,6 +114,7 @@ export function ExecutionView({
   onSaveStateChange,
   canAssignTicket = false,
   isWorkspaceMember = false,
+  animatingPinId,
 }: ExecutionViewProps) {
   const displayItem = item;
 
@@ -155,20 +157,8 @@ export function ExecutionView({
         isWorkspaceMember={isWorkspaceMember}
       />
 
-      {!isPublicReadOnly && !isShareSurface && isCommentMode && (
-        <div className="shrink-0 px-3 py-2.5 flex items-center justify-center bg-[#FAFBFC] -mx-6 mt-1">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-neutral-100 text-[11px] text-[#6B7280]">
-            Comment mode · Click anywhere to add comment · Esc to exit
-          </span>
-        </div>
-      )}
-
       <div
-        className={`main-content flex-1 min-h-0 overflow-y-auto ${
-          !isPublicReadOnly && !isShareSurface && isCommentMode
-            ? "cursor-crosshair"
-            : ""
-        }`}
+        className="main-content flex-1 min-h-0 overflow-y-auto"
         data-comment-mode={
           !isPublicReadOnly && !isShareSurface && isCommentMode ? true : undefined
         }
@@ -194,7 +184,8 @@ export function ExecutionView({
                 !isPublicReadOnly && !isShareSurface && isCommentMode
               }
               comments={comments}
-              pinComments={comments.filter((c): c is Comment & { position: NonNullable<Comment["position"]> } => c.type === "pin" && c.position != null)}
+              pinComments={comments.filter((c): c is Comment & { position: NonNullable<Comment["position"]> } => c.type === "pin" && c.position != null && c.feedbackId === displayItem?.id)}
+              animatingPinId={animatingPinId}
               activePinId={activePinIdForPopover ?? undefined}
               activeThreadId={activeThreadId}
               onPinClick={onPinClick}

@@ -11,11 +11,10 @@ interface ActionStepsSectionProps {
   isResolved?: boolean;
 }
 
-const cardClass =
-  "action-steps-card rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-4";
+const cardClass = "py-2";
 
 const titleClass =
-  "text-[13px] font-semibold text-[#475569] tracking-[0.06em] uppercase mb-3";
+  "text-[12px] font-semibold text-[var(--text-tertiary)] tracking-[0.06em] uppercase mb-3";
 
 export function ActionItemsSection({
   actionSteps,
@@ -93,7 +92,7 @@ export function ActionItemsSection({
           <button
             type="button"
             onClick={startAdd}
-            className="flex items-center gap-2 px-1 py-1.5 text-sm font-medium text-[#64748B] hover:text-[#0F172A] transition-colors duration-150 cursor-pointer"
+            className="flex items-center gap-2 px-1 py-1.5 text-[13px] font-medium text-[var(--text-tertiary)] hover:text-[var(--text-heading)] transition-colors duration-150 cursor-pointer"
           >
             <Plus size={14} />
             Add action step
@@ -110,7 +109,7 @@ export function ActionItemsSection({
                 if (e.key === "Escape") cancelAdd();
               }}
               placeholder="New action step…"
-              className="flex-1 min-w-0 text-[14px] leading-relaxed px-3 py-2 rounded-lg border border-neutral-200/80 bg-white text-[hsl(var(--text-primary-strong))] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]/20 transition-[box-shadow] duration-[120ms]"
+              className="flex-1 min-w-0 text-[14px] leading-relaxed px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface-card)] focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]/20 transition-colors"
               autoFocus
               aria-label="New action step"
             />
@@ -120,7 +119,7 @@ export function ActionItemsSection({
     );
   }
 
-  const numberClass = "font-sans font-semibold text-[#0F172A] text-base";
+  const numberClass = "font-sans font-semibold text-[var(--text-heading)] text-[14px]";
   return (
     <div className={cardClass}>
       <h2 className={titleClass}>Action steps</h2>
@@ -130,10 +129,10 @@ export function ActionItemsSection({
             <span className={numberClass}>{i + 1}.</span>
             {isReadOnly ? (
               <span
-                className={`flex-1 min-w-0 text-base leading-relaxed ${
+                className={`flex-1 min-w-0 text-[14px] leading-relaxed ${
                   isResolved
-                    ? "line-through text-[#64748B]"
-                    : "text-[#0F172A] font-medium"
+                    ? "line-through text-[var(--text-tertiary)]"
+                    : "text-[var(--text-body)] font-normal"
                 }`}
               >
                 {formatActionStep(text)}
@@ -166,10 +165,10 @@ export function ActionItemsSection({
                 <button
                   type="button"
                   onClick={() => startEdit(i)}
-                  className={`flex-1 text-left px-0 py-0 min-w-0 cursor-pointer text-base leading-relaxed ${
+                  className={`flex-1 text-left px-0 py-0 min-w-0 cursor-pointer text-[14px] leading-relaxed ${
                     isResolved
-                      ? "line-through text-[#64748B]"
-                      : "text-[#0F172A] font-medium"
+                      ? "line-through text-[var(--text-tertiary)]"
+                      : "text-[var(--text-body)] font-normal"
                   }`}
                 >
                   {formatActionStep(text)}
@@ -210,7 +209,7 @@ export function ActionItemsSection({
         <button
           type="button"
           onClick={startAdd}
-          className="mt-3 flex items-center gap-2 px-1 py-1 text-sm font-medium text-[#64748B] hover:text-[#0F172A] cursor-pointer"
+          className="mt-3 flex items-center gap-2 px-1 py-1 text-[13px] font-medium text-[var(--text-tertiary)] hover:text-[var(--text-heading)] cursor-pointer"
         >
           <Plus size={14} />
           Add action step

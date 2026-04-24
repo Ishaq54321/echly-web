@@ -25,6 +25,10 @@ export interface CommentItemProps {
   /** Visual size variant */
   size?: "default" | "compact";
   className?: string;
+  /** Ticket title badge (root comments only) */
+  ticketTitle?: string;
+  onNavigateToTicket?: () => void;
+  isThreadResolved?: boolean;
 }
 
 function renderMessageWithMentions(message: string) {
@@ -53,6 +57,9 @@ export function CommentItem({
   onResolveToggle,
   size = "default",
   className = "",
+  ticketTitle,
+  onNavigateToTicket,
+  isThreadResolved,
 }: CommentItemProps) {
   const [editing, setEditing] = useState(false);
   const [editDraft, setEditDraft] = useState(comment.message);
@@ -136,12 +143,12 @@ export function CommentItem({
     }
   }, [comment.id, comment.reactions, currentUserId, currentUserName, onReactionsChanged]);
 
-  const avatarSize = size === "compact" ? "w-[28px] h-[28px]" : "w-[32px] h-[32px]";
-  const textSize = size === "compact" ? "text-[14px]" : "text-[15px]";
-  const metaSize = size === "compact" ? "text-[12px]" : "text-[13px]";
+  const avatarSize = size === "compact" ? "w-[28px] h-[28px]" : "w-[30px] h-[30px]";
+  const textSize = "text-[14px]";
+  const metaSize = "text-[12px]";
 
   return (
-    <div className={`flex gap-2.5 group relative ${className}`}>
+    <div className={`flex gap-2.5 group/item relative ${className} ${(comment.resolved || isThreadResolved) ? "opacity-60" : ""}`}>
       <div
         className={`${avatarSize} shrink-0 rounded-full bg-[var(--surface-subtle)] flex items-center justify-center text-xs font-medium text-discussion-supporting overflow-hidden`}
       >
@@ -161,7 +168,7 @@ export function CommentItem({
         {!editing && (
           <div className="flex items-center flex-wrap gap-2">
             <span
-              className={`font-semibold text-discussion-title ${size === "compact" ? "text-[14px]" : "text-[15px]"}`}
+              className={`font-semibold text-discussion-title text-[14px]`}
             >
               {comment.userName ?? "User"}
             </span>
@@ -169,13 +176,14 @@ export function CommentItem({
               {formatCommentDate(comment.createdAt)}
             </span>
             {showActionBar && (
-              <div className="flex items-center gap-1 ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-center gap-1 ml-auto opacity-0 group-hover/item:opacity-100 transition-opacity">
                 {onReactionsChanged && (
                   <div className="relative">
                     <button
                       ref={reactionButtonRef}
                       type="button"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         if (reactionButtonRef.current) {
                           setReactionAnchorRect(reactionButtonRef.current.getBoundingClientRect());
                         }
@@ -192,7 +200,7 @@ export function CommentItem({
                 {onResolveToggle && (
                   <button
                     type="button"
-                    onClick={onResolveToggle}
+                    onClick={(e) => { e.stopPropagation(); onResolveToggle(); }}
                     className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
                     title={comment.resolved ? "Mark as unresolved" : "Mark as resolved"}
                   >
@@ -203,7 +211,7 @@ export function CommentItem({
                 {canEditDelete && onUpdate && (
                   <button
                     type="button"
-                    onClick={() => setEditing(true)}
+                    onClick={(e) => { e.stopPropagation(); setEditing(true); }}
                     className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
                     title="Edit"
                   >
@@ -214,7 +222,7 @@ export function CommentItem({
                 {canEditDelete && onDelete && (
                   <button
                     type="button"
-                    onClick={() => setDeleteModalOpen(true)}
+                    onClick={(e) => { e.stopPropagation(); setDeleteModalOpen(true); }}
                     className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
                     title="Delete"
                   >
@@ -223,6 +231,19 @@ export function CommentItem({
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {!comment.threadId && ticketTitle && !editing && (
+          <div className="max-h-0 overflow-hidden group-hover:max-h-[24px] transition-all duration-200 ease-out">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onNavigateToTicket?.(); }}
+              className="text-[12px] font-medium text-[var(--brand)] hover:bg-[var(--surface-hover)] pl-0 pr-1.5 py-0.5 rounded-md transition-colors cursor-pointer truncate max-w-[180px]"
+              title={ticketTitle}
+            >
+              {ticketTitle}
+            </button>
           </div>
         )}
 
@@ -268,7 +289,7 @@ export function CommentItem({
         ) : (
           <>
             <p
-              className={`mt-1 leading-relaxed text-discussion-body font-normal ${textSize} ${comment.resolved ? "opacity-60" : ""}`}
+              className={`mt-1.5 leading-relaxed text-discussion-body font-normal ${textSize}`}
             >
               {renderMessageWithMentions(comment.message)}
             </p>

@@ -6,7 +6,7 @@ import type { Comment } from "@/lib/domain/comment";
 
 type Args = {
   sessionId: string | null | undefined;
-  feedbackId: string | null | undefined;
+  feedbackId?: string | null | undefined;
   /**
    * When false, no fetches (caller clears comment state if needed).
    */
@@ -35,9 +35,8 @@ export function useCommentsRepoSubscription({
   }, [onComments]);
 
   const sid = typeof sessionId === "string" ? sessionId.trim() : "";
-  const fid = typeof feedbackId === "string" ? feedbackId.trim() : "";
-  const fetchEnabled = enabled && !!sid && !!fid;
-  const scopeKey = sid && fid ? `${sid}\x1f${fid}` : "";
+  const fetchEnabled = enabled && !!sid;
+  const scopeKey = sid;
 
   useEffect(() => {
     if (!scopeKey) return;
@@ -60,7 +59,7 @@ export function useCommentsRepoSubscription({
     void (async () => {
       try {
         const scoped = await fetchComments(sid, {
-          feedbackId: fid,
+          feedbackId: undefined,
           force: false,
         });
         if (cancelled) return;
@@ -73,11 +72,11 @@ export function useCommentsRepoSubscription({
     return () => {
       cancelled = true;
     };
-  }, [fetchEnabled, scopeKey, sid, fid]);
+  }, [fetchEnabled, scopeKey, sid]);
 
   const runRefetch = useCallback(
     async (queueIfBusy: boolean) => {
-      if (!sid || !fid) return;
+      if (!sid) return;
 
       if (inFlightRef.current) {
         if (queueIfBusy) queuedRefetchRef.current = true;
@@ -88,7 +87,7 @@ export function useCommentsRepoSubscription({
         do {
           queuedRefetchRef.current = false;
           const scoped = await fetchComments(sid, {
-            feedbackId: fid,
+            feedbackId: undefined,
             force: true,
           });
           initialDoneRef.current = scopeKey;
@@ -100,7 +99,7 @@ export function useCommentsRepoSubscription({
         inFlightRef.current = false;
       }
     },
-    [sid, fid, scopeKey],
+    [sid, scopeKey],
   );
 
   const refetch = useCallback(async () => {

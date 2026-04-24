@@ -11,6 +11,7 @@ import {
   AppBootGate,
   AppBootReadinessBridge,
 } from "@/components/providers/AppBootGate";
+import { ToastProvider } from "@/components/dashboard/context/ToastContext";
 
 export default function AppLayout({
   children,
@@ -18,6 +19,7 @@ export default function AppLayout({
   children: React.ReactNode;
 }) {
   return (
+    <ToastProvider>
     <AppBootGate>
       <WorkspaceProvider>
         <WorkspaceSuspendedGuard>
@@ -44,5 +46,6 @@ export default function AppLayout({
         </WorkspaceSuspendedGuard>
       </WorkspaceProvider>
     </AppBootGate>
+    </ToastProvider>
   );
 }

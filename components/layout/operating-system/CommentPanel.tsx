@@ -9,7 +9,7 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Mention from "@tiptap/extension-mention";
 import Placeholder from "@tiptap/extension-placeholder";
-import type { Comment, CommentAttachment } from "@/lib/domain/comment";
+import type { Comment, CommentAttachment, CommentPosition } from "@/lib/domain/comment";
 import { CommentItem } from "@/components/comments/CommentItem";
 
 const AttachmentUploadModal = dynamic(
@@ -18,6 +18,14 @@ const AttachmentUploadModal = dynamic(
 );
 
 const PANEL_WIDTH = 380;
+
+function getUploadBoxColor(fileName: string): string {
+  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+  if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"].includes(ext)) return "var(--brand)";
+  if (["pdf"].includes(ext)) return "var(--color-danger)";
+  if (["doc", "docx", "xls", "xlsx", "ppt", "pptx", "csv", "txt"].includes(ext)) return "var(--color-warning)";
+  return "var(--text-secondary)";
+}
 const MAX_ATTACHMENTS = 5;
 
 export type CommentFilterTab = "all" | "unresolved" | "resolved";
@@ -34,7 +42,7 @@ export interface CommentPanelProps {
   comments: Comment[];
   loading: boolean;
   sendReply: (threadId: string, message: string, attachment?: CommentAttachment, attachments?: CommentAttachment[]) => Promise<void>;
-  sendComment?: (message: string, attachment?: CommentAttachment, attachments?: CommentAttachment[]) => Promise<void>;
+  sendComment?: (message: string, attachment?: CommentAttachment, attachments?: CommentAttachment[], position?: CommentPosition) => Promise<string>;
   currentUserInitial?: string;
   currentUserName?: string;
   currentUserAvatarUrl?: string;
@@ -49,6 +57,11 @@ export interface CommentPanelProps {
   onRefreshComments?: () => void;
   participants?: { uid: string; displayName: string; email: string; avatarUrl: string | null }[];
   showToast?: (message: string) => void;
+  ticketTitleMap?: Map<string, string>;
+  selectedTicketTitle?: string;
+  onNavigateToTicket?: (feedbackId: string) => void;
+  onAnimatePin?: (commentId: string) => void;
+  animatingCommentId?: string | null;
 }
 
 type Participant = { uid: string; displayName: string; email: string; avatarUrl: string | null };
@@ -85,6 +98,7 @@ interface TiptapCommentEditorProps {
   editorRef?: React.MutableRefObject<any>;
   autoFocus?: boolean;
   onContentChange?: (hasContent: boolean) => void;
+  onEscape?: () => void;
 }
 
 function TiptapCommentEditor({
@@ -94,12 +108,16 @@ function TiptapCommentEditor({
   editorRef,
   autoFocus,
   onContentChange,
+  onEscape,
 }: TiptapCommentEditorProps) {
   const onSubmitRef = useRef(onSubmit);
   useLayoutEffect(() => { onSubmitRef.current = onSubmit; }, [onSubmit]);
 
   const onContentChangeRef = useRef(onContentChange);
   useLayoutEffect(() => { onContentChangeRef.current = onContentChange; }, [onContentChange]);
+
+  const onEscapeRef = useRef(onEscape);
+  useLayoutEffect(() => { onEscapeRef.current = onEscape; }, [onEscape]);
 
   const participantsRef = useRef(participants);
   useLayoutEffect(() => { participantsRef.current = participants; }, [participants]);
@@ -270,6 +288,10 @@ function TiptapCommentEditor({
     },
     editorProps: {
       handleKeyDown: (_view, event) => {
+        if (event.key === "Escape") {
+          onEscapeRef.current?.();
+          return true;
+        }
         if (event.key === "Enter" && !event.shiftKey) {
           if (mentionOpenRef.current) return false;
           const text = extractTextFromDoc(_view.state.doc);
@@ -310,6 +332,9 @@ const CommentRow = memo(function CommentRow({
   deleteComment,
   onReactionsChanged,
   showResolve,
+  ticketTitle,
+  onNavigateToTicket,
+  isThreadResolved,
 }: {
   comment: Comment;
   size: "root" | "reply";
@@ -319,6 +344,9 @@ const CommentRow = memo(function CommentRow({
   deleteComment?: (id: string) => Promise<void>;
   onReactionsChanged?: (commentId: string, reactions: Record<string, { userIds: string[]; userNames: string[] }>) => void;
   showResolve?: boolean;
+  ticketTitle?: string;
+  onNavigateToTicket?: () => void;
+  isThreadResolved?: boolean;
 }) {
   const onResolveToggle =
     showResolve && updateComment
@@ -336,6 +364,9 @@ const CommentRow = memo(function CommentRow({
         onResolveToggle={onResolveToggle}
         onReactionsChanged={onReactionsChanged}
         size={size === "root" ? "default" : "compact"}
+        ticketTitle={ticketTitle}
+        onNavigateToTicket={onNavigateToTicket}
+        isThreadResolved={isThreadResolved}
       />
     </div>
   );
@@ -361,6 +392,10 @@ const ThreadBlock = memo(function ThreadBlock({
   onReplyToggle,
   participants,
   showToast,
+  ticketTitleMap,
+  onNavigateToTicket,
+  onAnimatePin,
+  animatingCommentId,
 }: {
   root: Comment;
   replies: Comment[];
@@ -380,7 +415,12 @@ const ThreadBlock = memo(function ThreadBlock({
   onReplyToggle: (open: boolean) => void;
   participants?: Participant[];
   showToast?: (message: string) => void;
+  ticketTitleMap?: Map<string, string>;
+  onNavigateToTicket?: (feedbackId: string) => void;
+  onAnimatePin?: (commentId: string) => void;
+  animatingCommentId?: string | null;
 }) {
+  const [pulseActive, setPulseActive] = useState(false);
   const [replyPendingAttachments, setReplyPendingAttachments] = useState<CommentAttachment[]>([]);
   const [attachmentModalOpen, setAttachmentModalOpen] = useState(false);
   const replyFileInputRef = useRef<HTMLInputElement>(null);
@@ -436,14 +476,30 @@ const ThreadBlock = memo(function ThreadBlock({
       data-thread-id={root.id}
       role="button"
       tabIndex={0}
-      onClick={() => onSelectThread?.(root.id)}
+      onClick={() => {
+        onSelectThread?.(root.id);
+        onNavigateToTicket?.(root.feedbackId);
+        if (root.type === "pin" && root.position) {
+          onAnimatePin?.(root.id);
+        } else {
+          setPulseActive(true);
+          setTimeout(() => setPulseActive(false), 600);
+        }
+      }}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onSelectThread?.(root.id);
+          onNavigateToTicket?.(root.feedbackId);
+          if (root.type === "pin" && root.position) {
+            onAnimatePin?.(root.id);
+          } else {
+            setPulseActive(true);
+            setTimeout(() => setPulseActive(false), 600);
+          }
         }
       }}
-      className={`relative w-full box-border rounded-xl px-3 py-3 min-w-0 overflow-visible transition-colors duration-[var(--motion-duration)] cursor-pointer ${isActive ? "bg-[var(--layer-2-hover-bg)]" : "hover:bg-[var(--layer-2-hover-bg)]"} ${root.resolved ? "opacity-90" : ""} ${isHighlighted ? "bg-[var(--color-primary-soft)]" : ""}`}
+      className={`group relative w-full box-border rounded-xl px-3 py-2 min-w-0 overflow-visible transition-colors duration-[var(--motion-duration)] cursor-pointer scroll-mt-4 ${isActive ? "bg-[var(--layer-2-hover-bg)]" : "hover:bg-[var(--layer-2-hover-bg)]"} ${isHighlighted ? "bg-[var(--color-primary-soft)]" : ""} ${pulseActive ? "ring-2 ring-[var(--brand)]/30 transition-all" : ""} ${animatingCommentId === root.id ? "ticket-border-animate" : ""}`}
       style={{ boxSizing: "border-box" }}
     >
       <CommentRow
@@ -455,6 +511,8 @@ const ThreadBlock = memo(function ThreadBlock({
         deleteComment={deleteComment}
         onReactionsChanged={onReactionsChanged}
         showResolve={Boolean(updateComment)}
+        ticketTitle={ticketTitleMap?.get(root.feedbackId) ?? undefined}
+        onNavigateToTicket={onNavigateToTicket ? () => onNavigateToTicket(root.feedbackId) : undefined}
       />
       {replies.length > 0 && (
         <div className="ml-[19px] mt-1 pl-[21px] border-l-2 border-[var(--border)] space-y-0.5">
@@ -468,6 +526,7 @@ const ThreadBlock = memo(function ThreadBlock({
               updateComment={updateComment}
               deleteComment={deleteComment}
               onReactionsChanged={onReactionsChanged}
+              isThreadResolved={root.resolved === true}
             />
           ))}
         </div>
@@ -482,7 +541,7 @@ const ThreadBlock = memo(function ThreadBlock({
                   e.stopPropagation();
                   onReplyToggle(true);
                 }}
-                className="text-[12px] font-medium text-[var(--text-body)] hover:text-[var(--text-heading)] hover:underline cursor-pointer"
+                className="text-[12px] font-semibold text-[var(--text-body)] hover:text-[var(--text-heading)] hover:underline cursor-pointer"
               >
                 Reply
               </button>
@@ -529,8 +588,16 @@ const ThreadBlock = memo(function ThreadBlock({
                           className="flex items-center gap-2.5 px-3 py-2.5 bg-[var(--surface-subtle)] border border-[var(--border)] rounded-xl"
                         >
                           {isLoading ? (
-                            <div className="h-10 w-10 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border)] flex items-center justify-center shrink-0">
-                              <div className="h-5 w-5 border-2 border-[var(--border)] border-t-[var(--brand)] rounded-full animate-spin" />
+                            <div className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: getUploadBoxColor(att.file_name) }}>
+                              <svg className="w-6 h-6 -rotate-90" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="10" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="2.5" />
+                                <circle cx="12" cy="12" r="10" fill="none" stroke="white" strokeWidth="3"
+                                  strokeLinecap="round"
+                                  strokeDasharray="62.83"
+                                  strokeDashoffset="62.83"
+                                  className="upload-ring-animate"
+                                />
+                              </svg>
                             </div>
                           ) : att.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(att.file_name) ? (
                             <img
@@ -539,8 +606,8 @@ const ThreadBlock = memo(function ThreadBlock({
                               className="h-10 w-10 rounded-lg object-cover shrink-0"
                             />
                           ) : (
-                            <div className="h-10 w-10 rounded-lg bg-[var(--brand-subtle)] flex items-center justify-center shrink-0">
-                              <Paperclip className="h-4 w-4 text-[var(--brand)]" />
+                            <div className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: getUploadBoxColor(att.file_name) }}>
+                              <Paperclip className="h-4 w-4 text-white" />
                             </div>
                           )}
                           <span className="flex-1 min-w-0 text-[13px] font-medium text-[var(--text-body)] truncate">
@@ -629,9 +696,9 @@ const ThreadBlock = memo(function ThreadBlock({
                       onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
-                        if (file.size > 15 * 1024 * 1024) {
-                          setReplyFileError("File must be under 15 MB");
-                          showToast?.("File must be under 15 MB");
+                        if (file.size > 10 * 1024 * 1024) {
+                          setReplyFileError("File must be under 10 MB");
+                          showToast?.("File must be under 10 MB");
                           e.target.value = "";
                           return;
                         }
@@ -648,12 +715,19 @@ const ThreadBlock = memo(function ThreadBlock({
                           file_size: file.size,
                           _loading: true,
                           _id: placeholderId,
+                          _progress: 0,
                         } as CommentAttachment & { _loading: boolean; _id: string };
                         setReplyPendingAttachments((prev) => [...prev, placeholder]);
                         const UPLOAD_TIMEOUT = 30000;
                         try {
                           const { uploadAttachmentWithProgress } = await import("@/lib/uploadAttachment");
-                          const uploadPromise = uploadAttachmentWithProgress(file, () => {});
+                          const uploadPromise = uploadAttachmentWithProgress(file, (percent) => {
+                            setReplyPendingAttachments(prev =>
+                              prev.map(att => (att as any)._id === placeholderId
+                                ? { ...att, _progress: percent }
+                                : att)
+                            );
+                          });
                           const timeoutPromise = new Promise<never>((_, reject) =>
                             setTimeout(() => reject(new Error("Upload timed out")), UPLOAD_TIMEOUT)
                           );
@@ -780,6 +854,10 @@ const CommentThreadList = memo(function CommentThreadList({
   onSelectThread,
   participants,
   showToast,
+  ticketTitleMap,
+  onNavigateToTicket,
+  onAnimatePin,
+  animatingCommentId,
 }: {
   comments: Comment[];
   loading: boolean;
@@ -798,6 +876,10 @@ const CommentThreadList = memo(function CommentThreadList({
   onSelectThread?: (threadId: string) => void;
   participants?: Participant[];
   showToast?: (message: string) => void;
+  ticketTitleMap?: Map<string, string>;
+  onNavigateToTicket?: (feedbackId: string) => void;
+  onAnimatePin?: (commentId: string) => void;
+  animatingCommentId?: string | null;
 }) {
   const roots = comments.filter((c) => !c.threadId);
   roots.sort((a, b) => {
@@ -862,10 +944,14 @@ const CommentThreadList = memo(function CommentThreadList({
     onReplyToggle: (open: boolean) => setOpenReplyThreadId(open ? root.id : null),
     participants,
     showToast,
+    ticketTitleMap,
+    onNavigateToTicket,
+    onAnimatePin,
+    animatingCommentId,
   });
 
   return (
-    <div className="space-y-1 min-w-0">
+    <div className="space-y-2 min-w-0">
       {(filterTab === "unresolved" || filterTab === "all") &&
         unresolvedRoots.map((root) => (
           <ThreadBlock key={root.id} {...threadBlockProps(root)} />
@@ -897,6 +983,22 @@ const CommentThreadList = memo(function CommentThreadList({
   );
 });
 
+function computeAutoPin(existingPins: { xPercent: number; yPercent: number }[]): { xPercent: number; yPercent: number } {
+  const MIN_DISTANCE = 10;
+  const MAX_RETRIES = 5;
+  for (let i = 0; i < MAX_RETRIES; i++) {
+    const x = 25 + Math.random() * 50;
+    const y = 15 + Math.random() * 50;
+    const tooClose = existingPins.some(p => {
+      const dx = p.xPercent - x;
+      const dy = p.yPercent - y;
+      return Math.sqrt(dx * dx + dy * dy) < MIN_DISTANCE;
+    });
+    if (!tooClose) return { xPercent: Math.round(x * 10) / 10, yPercent: Math.round(y * 10) / 10 };
+  }
+  return { xPercent: 25 + Math.random() * 50, yPercent: 15 + Math.random() * 50 };
+}
+
 // ── CommentPanel ──
 export function CommentPanel({
   isOpen,
@@ -919,6 +1021,11 @@ export function CommentPanel({
   onRefreshComments,
   participants,
   showToast,
+  ticketTitleMap,
+  selectedTicketTitle,
+  onNavigateToTicket,
+  onAnimatePin,
+  animatingCommentId,
 }: CommentPanelProps) {
   const [filterTab, setFilterTab] = useState<CommentFilterTab>("all");
   const [highlightThreadId, setHighlightThreadId] = useState<string | null>(null);
@@ -951,7 +1058,7 @@ export function CommentPanel({
     setHighlightThreadId(activeThreadId);
     const el = threadRefs.current.get(activeThreadId);
     if (el && scrollContainerRef.current) {
-      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
     }
     const t = setTimeout(() => setHighlightThreadId(null), 2000);
     return () => clearTimeout(t);
@@ -986,12 +1093,21 @@ export function CommentPanel({
       const atts = composePendingAttachments;
       if (!trimmed && atts.length === 0) return;
       if (!sendComment) return;
+
+      const existingPins = (comments ?? [])
+        .filter(c => c.type === "pin" && c.position)
+        .map(c => c.position!);
+      const autoPosition = computeAutoPin(existingPins);
+
       setComposePendingAttachments([]);
       setComposeHasContent(false);
       setComposeExpanded(false);
-      await sendComment(trimmed, undefined, atts.length > 0 ? atts : undefined);
+
+      await sendComment(trimmed, undefined, atts.length > 0 ? atts : undefined, autoPosition);
+
+      scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     },
-    [composePendingAttachments, sendComment]
+    [composePendingAttachments, sendComment, comments]
   );
 
   if (!isOpen) return null;
@@ -1083,6 +1199,12 @@ export function CommentPanel({
                   editorRef={composeEditorRef}
                   autoFocus
                   onContentChange={setComposeHasContent}
+                  onEscape={() => {
+                    setComposePendingAttachments([]);
+                    setComposeHasContent(false);
+                    composeEditorRef.current?.commands.clearContent();
+                    setComposeExpanded(false);
+                  }}
                 />
               </div>
             </div>
@@ -1099,8 +1221,16 @@ export function CommentPanel({
                       className="flex items-center gap-2.5 px-3 py-2.5 bg-[var(--surface-subtle)] border border-[var(--border)] rounded-xl"
                     >
                       {isLoading ? (
-                        <div className="h-10 w-10 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border)] flex items-center justify-center shrink-0">
-                          <div className="h-5 w-5 border-2 border-[var(--border)] border-t-[var(--brand)] rounded-full animate-spin" />
+                        <div className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: getUploadBoxColor(att.file_name) }}>
+                          <svg className="w-6 h-6 -rotate-90" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="2.5" />
+                            <circle cx="12" cy="12" r="10" fill="none" stroke="white" strokeWidth="3"
+                              strokeLinecap="round"
+                              strokeDasharray="62.83"
+                              strokeDashoffset="62.83"
+                              className="upload-ring-animate"
+                            />
+                          </svg>
                         </div>
                       ) : att.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(att.file_name) ? (
                         <img
@@ -1109,8 +1239,8 @@ export function CommentPanel({
                           className="h-10 w-10 rounded-lg object-cover shrink-0"
                         />
                       ) : (
-                        <div className="h-10 w-10 rounded-lg bg-[var(--brand-subtle)] flex items-center justify-center shrink-0">
-                          <Paperclip className="h-4 w-4 text-[var(--brand)]" />
+                        <div className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: getUploadBoxColor(att.file_name) }}>
+                          <Paperclip className="h-4 w-4 text-white" />
                         </div>
                       )}
                       <span className="flex-1 min-w-0 text-[13px] font-medium text-[var(--text-body)] truncate">
@@ -1205,9 +1335,9 @@ export function CommentPanel({
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
-                    if (file.size > 15 * 1024 * 1024) {
-                      setComposeFileError("File must be under 15 MB");
-                      showToast?.("File must be under 15 MB");
+                    if (file.size > 10 * 1024 * 1024) {
+                      setComposeFileError("File must be under 10 MB");
+                      showToast?.("File must be under 10 MB");
                       e.target.value = "";
                       return;
                     }
@@ -1224,12 +1354,19 @@ export function CommentPanel({
                       file_size: file.size,
                       _loading: true,
                       _id: placeholderId,
+                      _progress: 0,
                     } as CommentAttachment & { _loading: boolean; _id: string };
                     setComposePendingAttachments((prev) => [...prev, placeholder]);
                     const UPLOAD_TIMEOUT = 30000;
                     try {
                       const { uploadAttachmentWithProgress } = await import("@/lib/uploadAttachment");
-                      const uploadPromise = uploadAttachmentWithProgress(file, () => {});
+                      const uploadPromise = uploadAttachmentWithProgress(file, (percent) => {
+                        setComposePendingAttachments(prev =>
+                          prev.map(att => (att as any)._id === placeholderId
+                            ? { ...att, _progress: percent }
+                            : att)
+                        );
+                      });
                       const timeoutPromise = new Promise<never>((_, reject) =>
                         setTimeout(() => reject(new Error("Upload timed out")), UPLOAD_TIMEOUT)
                       );
@@ -1268,18 +1405,6 @@ export function CommentPanel({
                 <button
                   type="button"
                   onClick={() => {
-                    setComposePendingAttachments([]);
-                    setComposeHasContent(false);
-                    composeEditorRef.current?.commands.clearContent();
-                    setComposeExpanded(false);
-                  }}
-                  className="text-[13px] font-semibold text-[var(--text-body)] hover:text-[var(--text-heading)] px-2 py-1 transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
                     const ed = composeEditorRef.current;
                     if (ed) {
                       const text = extractTextFromDoc(ed.state.doc);
@@ -1289,7 +1414,7 @@ export function CommentPanel({
                     }
                   }}
                   disabled={(!composeHasContent && composePendingAttachments.length === 0) || composePendingAttachments.some(att => (att as any)._loading)}
-                  className="text-[13px] font-semibold text-white bg-[var(--brand)] hover:bg-[var(--brand-hover)] px-4 py-1.5 rounded-full disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer"
+                  className="text-[13px] font-semibold text-white bg-[var(--brand)] hover:bg-[var(--brand-hover)] px-4 py-1.5 rounded-full disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer max-w-[280px] truncate"
                 >
                   Comment
                 </button>
@@ -1351,6 +1476,10 @@ export function CommentPanel({
             onSelectThread={onSelectThread}
             participants={participants}
             showToast={showToast}
+            ticketTitleMap={ticketTitleMap}
+            onNavigateToTicket={onNavigateToTicket}
+            onAnimatePin={onAnimatePin}
+            animatingCommentId={animatingCommentId}
           />
         </div>
       </div>

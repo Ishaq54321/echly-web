@@ -104,7 +104,7 @@ export function useFeedbackDetailController(args: {
     tokenFromUrl !== "" || (getShareToken()?.trim() ?? "") !== "";
   const commentsPollEnabled =
     authReady &&
-    Boolean(sessionId?.trim() && feedbackId?.trim()) &&
+    Boolean(sessionId?.trim()) &&
     (Boolean(authUid?.trim()) || shareTokenPresent);
 
   const [comments, setComments] = useState<LocalComment[]>([]);
@@ -154,24 +154,14 @@ export function useFeedbackDetailController(args: {
   }, [authReady, authUid, shareTokenPresent]);
 
   useEffect(() => {
-    if (!feedbackId) {
-      const t = requestAnimationFrame(() => {
-        setComments([]);
-        setLoadingComments(false);
-      });
-      return () => cancelAnimationFrame(t);
-    }
-  }, [feedbackId]);
-
-  useEffect(() => {
-    if (!sessionId || !feedbackId) return;
+    if (!sessionId) return;
     setComments([]);
     setLoadingComments(true);
-  }, [sessionId, feedbackId]);
+  }, [sessionId]);
 
   const { refetch: refetchComments } = useCommentsRepoSubscription({
     sessionId,
-    feedbackId,
+    feedbackId: undefined,
     enabled: commentsPollEnabled,
     onComments: (incomingComments) => {
       setLocalCountsOverride(null);
@@ -193,11 +183,11 @@ export function useFeedbackDetailController(args: {
     },
   });
 
-  const sendComment = async (message: string, attachment?: CommentAttachment, attachments?: CommentAttachment[]): Promise<void> => {
-    if (!authUid || !feedbackId) return;
-    if (!isIdentityResolved) return;
+  const sendComment = async (message: string, attachment?: CommentAttachment, attachments?: CommentAttachment[], position?: CommentPosition): Promise<string> => {
+    if (!authUid || !feedbackId) return "";
+    if (!isIdentityResolved) return "";
     const trimmed = message.trim();
-    if (!trimmed && !attachment && (!attachments || attachments.length === 0)) return;
+    if (!trimmed && !attachment && (!attachments || attachments.length === 0)) return "";
     const payload: AddCommentOptions = {
       userId: authUid,
       userName: authDisplayName || "User",
@@ -205,6 +195,7 @@ export function useFeedbackDetailController(args: {
       message: trimmed,
       ...(attachments && attachments.length > 0 ? { attachments } : {}),
       ...(attachment ? { attachment } : {}),
+      ...(position ? { type: "pin" as const, position } : {}),
     };
     const optimistic = createOptimisticComment({
       sessionId,
@@ -222,6 +213,7 @@ export function useFeedbackDetailController(args: {
         if (!handlePermissionError(err, showToast)) showToast("Failed to send comment");
       }
     })();
+    return optimistic.id;
   };
 
   const sendReply = async (threadId: string, message: string, attachment?: CommentAttachment, attachments?: CommentAttachment[]): Promise<void> => {
@@ -350,18 +342,24 @@ export function useFeedbackDetailController(args: {
     return optimistic.id;
   };
 
-  const updatePinPositionHandler = async (
+  const updatePinPositionHandler = useCallback(async (
     commentId: string,
     position: { xPercent: number; yPercent: number }
   ) => {
     if (!isIdentityResolved) return;
+    setComments(prev => prev.map(c =>
+      c.id === commentId && c.position
+        ? { ...c, position: { ...c.position, xPercent: position.xPercent, yPercent: position.yPercent } }
+        : c
+    ));
     try {
       await updatePinPosition(commentId, position);
     } catch (err) {
       console.error("[ECHLY] updatePinPosition failed", err);
+      void refetchComments();
       if (!handlePermissionError(err, showToast)) showToast("Failed to move pin");
     }
-  };
+  }, [isIdentityResolved, refetchComments, showToast]);
 
   const updateCommentHandler = async (
     commentId: string,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { Paperclip } from "lucide-react";
 import { Section } from "./Section";
 import { ScreenshotBlock } from "./ScreenshotBlock";
@@ -9,7 +9,6 @@ import { SuggestionSection } from "./SuggestionSection";
 import { DescriptionSection } from "./DescriptionSection";
 import { ActionItemsSection } from "./ActionItemsSection";
 import { Tag } from "@/components/ui/Tag";
-import { AVAILABLE_TAGS, getTagDotClass } from "@/lib/tagConfig";
 import type { FeedbackItemShape } from "./types";
 import type { Comment } from "@/lib/domain/comment";
 
@@ -39,6 +38,7 @@ interface FeedbackContentProps {
   sendTextComment?: (textRange: { startOffset: number; endOffset: number; containerId: string }, message: string) => Promise<string | null>;
   onCommentPlaced?: () => void;
   updatePinPosition?: (commentId: string, position: { xPercent: number; yPercent: number }) => Promise<void>;
+  animatingPinId?: string | null;
 }
 
 export function FeedbackContent({
@@ -65,49 +65,21 @@ export function FeedbackContent({
   sendTextComment,
   onCommentPlaced,
   updatePinPosition,
+  animatingPinId,
 }: FeedbackContentProps) {
   const actionSteps = Array.isArray(item.actionSteps) ? item.actionSteps : [];
   const tags = Array.isArray(item.suggestedTags) ? item.suggestedTags : [];
   const fileAttachments =
     item.publicAttachments?.filter((a): a is { kind: "file"; url: string; name?: string; size?: number } => a.kind === "file") ??
     [];
-  const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
-  const [dropdownAnimate, setDropdownAnimate] = useState(false);
-  const tagPopoverRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!tagPopoverOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (tagPopoverRef.current && !tagPopoverRef.current.contains(e.target as Node)) {
-        setTagPopoverOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [tagPopoverOpen]);
-
-  useEffect(() => {
-    if (tagPopoverOpen) {
-      const t = requestAnimationFrame(() => setDropdownAnimate(true));
-      return () => cancelAnimationFrame(t);
-    }
-    const t = requestAnimationFrame(() => setDropdownAnimate(false));
-    return () => cancelAnimationFrame(t);
-  }, [tagPopoverOpen]);
+  const [isAddingTag, setIsAddingTag] = useState(false);
+  const [newTagValue, setNewTagValue] = useState("");
 
   const handleRemoveTag = (tagToRemove: string) => {
     if (!onSaveTags) return;
     const next = tags.filter((t) => t !== tagToRemove);
     onSaveTags(next);
   };
-
-  const handleAddTag = (tag: string) => {
-    if (!onSaveTags || tags.includes(tag)) return;
-    onSaveTags([...tags, tag]);
-    setTagPopoverOpen(false);
-  };
-
-  const tagsToOffer = AVAILABLE_TAGS.filter((t) => !tags.includes(t));
 
   const roDesc = typeof readOnlyDescription === "string" ? readOnlyDescription.trim() : "";
   const hasAttachmentContent =
@@ -148,6 +120,7 @@ export function FeedbackContent({
                   onEdit={onEdit}
                   canEdit={canEdit}
                   embeddedInCard
+                  animatingPinId={animatingPinId}
                 />
               ) : (
                 <ScreenshotBlock
@@ -213,46 +186,46 @@ export function FeedbackContent({
               </Tag>
             ))}
             {onSaveTags && (
-              <div className="relative" ref={tagPopoverRef}>
+              isAddingTag ? (
+                <input
+                  type="text"
+                  value={newTagValue}
+                  onChange={(e) => {
+                    if (e.target.value.length <= 25) setNewTagValue(e.target.value);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newTagValue.trim()) {
+                      const trimmed = newTagValue.trim();
+                      onSaveTags([...tags, trimmed]);
+                      setNewTagValue("");
+                      setIsAddingTag(false);
+                    }
+                    if (e.key === "Escape") {
+                      setNewTagValue("");
+                      setIsAddingTag(false);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (newTagValue.trim()) {
+                      onSaveTags([...tags, newTagValue.trim()]);
+                    }
+                    setNewTagValue("");
+                    setIsAddingTag(false);
+                  }}
+                  maxLength={25}
+                  placeholder="Type tag..."
+                  autoFocus
+                  className="inline-flex items-center px-3 py-1.5 rounded-full border border-[var(--border)] bg-[var(--surface-card)] text-xs font-medium text-[var(--text-body)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--brand)] focus:ring-1 focus:ring-[var(--brand)]/20 w-[120px] transition-colors"
+                />
+              ) : (
                 <button
                   type="button"
-                  onClick={() => setTagPopoverOpen((o) => !o)}
-                  className="inline-flex items-center px-3 py-1.5 rounded-full border border-dashed text-muted-foreground hover:bg-muted/50 transition-all duration-150 ease-out text-xs font-medium cursor-pointer"
+                  onClick={() => setIsAddingTag(true)}
+                  className="inline-flex items-center px-3 py-1.5 rounded-full border border-dashed text-[var(--text-tertiary)] hover:bg-[var(--surface-hover)] transition-all duration-150 text-xs font-medium cursor-pointer"
                 >
                   + Add tag
                 </button>
-                {tagPopoverOpen && tagsToOffer.length > 0 && (
-                  <div
-                    className={`absolute left-0 top-full mt-1.5 z-20 min-w-[180px] max-w-[min(280px,calc(100vw-2rem))] bg-white border border-neutral-200 rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.06)] py-2 transition-all duration-[120ms] ease-out ${
-                      dropdownAnimate ? "opacity-100 scale-100" : "opacity-0 scale-[0.98]"
-                    }`}
-                  >
-                    {tagsToOffer.map((tag) => (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() => handleAddTag(tag)}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[var(--layer-2-hover-bg)] cursor-pointer transition-colors duration-120 text-left"
-                      >
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full shrink-0 ${getTagDotClass(tag)}`}
-                          aria-hidden
-                        />
-                        <span className="text-[15px] text-neutral-800">{tag}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {tagPopoverOpen && tagsToOffer.length === 0 && (
-                  <div
-                    className={`absolute left-0 top-full mt-1.5 z-20 min-w-[180px] max-w-[min(280px,calc(100vw-2rem))] bg-white border border-neutral-200 rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.06)] py-2 px-3 transition-all duration-[120ms] ease-out ${
-                      dropdownAnimate ? "opacity-100 scale-100" : "opacity-0 scale-[0.98]"
-                    }`}
-                  >
-                    <p className="text-[14px] text-secondary">All tags added</p>
-                  </div>
-                )}
-              </div>
+              )
             )}
           </div>
         </Section>

@@ -348,7 +348,7 @@ function TicketListInner({
   }, [items.length, scrollToId]);
 
   return (
-    <div className="sidebar flex flex-col h-full min-h-0 rounded-none bg-[#FAFBFC] overflow-hidden">
+    <div className="sidebar flex flex-col h-full min-h-0 rounded-none bg-white overflow-hidden">
       {/* Session header */}
       <div className="sidebar-inner">
         <div className="sidebar-header z-20 shrink-0">

@@ -3,7 +3,7 @@
 import React, { useMemo } from "react";
 import type { Comment } from "@/lib/comments";
 import { TicketMetadata } from "./TicketMetadata";
-import { getTagColor, TAG_CHIP_BASE_CLASS } from "@/lib/tagConfig";
+import { TAG_CHIP_BASE_CLASS } from "@/lib/tagConfig";
 
 export interface ContextPanelProps {
   createdAt?: string | { seconds: number } | null;
@@ -112,7 +112,7 @@ export function ContextPanel({
                   {safeTags.map((tag) => (
                     <span
                       key={tag}
-                      className={`${TAG_CHIP_BASE_CLASS} ${getTagColor(tag)} !px-2.5 !py-0.5 !text-[11px]`}
+                      className={`${TAG_CHIP_BASE_CLASS} bg-gray-50 text-gray-700 border-[#EBEBEB] !px-2.5 !py-0.5 !text-[11px]`}
                     >
                       {tag}
                     </span>

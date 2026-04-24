@@ -115,10 +115,11 @@ export async function authFetch(
       : controller.signal;
   }
 
+  let retried = false;
   try {
     const netStart = perf ? performance.now() : 0;
     if (perf) console.log("[ECHLY_PERF] NETWORK START (fetch → response)");
-    const res = await fetch(resolveInput(input), {
+    let res = await fetch(resolveInput(input), {
       ...restInit,
       headers,
       cache: "no-store",
@@ -137,6 +138,15 @@ export async function authFetch(
         networkMs.toFixed(1),
         "ms (API time = server logs: [Resolve] Total API)"
       );
+    }
+    if ((res.status === 401 || res.status === 403) && !retried && user) {
+      retried = true;
+      try {
+        const freshToken = await user.getIdToken(true);
+        const retryHeaders = new Headers(restInit.headers || {});
+        retryHeaders.set("Authorization", `Bearer ${freshToken}`);
+        res = await fetch(resolveInput(input), { ...restInit, headers: retryHeaders, cache: "no-store", signal: signal ?? restInit.signal });
+      } catch {}
     }
     if (timeoutId) clearTimeout(timeoutId);
     if (res.status === 403 && typeof window !== "undefined") {

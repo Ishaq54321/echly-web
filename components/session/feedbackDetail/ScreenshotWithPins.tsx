@@ -3,17 +3,23 @@
 import React, { useState, useCallback, useRef, memo, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
-import { Expand, CheckCircle2, ExternalLink, Loader2, Pencil } from "lucide-react";
+import { Expand, Loader2, Pencil, AtSign, Smile, Paperclip, X } from "lucide-react";
+import EmojiPicker from "emoji-picker-react";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import type { Comment } from "@/lib/domain/comment";
-import type { CommentPosition } from "@/lib/domain/comment";
-import { formatCommentDate } from "@/lib/utils/formatCommentDate";
+import type { CommentPosition, CommentAttachment } from "@/lib/domain/comment";
 
-const PIN_SIZE_PX = 23;
-const POPOVER_GAP_PERCENT = 2;
+function getUploadBoxColor(fileName: string): string {
+  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+  if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"].includes(ext)) return "var(--brand)";
+  if (["pdf"].includes(ext)) return "var(--color-danger)";
+  if (["doc", "docx", "xls", "xlsx", "ppt", "pptx", "csv", "txt"].includes(ext)) return "var(--color-warning)";
+  return "var(--text-secondary)";
+}
+
+const PIN_SIZE_PX = 24;
 const POPOVER_GAP_PX = 8;
 const TOOLTIP_MAX_LEN = 60;
-const POPOVER_MAX_WIDTH = 380;
 const POPOVER_Z_INDEX = 10050;
 const POPOVER_STYLE =
   "rounded-xl bg-white border border-neutral-200/80 shadow-[0_12px_40px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.04)] min-w-[300px] max-w-[380px] w-[min(380px,90vw)] p-6 animate-in fade-in zoom-in-95 duration-[120ms] ease-out";
@@ -38,12 +44,14 @@ interface ScreenshotWithPinsProps {
   onAddPinComment?: (position: CommentPosition, message: string) => Promise<string | null>;
   /** Resolve this comment (root); updates pin + panel immediately via single source of truth. */
   updateComment?: (commentId: string, data: { message?: string; resolved?: boolean }) => Promise<void>;
-  onCommentPlaced?: () => void;
+  onCommentPlaced?: (newCommentId?: string) => void;
   onPinPositionChange?: (commentId: string, position: CommentPosition) => Promise<void>;
   /** Omit outer card chrome when nested inside a parent attachment card. */
   embeddedInCard?: boolean;
   onEdit?: () => void;
   canEdit?: boolean;
+  /** Pin id that should pulse its ring animation (set by comment-click navigation). */
+  animatingPinId?: string | null;
 }
 
 const PinMarker = memo(function PinMarker({
@@ -56,6 +64,7 @@ const PinMarker = memo(function PinMarker({
   onClick,
   onPositionChange,
   containerRef,
+  animatingPinId,
 }: {
   commentId: string;
   position: CommentPosition;
@@ -66,6 +75,7 @@ const PinMarker = memo(function PinMarker({
   onClick: () => void;
   onPositionChange: (commentId: string, position: CommentPosition) => Promise<void>;
   containerRef: React.RefObject<HTMLDivElement | null>;
+  animatingPinId?: string | null;
 }) {
   const [showTooltip, setShowTooltip] = useState(false);
   const [dragPosition, setDragPosition] = useState<CommentPosition | null>(null);
@@ -122,38 +132,40 @@ const PinMarker = memo(function PinMarker({
   const preview = message.length > TOOLTIP_MAX_LEN ? message.slice(0, TOOLTIP_MAX_LEN) + "…" : message;
 
   return (
-    <button
-      type="button"
+    <div
       data-pin-marker
-      className={`absolute rounded-full flex items-center justify-center text-[11px] font-semibold tabular-nums transition-all duration-150 cursor-grab active:cursor-grabbing border-0 shadow-[0_1px_3px_rgba(0,0,0,0.08)] hover:scale-105 hover:ring-2 hover:ring-[#EA7038] hover:ring-offset-1 ${
-        isResolved
-          ? "bg-[var(--color-success-bg)] text-[var(--color-success-solid)] hover:bg-[var(--color-success-bg)]"
-          : "bg-[#FFA566] text-black hover:bg-[#EA7038]"
-      } ${
-        isActive && !isResolved
-          ? "bg-[#FFA566] text-black shadow-[0_0_0_2px_rgba(255,255,255,0.8),0_2px_8px_rgba(0,0,0,0.12)] scale-105 ring-2 ring-[#EA7038]"
-          : ""
-      } ${isActive && isResolved ? "ring-2 ring-[var(--color-success-border)] shadow-[0_1px_4px_rgba(0,0,0,0.08)] scale-105" : ""}`}
+      className={`absolute flex items-center justify-center transition-all duration-150 cursor-grab active:cursor-grabbing border-0 ${animatingPinId === commentId ? "animate-pin-pop" : ""} ${isActive ? "scale-110" : "hover:scale-105"}`}
       style={{
         width: PIN_SIZE_PX,
         height: PIN_SIZE_PX,
         left: `${displayPos.xPercent}%`,
         top: `${displayPos.yPercent}%`,
         transform: "translate(-50%, -50%)",
+        filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.25))",
       }}
       onMouseDown={handleMouseDown}
       onClick={handleClick}
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
+      role="button"
+      tabIndex={0}
       aria-label={`Comment ${number}${isResolved ? " (resolved)" : ""}`}
     >
-      {isResolved ? <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-success)]" aria-hidden /> : number}
+      <svg
+        viewBox="0 0 24 24"
+        fill={isResolved ? "var(--color-success)" : "var(--text-heading)"}
+        stroke="white"
+        strokeWidth="1.5"
+        className="w-full h-full"
+      >
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      </svg>
       {showTooltip && preview && (
         <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1.5 rounded bg-neutral-800 text-white text-[11px] leading-snug whitespace-nowrap overflow-hidden max-w-[200px] truncate pointer-events-none z-30 shadow-lg">
           {preview}
         </span>
       )}
-    </button>
+    </div>
   );
 });
 
@@ -178,14 +190,28 @@ const ScreenshotWithPinsInner = ({
   embeddedInCard = false,
   onEdit,
   canEdit,
+  animatingPinId,
 }: ScreenshotWithPinsProps) => {
   const { authDisplayName, authEmail, authPhotoUrl } = useWorkspace();
   const containerRef = useRef<HTMLDivElement>(null);
-  const threadPopoverRef = useRef<HTMLDivElement>(null);
+  const draftPopoverRef = useRef<HTMLDivElement>(null);
   const [draftPosition, setDraftPosition] = useState<CommentPosition | null>(null);
   const [draftMessage, setDraftMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [imageDecoded, setImageDecoded] = useState(false);
+
+  // Emoji picker state
+  const [draftEmojiOpen, setDraftEmojiOpen] = useState(false);
+  const draftEmojiButtonRef = useRef<HTMLButtonElement>(null);
+  const draftEmojiPickerRef = useRef<HTMLDivElement>(null);
+  const [draftEmojiAnchorRect, setDraftEmojiAnchorRect] = useState<DOMRect | null>(null);
+
+  // Attachment file input
+  const draftFileInputRef = useRef<HTMLInputElement>(null);
+
+  const [draftPendingAttachments, setDraftPendingAttachments] = useState<CommentAttachment[]>([]);
+  const [draftFileError, setDraftFileError] = useState<string | null>(null);
+  const MAX_ATTACHMENTS = 5;
 
   useLayoutEffect(() => {
     setImageDecoded(false);
@@ -197,6 +223,12 @@ const ScreenshotWithPinsInner = ({
     }, 5000);
     return () => window.clearTimeout(timeout);
   }, [url]);
+
+  useEffect(() => {
+    if (!draftFileError) return;
+    const t = setTimeout(() => setDraftFileError(null), 4000);
+    return () => clearTimeout(t);
+  }, [draftFileError]);
 
   const handleImageClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -215,52 +247,67 @@ const ScreenshotWithPinsInner = ({
     [isCommentMode, onAddPinComment, onCloseInlinePopover]
   );
 
-  useEffect(() => {
-    if (!activePinId || !onCloseInlinePopover) return;
-    const handleClick = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (threadPopoverRef.current?.contains(target)) return;
-      let node: Node | null = target;
-      while (node && node !== document.body) {
-        if (node instanceof Element && node.getAttribute?.("data-pin-marker") != null) return;
-        node = node.parentElement;
-      }
-      onCloseInlinePopover();
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [activePinId, onCloseInlinePopover]);
-
   const handleSubmitDraft = useCallback(async () => {
     if (!draftPosition || !onAddPinComment) return;
     const trimmed = draftMessage.trim();
-    if (!trimmed) return;
+    if (!trimmed && draftPendingAttachments.length === 0) return;
     setSubmitting(true);
     try {
-      await onAddPinComment(draftPosition, trimmed);
+      const newCommentId = await onAddPinComment(draftPosition, trimmed);
       setDraftPosition(null);
       setDraftMessage("");
-      onCommentPlaced?.();
+      setDraftPendingAttachments([]);
+      onCommentPlaced?.(newCommentId ?? undefined);
     } finally {
       setSubmitting(false);
     }
-  }, [draftPosition, draftMessage, onAddPinComment, onCommentPlaced]);
+  }, [draftPosition, draftMessage, draftPendingAttachments, onAddPinComment, onCommentPlaced]);
 
   const handleCancelDraft = useCallback(() => {
     setDraftPosition(null);
     setDraftMessage("");
+    setDraftPendingAttachments([]);
+    setDraftFileError(null);
   }, []);
+
+  // Click-outside: dismiss draft compose when clicking outside the popover and outside the screenshot
+  useEffect(() => {
+    if (!draftPosition) return;
+    function handleClickOutside(e: MouseEvent) {
+      const target = e.target as Node;
+      if (draftPopoverRef.current?.contains(target)) return;
+      if (containerRef.current?.contains(target)) return;
+      if (draftEmojiPickerRef.current?.contains(target)) return;
+      if (draftEmojiButtonRef.current?.contains(target)) return;
+      handleCancelDraft();
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [draftPosition, handleCancelDraft]);
+
+  // Click-outside: close emoji picker
+  useEffect(() => {
+    if (!draftEmojiOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (
+        draftEmojiPickerRef.current &&
+        !draftEmojiPickerRef.current.contains(e.target as Node) &&
+        draftEmojiButtonRef.current &&
+        !draftEmojiButtonRef.current.contains(e.target as Node)
+      ) {
+        setDraftEmojiOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [draftEmojiOpen]);
 
   const pinComments = pins.filter(
     (c): c is Comment & { position: CommentPosition } => c.type === "pin" && c.position != null
   );
-  const root = activePinId
-    ? (comments.find((c) => c.id === activePinId && c.type === "pin" && c.position) as (Comment & { position: CommentPosition }) | undefined)
-    : undefined;
 
   type Placement = { left: number; top: number; showAbove: boolean };
   const [draftPlacement, setDraftPlacement] = useState<Placement | null>(null);
-  const [threadPlacement, setThreadPlacement] = useState<Placement | null>(null);
 
   const computePlacements = useCallback(() => {
     const el = containerRef.current;
@@ -275,16 +322,7 @@ const ScreenshotWithPinsInner = ({
     } else {
       setDraftPlacement(null);
     }
-    if (root?.position) {
-      setThreadPlacement({
-        left: rect.left + (rect.width * root.position.xPercent) / 100,
-        top: rect.top + (rect.height * root.position.yPercent) / 100,
-        showAbove: root.position.yPercent >= 35,
-      });
-    } else {
-      setThreadPlacement(null);
-    }
-  }, [draftPosition, root]);
+  }, [draftPosition]);
 
   useLayoutEffect(() => {
     computePlacements();
@@ -308,7 +346,7 @@ const ScreenshotWithPinsInner = ({
     <div className={outerCard}>
       <div
         ref={containerRef}
-        className={`group relative overflow-visible rounded-lg max-h-[317px] bg-white ${innerBorder} shadow-none ${isCommentMode ? "cursor-crosshair" : ""}`}
+        className={`group relative overflow-visible rounded-lg max-h-[317px] bg-white ${innerBorder} shadow-none ${isCommentMode ? "comment-mode-cursor" : ""}`}
         onClick={handleImageClick}
         role={isCommentMode ? "button" : undefined}
         aria-label={isCommentMode ? "Click to add comment pin" : undefined}
@@ -357,21 +395,31 @@ const ScreenshotWithPinsInner = ({
             onClick={() => onPinClick?.(c.id)}
             onPositionChange={onPinPositionChange ?? (async () => {})}
             containerRef={containerRef}
+            animatingPinId={animatingPinId}
           />
         ))}
 
         {draftPosition && (
           <div
-            className="absolute rounded-full flex items-center justify-center text-[11px] font-semibold tabular-nums bg-neutral-200 text-neutral-800 border-0 shadow-[0_1px_3px_rgba(0,0,0,0.08)] z-20 pointer-events-none animate-in zoom-in-95 duration-150"
+            className="absolute flex items-center justify-center z-20 pointer-events-none animate-in zoom-in-95 duration-150"
             style={{
               width: PIN_SIZE_PX,
               height: PIN_SIZE_PX,
               left: `${draftPosition.xPercent}%`,
               top: `${draftPosition.yPercent}%`,
               transform: "translate(-50%, -50%)",
+              filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.25))",
             }}
           >
-            {pinComments.length + 1}
+            <svg
+              viewBox="0 0 24 24"
+              fill="var(--text-heading)"
+              stroke="white"
+              strokeWidth="1.5"
+              className="w-full h-full"
+            >
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
           </div>
         )}
 
@@ -380,7 +428,8 @@ const ScreenshotWithPinsInner = ({
           typeof document !== "undefined" &&
           createPortal(
             <div
-              className={POPOVER_STYLE}
+              ref={draftPopoverRef}
+              className="rounded-2xl bg-white shadow-[var(--shadow-lg)] w-[420px]"
               style={{
                 position: "fixed",
                 left: draftPlacement.left,
@@ -389,116 +438,150 @@ const ScreenshotWithPinsInner = ({
                 zIndex: POPOVER_Z_INDEX,
               }}
               onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
             >
-              {draftPlacement.showAbove && (
-                <div className="absolute left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-neutral-200" style={{ top: "100%", marginTop: -1 }} />
-              )}
-              {!draftPlacement.showAbove && (
-                <div className="absolute left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[8px] border-b-neutral-200" style={{ bottom: "100%", marginBottom: -1 }} />
-              )}
-              <div className="relative space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-neutral-100 overflow-hidden shrink-0">
-                    {userAvatar ? (
-                      <Image src={userAvatar} alt="" width={36} height={36} sizes="36px" className="w-full h-full object-cover" unoptimized />
-                    ) : (
-                      <span className="w-full h-full flex items-center justify-center text-[12px] font-medium text-secondary">{userName.charAt(0)}</span>
-                    )}
-                  </div>
-                  <span className="text-[13px] font-medium text-[hsl(var(--text-secondary-soft))] truncate">{userName}</span>
-                </div>
-                <textarea
-                  value={draftMessage}
-                  onChange={(e) => setDraftMessage(e.target.value)}
-                  placeholder="Add a comment..."
-                  className="box-border w-full min-h-[56px] rounded-lg bg-[#f5f5f5] border border-[#EBEBEB] px-3 py-2.5 text-[13px] leading-[1.5] text-[hsl(var(--text-primary-strong))] placeholder:text-meta focus:outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--accent-operational)]/20 resize-none transition-all duration-[120ms] ease-out"
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") handleCancelDraft();
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      void handleSubmitDraft();
-                    }
-                  }}
-                />
-                <div className="flex justify-between items-center gap-3 flex-shrink-0 pt-0.5">
-                  <button type="button" onClick={handleCancelDraft} className="text-[12px] font-medium text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] px-2.5 py-2 rounded-lg transition-colors duration-150 shrink-0">
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleSubmitDraft()}
-                    disabled={!draftMessage.trim() || submitting}
-                    className="text-[12px] font-medium text-white bg-[var(--color-success-solid)] hover:bg-[var(--color-success-solid)] rounded-lg px-4 py-2 disabled:opacity-50 disabled:pointer-events-none transition-all duration-150 shrink-0 shadow-sm"
-                  >
-                    {submitting ? "Sending…" : "Done"}
-                  </button>
-                </div>
-              </div>
-            </div>,
-            document.body
-          )}
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-card)] overflow-hidden focus-within:border-[var(--brand)] focus-within:ring-2 focus-within:ring-[var(--brand)]/20 transition-colors">
 
-        {activePinId && root && threadPlacement && typeof document !== "undefined" &&
-          createPortal(
-            <div
-              ref={threadPopoverRef}
-              className={POPOVER_STYLE}
-              style={{
-                position: "fixed",
-                left: threadPlacement.left,
-                top: threadPlacement.showAbove ? threadPlacement.top - POPOVER_GAP_PX : threadPlacement.top + POPOVER_GAP_PX,
-                transform: threadPlacement.showAbove ? "translate(-50%, -100%)" : "translate(-50%, 0)",
-                zIndex: POPOVER_Z_INDEX,
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {threadPlacement.showAbove && <div className="absolute left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-neutral-200" style={{ top: "100%", marginTop: -1 }} />}
-              {!threadPlacement.showAbove && <div className="absolute left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[8px] border-b-neutral-200" style={{ bottom: "100%", marginBottom: -1 }} />}
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-neutral-100 overflow-hidden shrink-0">
-                    {root.userAvatar ? (
-                      <Image src={root.userAvatar} alt="" width={36} height={36} sizes="36px" className="w-full h-full object-cover" unoptimized />
+                {/* Row 1: Avatar + textarea */}
+                <div className="flex items-start gap-3 px-4 pt-4">
+                  <div className="w-[28px] h-[28px] rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold text-[13px] flex items-center justify-center shrink-0 overflow-hidden mt-0.5">
+                    {userAvatar ? (
+                      <Image src={userAvatar} alt="" width={28} height={28} className="w-full h-full object-cover" unoptimized />
                     ) : (
-                      <span className="w-full h-full flex items-center justify-center text-[12px] font-medium text-secondary">{root.userName?.charAt(0) ?? "?"}</span>
+                      userName.charAt(0).toUpperCase()
                     )}
                   </div>
-                  <div className="min-w-0">
-                    <span className="text-[13px] font-medium text-[hsl(var(--text-primary-strong))]">{root.userName}</span>
-                    <span className="text-[11px] text-[hsl(var(--text-tertiary))] ml-2">{formatCommentDate(root.createdAt)}</span>
+                  <div className="flex-1 min-w-0 py-1.5">
+                    <textarea
+                      value={draftMessage}
+                      onChange={(e) => setDraftMessage(e.target.value)}
+                      placeholder="Add a comment..."
+                      className="w-full min-h-[48px] bg-transparent text-[14px] text-[var(--text-body)] placeholder:text-[var(--text-secondary)] border-none outline-none resize-none px-2"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") handleCancelDraft();
+                        if (e.key === "Enter" && !e.shiftKey && draftMessage.trim()) {
+                          e.preventDefault();
+                          void handleSubmitDraft();
+                        }
+                      }}
+                    />
                   </div>
                 </div>
-                <p className={`text-[13px] leading-[1.5] ${root.resolved ? "text-[hsl(var(--text-tertiary))] opacity-80 line-through" : "text-[hsl(var(--text-secondary-soft))]"}`}>
-                  {root.message}
-                </p>
-                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-neutral-100">
-                  {updateComment && !root.resolved && (
+
+                {draftPendingAttachments.length > 0 && (
+                  <div className="flex flex-col gap-2 mx-4 mt-2 mb-1">
+                    {draftPendingAttachments.map((att, i) => {
+                      const isLoading = (att as any)._loading;
+                      return (
+                        <div key={i} className="flex items-center gap-2.5 px-3 py-2.5 bg-[var(--surface-subtle)] border border-[var(--border)] rounded-xl">
+                          {isLoading ? (
+                            <div className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: getUploadBoxColor(att.file_name) }}>
+                              <svg className="w-6 h-6 -rotate-90" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="10" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="2.5" />
+                                <circle cx="12" cy="12" r="10" fill="none" stroke="white" strokeWidth="3"
+                                  strokeLinecap="round"
+                                  strokeDasharray="62.83"
+                                  strokeDashoffset="62.83"
+                                  className="upload-ring-animate"
+                                />
+                              </svg>
+                            </div>
+                          ) : att.file_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(att.file_name) ? (
+                            <img src={att.file_url} alt="" className="h-10 w-10 rounded-lg object-cover shrink-0" />
+                          ) : (
+                            <div className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: getUploadBoxColor(att.file_name) }}>
+                              <Paperclip className="h-4 w-4 text-white" />
+                            </div>
+                          )}
+                          <span className="flex-1 min-w-0 text-[13px] font-medium text-[var(--text-body)] truncate">
+                            {att.file_name}
+                            {isLoading && <span className="ml-2 text-[11px] text-[var(--text-tertiary)]">Uploading...</span>}
+                          </span>
+                          <button type="button" onClick={() => setDraftPendingAttachments(prev => prev.filter((_, idx) => idx !== i))}
+                            className="p-1 rounded-md text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors shrink-0">
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {draftFileError && (
+                  <div className="flex items-center gap-2 mx-4 mb-1 px-3 py-2 bg-[var(--color-danger-bg)] border border-[var(--color-danger-border)] rounded-xl">
+                    <span className="text-[13px] font-medium text-[var(--color-danger)]">{draftFileError}</span>
+                    <button type="button" onClick={() => setDraftFileError(null)} className="ml-auto p-0.5 rounded text-[var(--color-danger)]">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Row 2: Icons + Cancel + Comment button */}
+                <div className="flex items-center justify-between px-4 py-3">
+                  <div className="flex items-center gap-0.5">
                     <button
                       type="button"
-                      onClick={() => void updateComment(root.id, { resolved: true })}
-                      className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--color-success)] bg-[var(--color-success-bg)] border border-[var(--color-success-border)] rounded-md px-2 py-1.5 hover:bg-[var(--color-success-bg)]"
+                      onClick={() => {
+                        setDraftMessage(prev => prev + "@");
+                        const textarea = draftPopoverRef.current?.querySelector("textarea");
+                        if (textarea) {
+                          textarea.focus();
+                          setTimeout(() => {
+                            textarea.selectionStart = textarea.value.length;
+                            textarea.selectionEnd = textarea.value.length;
+                          }, 0);
+                        }
+                      }}
+                      className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
+                      title="Mention"
                     >
-                      <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-success)]" />
-                      Resolve comment
+                      <AtSign className="h-[18px] w-[18px]" strokeWidth={1.5} />
                     </button>
-                  )}
-                  {root.resolved && (
-                    <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--color-success)]">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-success)]" /> Resolved
-                    </span>
-                  )}
-                  {onOpenThreadPanel && (
+                    <span className="w-px h-4 bg-[var(--border)] mx-1" />
+                    <button
+                      ref={draftEmojiButtonRef}
+                      type="button"
+                      onClick={() => {
+                        if (draftEmojiButtonRef.current) {
+                          setDraftEmojiAnchorRect(draftEmojiButtonRef.current.getBoundingClientRect());
+                        }
+                        setDraftEmojiOpen(v => !v);
+                      }}
+                      className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
+                      title="Emoji"
+                    >
+                      <Smile className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                    </button>
+                    <span className="w-px h-4 bg-[var(--border)] mx-1" />
                     <button
                       type="button"
-                      onClick={() => onOpenThreadPanel(activePinId)}
-                      className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[hsl(var(--text-secondary-soft))] hover:text-[hsl(var(--text-primary-strong))] px-2 py-1.5 rounded-md border border-[var(--layer-2-border)] bg-white"
+                      onClick={() => draftFileInputRef.current?.click()}
+                      className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
+                      title="Attach"
                     >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      Open thread
+                      <Paperclip className="h-[18px] w-[18px]" strokeWidth={1.5} />
                     </button>
-                  )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleCancelDraft}
+                      className="text-[13px] font-semibold text-[var(--text-body)] hover:text-[var(--text-heading)] px-2 py-1 transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleSubmitDraft()}
+                      disabled={(!draftMessage.trim() && draftPendingAttachments.length === 0) || submitting}
+                      className="text-[13px] font-semibold text-white bg-[var(--brand)] hover:bg-[var(--brand-hover)] px-4 py-1.5 rounded-full disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer"
+                    >
+                      {submitting ? "Sending..." : "Comment"}
+                    </button>
+                  </div>
                 </div>
+
               </div>
             </div>,
             document.body
@@ -533,6 +616,86 @@ const ScreenshotWithPinsInner = ({
           </>
         )}
       </div>
+
+      {/* Hidden file input for attachment */}
+      <input
+        ref={draftFileInputRef}
+        type="file"
+        accept="*/*"
+        className="hidden"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          if (file.size > 10 * 1024 * 1024) {
+            setDraftFileError("File must be under 10 MB");
+            e.target.value = "";
+            return;
+          }
+          if (draftPendingAttachments.length >= MAX_ATTACHMENTS) {
+            setDraftFileError("Maximum 5 attachments allowed");
+            e.target.value = "";
+            return;
+          }
+          const placeholderId = Date.now().toString();
+          const placeholder = { file_name: file.name, file_url: "", file_size: file.size, _loading: true, _id: placeholderId, _progress: 0 } as any;
+          setDraftPendingAttachments(prev => [...prev, placeholder]);
+          try {
+            const { uploadAttachmentWithProgress } = await import("@/lib/uploadAttachment");
+            const result = await Promise.race([
+              uploadAttachmentWithProgress(file, (percent) => {
+                setDraftPendingAttachments(prev =>
+                  prev.map(att => (att as any)._id === placeholderId
+                    ? { ...att, _progress: percent }
+                    : att)
+                );
+              }),
+              new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Upload timed out")), 30000)),
+            ]);
+            if (!result.url) {
+              setDraftPendingAttachments(prev => prev.filter(att => (att as any)._id !== placeholderId));
+              setDraftFileError("Upload completed but file URL is missing");
+              e.target.value = "";
+              return;
+            }
+            setDraftPendingAttachments(prev =>
+              prev.map(att => (att as any)._id === placeholderId
+                ? { file_name: result.name, file_url: result.url, file_size: result.size }
+                : att)
+            );
+          } catch (err) {
+            setDraftPendingAttachments(prev => prev.filter(att => (att as any)._id !== placeholderId));
+            const message = err instanceof Error && err.message === "Upload timed out"
+              ? "Upload timed out. Please try again."
+              : "Failed to upload file. Please try again.";
+            setDraftFileError(message);
+          }
+          e.target.value = "";
+        }}
+      />
+
+      {/* Emoji picker portal */}
+      {draftEmojiOpen && typeof document !== "undefined" && createPortal(
+        <div
+          ref={draftEmojiPickerRef}
+          className="fixed z-[2147480001]"
+          style={{
+            top: (draftEmojiAnchorRect?.bottom ?? 0) + 4,
+            left: Math.min(draftEmojiAnchorRect?.left ?? 0, window.innerWidth - 320),
+          }}
+        >
+          <EmojiPicker
+            onEmojiClick={(emojiData) => {
+              setDraftMessage(prev => prev + emojiData.emoji);
+              setDraftEmojiOpen(false);
+            }}
+            width={300}
+            height={380}
+            searchPlaceHolder="Search emoji..."
+            previewConfig={{ showPreview: false }}
+          />
+        </div>,
+        document.body
+      )}
     </div>
   );
 };
