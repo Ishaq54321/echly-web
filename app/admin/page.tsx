@@ -36,7 +36,7 @@ export default function AdminPage() {
   if (loading) {
     return (
       <div className="p-8">
-        <h1 className="text-2xl font-semibold text-neutral-900 mb-8">Dashboard</h1>
+        <h1 className="text-2xl font-semibold text-[var(--text-heading)] mb-8">Dashboard</h1>
         <p className="text-sm text-neutral-500">Loading…</p>
       </div>
     );
@@ -45,7 +45,7 @@ export default function AdminPage() {
   if (error) {
     return (
       <div className="p-8">
-        <h1 className="text-2xl font-semibold text-neutral-900 mb-8">Dashboard</h1>
+        <h1 className="text-2xl font-semibold text-[var(--text-heading)] mb-8">Dashboard</h1>
         <p className="text-sm text-[var(--color-danger)]">{error}</p>
       </div>
     );
@@ -76,8 +76,8 @@ export default function AdminPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold text-neutral-900 mb-1">Dashboard</h1>
-      <p className="text-sm text-neutral-600 mb-8">
+      <h1 className="text-2xl font-semibold text-[var(--text-heading)] mb-1">Dashboard</h1>
+      <p className="text-sm text-[var(--text-secondary)] mb-8">
         Platform usage at a glance.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -85,12 +85,12 @@ export default function AdminPage() {
           const content = (
             <>
               <p className="text-sm font-medium text-neutral-500">{card.label}</p>
-              <p className="text-2xl font-semibold text-neutral-900 mt-1">{card.value}</p>
+              <p className="text-2xl font-semibold text-[var(--text-heading)] mt-1">{card.value}</p>
             </>
           );
           const className =
-            "rounded-xl border border-[#EBEBEB] bg-white p-5 shadow-sm transition hover:border-[#D5D5D5] " +
-            (card.href ? "cursor-pointer hover:bg-neutral-50/50" : "");
+            "rounded-xl border border-[var(--border)] bg-white p-5 shadow-sm transition hover:border-[var(--border-strong)] " +
+            (card.href ? "cursor-pointer hover:bg-[var(--surface-hover)]/50" : "");
           if (card.href) {
             return (
               <Link key={card.label} href={card.href} className={className}>

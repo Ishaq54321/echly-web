@@ -1,8 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Paperclip } from "lucide-react";
-import { Section } from "./Section";
 import { ScreenshotBlock } from "./ScreenshotBlock";
 import { ScreenshotWithPins } from "./ScreenshotWithPins";
 import { SuggestionSection } from "./SuggestionSection";
@@ -86,17 +84,13 @@ export function FeedbackContent({
     Boolean(item.screenshotId?.trim()) || fileAttachments.length > 0;
 
   return (
-    <div className="content-wrapper flex flex-col gap-4 min-w-0">
+    <div className="content-wrapper flex flex-col min-w-0">
       {roDesc ? (
         <DescriptionSection description={roDesc} />
       ) : null}
       {hasAttachmentContent ? (
         <section className="min-w-0">
-          <div className="section-header text-[12px] font-semibold uppercase tracking-[0.08em] text-[#6B7280] flex items-center gap-1.5 mb-2">
-            <Paperclip size={16} strokeWidth={1.8} className="shrink-0 text-[#6B7280]" aria-hidden />
-            Attachments
-          </div>
-          <div className="attachments rounded-xl border border-[#E5E7EB] bg-white p-[14px] space-y-3">
+          <div className="attachments rounded-[var(--radius-md)] overflow-hidden space-y-3 border border-[var(--border)] shadow-[var(--shadow-sm)]">
             {item.screenshotId ? (
               sendPinComment != null ? (
                 <ScreenshotWithPins
@@ -143,7 +137,7 @@ export function FeedbackContent({
                       href={f.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[14px] font-medium text-[#1775E0] hover:underline break-all"
+                      className="text-[14px] font-medium text-[var(--brand)] hover:underline break-all"
                     >
                       {f.name?.trim() ? f.name : f.url}
                     </a>
@@ -163,27 +157,16 @@ export function FeedbackContent({
         isResolved={item.isResolved ?? false}
       />
       {(onSaveTags != null || (Array.isArray(item.suggestedTags) && item.suggestedTags.length > 0)) && (
-        <Section title="Tags" titleMuted>
-          <div className="flex flex-wrap justify-start gap-2 mt-3 max-w-full min-w-0">
+        <section className="mt-12 min-w-0">
+          <h2 className="text-[16px] font-semibold text-[var(--text-heading)] mb-3">Tags</h2>
+          <div className="flex flex-wrap justify-start gap-2 max-w-full min-w-0">
             {tags.map((tag, i) => (
-              <Tag key={`${tag}-${i}`} name={tag} variant="default">
-                {onSaveTags && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleRemoveTag(tag);
-                    }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-colors duration-120 text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] cursor-pointer"
-                    aria-label={`Remove ${tag}`}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-                      <path d="M2 2l8 8M10 2L2 10" />
-                    </svg>
-                  </button>
-                )}
-              </Tag>
+              <Tag
+                key={`${tag}-${i}`}
+                name={tag}
+                variant="default"
+                onRemove={onSaveTags ? () => handleRemoveTag(tag) : undefined}
+              />
             ))}
             {onSaveTags && (
               isAddingTag ? (
@@ -215,20 +198,20 @@ export function FeedbackContent({
                   maxLength={25}
                   placeholder="Type tag..."
                   autoFocus
-                  className="inline-flex items-center px-3 py-1.5 rounded-full border border-[var(--border)] bg-[var(--surface-card)] text-xs font-medium text-[var(--text-body)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--brand)] focus:ring-1 focus:ring-[var(--brand)]/20 w-[120px] transition-colors"
+                  className="inline-flex items-center px-3 py-1.5 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-card)] text-xs font-medium text-[var(--text-body)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--brand)] focus:ring-1 focus:ring-[var(--brand)]/20 w-[120px] transition-colors"
                 />
               ) : (
                 <button
                   type="button"
                   onClick={() => setIsAddingTag(true)}
-                  className="inline-flex items-center px-3 py-1.5 rounded-full border border-dashed text-[var(--text-tertiary)] hover:bg-[var(--surface-hover)] transition-all duration-150 text-xs font-medium cursor-pointer"
+                  className="inline-flex items-center px-3.5 py-1.5 rounded-[var(--radius-sm)] border border-dashed border-[var(--border)] text-[var(--text-tertiary)] hover:border-[var(--text-secondary)] hover:text-[var(--text-secondary)] text-[14px] font-medium cursor-pointer transition-colors"
                 >
                   + Add tag
                 </button>
               )
             )}
           </div>
-        </Section>
+        </section>
       )}
     </div>
   );

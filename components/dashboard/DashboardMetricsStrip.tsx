@@ -23,12 +23,12 @@ function Metric({
 }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))]">
+      <span className="text-[12px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
         {label}
       </span>
       <span
         className={`text-[18px] font-semibold tabular-nums tracking-[-0.02em] ${
-          muted ? "text-[hsl(var(--text-tertiary))]" : "text-[hsl(var(--text-primary-strong))]"
+          muted ? "text-[var(--text-tertiary)]" : "text-[var(--text-primary-strong)]"
         }`}
       >
         {value}

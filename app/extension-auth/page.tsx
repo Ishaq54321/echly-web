@@ -59,8 +59,8 @@ export default function ExtensionAuthPage() {
   }, [router]);
 
   return (
-    <div className="flex h-full items-center justify-center bg-[#f9fafc]">
-      <p className="text-gray-500">Completing sign-in for Echly extension…</p>
+    <div className="flex h-full items-center justify-center bg-[var(--surface-subtle)]">
+      <p className="text-[var(--text-secondary)]">Completing sign-in for Echly extension…</p>
     </div>
   );
 }

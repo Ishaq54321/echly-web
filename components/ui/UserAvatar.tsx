@@ -69,15 +69,15 @@ export function UserAvatar({
         <span
           className={
             initialsClassName ??
-            "flex h-full w-full items-center justify-center rounded-full bg-neutral-200 text-sm font-semibold text-neutral-700"
+            "flex h-full w-full items-center justify-center rounded-full bg-[var(--surface-hover)] text-sm font-semibold text-neutral-700"
           }
           aria-hidden
         >
           {getInitials(label)}
         </span>
       ) : (
-        <span className="flex h-full w-full items-center justify-center rounded-full bg-neutral-200">
-          <User className="h-5 w-5 text-neutral-600" aria-hidden />
+        <span className="flex h-full w-full items-center justify-center rounded-full bg-[var(--surface-hover)]">
+          <User className="h-5 w-5 text-[var(--text-secondary)]" aria-hidden />
         </span>
       )}
     </span>

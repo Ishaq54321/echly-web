@@ -98,7 +98,7 @@ function FeedbackSidebarInner({
       : "0 total";
 
   return (
-    <div className="h-full border-r border-gray-100 flex flex-col">
+    <div className="h-full border-r border-[var(--border)] flex flex-col">
       <div className="pt-5 px-3">
         <div className="flex flex-col gap-3 pb-4">
           {/* Header (fixed) */}
@@ -107,7 +107,7 @@ function FeedbackSidebarInner({
               <h2 className="text-[12px] uppercase tracking-[0.08em] text-meta">
                 Feedback
               </h2>
-              <p className="text-[13px] text-meta mt-1">
+              <p className="text-[14px] text-meta mt-1">
                 {subline}
               </p>
             </div>
@@ -115,20 +115,20 @@ function FeedbackSidebarInner({
               <button
                 type="button"
                 onClick={() => setMenuOpen((o) => !o)}
-                className="p-1.5 rounded-md cursor-pointer hover:bg-neutral-100 transition-colors duration-150"
+                className="p-1.5 rounded-md cursor-pointer hover:bg-[var(--surface-hover)] transition-colors duration-150"
                 aria-label="Options"
               >
                 <MoreHorizontal className="h-4 w-4 text-secondary" />
               </button>
               {menuOpen && (
                 <div
-                  className="absolute right-0 mt-2 w-52 rounded-lg border border-neutral-200 bg-white shadow-sm transition-opacity duration-120 z-20"
+                  className="absolute right-0 mt-2 w-52 rounded-lg border border-[var(--border)] bg-white shadow-sm transition-opacity duration-120 z-20"
                   role="menu"
                 >
                   <button
                     type="button"
                     role="menuitem"
-                    className="w-full text-left px-4 py-2 text-[14px] text-neutral-700 cursor-pointer hover:bg-neutral-100 transition-colors duration-120"
+                    className="w-full text-left px-4 py-2 text-[14px] text-neutral-700 cursor-pointer hover:bg-[var(--surface-hover)] transition-colors duration-120"
                     onClick={() => {
                       setFilter("all");
                       setMenuOpen(false);
@@ -139,7 +139,7 @@ function FeedbackSidebarInner({
                   <button
                     type="button"
                     role="menuitem"
-                    className="w-full text-left px-4 py-2 text-[14px] text-neutral-700 cursor-pointer hover:bg-neutral-100 transition-colors duration-120"
+                    className="w-full text-left px-4 py-2 text-[14px] text-neutral-700 cursor-pointer hover:bg-[var(--surface-hover)] transition-colors duration-120"
                     onClick={() => {
                       setFilter("active");
                       setMenuOpen(false);
@@ -150,7 +150,7 @@ function FeedbackSidebarInner({
                   <button
                     type="button"
                     role="menuitem"
-                    className="w-full text-left px-4 py-2 text-[14px] text-neutral-700 cursor-pointer hover:bg-neutral-100 transition-colors duration-120"
+                    className="w-full text-left px-4 py-2 text-[14px] text-neutral-700 cursor-pointer hover:bg-[var(--surface-hover)] transition-colors duration-120"
                     onClick={() => {
                       setFilter("resolved");
                       setMenuOpen(false);
@@ -161,7 +161,7 @@ function FeedbackSidebarInner({
                   <button
                     type="button"
                     role="menuitem"
-                    className="w-full text-left px-4 py-2 text-[14px] text-neutral-700 cursor-pointer hover:bg-neutral-100 transition-colors duration-120"
+                    className="w-full text-left px-4 py-2 text-[14px] text-neutral-700 cursor-pointer hover:bg-[var(--surface-hover)] transition-colors duration-120"
                     onClick={async () => {
                       setMenuOpen(false);
                       await onMarkAllResolved?.();
@@ -181,7 +181,7 @@ function FeedbackSidebarInner({
               placeholder="Search feedback…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 w-full text-[15px] px-3 rounded-md bg-white border border-[#EBEBEB] placeholder:text-meta focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)]/20 focus:border-[var(--border-focus)] transition-all duration-150"
+              className="h-9 w-full text-[15px] px-3 rounded-md bg-white border border-[var(--border)] placeholder:text-meta focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)]/20 focus:border-[var(--border-focus)] transition-all duration-150"
               aria-label="Search feedback"
             />
           </div>
@@ -207,27 +207,27 @@ function FeedbackSidebarInner({
                     }}
                     className={`relative flex items-center gap-3 px-5 py-2.5 rounded-full transition-colors duration-[120ms] outline-none focus:outline-none focus:ring-1 focus:ring-[var(--ai-accent)] cursor-pointer ${
                       isActive
-                        ? "text-[hsl(var(--text-primary-strong))] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
-                        : "text-[hsl(var(--text-secondary-soft))] hover:text-[hsl(var(--text-primary-strong))] hover:bg-black/[0.04]"
+                        ? "text-[var(--text-primary-strong)] bg-white shadow-[var(--shadow-sm)]"
+                        : "text-[var(--text-secondary-soft)] hover:text-[var(--text-primary-strong)] hover:bg-black/[0.04]"
                     }`}
                   >
                     <span
-                      className={`w-6 shrink-0 text-right text-[13px] ${
-                        isActive ? "text-[hsl(var(--text-primary-strong))] font-medium" : "text-[hsl(var(--text-tertiary))]"
+                      className={`w-6 shrink-0 text-right text-[14px] ${
+                        isActive ? "text-[var(--text-primary-strong)] font-medium" : "text-[var(--text-tertiary)]"
                       }`}
                     >
                       {index + 1}
                     </span>
                     <span
                       className={`min-w-0 flex-1 truncate text-[15px] ${
-                        isActive ? "font-semibold text-[hsl(var(--text-primary-strong))]" : "font-normal text-[hsl(var(--text-secondary-soft))]"
+                        isActive ? "font-semibold text-[var(--text-primary-strong)]" : "font-normal text-[var(--text-secondary-soft)]"
                       }`}
                     >
                       {item.title}
                     </span>
                     <button
                       type="button"
-                      className="opacity-0 group-hover:opacity-100 transition-colors duration-120 ease-out p-0.5 rounded-md text-meta hover:text-neutral-900 hover:bg-neutral-100 cursor-pointer border-0 bg-transparent shrink-0"
+                      className="opacity-0 group-hover:opacity-100 transition-colors duration-120 ease-out p-0.5 rounded-md text-meta hover:text-[var(--text-heading)] hover:bg-[var(--surface-hover)] cursor-pointer border-0 bg-transparent shrink-0"
                       onClick={(e) => e.stopPropagation()}
                       aria-label="More actions"
                     >

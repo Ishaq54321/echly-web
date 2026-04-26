@@ -174,7 +174,7 @@ export function ShareModal({
           {/* General access */}
           <section className="share-modal-general-access-stack">
             <div className="flex items-center justify-between gap-3">
-              <h3 className="text-[13px] font-medium text-foreground/70 mb-3">
+              <h3 className="text-[14px] font-medium text-foreground/70 mb-3">
                 General access
               </h3>
             </div>
@@ -201,7 +201,7 @@ export function ShareModal({
 
           {/* Invite people */}
           <section className="py-3">
-            <h3 className="text-[13px] font-medium text-foreground/70 mb-3">Invite people</h3>
+            <h3 className="text-[14px] font-medium text-foreground/70 mb-3">Invite people</h3>
             <div className="flex items-center gap-2">
               {/* Email input */}
               <input
@@ -209,7 +209,7 @@ export function ShareModal({
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
                 placeholder="Email address"
-                className="flex-1 h-[38px] border border-border rounded-lg px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:border-[#1775E0] bg-background disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex-1 h-[38px] border border-border rounded-lg px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:border-[var(--brand)] bg-background disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={!canWrite || inviting}
                 autoComplete="email"
               />
@@ -217,7 +217,7 @@ export function ShareModal({
               {/* Can view / Can resolve dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] font-medium border border-border rounded-lg bg-transparent hover:bg-muted/30 transition-colors text-foreground whitespace-nowrap">
+                  <button className="inline-flex items-center gap-1.5 h-8 px-3 text-[14px] font-medium border border-border rounded-lg bg-transparent hover:bg-muted/30 transition-colors text-foreground whitespace-nowrap">
                     {inviteAccess === "resolve" ? "Can resolve" : "Can view"}
                     <ChevronDown className="h-3.5 w-3.5 text-muted-foreground ml-0.5" />
                   </button>
@@ -235,7 +235,7 @@ export function ShareModal({
               {/* Invite button */}
               <button
                 type="button"
-                className="h-[38px] bg-[#1775E0] hover:bg-[#1462C4] text-white text-sm font-medium rounded-lg px-4 flex-shrink-0 transition-colors inline-flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
+                className="h-[38px] bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white text-sm font-medium rounded-lg px-4 flex-shrink-0 transition-colors inline-flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={onInvite}
                 disabled={!canWrite || inviting}
               >
@@ -260,7 +260,7 @@ export function ShareModal({
                 accessRequests.length > 0) && (
               <>
               <section className="share-modal-requests shrink-0 py-3">
-                <h3 className="text-[13px] font-medium text-foreground/70 mb-3">Requests</h3>
+                <h3 className="text-[14px] font-medium text-foreground/70 mb-3">Requests</h3>
                 {initialLoading ? (
                   <div className="flex flex-col gap-0 px-5 py-2">
                     {Array.from({ length: 1 }).map((_, i) => (
@@ -298,7 +298,7 @@ export function ShareModal({
                             {/* Role selector */}
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <button className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] font-medium border border-border rounded-lg bg-transparent hover:bg-muted/30 transition-colors text-foreground whitespace-nowrap">
+                                <button className="inline-flex items-center gap-1.5 h-8 px-3 text-[14px] font-medium border border-border rounded-lg bg-transparent hover:bg-muted/30 transition-colors text-foreground whitespace-nowrap">
                                   {getRequestAccess(req) === "resolve" ? "Can resolve" : "Can view"}
                                   <ChevronDown className="h-3.5 w-3.5 text-muted-foreground ml-0.5" />
                                 </button>
@@ -312,7 +312,7 @@ export function ShareModal({
                                   className="flex items-center gap-2"
                                 >
                                   <Check
-                                    className={`h-4 w-4 flex-shrink-0 stroke-[2.5px] ${getRequestAccess(req) === "view" ? "text-[#1775E0]" : "text-transparent"}`}
+                                    className={`h-4 w-4 flex-shrink-0 stroke-[2.5px] ${getRequestAccess(req) === "view" ? "text-[var(--brand)]" : "text-transparent"}`}
                                   />
                                   <span>Can view</span>
                                 </DropdownMenuItem>
@@ -324,7 +324,7 @@ export function ShareModal({
                                   className="flex items-center gap-2"
                                 >
                                   <Check
-                                    className={`h-4 w-4 flex-shrink-0 stroke-[2.5px] ${getRequestAccess(req) === "resolve" ? "text-[#1775E0]" : "text-transparent"}`}
+                                    className={`h-4 w-4 flex-shrink-0 stroke-[2.5px] ${getRequestAccess(req) === "resolve" ? "text-[var(--brand)]" : "text-transparent"}`}
                                   />
                                   <span>Can resolve</span>
                                 </DropdownMenuItem>
@@ -332,7 +332,7 @@ export function ShareModal({
                             </DropdownMenu>
                             <button
                               type="button"
-                              className="h-7 px-3 text-[12px] font-medium bg-[#1775E0] hover:bg-[#1462C4] text-white rounded-lg transition-colors whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60 inline-flex items-center justify-center gap-1.5"
+                              className="h-7 px-3 text-[12px] font-medium bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white rounded-lg transition-colors whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
                               disabled={busy}
                               onClick={() => onApproveAccessRequest(req.id, getRequestAccess(req))}
                             >
@@ -364,7 +364,7 @@ export function ShareModal({
 
           {/* People with access */}
           <div className="share-modal-shared-with min-h-0 flex-1 py-3">
-            <h3 className="text-[13px] font-medium text-foreground/70 mb-3">People with access</h3>
+            <h3 className="text-[14px] font-medium text-foreground/70 mb-3">People with access</h3>
             <div className="share-modal-team share-modal-team--members min-h-0 overflow-y-auto pr-1">
               {initialLoading ? (
                 <div className="flex flex-col gap-0">
@@ -425,7 +425,7 @@ export function ShareModal({
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button
-                              className={`inline-flex items-center gap-1.5 h-8 px-3 text-[13px] font-medium border border-border rounded-lg bg-transparent hover:bg-muted/30 transition-colors text-foreground whitespace-nowrap${disabled ? " opacity-50 cursor-not-allowed pointer-events-none" : ""}`}
+                              className={`inline-flex items-center gap-1.5 h-8 px-3 text-[14px] font-medium border border-border rounded-lg bg-transparent hover:bg-muted/30 transition-colors text-foreground whitespace-nowrap${disabled ? " opacity-50 cursor-not-allowed pointer-events-none" : ""}`}
                             >
                               {busyUpdate && (
                                 <Loader2 size={12} className="animate-spin" aria-hidden />
@@ -440,7 +440,7 @@ export function ShareModal({
                               className="flex items-center gap-2"
                             >
                               <Check
-                                className={`h-4 w-4 flex-shrink-0 stroke-[2.5px] ${item.access === "view" ? "text-[#1775E0]" : "text-transparent"}`}
+                                className={`h-4 w-4 flex-shrink-0 stroke-[2.5px] ${item.access === "view" ? "text-[var(--brand)]" : "text-transparent"}`}
                               />
                               <span>Can view</span>
                             </DropdownMenuItem>
@@ -449,7 +449,7 @@ export function ShareModal({
                               className="flex items-center gap-2"
                             >
                               <Check
-                                className={`h-4 w-4 flex-shrink-0 stroke-[2.5px] ${item.access === "resolve" ? "text-[#1775E0]" : "text-transparent"}`}
+                                className={`h-4 w-4 flex-shrink-0 stroke-[2.5px] ${item.access === "resolve" ? "text-[var(--brand)]" : "text-transparent"}`}
                               />
                               <span>Can resolve</span>
                             </DropdownMenuItem>
@@ -459,7 +459,7 @@ export function ShareModal({
                         {/* Remove button */}
                         <button
                           type="button"
-                          className="w-7 h-7 rounded-md border border-border flex items-center justify-center hover:bg-[var(--color-danger-bg)] hover:border-[var(--color-danger-border)] hover:text-[var(--color-danger)] transition-colors text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                          className="w-7 h-7 rounded-md border border-border flex items-center justify-center hover:bg-[var(--color-danger-bg)] hover:border-[var(--color-danger-border)] hover:text-[var(--color-danger)] transition-colors text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
                           aria-label="Remove access"
                           disabled={disabled}
                           onClick={() => onRemove(item)}
@@ -491,10 +491,10 @@ export function ShareModal({
                 <section className="share-modal-section py-3">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-1.5">
-                      <h3 className="text-[13px] font-medium text-foreground/70">Members</h3>
+                      <h3 className="text-[14px] font-medium text-foreground/70">Members</h3>
                     </div>
-                    <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 bg-white border border-neutral-400">
-                      <ChevronDown className="h-3.5 w-3.5 text-neutral-600" />
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 bg-white border border-[var(--border-strong)]">
+                      <ChevronDown className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
                     </div>
                   </div>
                 </section>
@@ -508,13 +508,13 @@ export function ShareModal({
                   onClick={() => setMembersExpanded(prev => !prev)}
                 >
                   <div className="flex items-center gap-1.5">
-                    <h3 className="text-[13px] font-medium text-foreground/70">Members</h3>
+                    <h3 className="text-[14px] font-medium text-foreground/70">Members</h3>
                     <div
                       onClick={e => e.stopPropagation()}
                       className="relative group flex items-center justify-center"
                     >
                       <div className="w-[17px] h-[17px] rounded-full border border-foreground/40 flex items-center justify-center cursor-default flex-shrink-0">
-                        <div className="flex items-center justify-center w-full h-full text-[10px] font-medium text-foreground/60 leading-none select-none">i</div>
+                        <div className="flex items-center justify-center w-full h-full text-[12px] font-medium text-foreground/60 leading-none select-none">i</div>
                       </div>
                       <div className="absolute right-full top-1/2 -translate-y-1/2 mr-2 hidden group-hover:block z-50 pointer-events-none w-52">
                         <div className="rounded-lg px-4 py-3 text-[12px] leading-snug shadow-md text-white bg-neutral-900">
@@ -523,8 +523,8 @@ export function ShareModal({
                       </div>
                     </div>
                   </div>
-                  <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 bg-white border border-neutral-400">
-                    <ChevronDown className={`h-3.5 w-3.5 text-neutral-600 transition-transform duration-200${membersExpanded ? " rotate-180" : ""}`} />
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 bg-white border border-[var(--border-strong)]">
+                    <ChevronDown className={`h-3.5 w-3.5 text-[var(--text-secondary)] transition-transform duration-200${membersExpanded ? " rotate-180" : ""}`} />
                   </div>
                 </div>
 
@@ -575,7 +575,7 @@ export function ShareModal({
           {canWrite ? (
             <button
               type="button"
-              className="inline-flex items-center gap-2 text-[13px] font-medium text-[#1775E0] bg-[#EBF4FF] border border-[#C3DFFE] rounded-lg px-4 py-2 hover:bg-[#E0EAFF] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center gap-2 text-[14px] font-medium text-[var(--brand)] bg-[var(--brand-subtle)] border border-[var(--brand-muted)] rounded-lg px-4 py-2 hover:bg-[#E0EAFF] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               onClick={onCopyShareLink}
               disabled={copyingLink}
             >
@@ -596,7 +596,7 @@ export function ShareModal({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="h-9 px-5 text-[13px] font-medium border border-border rounded-lg bg-transparent hover:bg-muted/40 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-9 px-5 text-[14px] font-medium border border-border rounded-lg bg-transparent hover:bg-muted/40 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               onClick={onClose}
               disabled={inviting || patchingAccessRequestId !== null}
             >
@@ -604,7 +604,7 @@ export function ShareModal({
             </button>
             <button
               type="button"
-              className="h-9 px-6 text-[13px] font-medium bg-[#1775E0] hover:bg-[#1462C4] text-white rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-9 px-6 text-[14px] font-medium bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               onClick={onClose}
               disabled={
                 inviting ||

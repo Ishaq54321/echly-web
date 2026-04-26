@@ -31,11 +31,7 @@ function TicketItemInner({
       type="button"
       onClick={handleClick}
       data-ticket-id={id}
-      className={`sidebar-item sidebar-row-interactive group relative flex w-full items-center gap-2 text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration-fast)] hover:bg-[#F1F4F8] ${
-        active
-          ? "bg-[#EBF2FF]"
-          : ""
-      } ${isNewTicket ? "echly-new-ticket-highlight" : ""}`}
+      className={`sidebar-item sidebar-row-interactive group relative flex w-full items-center gap-2 text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]/40 transition-colors duration-[var(--motion-duration-fast)] hover:bg-[var(--surface-hover)] ${isNewTicket ? "echly-new-ticket-highlight" : ""}`}
       aria-current={active ? "true" : undefined}
     >
       <span className="relative min-w-0 flex-1 truncate text-[14px] leading-[1.4] py-0.5">
@@ -43,8 +39,8 @@ function TicketItemInner({
           <span
             className={`truncate block ${
               active
-                ? "text-[#1462C4] font-semibold"
-                : "text-[#4B5563] font-normal"
+                ? "text-[var(--text-heading)] font-[550]"
+                : "text-[var(--text-body)] font-[450]"
             }`}
           >
             {title}
@@ -52,7 +48,7 @@ function TicketItemInner({
         ) : null}
       </span>
       {impactLabel && (
-        <span className="shrink-0 rounded-full border border-[var(--layer-2-border)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.06em] text-[hsl(var(--text-tertiary))] bg-[var(--layer-1-bg)]">
+        <span className="shrink-0 rounded-full border border-[var(--layer-2-border)] px-2 py-0.5 text-[12px] font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)] bg-[var(--layer-1-bg)]">
           {impactLabel}
         </span>
       )}

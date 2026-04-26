@@ -54,7 +54,7 @@ export function GlobalNavBar() {
   }, [sessionId, copyBusy, authUid, isIdentityResolved]);
 
   const iconButtonClass =
-    "h-10 w-10 flex items-center justify-center rounded-xl text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-[var(--motion-duration-fast)] cursor-pointer shrink-0";
+    "h-10 w-10 flex items-center justify-center rounded-xl text-[var(--text-tertiary)] hover:bg-[var(--layer-2-hover-bg)] hover:text-[var(--text-primary-strong)] transition-colors duration-[var(--motion-duration-fast)] cursor-pointer shrink-0";
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-[56px] w-full bg-[var(--layer-1-bg)] border-b border-[var(--layer-1-border)] shadow-[var(--shadow-level-1)] flex items-center justify-between px-6">
@@ -132,7 +132,7 @@ export function GlobalNavBar() {
           className={`${iconButtonClass} rounded-full overflow-hidden`}
           aria-label="User menu"
         >
-          <div className="h-8 w-8 rounded-full bg-neutral-200 flex items-center justify-center text-[14px] font-medium text-secondary">
+          <div className="h-8 w-8 rounded-full bg-[var(--surface-hover)] flex items-center justify-center text-[14px] font-medium text-secondary">
             U
           </div>
         </button>

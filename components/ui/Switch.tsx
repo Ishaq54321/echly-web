@@ -18,11 +18,11 @@ export const Switch = forwardRef<HTMLButtonElement, SwitchProps>(
         aria-checked={checked}
         onClick={() => onChange(!checked)}
         className={`
-          relative inline-flex shrink-0 items-center rounded-[999px]
+          relative inline-flex shrink-0 items-center rounded-[var(--radius-pill)]
           h-[22px] w-[40px] transition-all duration-150 ease-in-out
           focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30 focus-visible:ring-offset-2
           disabled:opacity-50
-          ${checked ? "bg-[#1775E0]" : "bg-neutral-200"}
+          ${checked ? "bg-[var(--brand)]" : "bg-[var(--surface-hover)]"}
           ${className}
         `.trim()}
         {...props}

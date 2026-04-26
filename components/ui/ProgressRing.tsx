@@ -41,7 +41,7 @@ export function ProgressRing({ value }: { value: number }) {
           transform={`rotate(-90 ${center} ${center})`}
         />
       </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-neutral-900">
+      <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-[var(--text-heading)]">
         {pct}%
       </span>
     </div>

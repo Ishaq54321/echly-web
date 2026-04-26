@@ -14,7 +14,7 @@ export function ActivityComposer({
   placeholder = "Add a comment…",
 }: ActivityComposerProps) {
   return (
-    <div className="flex items-center gap-3 rounded-xl bg-slate-50/80 px-4 py-3 focus-within:bg-slate-50 focus-within:ring-2 focus-within:ring-[hsl(var(--border))] focus-within:ring-offset-0 transition-all duration-150 ease-out">
+    <div className="flex items-center gap-3 rounded-xl bg-[var(--surface-subtle)]/80 px-4 py-3 focus-within:bg-[var(--surface-subtle)] focus-within:ring-2 focus-within:ring-[var(--border)] focus-within:ring-offset-0 transition-all duration-150 ease-out">
       <input
         value={newMessage}
         onChange={(e) => setNewMessage(e.target.value)}
@@ -33,7 +33,7 @@ export function ActivityComposer({
         onClick={() => onSend(newMessage)}
         className={`flex-shrink-0 text-sm font-medium transition-colors duration-120 rounded-md px-2 py-1 ${
           newMessage.trim()
-            ? "text-slate-700 hover:text-slate-900 hover:bg-neutral-100 cursor-pointer"
+            ? "text-slate-700 hover:text-slate-900 hover:bg-[var(--surface-hover)] cursor-pointer"
             : "text-slate-300 cursor-not-allowed"
         }`}
       >

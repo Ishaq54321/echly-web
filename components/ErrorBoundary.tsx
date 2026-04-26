@@ -38,19 +38,19 @@ export class ErrorBoundary extends Component<Props, State> {
       if (this.props.fallback) return this.props.fallback;
       return (
         <div
-          className="min-h-[200px] flex flex-col items-center justify-center p-6 bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] rounded-lg"
+          className="min-h-[200px] flex flex-col items-center justify-center p-6 bg-[var(--surface-1)] border border-[var(--border)] rounded-lg"
           role="alert"
         >
-          <p className="text-[15px] font-medium text-[hsl(var(--text-primary))]">
+          <p className="text-[15px] font-medium text-[var(--text-primary)]">
             Something went wrong
           </p>
-          <p className="text-[13px] text-[hsl(var(--text-muted))] mt-1 max-w-md text-center">
+          <p className="text-[14px] text-[var(--text-muted)] mt-1 max-w-md text-center">
             {this.state.error.message}
           </p>
           <button
             type="button"
             onClick={() => this.setState({ hasError: false, error: null })}
-            className="mt-4 px-4 py-2 text-[13px] font-medium rounded-md bg-[hsl(var(--text-primary))] text-[hsl(var(--surface-1))] hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2"
+            className="mt-4 px-4 py-2 text-[14px] font-medium rounded-md bg-[var(--text-primary)] text-[var(--surface-1)] hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2"
           >
             Try again
           </button>

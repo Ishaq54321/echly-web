@@ -87,7 +87,7 @@ const inputStyle: React.CSSProperties = {
   width: '100%',
   height: '48px',
   background: '#F7F8FA',
-  border: '1.5px solid #E8E8E8',
+  border: '1.5px solid var(--border)',
   borderRadius: '12px',
   padding: '0 14px',
   fontSize: '15px',
@@ -290,7 +290,7 @@ function PasswordInput({
           style={{
             ...inputStyle,
             paddingRight: '44px',
-            border: focused ? '1.5px solid #1775E0' : '1.5px solid #E8E8E8',
+            border: focused ? '1.5px solid #1775E0' : '1.5px solid var(--border)',
             boxShadow: focused ? '0 0 0 3px rgba(23,117,224,0.12)' : 'none',
           }}
           onFocus={() => setFocused(true)}
@@ -1121,7 +1121,7 @@ export default function InviteAcceptPage() {
                         ...inputStyle,
                         border: focusedField === 'name'
                           ? '1.5px solid #1775E0'
-                          : '1.5px solid #E8E8E8',
+                          : '1.5px solid var(--border)',
                         boxShadow: focusedField === 'name'
                           ? '0 0 0 3px rgba(23,117,224,0.12)'
                           : 'none',

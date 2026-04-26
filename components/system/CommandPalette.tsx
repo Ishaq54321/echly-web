@@ -131,7 +131,7 @@ export default function CommandPalette({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search..."
-            className="w-full bg-transparent px-6 py-5 text-base outline-none placeholder:text-[hsl(var(--text-muted))] placeholder:opacity-80 focus-visible:outline-none"
+            className="w-full bg-transparent px-6 py-5 text-base outline-none placeholder:text-[var(--text-muted)] placeholder:opacity-80 focus-visible:outline-none"
             aria-autocomplete="list"
             aria-controls="command-palette-results"
             aria-activedescendant={
@@ -145,13 +145,13 @@ export default function CommandPalette({
           className="max-h-[400px] overflow-y-auto"
         >
           <div
-            className="text-[10px] uppercase tracking-[0.18em] text-[hsl(var(--text-muted))] px-6 pt-4 pb-2"
+            className="text-[12px] uppercase tracking-[0.18em] text-[var(--text-muted)] px-6 pt-4 pb-2"
             aria-hidden
           >
             NAVIGATION
           </div>
           {filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center text-sm text-[hsl(var(--text-muted))]">
+            <div className="flex flex-col items-center justify-center py-12 text-center text-sm text-[var(--text-muted)]">
               <p>No matching results</p>
               <p className="mt-2 text-xs opacity-80">
                 Try another keyword or press Enter to create
@@ -179,7 +179,7 @@ export default function CommandPalette({
                 >
                   <div className="font-medium">{item.title}</div>
                   {item.meta && (
-                    <div className="text-xs text-[hsl(var(--text-muted))]">
+                    <div className="text-xs text-[var(--text-muted)]">
                       {item.meta}
                     </div>
                   )}

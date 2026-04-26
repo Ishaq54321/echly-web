@@ -345,24 +345,24 @@ export function DiscussionThread({
       <div className="shrink-0 px-5 pt-3.5 pb-[18px] bg-[var(--surface-card)]">
         <div className="flex max-w-[720px] mx-auto w-full min-w-0 items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <h2 className="mb-1.5 text-[17px] font-semibold leading-snug text-[#0F172A]">
+            <h2 className="mb-1.5 text-[17px] font-semibold leading-snug text-[var(--text-heading)]">
               {ticket.title?.trim() ? ticket.title : "Untitled"}
             </h2>
-            <div className="flex flex-wrap items-center gap-2 text-[13px]">
+            <div className="flex flex-wrap items-center gap-2 text-[14px]">
               <span
-                className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-normal tracking-wide ${
+                className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[12px] font-normal tracking-wide ${
                   isResolved
-                    ? "border-slate-200/90 bg-slate-50 text-slate-500"
+                    ? "border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--text-secondary)]"
                     : "border-[var(--color-success-border)]/50 bg-[var(--color-success-bg)]/70 text-[var(--color-success)]/75"
                 }`}
               >
                 {isResolved ? "Resolved" : "Open"}
               </span>
               {sessionName && ticket.sessionId ? (
-                <span className="min-w-0 truncate text-[#364153]">{sessionName}</span>
+                <span className="min-w-0 truncate text-[var(--text-body)]">{sessionName}</span>
               ) : null}
               {threadIndex !== undefined && threadTotal !== undefined ? (
-                <span className="shrink-0 tabular-nums text-[13px] text-[#64748B]/80">
+                <span className="shrink-0 tabular-nums text-[14px] text-[#64748B]/80">
                   {threadIndex} of {threadTotal}
                 </span>
               ) : null}
@@ -371,11 +371,11 @@ export function DiscussionThread({
           {ticket.sessionId && feedbackId ? (
             <Link
               href={`/session/${ticket.sessionId}?ticket=${feedbackId}`}
-              className="group inline-flex shrink-0 items-center gap-1 rounded-lg border border-[#EBEBEB] bg-[var(--surface-card)] px-2.5 py-1.5 text-[12px] font-medium text-[#364153] shadow-[0_1px_0_rgba(15,23,42,0.03)] transition-colors hover:border-[#D5D5D5] hover:bg-slate-50/90 hover:text-[#0F172A] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/20"
+              className="group inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface-card)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--text-body)] shadow-[0_1px_0_rgba(15,23,42,0.03)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-subtle)]/90 hover:text-[var(--text-heading)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/20"
             >
               View Ticket
               <ArrowUpRight
-                className="h-3 w-3 shrink-0 text-[#64748B] transition-colors group-hover:text-[#0F172A]"
+                className="h-3 w-3 shrink-0 text-[#64748B] transition-colors group-hover:text-[var(--text-heading)]"
                 strokeWidth={2}
                 aria-hidden
               />
@@ -391,7 +391,7 @@ export function DiscussionThread({
           {/* Screenshot */}
           {hasScreenshot && (
             <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-card)] overflow-hidden shadow-level-1">
-              <div className="relative flex items-center justify-center bg-neutral-50">
+              <div className="relative flex items-center justify-center bg-[var(--surface-subtle)]">
                 {resolvedScreenshotSrc ? (
                   <Image
                     src={resolvedScreenshotSrc}
@@ -424,11 +424,11 @@ export function DiscussionThread({
                 )}
               </div>
               <div className="px-4 py-2.5 border-t border-[var(--border)] flex items-center justify-between">
-                <span className="text-[13px] text-meta">Screenshot</span>
+                <span className="text-[14px] text-meta">Screenshot</span>
                 {ticket.sessionId && feedbackId && (
                   <Link
                     href={`/session/${ticket.sessionId}?ticket=${feedbackId}`}
-                    className="text-[13px] font-medium text-[#1775E0] hover:underline flex items-center gap-0.5"
+                    className="text-[14px] font-medium text-[var(--brand)] hover:underline flex items-center gap-0.5"
                   >
                     View full
                     <ArrowUpRight className="h-3 w-3" strokeWidth={2} />
@@ -462,7 +462,7 @@ export function DiscussionThread({
               <span className="text-sm font-semibold text-discussion-title">
                 Replies
                 {commentsInitialized && rootComments.length > 0 && (
-                  <span className="ml-1.5 text-[13px] font-normal text-meta tabular-nums">
+                  <span className="ml-1.5 text-[14px] font-normal text-meta tabular-nums">
                     · {rootComments.length}
                   </span>
                 )}
@@ -470,7 +470,7 @@ export function DiscussionThread({
               <button
                 type="button"
                 onClick={() => void refetchComments()}
-                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--brand)] hover:text-[var(--brand-hover)] transition-colors"
+                className="inline-flex items-center gap-1.5 text-[14px] font-medium text-[var(--brand)] hover:text-[var(--brand-hover)] transition-colors"
               >
                 <RefreshCw className="h-3 w-3 shrink-0" strokeWidth={2} />
                 Refresh
@@ -581,7 +581,7 @@ export function DiscussionThread({
             onClick={() => setScreenshotModalOpen(false)}
           >
             <div
-              className="max-w-[85vw] max-h-[85vh] rounded-[12px] shadow-xl overflow-hidden bg-[var(--surface-card)]"
+              className="max-w-[85vw] max-h-[85vh] rounded-[var(--radius-md)] shadow-xl overflow-hidden bg-[var(--surface-card)]"
               onClick={(e) => e.stopPropagation()}
             >
               <Image

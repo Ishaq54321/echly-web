@@ -149,7 +149,7 @@ export default function AdminCustomersPage() {
   if (loading) {
     return (
       <div className="p-8">
-        <h1 className="text-2xl font-semibold text-neutral-900 mb-8">Customers</h1>
+        <h1 className="text-2xl font-semibold text-[var(--text-heading)] mb-8">Customers</h1>
         <p className="text-sm text-neutral-500">Loading…</p>
       </div>
     );
@@ -157,8 +157,8 @@ export default function AdminCustomersPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold text-neutral-900 mb-1">Customers</h1>
-      <p className="text-sm text-neutral-600 mb-8">
+      <h1 className="text-2xl font-semibold text-[var(--text-heading)] mb-1">Customers</h1>
+      <p className="text-sm text-[var(--text-secondary)] mb-8">
         All workspaces. Click a row to open the detail panel.
         {planFilter && (
           <span className="ml-2 text-neutral-500">
@@ -166,16 +166,16 @@ export default function AdminCustomersPage() {
           </span>
         )}
       </p>
-      <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden">
+      <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
         <table className="w-full text-left text-sm">
           <thead>
-            <tr className="border-b border-neutral-200 bg-neutral-50">
-              <th className="px-4 py-3 font-semibold text-neutral-900">Workspace</th>
-              <th className="px-4 py-3 font-semibold text-neutral-900">Owner</th>
-              <th className="px-4 py-3 font-semibold text-neutral-900">Plan</th>
-              <th className="px-4 py-3 font-semibold text-neutral-900">Sessions</th>
-              <th className="px-4 py-3 font-semibold text-neutral-900">Members</th>
-              <th className="px-4 py-3 font-semibold text-neutral-900">Created</th>
+            <tr className="border-b border-[var(--border)] bg-[var(--surface-subtle)]">
+              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Workspace</th>
+              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Owner</th>
+              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Plan</th>
+              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Sessions</th>
+              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Members</th>
+              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Created</th>
             </tr>
           </thead>
           <tbody>
@@ -183,21 +183,21 @@ export default function AdminCustomersPage() {
               <tr
                 key={row.id}
                 onClick={() => setSelected(row)}
-                className={`border-b border-neutral-100 cursor-pointer transition ${
-                  selected?.id === row.id ? "bg-[#EBF4FF]" : "hover:bg-neutral-50"
+                className={`border-b border-[var(--border)] cursor-pointer transition ${
+                  selected?.id === row.id ? "bg-[var(--brand-subtle)]" : "hover:bg-[var(--surface-hover)]"
                 }`}
               >
-                <td className="px-4 py-2.5 font-medium text-neutral-900">{row.name}</td>
-                <td className="px-4 py-2.5 text-neutral-600">
+                <td className="px-4 py-2.5 font-medium text-[var(--text-heading)]">{row.name}</td>
+                <td className="px-4 py-2.5 text-[var(--text-secondary)]">
                   {(row.ownerEmail ?? row.ownerName ?? row.ownerId) || "—"}
                 </td>
                 <td className="px-4 py-2.5">
-                  <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-700">
+                  <span className="rounded-full bg-[var(--surface-hover)] px-2 py-0.5 text-xs font-medium text-neutral-700">
                     {row.plan}
                   </span>
                 </td>
-                <td className="px-4 py-2.5 text-neutral-600">{row.sessionsUsed}</td>
-                <td className="px-4 py-2.5 text-neutral-600">{row.members}</td>
+                <td className="px-4 py-2.5 text-[var(--text-secondary)]">{row.sessionsUsed}</td>
+                <td className="px-4 py-2.5 text-[var(--text-secondary)]">{row.members}</td>
                 <td className="px-4 py-2.5 text-neutral-500 text-xs">
                   {row.createdAt ? new Date(row.createdAt).toLocaleDateString() : "—"}
                 </td>
@@ -214,14 +214,14 @@ export default function AdminCustomersPage() {
             onClick={() => setSelected(null)}
             aria-hidden
           />
-          <div className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-white border-l border-neutral-200 shadow-xl z-50 overflow-auto">
+          <div className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-white border-l border-[var(--border)] shadow-xl z-50 overflow-auto">
             <div className="p-6 space-y-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-neutral-900">{selected.name}</h2>
+                <h2 className="text-lg font-semibold text-[var(--text-heading)]">{selected.name}</h2>
                 <button
                   type="button"
                   onClick={() => setSelected(null)}
-                  className="rounded-lg p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700"
+                  className="rounded-lg p-1.5 text-neutral-500 hover:bg-[var(--surface-hover)] hover:text-neutral-700"
                   aria-label="Close"
                 >
                   ×
@@ -236,27 +236,27 @@ export default function AdminCustomersPage() {
                 <dl className="space-y-2 text-sm">
                   <div>
                     <dt className="text-neutral-500">Workspace name</dt>
-                    <dd className="text-neutral-900 font-medium">{selected.name}</dd>
+                    <dd className="text-[var(--text-heading)] font-medium">{selected.name}</dd>
                   </div>
                   <div>
                     <dt className="text-neutral-500">Owner email</dt>
-                    <dd className="text-neutral-900">{selected.ownerEmail ?? selected.ownerId ?? "—"}</dd>
+                    <dd className="text-[var(--text-heading)]">{selected.ownerEmail ?? selected.ownerId ?? "—"}</dd>
                   </div>
                   <div>
                     <dt className="text-neutral-500">Plan</dt>
-                    <dd className="text-neutral-900">{PLAN_LABELS[selected.plan] ?? selected.plan}</dd>
+                    <dd className="text-[var(--text-heading)]">{PLAN_LABELS[selected.plan] ?? selected.plan}</dd>
                   </div>
                   <div>
                     <dt className="text-neutral-500">Sessions used</dt>
-                    <dd className="text-neutral-900">{selected.sessionsUsed}</dd>
+                    <dd className="text-[var(--text-heading)]">{selected.sessionsUsed}</dd>
                   </div>
                   <div>
                     <dt className="text-neutral-500">Members</dt>
-                    <dd className="text-neutral-900">{selected.members}</dd>
+                    <dd className="text-[var(--text-heading)]">{selected.members}</dd>
                   </div>
                   <div>
                     <dt className="text-neutral-500">Created date</dt>
-                    <dd className="text-neutral-900">
+                    <dd className="text-[var(--text-heading)]">
                       {selected.createdAt ? new Date(selected.createdAt).toLocaleDateString() : "—"}
                     </dd>
                   </div>
@@ -284,7 +284,7 @@ export default function AdminCustomersPage() {
                   value={newPlan || selected.plan}
                   onChange={(e) => setNewPlan(e.target.value)}
                   disabled={actionLoading}
-                  className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm mb-2 disabled:opacity-60"
+                  className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm mb-2 disabled:opacity-50"
                 >
                   {PLAN_OPTIONS.map((p) => (
                     <option key={p} value={p}>
@@ -299,7 +299,7 @@ export default function AdminCustomersPage() {
                     actionLoading ||
                     (newPlan || selected.plan) === (selected.billing?.plan ?? selected.plan)
                   }
-                  className="rounded-lg px-3 py-2 text-sm font-medium bg-[#1775E0] text-white hover:bg-[#1775E0]/90 disabled:opacity-60 w-full"
+                  className="rounded-lg px-3 py-2 text-sm font-medium bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 disabled:opacity-50 w-full"
                 >
                   {actionLoading ? "Updating…" : "Change Plan"}
                 </button>
@@ -310,7 +310,7 @@ export default function AdminCustomersPage() {
                 <h3 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-3">
                   Limits
                 </h3>
-                <p className="text-xs text-neutral-600 mb-2">
+                <p className="text-xs text-[var(--text-secondary)] mb-2">
                   Plan default:{" "}
                   {selected.planLimitSessions != null
                     ? `${selected.planLimitSessions} sessions`
@@ -329,7 +329,7 @@ export default function AdminCustomersPage() {
                       : "Empty = plan default (unlimited)"
                   }
                   disabled={actionLoading}
-                  className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm mb-2 disabled:opacity-60"
+                  className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm mb-2 disabled:opacity-50"
                 />
                 {/* Status: Custom limit | Unlimited | Using plan default */}
                 <p className="text-xs text-neutral-500 mb-2">
@@ -364,7 +364,7 @@ export default function AdminCustomersPage() {
                       }
                     }}
                     disabled={actionLoading}
-                    className="rounded-lg px-3 py-2 text-sm font-medium bg-neutral-100 text-neutral-800 hover:bg-neutral-200 disabled:opacity-60"
+                    className="rounded-lg px-3 py-2 text-sm font-medium bg-[var(--surface-hover)] text-neutral-800 hover:bg-[var(--surface-hover)] disabled:opacity-50"
                   >
                     {actionLoading ? "Updating…" : "Set limit"}
                   </button>
@@ -374,7 +374,7 @@ export default function AdminCustomersPage() {
                       runAction(selected.id, "grant_unlimited_sessions", {}, "Limit updated")
                     }
                     disabled={actionLoading}
-                    className="rounded-lg px-3 py-2 text-sm font-medium bg-neutral-100 text-neutral-800 hover:bg-neutral-200 disabled:opacity-60"
+                    className="rounded-lg px-3 py-2 text-sm font-medium bg-[var(--surface-hover)] text-neutral-800 hover:bg-[var(--surface-hover)] disabled:opacity-50"
                   >
                     {actionLoading ? "Updating…" : "Grant unlimited"}
                   </button>
@@ -385,7 +385,7 @@ export default function AdminCustomersPage() {
                         runAction(selected.id, "remove_session_override", {}, "Override removed")
                       }
                       disabled={actionLoading}
-                      className="rounded-lg px-3 py-2 text-sm font-medium bg-neutral-100 text-neutral-800 hover:bg-neutral-200 disabled:opacity-60"
+                      className="rounded-lg px-3 py-2 text-sm font-medium bg-[var(--surface-hover)] text-neutral-800 hover:bg-[var(--surface-hover)] disabled:opacity-50"
                     >
                       {actionLoading ? "Updating…" : "Remove override"}
                     </button>
@@ -404,7 +404,7 @@ export default function AdminCustomersPage() {
                       type="button"
                       onClick={() => handleResume(selected)}
                       disabled={actionLoading}
-                      className="w-full rounded-lg px-3 py-2 text-sm font-medium bg-[var(--color-success-bg)] text-[var(--color-success-solid)] border border-[var(--color-success-border)] hover:bg-[var(--color-success-bg)] disabled:opacity-60"
+                      className="w-full rounded-lg px-3 py-2 text-sm font-medium bg-[var(--color-success-bg)] text-[var(--color-success-solid)] border border-[var(--color-success-border)] hover:bg-[var(--color-success-bg)] disabled:opacity-50"
                     >
                       {actionLoading ? "Updating…" : "Resume workspace"}
                     </button>
@@ -413,7 +413,7 @@ export default function AdminCustomersPage() {
                       type="button"
                       onClick={() => handleSuspend(selected)}
                       disabled={actionLoading}
-                      className="w-full rounded-lg px-3 py-2 text-sm font-medium bg-[var(--color-danger-bg)] text-[var(--color-danger)] border border-[var(--color-danger-border)] hover:bg-[var(--color-danger-bg)] disabled:opacity-60"
+                      className="w-full rounded-lg px-3 py-2 text-sm font-medium bg-[var(--color-danger-bg)] text-[var(--color-danger)] border border-[var(--color-danger-border)] hover:bg-[var(--color-danger-bg)] disabled:opacity-50"
                     >
                       {actionLoading ? "Suspending…" : "Suspend workspace"}
                     </button>
@@ -433,22 +433,22 @@ export default function AdminCustomersPage() {
       >
         {confirm && (
           <div className="p-6">
-            <h3 id="confirm-title" className="text-lg font-semibold text-neutral-900">
+            <h3 id="confirm-title" className="text-lg font-semibold text-[var(--text-heading)]">
               {confirm.title}
             </h3>
-            <p className="mt-2 text-sm text-neutral-600">{confirm.message}</p>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">{confirm.message}</p>
             <div className="mt-6 flex gap-3 justify-end">
               <button
                 type="button"
                 onClick={closeConfirm}
-                className="rounded-lg px-3 py-2 text-sm font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200"
+                className="rounded-lg px-3 py-2 text-sm font-medium text-neutral-700 bg-[var(--surface-hover)] hover:bg-[var(--surface-hover)]"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={confirm.onConfirm}
-                className="rounded-lg px-3 py-2 text-sm font-medium bg-[#1775E0] text-white hover:bg-[#1775E0]/90"
+                className="rounded-lg px-3 py-2 text-sm font-medium bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90"
               >
                 {confirm.confirmLabel ?? "Confirm"}
               </button>

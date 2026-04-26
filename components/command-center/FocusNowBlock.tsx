@@ -24,7 +24,7 @@ export function FocusNowBlock({ items, onSelect }: FocusNowBlockProps) {
       aria-label="Focus now"
     >
       <header className="px-4 py-3 border-b border-[var(--layer-2-border)]">
-        <h2 className="text-[12px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))]">
+        <h2 className="text-[12px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
           Focus now
         </h2>
       </header>
@@ -34,9 +34,9 @@ export function FocusNowBlock({ items, onSelect }: FocusNowBlockProps) {
             <button
               type="button"
               onClick={() => onSelect(item.id, item.sessionId)}
-              className="w-full text-left px-4 py-2.5 text-[13px] text-[hsl(var(--text-primary-strong))] hover:bg-black/[0.02] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[var(--accent-operational)]"
+              className="w-full text-left px-4 py-2.5 text-[14px] text-[var(--text-primary-strong)] hover:bg-black/[0.02] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[var(--accent-operational)]"
             >
-              <span className="tabular-nums text-[hsl(var(--text-tertiary))] mr-2 text-[11px]">
+              <span className="tabular-nums text-[var(--text-tertiary)] mr-2 text-[12px]">
                 {item.impactScore}
               </span>
               <span className="truncate">{item.title}</span>

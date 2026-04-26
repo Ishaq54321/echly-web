@@ -125,21 +125,21 @@ export function FeedbackListPanel({
             }}
             aria-label={isChecked ? "Deselect" : "Select"}
           >
-            {isChecked ? <CheckSquare className="h-4 w-4 text-[var(--accent-operational)]" strokeWidth={1.5} /> : <Square className="h-4 w-4 text-[hsl(var(--text-tertiary))]" strokeWidth={1.5} />}
+            {isChecked ? <CheckSquare className="h-4 w-4 text-[var(--accent-operational)]" strokeWidth={1.5} /> : <Square className="h-4 w-4 text-[var(--text-tertiary)]" strokeWidth={1.5} />}
           </button>
         ) : (
           <span className="shrink-0 w-5 flex items-center justify-center" aria-hidden>
             {isUnread ? (
               <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-warning-dot)]/90" />
             ) : (
-              <Check className="h-3.5 w-3.5 text-[hsl(var(--text-tertiary))]" strokeWidth={2} />
+              <Check className="h-3.5 w-3.5 text-[var(--text-tertiary)]" strokeWidth={2} />
             )}
           </span>
         )}
         <div className="min-w-0 flex-1">
           {item.title?.trim() ? (
             <div
-              className={`text-[13px] truncate ${isUnread ? "font-semibold" : "font-normal"} text-[hsl(var(--text-primary-strong))]`}
+              className={`text-[14px] truncate ${isUnread ? "font-semibold" : "font-normal"} text-[var(--text-primary-strong)]`}
             >
               {item.title}
             </div>
@@ -160,7 +160,7 @@ export function FeedbackListPanel({
           <button
             type="button"
             onClick={() => onSelectionModeChange(!selectionMode)}
-            className={`text-[12px] ${selectionMode ? "text-[var(--accent-operational)]" : "text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))]"}`}
+            className={`text-[12px] ${selectionMode ? "text-[var(--accent-operational)]" : "text-[var(--text-tertiary)] hover:text-[var(--text-primary-strong)]"}`}
           >
             {selectionMode ? "Done" : "Select"}
           </button>
@@ -169,7 +169,7 @@ export function FeedbackListPanel({
 
       {selectionMode && bulkCount > 0 && onSelectedIdsChange && (
         <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-[var(--layer-2-border)] bg-[var(--structural-gray-ticket)]">
-          <span className="text-[12px] text-[hsl(var(--text-tertiary))]">{bulkCount} selected</span>
+          <span className="text-[12px] text-[var(--text-tertiary)]">{bulkCount} selected</span>
           <button type="button" className="text-[12px] text-[var(--accent-operational)] hover:underline" onClick={() => onSelectedIdsChange(new Set())}>Clear</button>
           {onBulkResolve && <button type="button" className="text-[12px] text-[var(--accent-operational)] hover:underline" onClick={() => onBulkResolve()}>Resolve</button>}
         </div>
@@ -177,13 +177,13 @@ export function FeedbackListPanel({
 
       <div ref={listContainerRef} className="flex-1 min-h-0 overflow-y-auto" tabIndex={-1}>
         {items.length === 0 ? (
-          <p className="py-8 text-center text-[13px] text-[hsl(var(--text-tertiary))]">No items</p>
+          <p className="py-8 text-center text-[14px] text-[var(--text-tertiary)]">No items</p>
         ) : (
           <div className="py-1">
             <button
               type="button"
               onClick={() => setOpenExpanded((x) => !x)}
-              className="flex items-center gap-2 w-full px-4 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))] hover:bg-black/[0.02]"
+              className="flex items-center gap-2 w-full px-4 py-2 text-left text-[12px] font-medium uppercase tracking-wider text-[var(--text-tertiary)] hover:bg-black/[0.02]"
             >
               {openExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
               Open ({openItems.length})
@@ -193,7 +193,7 @@ export function FeedbackListPanel({
             <button
               type="button"
               onClick={() => setResolvedExpanded((x) => !x)}
-              className="flex items-center gap-2 w-full px-4 py-2 mt-1 text-left text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))] hover:bg-black/[0.02]"
+              className="flex items-center gap-2 w-full px-4 py-2 mt-1 text-left text-[12px] font-medium uppercase tracking-wider text-[var(--text-tertiary)] hover:bg-black/[0.02]"
             >
               {resolvedExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
               Resolved ({resolvedItems.length})

@@ -32,7 +32,7 @@ export default function AdminUsagePage() {
   if (loading) {
     return (
       <div className="p-8">
-        <h1 className="text-2xl font-semibold text-neutral-900 mb-8">Usage</h1>
+        <h1 className="text-2xl font-semibold text-[var(--text-heading)] mb-8">Usage</h1>
         <p className="text-sm text-neutral-500">Loading…</p>
       </div>
     );
@@ -41,7 +41,7 @@ export default function AdminUsagePage() {
   if (!stats) {
     return (
       <div className="p-8">
-        <h1 className="text-2xl font-semibold text-neutral-900 mb-8">Usage</h1>
+        <h1 className="text-2xl font-semibold text-[var(--text-heading)] mb-8">Usage</h1>
         <p className="text-sm text-[var(--color-danger)]">Failed to load usage stats.</p>
       </div>
     );
@@ -57,18 +57,18 @@ export default function AdminUsagePage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold text-neutral-900 mb-1">Usage</h1>
-      <p className="text-sm text-neutral-600 mb-8">
+      <h1 className="text-2xl font-semibold text-[var(--text-heading)] mb-1">Usage</h1>
+      <p className="text-sm text-[var(--text-secondary)] mb-8">
         Platform-wide usage. Charts optional.
       </p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {cards.map(({ label, value }) => (
           <div
             key={label}
-            className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm"
+            className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm"
           >
             <p className="text-sm font-medium text-neutral-500">{label}</p>
-            <p className="mt-1 text-2xl font-semibold text-neutral-900">{value}</p>
+            <p className="mt-1 text-2xl font-semibold text-[var(--text-heading)]">{value}</p>
           </div>
         ))}
       </div>

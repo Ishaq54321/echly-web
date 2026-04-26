@@ -11,9 +11,9 @@ const variantClasses: Record<ButtonVariant, string> = {
   primary:
     "btn-primary-glow bg-[var(--color-primary)] text-white shadow-[0_2px_8px_rgba(26,86,219,0.28)] hover:bg-[var(--color-primary-hover)] active:scale-[0.98]",
   secondary:
-    "bg-[var(--layer-1-bg)] border border-[var(--layer-2-border)] text-[hsl(var(--text-primary-strong))] shadow-[0_1px_0_rgba(255,255,255,0.5)_inset] hover:bg-[var(--layer-2-hover-bg)] hover:border-[var(--layer-2-border)] hover:-translate-y-px active:translate-y-0",
+    "bg-[var(--layer-1-bg)] border border-[var(--layer-2-border)] text-[var(--text-primary-strong)] shadow-[0_1px_0_rgba(255,255,255,0.5)_inset] hover:bg-[var(--layer-2-hover-bg)] hover:border-[var(--layer-2-border)] hover:-translate-y-px active:translate-y-0",
   ghost:
-    "bg-transparent text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))]",
+    "bg-transparent text-[var(--text-secondary-soft)] hover:bg-[var(--layer-2-hover-bg)] hover:text-[var(--text-primary-strong)]",
   danger:
     "bg-[var(--color-danger)] text-white shadow-[0_2px_8px_rgba(229,72,77,0.25)] hover:opacity-95 active:scale-[0.998]",
 };

@@ -20,9 +20,9 @@ const COMPANY_SIZES = [
 
 /* Minimal card base; selection feedback comes from moving highlight */
 const ROLE_GRID_CLASS =
-  "relative flex flex-col items-center justify-center gap-2 h-[90px] rounded-xl border border-[#EBEBEB] bg-white/60 backdrop-blur-sm cursor-pointer transition-all duration-150 hover:bg-white/80 hover:border-[#466EFF] hover:scale-[1.02] active:scale-[0.97]";
+  "relative flex flex-col items-center justify-center gap-2 h-[90px] rounded-xl border border-[var(--border)] bg-white/60 backdrop-blur-sm cursor-pointer transition-all duration-150 hover:bg-white/80 hover:border-[#466EFF] hover:scale-[1.02] active:scale-[0.97]";
 const SIZE_OPTION_CLASS =
-  "relative rounded-xl bg-white/60 border border-[#EBEBEB] backdrop-blur-sm py-4 text-center cursor-pointer transition-all duration-150 hover:bg-white/80 hover:border-[#466EFF] hover:scale-[1.02] active:scale-[0.97]";
+  "relative rounded-xl bg-white/60 border border-[var(--border)] backdrop-blur-sm py-4 text-center cursor-pointer transition-all duration-150 hover:bg-white/80 hover:border-[#466EFF] hover:scale-[1.02] active:scale-[0.97]";
 
 export type WorkspaceFormValues = {
   workspaceName: string;
@@ -31,7 +31,7 @@ export type WorkspaceFormValues = {
 };
 
 const inputClass =
-  "w-full h-11 rounded-xl bg-white/70 border border-[#EBEBEB] px-4 text-gray-900 placeholder:text-gray-400 backdrop-blur-sm focus:outline-none focus:border-[#466EFF] focus:ring-[3px] focus:ring-[#466EFF]/20 transition-all duration-150 ease-out";
+  "w-full h-11 rounded-xl bg-white/70 border border-[var(--border)] px-4 text-[var(--text-heading)] placeholder:text-gray-400 backdrop-blur-sm focus:outline-none focus:border-[#466EFF] focus:ring-[3px] focus:ring-[#466EFF]/20 transition-all duration-150 ease-out";
 
 type HighlightStyle = { left: number; top: number; width: number; height: number } | null;
 
@@ -99,7 +99,7 @@ export function WorkspaceForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col space-y-6">
       <div>
-        <label htmlFor="workspace-name" className="block text-[16px] font-semibold text-gray-900 mb-2">
+        <label htmlFor="workspace-name" className="block text-[16px] font-semibold text-[var(--text-heading)] mb-2">
           Workspace Name
         </label>
         <input
@@ -114,7 +114,7 @@ export function WorkspaceForm({
       </div>
 
       <div>
-        <span className="block text-[16px] font-semibold text-gray-900 mb-2">Role</span>
+        <span className="block text-[16px] font-semibold text-[var(--text-heading)] mb-2">Role</span>
         <div ref={roleContainerRef} className="relative grid grid-cols-3 gap-4 mt-4">
           <div className="absolute inset-0 pointer-events-none" aria-hidden>
             <div
@@ -139,15 +139,15 @@ export function WorkspaceForm({
               onClick={() => setRole(id)}
               className={ROLE_GRID_CLASS}
             >
-              <Icon className={`w-6 h-6 shrink-0 ${role === id ? "text-[#466EFF]" : "text-gray-500"}`} />
-              <span className={`text-sm font-medium ${role === id ? "text-[#1462C4]" : "text-gray-700"}`}>{id}</span>
+              <Icon className={`w-6 h-6 shrink-0 ${role === id ? "text-[var(--brand)]" : "text-[var(--text-secondary)]"}`} />
+              <span className={`text-sm font-medium ${role === id ? "text-[#1462C4]" : "text-[var(--text-body)]"}`}>{id}</span>
             </button>
           ))}
         </div>
       </div>
 
       <div>
-        <span className="block text-[16px] font-semibold text-gray-900 mb-2">Company Size</span>
+        <span className="block text-[16px] font-semibold text-[var(--text-heading)] mb-2">Company Size</span>
         <div ref={sizeContainerRef} className="relative grid grid-cols-4 gap-3 mt-4">
           <div className="absolute inset-0 pointer-events-none" aria-hidden>
             <div
@@ -174,8 +174,8 @@ export function WorkspaceForm({
                 onClick={() => setCompanySize(value)}
                 className={SIZE_OPTION_CLASS}
               >
-                <span className={`block text-lg font-semibold ${isSelected ? "text-[#1462C4]" : "text-gray-700"}`}>{number}</span>
-                <span className={`block text-xs ${isSelected ? "text-[#466EFF]" : "text-gray-700"}`}>{label}</span>
+                <span className={`block text-lg font-semibold ${isSelected ? "text-[#1462C4]" : "text-[var(--text-body)]"}`}>{number}</span>
+                <span className={`block text-xs ${isSelected ? "text-[var(--brand)]" : "text-[var(--text-body)]"}`}>{label}</span>
               </button>
             );
           })}
@@ -185,7 +185,7 @@ export function WorkspaceForm({
       <button
         type="submit"
         disabled={loading || !workspaceName.trim()}
-        className="h-12 w-full rounded-xl font-semibold text-white text-[16px] transition-all duration-150 ease-out disabled:opacity-60 flex items-center justify-center mt-8 hover:scale-[1.02] hover:shadow-[0_14px_40px_rgba(70,110,255,0.35)] active:scale-[0.97]"
+        className="h-12 w-full rounded-xl font-semibold text-white text-[16px] transition-all duration-150 ease-out disabled:opacity-50 flex items-center justify-center mt-8 hover:scale-[1.02] hover:shadow-[0_14px_40px_rgba(70,110,255,0.35)] active:scale-[0.97]"
         style={{
           background: "linear-gradient(135deg, #466EFF, #6A8CFF)",
           boxShadow: "0 10px 28px rgba(70,110,255,0.28)",

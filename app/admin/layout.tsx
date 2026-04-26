@@ -50,7 +50,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
 
   if (authLoading || !user) {
     return (
-      <div className="flex h-full items-center justify-center bg-neutral-50">
+      <div className="flex h-full items-center justify-center bg-[var(--surface-subtle)]">
         <div className="text-sm text-neutral-500">Loading…</div>
       </div>
     );
@@ -58,7 +58,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
 
   if (!adminChecked) {
     return (
-      <div className="flex h-full items-center justify-center bg-neutral-50">
+      <div className="flex h-full items-center justify-center bg-[var(--surface-subtle)]">
         <div className="text-sm text-neutral-500">Loading…</div>
       </div>
     );
@@ -66,16 +66,16 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
 
   if (error) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 bg-neutral-50 px-6">
+      <div className="flex h-full flex-col items-center justify-center gap-2 bg-[var(--surface-subtle)] px-6">
         <div className="text-sm font-medium text-[var(--color-danger)]">Could not verify admin access</div>
-        <div className="max-w-md text-center text-sm text-neutral-600">{error.message}</div>
+        <div className="max-w-md text-center text-sm text-[var(--text-secondary)]">{error.message}</div>
       </div>
     );
   }
 
   if (!isAdmin) {
     return (
-      <div className="flex h-full items-center justify-center bg-neutral-50">
+      <div className="flex h-full items-center justify-center bg-[var(--surface-subtle)]">
         <div className="text-sm text-neutral-500">Loading…</div>
       </div>
     );

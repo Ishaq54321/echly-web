@@ -26,7 +26,7 @@ export function CriticalIssuesSection({
       className="mb-8 rounded-xl border border-[var(--layer-1-border)] bg-[var(--layer-1-bg)] py-5 px-5 shadow-[var(--shadow-level-1)]"
       aria-label="Critical Issues"
     >
-      <h2 className="text-[16px] font-semibold leading-[1.35] tracking-[-0.01em] text-[hsl(var(--text-primary-strong))] mb-4">
+      <h2 className="text-[16px] font-semibold leading-[1.35] tracking-[-0.01em] text-[var(--text-primary-strong)] mb-4">
         Critical Issues
       </h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
@@ -41,12 +41,12 @@ export function CriticalIssuesSection({
               className="dashboard-card text-left w-full hover:border-[var(--layer-2-hover-border)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] focus:ring-offset-1"
             >
               {item.title?.trim() ? (
-                <div className="text-[14px] font-semibold leading-[1.4] text-[hsl(var(--text-primary-strong))] truncate">
+                <div className="text-[14px] font-semibold leading-[1.4] text-[var(--text-primary-strong)] truncate">
                   {item.title}
                 </div>
               ) : null}
               {open != null ? (
-                <div className="text-[12px] text-[hsl(var(--text-tertiary))] mt-1 tabular-nums">
+                <div className="text-[12px] text-[var(--text-tertiary)] mt-1 tabular-nums">
                   {open} open
                 </div>
               ) : null}

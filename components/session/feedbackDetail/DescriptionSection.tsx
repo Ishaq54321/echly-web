@@ -76,7 +76,7 @@ export function DescriptionSection({
               onChange={(e) => onDraftChange?.(e.target.value)}
               onBlur={handleBlur}
               onKeyDown={handleKeyDown}
-              className="w-full min-h-[100px] rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] p-4 text-[15px] leading-[1.7] text-[hsl(var(--text-primary-strong))] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-[var(--motion-duration)] resize-none overflow-hidden"
+              className="w-full min-h-[100px] rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] p-4 text-[15px] leading-[1.7] text-[var(--text-primary-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-[var(--motion-duration)] resize-none overflow-hidden"
               autoFocus
               aria-label="Edit description"
             />
@@ -84,7 +84,7 @@ export function DescriptionSection({
               <button
                 type="button"
                 onClick={onCancel}
-                className="text-[14px] font-medium px-3 py-2 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] cursor-pointer"
+                className="text-[14px] font-medium px-3 py-2 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[var(--text-secondary-soft)] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] cursor-pointer"
               >
                 Cancel
               </button>
@@ -112,7 +112,7 @@ export function DescriptionSection({
               role={hasEdit ? "button" : undefined}
               tabIndex={hasEdit ? 0 : undefined}
             >
-              <p className="text-[15px] leading-[1.7] text-[hsl(var(--text-primary-strong))] flex-1 pr-6">
+              <p className="text-[15px] leading-[1.7] text-[var(--text-primary-strong)] flex-1 pr-6">
                 {displayValue || (hasEdit ? "Add description…" : "")}
               </p>
               {hasEdit && (
@@ -125,7 +125,7 @@ export function DescriptionSection({
                   ) : (
                     <Pencil
                       size={14}
-                      className="opacity-0 group-hover:opacity-60 transition-[opacity] duration-[120ms] ease text-[hsl(var(--text-secondary))] shrink-0"
+                      className="opacity-0 group-hover:opacity-60 transition-[opacity] duration-[120ms] ease text-[var(--text-secondary)] shrink-0"
                       aria-hidden
                     />
                   )}
@@ -141,7 +141,7 @@ export function DescriptionSection({
             role={hasEdit ? "button" : undefined}
             tabIndex={hasEdit ? 0 : undefined}
           >
-            <p className="text-[15px] leading-[1.7] text-[hsl(var(--text-primary-strong))] flex-1 pr-6">
+            <p className="text-[15px] leading-[1.7] text-[var(--text-primary-strong)] flex-1 pr-6">
               {displayValue || (hasEdit ? "Add description…" : "")}
             </p>
             {hasEdit && (
@@ -154,7 +154,7 @@ export function DescriptionSection({
                 ) : (
                   <Pencil
                     size={14}
-                    className="opacity-0 group-hover:opacity-60 transition-[opacity] duration-[120ms] ease text-[hsl(var(--text-secondary))] shrink-0"
+                    className="opacity-0 group-hover:opacity-60 transition-[opacity] duration-[120ms] ease text-[var(--text-secondary)] shrink-0"
                     aria-hidden
                   />
                 )}

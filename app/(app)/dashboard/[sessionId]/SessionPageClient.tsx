@@ -1,6 +1,9 @@
 "use client";
 
 import { authFetch, type AuthFetchInit } from "@/lib/authFetch";
+import Image from "next/image";
+import Link from "next/link";
+import { PanelLeftClose, Home, MessageSquare, Activity, Settings, Share2 } from "lucide-react";
 import { clearShareToken, getActiveShareToken, setShareToken } from "@/lib/client/shareToken";
 import {
   useEffect,
@@ -51,6 +54,21 @@ import { TopControlBar } from "@/components/ui/TopControlBar";
 import { useToast } from "@/components/dashboard/context/ToastContext";
 import { ImageViewer } from "@/components/ImageViewer";
 import { ResolveToast, type ResolveToastState } from "@/components/ui/ResolveToast";
+import { formatDistanceToNow } from "date-fns";
+
+function formatRelativeTime(timestamp: unknown): string {
+  try {
+    const date =
+      typeof timestamp === "object" &&
+      timestamp !== null &&
+      "seconds" in timestamp
+        ? new Date((timestamp as { seconds: number }).seconds * 1000)
+        : new Date(timestamp as string | number);
+    return formatDistanceToNow(date, { addSuffix: true });
+  } catch {
+    return "Just now";
+  }
+}
 
 const DeleteSessionModal = dynamic(
   () =>
@@ -155,6 +173,23 @@ type SessionLoadedInfo = {
   workspaceName: string | null;
   createdAt: string | null;
 };
+
+function NavOverlayItem({ href, label, onClick, active, children }: { href: string; label: string; onClick: () => void; active: boolean; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      className={`flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-sm)] text-[14px] font-medium transition-colors mb-0.5 ${
+        active
+          ? "bg-[var(--surface-hover)] text-[var(--text-heading)]"
+          : "text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)]"
+      }`}
+    >
+      <span className="text-[var(--text-secondary)] shrink-0">{children}</span>
+      {label}
+    </Link>
+  );
+}
 
 export default function SessionPageClient({
   sessionId,
@@ -678,6 +713,7 @@ export default function SessionPageClient({
     }
   }
 
+  const [navPanelOpen, setNavPanelOpen] = useState(false);
   const [isTicketNavigatorOpen, setIsTicketNavigatorOpen] = useState(false);
   const [isCommentMode, setIsCommentMode] = useState(false);
   const [isCommentPanelOpen, setIsCommentPanelOpen] = useState(false);
@@ -1633,9 +1669,11 @@ export default function SessionPageClient({
         return;
       }
       setFeedback((prev) =>
-        prev.map((item) =>
-          item.id === effectiveSelectedId ? { ...item, ...ticketPayload } : item
-        )
+        prev.map((item) => {
+          if (item.id !== effectiveSelectedId) return item;
+          const { suggestedTags, ...rest } = ticketPayload;
+          return { ...item, ...rest };
+        })
       );
       broadcastTicketUpdated(ticketPayload);
     } catch (err) {
@@ -2152,10 +2190,10 @@ export default function SessionPageClient({
     return (
       <div className="flex h-full min-h-[50vh] w-full items-center justify-center p-8">
         <div className="max-w-md text-center">
-          <h1 className="text-[20px] font-semibold text-[hsl(var(--text-primary-strong))]">
+          <h1 className="text-[20px] font-semibold text-[var(--text-primary-strong)]">
             Access denied
           </h1>
-          <p className="mt-3 text-[14px] text-[hsl(var(--text-secondary-soft))]">
+          <p className="mt-3 text-[14px] text-[var(--text-secondary-soft)]">
             You don&apos;t have permission to view this session.
           </p>
         </div>
@@ -2167,10 +2205,10 @@ export default function SessionPageClient({
     return (
       <div className="flex h-full min-h-[50vh] w-full items-center justify-center p-8">
         <div className="max-w-md text-center">
-          <h1 className="text-[20px] font-semibold text-[hsl(var(--text-primary-strong))]">
+          <h1 className="text-[20px] font-semibold text-[var(--text-primary-strong)]">
             Session not found
           </h1>
-          <p className="mt-3 text-[14px] text-[hsl(var(--text-secondary-soft))]">
+          <p className="mt-3 text-[14px] text-[var(--text-secondary-soft)]">
             This link may be invalid or the session was removed.
           </p>
         </div>
@@ -2182,10 +2220,10 @@ export default function SessionPageClient({
     return (
       <div className="flex h-full min-h-[50vh] w-full items-center justify-center p-8">
         <div className="max-w-md text-center">
-          <h1 className="text-[20px] font-semibold text-[hsl(var(--text-primary-strong))]">
+          <h1 className="text-[20px] font-semibold text-[var(--text-primary-strong)]">
             Couldn&apos;t load session
           </h1>
-          <p className="mt-3 text-[14px] text-[hsl(var(--text-secondary-soft))]">
+          <p className="mt-3 text-[14px] text-[var(--text-secondary-soft)]">
             Check your connection and try again.
           </p>
         </div>
@@ -2210,10 +2248,10 @@ export default function SessionPageClient({
       }
       return (
         <div className="mt-16">
-          <div className="text-[16px] font-medium text-[hsl(var(--text-primary-strong))]">
+          <div className="text-[16px] font-medium text-[var(--text-primary-strong)]">
             No feedback yet
           </div>
-          <div className="mt-2 text-[14px] text-[hsl(var(--text-tertiary))]">
+          <div className="mt-2 text-[14px] text-[var(--text-tertiary)]">
             Capture feedback to start organizing insights.
           </div>
         </div>
@@ -2334,7 +2372,7 @@ export default function SessionPageClient({
         onDismiss={() => setActionToastState("hidden")}
         errorText="Failed to save"
       />
-      <div className="flex h-full min-h-0 overflow-hidden relative">
+      <div className="flex flex-col h-full min-h-0 overflow-hidden relative">
         {!isIdentityResolved && !isAnonymousViewer && (
           <div
             aria-hidden
@@ -2348,37 +2386,45 @@ export default function SessionPageClient({
             }}
           />
         )}
-        <aside className="sidebar hidden lg:flex w-[300px] h-screen overflow-hidden shrink-0 self-start min-h-0 flex-col sticky top-0">
-          <TicketList
+        {!isPublicRoute && (
+          <TopControlBar
+            sessionId={sessionId}
             sessionTitle={session ? (session.title ?? "").trim() : ""}
+            session={session}
+            onSessionRenameSuccess={handleSessionRenameFromMenu}
+            onSetSessionArchived={handleSetSessionArchivedFromMenu}
+            onRequestDeleteSession={handleRequestDeleteSessionFromMenu}
+            publicViewer={isAnonymousViewer}
+            canManageShare={sessionAccess?.canResolve === true}
+            canManageAccess={sessionAccess?.canDeleteTicket === true}
+            isWorkspaceMember={isWorkspaceMember}
+            pendingRequestsCount={pendingRequestsCount}
+            onShareModalOpen={() => setPendingRequestsCount(0)}
+            sessionLoaded={sessionLoaded}
+            openCount={isCountsSynced ? feedbackActiveCount : Math.max(0, sessionRestOpen)}
+            resolvedCount={isCountsSynced ? feedbackResolvedCount : Math.max(0, sessionRestResolved)}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            isEditingTitle={isEditingSessionTitle}
+            onTitleClick={() => { setSessionTitleDraft((session?.title ?? "").trim()); setIsEditingSessionTitle(true); }}
+            onTitleChange={(v) => setSessionTitleDraft(v)}
+            onTitleSave={handleSessionTitleBlur}
+            onTitleCancel={() => { setIsEditingSessionTitle(false); setSessionTitleDraft((session?.title ?? "").trim()); }}
+            titleDraft={sessionTitleDraft}
+            canEditTitle={isWorkspaceMember}
+            onToggleNavPanel={() => setNavPanelOpen(true)}
+          />
+        )}
+        <div className="flex flex-1 min-h-0 overflow-hidden bg-[var(--surface-subtle)]">
+        <aside className="hidden lg:flex w-[336px] shrink-0 min-h-0 flex-col p-4 pr-2">
+          <div className="flex-1 min-h-0 flex flex-col bg-[var(--surface-card)] rounded-[var(--radius-md)] border border-[var(--border)] shadow-[var(--shadow-sm)] overflow-hidden">
+          <TicketList
             counts={{
               total: isCountsSynced ? feedbackTotal : Math.max(0, sessionRestTotal),
               open: isCountsSynced ? feedbackActiveCount : Math.max(0, sessionRestOpen),
               resolved: isCountsSynced ? feedbackResolvedCount : Math.max(0, sessionRestResolved),
             }}
             countsLoading={!hasSessionCounts}
-            {...(!isWorkspaceMember
-              ? {
-                  showTicketSearch: sessionAccess?.canView === true,
-                  showSessionOverflowMenu: false,
-                }
-              : {
-                  isEditingSessionTitle,
-                  sessionTitleDraft,
-                  onSessionTitleChange: setSessionTitleDraft,
-                  onSessionTitleSave: handleSessionTitleBlur,
-                  onSessionTitleCancel: () => {
-                    setIsEditingSessionTitle(false);
-                    setSessionTitleDraft((session?.title ?? "").trim());
-                  },
-                  onSessionTitleEdit: () => {
-                    setSessionTitleDraft((session?.title ?? "").trim());
-                    setIsEditingSessionTitle(true);
-                  },
-                  saveSessionTitleSuccess,
-                  onMarkAllTicketsResolved: handleMarkAllResolved,
-                  onMarkAllTicketsUnresolved: handleMarkAllUnresolved,
-                })}
             items={stableScopedFeedback}
             selectedId={effectiveSelectedId}
             onSelect={(id: string) => {
@@ -2401,51 +2447,35 @@ export default function SessionPageClient({
             resolvedExpanded={resolvedExpanded}
             onResolvedExpandedChange={onResolvedExpandedChange}
             isLoadingResolved={isSearchMode ? false : feedbackLoadingResolved}
-            searchQuery={searchQuery}
-            onSearchQueryChange={setSearchQuery}
             isSearchMode={isSearchMode}
             searchResults={searchResults}
             searchLoading={searchLoading}
+            sessionTitle={session?.title || "Untitled"}
+            workspaceName={workspaceName || "Workspace"}
+            updatedAt={session?.updatedAt}
+            viewCount={session?.viewCount ?? 0}
           />
+          </div>
         </aside>
 
-        <div className="content-divider hidden lg:block shrink-0" aria-hidden />
-
-        <div className="main-area flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {pendingResolveRequest && sessionAccess?.canResolve === false ? (
             <PendingAccessBanner />
           ) : null}
-          {!isPublicRoute && (
-            <TopControlBar
-              sessionId={sessionId}
-              sessionTitle={session ? (session.title ?? "").trim() : ""}
-              session={session}
-              onSessionRenameSuccess={handleSessionRenameFromMenu}
-              onSetSessionArchived={handleSetSessionArchivedFromMenu}
-              onRequestDeleteSession={handleRequestDeleteSessionFromMenu}
-              publicViewer={isAnonymousViewer}
-              canManageShare={sessionAccess?.canResolve === true}
-              canManageAccess={sessionAccess?.canDeleteTicket === true}
-              isWorkspaceMember={isWorkspaceMember}
-              pendingRequestsCount={pendingRequestsCount}
-              onShareModalOpen={() => setPendingRequestsCount(0)}
-              sessionLoaded={sessionLoaded}
-            />
-          )}
           <div className="flex flex-1 min-h-0 min-w-0">
-            <main className="surface-main flex-1 min-h-0 overflow-y-auto flex flex-col min-w-0">
+            <main className="flex-1 min-h-0 overflow-y-auto flex flex-col min-w-0 bg-[var(--surface-subtle)]">
               <div className="h-full flex flex-col min-w-0">
                 <div className="z-20 shrink-0 flex items-center gap-2 px-4 py-3 lg:hidden bg-[var(--layer-1-bg)]">
                   <button
                     type="button"
                     onClick={() => setIsTicketNavigatorOpen(true)}
-                    className="h-9 inline-flex items-center px-4 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[13px] font-medium text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-200"
+                    className="h-9 inline-flex items-center px-4 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[14px] font-medium text-[var(--text-secondary-soft)] hover:bg-[var(--layer-2-hover-bg)] hover:text-[var(--text-primary-strong)] transition-colors duration-200"
                   >
                     Tickets
                   </button>
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
-                  <div className="max-w-[800px] mx-auto w-full px-6 py-6 flex-1 min-h-0 flex flex-col">
+                  <div className="max-w-[760px] mx-auto w-full px-8 pt-10 pb-16 flex-1 min-h-0 flex flex-col">
                     {renderExecutionContent()}
                   </div>
                 </div>
@@ -2454,44 +2484,47 @@ export default function SessionPageClient({
 
             {/* Comment panel: opens when comment mode is active or a thread is selected. */}
             <div
-              className="shrink-0 flex flex-col min-h-0 bg-[var(--canvas-base)] shadow-[-8px_0_24px_-12px_rgba(15,23,42,0.12)] transition-[width] duration-200 ease-out overflow-hidden"
-              style={{ width: (isCommentPanelOpen || activeThreadId != null) ? 380 : 0 }}
+              className="shrink-0 flex flex-col min-h-0 transition-[width] duration-[250ms] ease-out overflow-visible p-4 pl-2"
+              style={{ width: (isCommentPanelOpen || activeThreadId != null) ? 404 : 0 }}
             >
               {(isCommentPanelOpen || activeThreadId != null) && (
-                <CommentPanel
-                  variant="sidebar"
-                  isOpen
-                  onClose={() => {
-                    setActiveThreadId(null);
-                    setIsCommentPanelOpen(false);
-                    setIsCommentMode(false);
-                  }}
-                  comments={comments}
-                  loading={loadingComments}
-                  threadCounts={displayCommentThreadCounts}
-                  onRefreshComments={() => void refetchComments()}
-                  sendReply={sendReply}
-                  sendComment={sendComment}
-                  activeThreadId={activeThreadId}
-                  onSelectThread={setActiveThreadId}
-                  currentUserId={authUid}
-                  currentUserInitial={authDisplayName ? authDisplayName.charAt(0).toUpperCase() : "?"}
-                  currentUserName={authDisplayName || undefined}
-                  currentUserAvatarUrl={authPhotoUrl || undefined}
-                  updateComment={updateComment}
-                  deleteComment={deleteComment}
-                  onReactionsChanged={handleReactionsChanged}
-                  participants={participants}
-                  showToast={showToast}
-                  ticketTitleMap={ticketTitleMap}
-                  selectedTicketTitle={selectedTicketTitle}
-                  onNavigateToTicket={(fid: string) => setSelectedId(fid)}
-                  onAnimatePin={triggerPinAnimation}
-                  animatingCommentId={animatingCommentId}
-                />
+                <div className="flex-1 min-h-0 bg-[var(--surface-card)] rounded-[var(--radius-md)] border border-[var(--border)] shadow-[var(--shadow-sm)] overflow-hidden flex flex-col">
+                  <CommentPanel
+                    variant="sidebar"
+                    isOpen
+                    onClose={() => {
+                      setActiveThreadId(null);
+                      setIsCommentPanelOpen(false);
+                      setIsCommentMode(false);
+                    }}
+                    comments={comments}
+                    loading={loadingComments}
+                    threadCounts={displayCommentThreadCounts}
+                    onRefreshComments={() => void refetchComments()}
+                    sendReply={sendReply}
+                    sendComment={sendComment}
+                    activeThreadId={activeThreadId}
+                    onSelectThread={setActiveThreadId}
+                    currentUserId={authUid}
+                    currentUserInitial={authDisplayName ? authDisplayName.charAt(0).toUpperCase() : "?"}
+                    currentUserName={authDisplayName || undefined}
+                    currentUserAvatarUrl={authPhotoUrl || undefined}
+                    updateComment={updateComment}
+                    deleteComment={deleteComment}
+                    onReactionsChanged={handleReactionsChanged}
+                    participants={participants}
+                    showToast={showToast}
+                    ticketTitleMap={ticketTitleMap}
+                    selectedTicketTitle={selectedTicketTitle}
+                    onNavigateToTicket={(fid: string) => setSelectedId(fid)}
+                    onAnimatePin={triggerPinAnimation}
+                    animatingCommentId={animatingCommentId}
+                  />
+                </div>
               )}
             </div>
           </div>
+        </div>
         </div>
       </div>
 
@@ -2507,35 +2540,12 @@ export default function SessionPageClient({
             onClick={(e) => e.stopPropagation()}
           >
             <TicketList
-              sessionTitle={session ? (session.title ?? "").trim() : ""}
               counts={{
                 total: isCountsSynced ? feedbackTotal : Math.max(0, sessionRestTotal),
                 open: isCountsSynced ? feedbackActiveCount : Math.max(0, sessionRestOpen),
                 resolved: isCountsSynced ? feedbackResolvedCount : Math.max(0, sessionRestResolved),
               }}
               countsLoading={!hasSessionCounts}
-              {...(!isWorkspaceMember
-                ? {
-                    showTicketSearch: sessionAccess?.canView === true,
-                    showSessionOverflowMenu: false,
-                  }
-                : {
-                    isEditingSessionTitle,
-                    sessionTitleDraft,
-                    onSessionTitleChange: setSessionTitleDraft,
-                    onSessionTitleSave: handleSessionTitleBlur,
-                    onSessionTitleCancel: () => {
-                      setIsEditingSessionTitle(false);
-                      setSessionTitleDraft((session?.title ?? "").trim());
-                    },
-                    onSessionTitleEdit: () => {
-                      setSessionTitleDraft((session?.title ?? "").trim());
-                      setIsEditingSessionTitle(true);
-                    },
-                    saveSessionTitleSuccess,
-                    onMarkAllTicketsResolved: handleMarkAllResolved,
-                    onMarkAllTicketsUnresolved: handleMarkAllUnresolved,
-                  })}
               items={stableScopedFeedback}
               selectedId={effectiveSelectedId}
               onSelect={(id: string) => {
@@ -2559,8 +2569,6 @@ export default function SessionPageClient({
               resolvedExpanded={resolvedExpanded}
               onResolvedExpandedChange={onResolvedExpandedChange}
               isLoadingResolved={isSearchMode ? false : feedbackLoadingResolved}
-              searchQuery={searchQuery}
-              onSearchQueryChange={setSearchQuery}
               isSearchMode={isSearchMode}
               searchResults={searchResults}
               searchLoading={searchLoading}
@@ -2595,6 +2603,68 @@ export default function SessionPageClient({
         />
       ) : null}
 
+      {/* Navigation Overlay Panel */}
+      {navPanelOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-[60] bg-black/15 backdrop-blur-[1px] transition-opacity"
+            onClick={() => setNavPanelOpen(false)}
+          />
+
+          {/* Panel */}
+          <div className="fixed top-0 left-0 bottom-0 z-[61] w-[260px] bg-[var(--surface-card)] shadow-[var(--shadow-xl)] flex flex-col animate-in slide-in-from-left duration-200">
+
+            {/* Header: Logo + Echly + Close */}
+            <div className="flex items-center justify-between px-4 py-4">
+              <Link href="/dashboard" className="flex items-center gap-2.5" onClick={() => setNavPanelOpen(false)}>
+                <div className="relative w-8 h-8 bg-[var(--brand)] rounded-[var(--radius-sm)] flex items-center justify-center overflow-hidden shrink-0">
+                  <Image src="/Echly_logo.svg" alt="" fill sizes="32px" className="object-cover" />
+                </div>
+                <span className="text-[16px] font-bold text-[var(--text-heading)] tracking-[-0.01em]">Echly</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => setNavPanelOpen(false)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors cursor-pointer"
+                title="Close navigation"
+              >
+                <PanelLeftClose size={18} strokeWidth={1.5} />
+              </button>
+            </div>
+
+            {/* Navigation */}
+            <nav className="flex-1 overflow-y-auto px-3 py-1">
+              <NavOverlayItem href="/dashboard" label="Dashboard" onClick={() => setNavPanelOpen(false)} active={false}>
+                <Home size={18} strokeWidth={1.5} />
+              </NavOverlayItem>
+              <NavOverlayItem href="/discussion" label="Discussion" onClick={() => setNavPanelOpen(false)} active={false}>
+                <MessageSquare size={18} strokeWidth={1.5} />
+              </NavOverlayItem>
+              <NavOverlayItem href="/activity" label="Activity" onClick={() => setNavPanelOpen(false)} active={false}>
+                <Activity size={18} strokeWidth={1.5} />
+              </NavOverlayItem>
+              <NavOverlayItem href="/shared" label="Shared" onClick={() => setNavPanelOpen(false)} active={false}>
+                <Share2 size={18} strokeWidth={1.5} />
+              </NavOverlayItem>
+              <NavOverlayItem href="/settings" label="Settings" onClick={() => setNavPanelOpen(false)} active={false}>
+                <Settings size={18} strokeWidth={1.5} />
+              </NavOverlayItem>
+            </nav>
+
+            {/* Workspace info at bottom */}
+            <div className="px-4 py-3">
+              <div className="flex items-center gap-2.5 px-2 py-2 rounded-[var(--radius-sm)] text-[13px] text-[var(--text-secondary)]">
+                <div className="w-6 h-6 rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] flex items-center justify-center text-[11px] font-semibold text-[var(--text-body)] overflow-hidden shrink-0">
+                  {workspaceName?.charAt(0)?.toUpperCase() || "W"}
+                </div>
+                <span className="truncate font-medium">{workspaceName || "Workspace"}</span>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       {showDeleteModal && effectiveSelectedId && (
         <Modal
           open={showDeleteModal}
@@ -2607,7 +2677,7 @@ export default function SessionPageClient({
           >
             <h2
               id="delete-ticket-title"
-              className="text-[18px] font-medium leading-[1.3] text-[hsl(var(--text-primary-strong))]"
+              className="text-[18px] font-medium leading-[1.3] text-[var(--text-primary-strong)]"
             >
               Delete this ticket?
             </h2>
@@ -2618,14 +2688,14 @@ export default function SessionPageClient({
               <button
                 type="button"
                 onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2 text-[13px] font-medium rounded-xl text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration)] cursor-pointer"
+                className="px-4 py-2 text-[14px] font-medium rounded-xl text-[var(--text-tertiary)] hover:text-[var(--text-primary-strong)] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration)] cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={() => handleDeleteFeedback(effectiveSelectedId)}
-                className="px-4 py-2 text-[13px] font-medium rounded-xl bg-[#ef4444] text-white hover:bg-[#dc2626] focus:outline-none focus:ring-2 focus:ring-[#ef4444]/40 transition-colors duration-[120ms] cursor-pointer"
+                className="px-4 py-2 text-[14px] font-medium rounded-xl bg-[#ef4444] text-white hover:bg-[#dc2626] focus:outline-none focus:ring-2 focus:ring-[#ef4444]/40 transition-colors duration-[120ms] cursor-pointer"
               >
                 Delete
               </button>

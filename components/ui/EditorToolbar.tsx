@@ -83,7 +83,7 @@ function OpacitySlider({ color, value, onChange }: { color: string; value: numbe
           style={{ left: `clamp(8px, calc(${value * 100}% - 8px), calc(100% - 8px))` }}
         />
       </div>
-      <span className="text-white/60 text-[11px] w-8 text-right tabular-nums">
+      <span className="text-white/60 text-[12px] w-8 text-right tabular-nums">
         {Math.round(value * 100)}%
       </span>
     </div>
@@ -357,7 +357,7 @@ export function EditorToolbar({
             </button>
             {fillPickerOpen && (
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-5 bg-[#2C2C2E] border border-white/10 rounded-2xl p-5 shadow-2xl z-[60] w-[360px]">
-                <p className="text-white/50 text-[13px] font-semibold tracking-wider uppercase mb-2">Colors</p>
+                <p className="text-white/50 text-[14px] font-semibold tracking-wider uppercase mb-2">Colors</p>
                 <button
                   onClick={() => { onFillColorChange("transparent"); setFillPickerOpen(false); }}
                   className="flex items-center gap-2 mb-2 text-white/70 hover:text-white text-[14px]"
@@ -379,7 +379,7 @@ export function EditorToolbar({
                     />
                   ))}
                 </div>
-                <p className="text-white/50 text-[13px] font-semibold tracking-wider uppercase mb-2">Opacity</p>
+                <p className="text-white/50 text-[14px] font-semibold tracking-wider uppercase mb-2">Opacity</p>
                 <OpacitySlider color={fillColor} value={fillOpacity} onChange={onFillOpacityChange} />
               </div>
             )}
@@ -407,7 +407,7 @@ export function EditorToolbar({
             </button>
             {outlinePickerOpen && (
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-5 bg-[#2C2C2E] border border-white/10 rounded-2xl p-5 shadow-2xl z-[60] w-[380px]">
-                <p className="text-white/50 text-[13px] font-semibold tracking-wider uppercase mb-2">Colors</p>
+                <p className="text-white/50 text-[14px] font-semibold tracking-wider uppercase mb-2">Colors</p>
                 <button
                   onClick={() => { onOutlineColorChange("transparent"); setOutlinePickerOpen(false); }}
                   className="flex items-center gap-2 mb-2 text-white/70 hover:text-white text-[14px]"
@@ -429,7 +429,7 @@ export function EditorToolbar({
                     />
                   ))}
                 </div>
-                <p className="text-white/50 text-[13px] font-semibold tracking-wider uppercase mb-2">Size</p>
+                <p className="text-white/50 text-[14px] font-semibold tracking-wider uppercase mb-2">Size</p>
                 <canvas ref={outlinePreviewRef} width={340} height={64} className="w-full rounded-lg bg-black/20 mb-2" />
                 <input
                   type="range"
@@ -467,7 +467,7 @@ export function EditorToolbar({
           />
           {drawPopoverOpen && (
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-5 w-[400px] bg-[#2C2C2E] rounded-2xl p-5 shadow-2xl border border-white/10 z-[60]">
-              <p className="text-white/50 text-[13px] font-semibold tracking-wider uppercase mb-3">Colors</p>
+              <p className="text-white/50 text-[14px] font-semibold tracking-wider uppercase mb-3">Colors</p>
               <div className="grid grid-cols-6 gap-2.5 mb-4">
                 {PALETTE_COLORS.map(c => (
                   <button
@@ -482,7 +482,7 @@ export function EditorToolbar({
                   />
                 ))}
               </div>
-              <p className="text-white/50 text-[13px] font-semibold tracking-wider uppercase mb-2">Size</p>
+              <p className="text-white/50 text-[14px] font-semibold tracking-wider uppercase mb-2">Size</p>
               <canvas ref={previewCanvasRef} width={360} height={64} className="w-full rounded-lg bg-black/20 mb-3" />
               <input
                 type="range"
@@ -524,7 +524,7 @@ export function EditorToolbar({
               <Crop {...iconProps} />
             </button>
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block pointer-events-none whitespace-nowrap">
-              <div className="bg-[#3A3A3C] text-white text-[11px] px-2.5 py-1.5 rounded-lg">
+              <div className="bg-[#3A3A3C] text-white text-[12px] px-2.5 py-1.5 rounded-lg">
                 Crop unavailable — screenshot has feedback pins
               </div>
             </div>
@@ -587,7 +587,7 @@ export function EditorToolbar({
           type="button"
           onClick={onSave}
           disabled={saving}
-          className="h-10 px-5 bg-[#1775E0] hover:bg-[#1462C4] text-white text-[15px] font-medium rounded-xl transition-colors disabled:opacity-50 flex items-center gap-1.5"
+          className="h-10 px-5 bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white text-[15px] font-medium rounded-xl transition-colors disabled:opacity-50 flex items-center gap-1.5"
         >
           {saving ? (
             <Loader2 className="h-4 w-4 animate-spin" />

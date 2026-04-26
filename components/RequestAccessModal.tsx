@@ -36,11 +36,11 @@ export function RequestAccessModal({
       >
         <h2
           id={titleId}
-          className="text-[20px] font-semibold leading-[1.35] tracking-[-0.02em] text-[hsl(var(--text-primary-strong))]"
+          className="text-[20px] font-semibold leading-[1.35] tracking-[-0.02em] text-[var(--text-primary-strong)]"
         >
           Request resolve access
         </h2>
-        <p className="mt-2 text-[14px] leading-[1.5] text-[hsl(var(--text-tertiary))]">
+        <p className="mt-2 text-[14px] leading-[1.5] text-[var(--text-tertiary)]">
           You&apos;ll be able to resolve and manage feedback once approved.
         </p>
         <div className="mt-6 flex flex-wrap gap-3 justify-end">
@@ -48,7 +48,7 @@ export function RequestAccessModal({
             type="button"
             onClick={safeClose}
             disabled={submitting}
-            className="px-4 py-2.5 text-[14px] font-medium rounded-xl bg-[var(--layer-2-bg)] text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration)] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            className="px-4 py-2.5 text-[14px] font-medium rounded-xl bg-[var(--layer-2-bg)] text-[var(--text-primary-strong)] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
@@ -56,7 +56,7 @@ export function RequestAccessModal({
             type="button"
             onClick={() => void onConfirm()}
             disabled={submitting}
-            className="inline-flex items-center justify-center gap-2 px-[18px] h-[38px] text-[14px] font-semibold rounded-[9px] border-none bg-[#1775E0] text-white shadow-[0_1px_3px_rgba(23,117,224,0.20)] hover:bg-[#1462C4] focus:outline-none focus:ring-2 focus:ring-[#1775E0]/40 transition-all duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            className="inline-flex items-center justify-center gap-2 px-[18px] h-[38px] text-[14px] font-semibold rounded-[var(--radius-sm)] border-none bg-[var(--brand)] text-white shadow-[0_1px_3px_rgba(23,117,224,0.20)] hover:bg-[var(--brand-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40 transition-all duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? (
               <>

@@ -143,7 +143,7 @@ export function DropdownMenuItem({
   const { setOpen } = useCtx();
   return (
     <div
-      className={`px-3 py-1.5 text-[13px] cursor-pointer hover:bg-muted/50 transition-colors text-foreground ${className}`}
+      className={`px-3 py-1.5 text-[14px] cursor-pointer hover:bg-muted/50 transition-colors text-foreground ${className}`}
       onMouseDown={(e) => e.preventDefault()}
       onClick={() => {
         onClick?.();

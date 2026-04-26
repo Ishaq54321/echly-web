@@ -20,23 +20,23 @@ export function OverlayError({ title, message, showOnboardingLink }: OverlayErro
       aria-modal="true"
       aria-labelledby="echly-overlay-error-title"
     >
-      <div className="w-full max-w-md rounded-xl border border-[#EBEBEB] bg-white p-6 text-center shadow-xl">
-        <p id="echly-overlay-error-title" className="text-lg font-medium text-gray-900">
+      <div className="w-full max-w-md rounded-xl border border-[var(--border)] bg-white p-6 text-center shadow-xl">
+        <p id="echly-overlay-error-title" className="text-lg font-medium text-[var(--text-heading)]">
           {title}
         </p>
-        <p className="mt-2 text-sm text-gray-600">{message}</p>
+        <p className="mt-2 text-sm text-[var(--text-secondary)]">{message}</p>
         <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
           {showOnboardingLink ? (
             <Link
               href="/onboarding"
-              className="rounded-lg bg-[#466EFF] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+              className="rounded-lg bg-[var(--brand)] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
             >
               Complete setup
             </Link>
           ) : null}
           <button
             type="button"
-            className="rounded-lg border border-[#EBEBEB] bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+            className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--text-heading)] hover:bg-[var(--surface-hover)]"
             onClick={() => window.location.reload()}
           >
             Reload

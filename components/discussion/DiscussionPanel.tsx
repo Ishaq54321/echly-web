@@ -209,14 +209,14 @@ export function DiscussionPanel({
         role="dialog"
         aria-label="Discussion"
         style={{ width: PANEL_WIDTH }}
-        className="fixed top-0 right-0 bottom-0 z-50 flex flex-col bg-white border-l border-neutral-200 shadow-xl overflow-hidden discussion-panel-slide-in"
+        className="fixed top-0 right-0 bottom-0 z-50 flex flex-col bg-white border-l border-[var(--border)] shadow-xl overflow-hidden discussion-panel-slide-in"
       >
-        <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-neutral-200">
-          <h2 className="text-sm font-semibold text-neutral-900">Discussion</h2>
+        <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
+          <h2 className="text-sm font-semibold text-[var(--text-heading)]">Discussion</h2>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-lg text-secondary hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
+            className="p-2 rounded-lg text-secondary hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
             aria-label="Close panel"
           >
             <X className="h-4 w-4" strokeWidth={1.5} />
@@ -231,7 +231,7 @@ export function DiscussionPanel({
           ) : (
             <div className="p-6 space-y-6">
               <div>
-                <h3 className="text-lg font-semibold text-neutral-900">
+                <h3 className="text-lg font-semibold text-[var(--text-heading)]">
                   {ticket.title}
                 </h3>
                 <div className="mt-1 text-sm text-secondary">
@@ -239,7 +239,7 @@ export function DiscussionPanel({
                   {sessionName ? (
                     <Link
                       href={`/session/${ticket.sessionId}`}
-                      className="text-[#1775E0] hover:underline"
+                      className="text-[var(--brand)] hover:underline"
                     >
                       {sessionName}
                     </Link>
@@ -259,7 +259,7 @@ export function DiscussionPanel({
                   <button
                     type="button"
                     onClick={() => void refetchComments()}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-[#1775E0] hover:text-[#1462C4] shrink-0 transition-colors"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-[var(--brand)] hover:text-[#1462C4] shrink-0 transition-colors"
                   >
                     <RefreshCw className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
                     Refresh
@@ -274,12 +274,12 @@ export function DiscussionPanel({
                       return (
                         <div key={root.id} className="space-y-2">
                           <div className="flex gap-3">
-                            <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center text-xs font-medium text-secondary shrink-0">
+                            <div className="w-8 h-8 rounded-full bg-[var(--surface-hover)] flex items-center justify-center text-xs font-medium text-secondary shrink-0">
                               {root.userName?.charAt(0) ?? "?"}
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2 text-xs">
-                                <span className="font-medium text-neutral-900">
+                                <span className="font-medium text-[var(--text-heading)]">
                                   {root.userName ?? "User"}
                                 </span>
                                 <span className="text-meta">
@@ -292,10 +292,10 @@ export function DiscussionPanel({
                               {replies.map((r) => (
                                 <div
                                   key={r.id}
-                                  className="mt-3 ml-4 pl-3 border-l-2 border-neutral-200"
+                                  className="mt-3 ml-4 pl-3 border-l-2 border-[var(--border)]"
                                 >
                                   <div className="flex items-center gap-2 text-xs">
-                                    <span className="font-medium text-neutral-900">
+                                    <span className="font-medium text-[var(--text-heading)]">
                                       {r.userName ?? "User"}
                                     </span>
                                     <span className="text-meta">
@@ -320,7 +320,7 @@ export function DiscussionPanel({
         </div>
 
         {ticket && (
-          <div className="shrink-0 border-t border-neutral-200 p-4 bg-white">
+          <div className="shrink-0 border-t border-[var(--border)] p-4 bg-white">
             <div className="flex gap-3">
               <input
                 type="text"
@@ -333,13 +333,13 @@ export function DiscussionPanel({
                     handleSendComment();
                   }
                 }}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-[#1775E0]/20 focus:border-[#1775E0] transition"
+                className="flex-1 px-4 py-2.5 rounded-xl border border-[var(--border)] text-sm text-[var(--text-heading)] placeholder:text-meta focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20 focus:border-[var(--brand)] transition"
               />
               <button
                 type="button"
                 onClick={handleSendComment}
                 disabled={sending || !commentDraft.trim()}
-                className="px-4 py-2.5 rounded-xl bg-[#1775E0] text-white text-sm font-medium hover:bg-[#1462C4] disabled:opacity-50 disabled:cursor-not-allowed transition"
+                className="px-4 py-2.5 rounded-xl bg-[var(--brand)] text-white text-sm font-medium hover:bg-[var(--brand-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition"
               >
                 {sending ? "Sending…" : "Send"}
               </button>

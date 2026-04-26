@@ -96,7 +96,7 @@ export function ContextPanel({
     >
       <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-6">
         <section>
-          <h2 className="text-[11px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--text-tertiary))] mb-3">
+          <h2 className="text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--text-tertiary)] mb-3">
             Details
           </h2>
           <TicketMetadata
@@ -107,12 +107,12 @@ export function ContextPanel({
           <dl className="space-y-1.5 text-[12px]">
             {safeTags.length > 0 ? (
               <div>
-                <dt className="text-[hsl(var(--text-tertiary))]">Tags</dt>
+                <dt className="text-[var(--text-tertiary)]">Tags</dt>
                 <dd className="mt-0.5 flex flex-wrap gap-1.5">
                   {safeTags.map((tag) => (
                     <span
                       key={tag}
-                      className={`${TAG_CHIP_BASE_CLASS} bg-gray-50 text-gray-700 border-[#EBEBEB] !px-2.5 !py-0.5 !text-[11px]`}
+                      className={`${TAG_CHIP_BASE_CLASS} bg-[var(--surface-subtle)] text-[var(--text-body)] border-[var(--border)] !px-2.5 !py-0.5 !text-[12px]`}
                     >
                       {tag}
                     </span>
@@ -122,16 +122,16 @@ export function ContextPanel({
             ) : null}
             {priorityLabel?.trim() ? (
               <div>
-                <dt className="text-[hsl(var(--text-tertiary))]">Priority</dt>
-                <dd className="mt-0.5 text-[hsl(var(--text-primary-strong))] font-medium">
+                <dt className="text-[var(--text-tertiary)]">Priority</dt>
+                <dd className="mt-0.5 text-[var(--text-primary-strong)] font-medium">
                   {priorityLabel}
                 </dd>
               </div>
             ) : null}
             {estimatedEffortLabel?.trim() ? (
               <div>
-                <dt className="text-[hsl(var(--text-tertiary))]">Estimated effort</dt>
-                <dd className="mt-0.5 text-[hsl(var(--text-primary-strong))] font-medium">
+                <dt className="text-[var(--text-tertiary)]">Estimated effort</dt>
+                <dd className="mt-0.5 text-[var(--text-primary-strong)] font-medium">
                   {estimatedEffortLabel}
                 </dd>
               </div>
@@ -140,21 +140,21 @@ export function ContextPanel({
         </section>
 
         <section>
-          <h2 className="text-[11px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--text-tertiary))] mb-2">
+          <h2 className="text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--text-tertiary)] mb-2">
             Activity summary
           </h2>
           <dl className="space-y-1.5 text-[12px]">
             {lastActionLabel ? (
               <div>
-                <dt className="text-[hsl(var(--text-tertiary))]">Last action</dt>
-                <dd className="mt-0.5 text-[hsl(var(--text-primary-strong))]">
+                <dt className="text-[var(--text-tertiary)]">Last action</dt>
+                <dd className="mt-0.5 text-[var(--text-primary-strong)]">
                   {lastActionLabel}
                 </dd>
               </div>
             ) : null}
             <div>
-              <dt className="text-[hsl(var(--text-tertiary))]">Resolve history</dt>
-              <dd className="mt-0.5 text-[hsl(var(--text-primary-strong))]">
+              <dt className="text-[var(--text-tertiary)]">Resolve history</dt>
+              <dd className="mt-0.5 text-[var(--text-primary-strong)]">
                 {resolveHistoryLabel}
               </dd>
             </div>
@@ -162,10 +162,10 @@ export function ContextPanel({
         </section>
 
         <section>
-          <h2 className="text-[11px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--text-tertiary))] mb-2">
+          <h2 className="text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--text-tertiary)] mb-2">
             Execution insights
           </h2>
-          <p className="text-[12px] text-[hsl(var(--text-tertiary))] leading-relaxed">
+          <p className="text-[12px] text-[var(--text-tertiary)] leading-relaxed">
             Reserved for AI velocity metrics. This panel will surface risk, effort,
             and throughput signals as the system learns from execution patterns.
           </p>

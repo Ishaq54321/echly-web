@@ -32,13 +32,13 @@ export function SessionsListArchiveTabs({
         className={`
               relative border-0 bg-transparent p-0 pb-3 text-[16px] transition-colors duration-200
               focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30 focus-visible:ring-offset-2 rounded-sm
-              ${isActive ? "z-10 font-semibold text-[#1775E0]" : "font-medium text-neutral-500 hover:text-neutral-800"}
+              ${isActive ? "z-10 font-semibold text-[var(--brand)]" : "font-medium text-neutral-500 hover:text-neutral-800"}
             `}
       >
         {label}
         {isActive ? (
           <span
-            className="absolute -bottom-px left-0 right-0 z-10 h-[3px] rounded-full bg-[#1775E0]"
+            className="absolute -bottom-px left-0 right-0 z-10 h-[3px] rounded-full bg-[var(--brand)]"
             aria-hidden
           />
         ) : null}

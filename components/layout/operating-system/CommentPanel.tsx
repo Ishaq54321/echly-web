@@ -515,7 +515,7 @@ const ThreadBlock = memo(function ThreadBlock({
         onNavigateToTicket={onNavigateToTicket ? () => onNavigateToTicket(root.feedbackId) : undefined}
       />
       {replies.length > 0 && (
-        <div className="ml-[19px] mt-1 pl-[21px] border-l-2 border-[var(--border)] space-y-0.5">
+        <div className="ml-[19px] mt-1 pl-[21px] border-l border-[var(--text-tertiary)]/20 space-y-0.5">
           {replies.map((r) => (
             <CommentRow
               key={r.id}
@@ -553,11 +553,11 @@ const ThreadBlock = memo(function ThreadBlock({
               onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.stopPropagation()}
             >
-              <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-card)] overflow-hidden focus-within:border-[var(--brand)] focus-within:ring-2 focus-within:ring-[var(--brand)]/20 transition-colors">
+              <div className="rounded-[var(--radius-md)] bg-[var(--surface-card)] shadow-[var(--shadow-sm)] overflow-hidden focus-within:ring-2 focus-within:ring-[var(--brand)]/20 transition-all">
 
                 {/* Row 1: Avatar + Tiptap Editor */}
                 <div className="flex items-start gap-3 px-4 pt-4">
-                  <div className="w-[24px] h-[24px] rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold text-[11px] flex items-center justify-center shrink-0 overflow-hidden mt-0.5">
+                  <div className="w-[24px] h-[24px] rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold text-[12px] flex items-center justify-center shrink-0 overflow-hidden mt-0.5">
                     {currentUserAvatarUrl ? (
                       <img src={currentUserAvatarUrl} alt="" className="w-full h-full object-cover" />
                     ) : (
@@ -585,7 +585,7 @@ const ThreadBlock = memo(function ThreadBlock({
                       return (
                         <div
                           key={i}
-                          className="flex items-center gap-2.5 px-3 py-2.5 bg-[var(--surface-subtle)] border border-[var(--border)] rounded-xl"
+                          className="flex items-center gap-2.5 px-3 py-2.5 bg-[var(--surface-subtle)] rounded-xl"
                         >
                           {isLoading ? (
                             <div className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: getUploadBoxColor(att.file_name) }}>
@@ -610,9 +610,9 @@ const ThreadBlock = memo(function ThreadBlock({
                               <Paperclip className="h-4 w-4 text-white" />
                             </div>
                           )}
-                          <span className="flex-1 min-w-0 text-[13px] font-medium text-[var(--text-body)] truncate">
+                          <span className="flex-1 min-w-0 text-[14px] font-medium text-[var(--text-body)] truncate">
                             {att.file_name}
-                            {isLoading && <span className="ml-2 text-[11px] text-[var(--text-tertiary)]">Uploading...</span>}
+                            {isLoading && <span className="ml-2 text-[12px] text-[var(--text-tertiary)]">Uploading...</span>}
                           </span>
                           <button
                             type="button"
@@ -633,7 +633,7 @@ const ThreadBlock = memo(function ThreadBlock({
                 {replyFileError && (
                   <div className="flex items-center gap-2 mx-4 mb-1 px-3 py-2 bg-[var(--color-danger-bg)] border border-[var(--color-danger-border)] rounded-xl">
                     <svg className="h-4 w-4 text-[var(--color-danger)] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                    <span className="text-[13px] font-medium text-[var(--color-danger)]">{replyFileError}</span>
+                    <span className="text-[14px] font-medium text-[var(--color-danger)]">{replyFileError}</span>
                     <button type="button" onClick={() => setReplyFileError(null)} className="ml-auto p-0.5 rounded text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 transition-colors">
                       <X className="h-3 w-3" />
                     </button>
@@ -654,7 +654,6 @@ const ThreadBlock = memo(function ThreadBlock({
                     >
                       <AtSign className="h-[18px] w-[18px]" strokeWidth={1.5} />
                     </button>
-                    <span className="w-px h-4 bg-[var(--border)] mx-1" />
                     <button
                       ref={replyEmojiButtonRef}
                       type="button"
@@ -669,7 +668,6 @@ const ThreadBlock = memo(function ThreadBlock({
                     >
                       <Smile className="h-[18px] w-[18px]" strokeWidth={1.5} />
                     </button>
-                    <span className="w-px h-4 bg-[var(--border)] mx-1" />
                     <button
                       type="button"
                       onClick={() => {
@@ -770,7 +768,7 @@ const ThreadBlock = memo(function ThreadBlock({
                         replyEditorRef.current?.commands.clearContent();
                         onReplyToggle(false);
                       }}
-                      className="text-[13px] font-semibold text-[var(--text-body)] hover:text-[var(--text-heading)] px-2 py-1 transition-colors cursor-pointer"
+                      className="text-[14px] font-semibold text-[var(--text-body)] hover:text-[var(--text-heading)] px-2 py-1 transition-colors cursor-pointer"
                     >
                       Cancel
                     </button>
@@ -786,7 +784,7 @@ const ThreadBlock = memo(function ThreadBlock({
                         }
                       }}
                       disabled={(!replyHasContent && replyPendingAttachments.length === 0) || replyPendingAttachments.some(att => (att as any)._loading)}
-                      className="text-[13px] font-semibold text-white bg-[var(--brand)] hover:bg-[var(--brand-hover)] px-4 py-1.5 rounded-full disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer"
+                      className="text-[14px] font-semibold text-white bg-[var(--brand)] hover:bg-[var(--brand-hover)] px-4 py-1.5 rounded-full disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer"
                     >
                       Reply
                     </button>
@@ -918,7 +916,7 @@ const CommentThreadList = memo(function CommentThreadList({
       <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
         <MessageSquare className="h-10 w-10 text-[var(--text-tertiary)] mb-3" strokeWidth={1} />
         <p className="text-[15px] font-medium text-[var(--text-heading)]">No comments yet</p>
-        <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
+        <p className="mt-1 text-[14px] text-[var(--text-secondary)]">
           Leave a comment above to start a conversation.
         </p>
       </div>
@@ -957,7 +955,7 @@ const CommentThreadList = memo(function CommentThreadList({
           <ThreadBlock key={root.id} {...threadBlockProps(root)} />
         ))}
       {filterTab === "all" && resolvedRoots.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-[var(--layer-2-border)]">
+        <div className="mt-4 pt-2">
           <button
             type="button"
             onClick={() => setResolvedCollapsed((c) => !c)}
@@ -1130,7 +1128,7 @@ export function CommentPanel({
   const panelContent = (
     <>
       {/* Header */}
-      <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-[var(--layer-2-border)]">
+      <div className="shrink-0 flex items-center justify-between px-4 py-3">
         <h2 className="text-[14px] font-semibold text-[var(--text-heading)] tracking-[-0.01em]">
           Comments ({comments.length})
         </h2>
@@ -1139,7 +1137,7 @@ export function CommentPanel({
             <button
               type="button"
               onClick={onRefreshComments}
-              className="p-2 rounded-xl text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-[var(--motion-duration)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] cursor-pointer"
+              className="p-2 rounded-xl text-[var(--text-tertiary)] hover:bg-[var(--layer-2-hover-bg)] hover:text-[var(--text-primary-strong)] transition-colors duration-[var(--motion-duration)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] cursor-pointer"
               aria-label="Refresh comments"
             >
               <RefreshCw className="h-4 w-4" strokeWidth={1.5} />
@@ -1148,7 +1146,7 @@ export function CommentPanel({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-[var(--motion-duration)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] cursor-pointer"
+            className="p-2 rounded-xl text-[var(--text-tertiary)] hover:bg-[var(--layer-2-hover-bg)] hover:text-[var(--text-primary-strong)] transition-colors duration-[var(--motion-duration)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] cursor-pointer"
             aria-label="Close comment panel"
           >
             <X className="h-4 w-4" strokeWidth={1.5} />
@@ -1158,12 +1156,12 @@ export function CommentPanel({
 
       {/* Top-level compose */}
       {!composeExpanded ? (
-        <div className="shrink-0 px-4 py-4 border-b border-[var(--border)]">
+        <div className="shrink-0 px-4 py-4">
           <div
-            className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-card)] px-4 py-3 cursor-text"
+            className="flex items-center gap-3 rounded-[var(--radius-md)] bg-[var(--surface-card)] shadow-[var(--shadow-sm)] px-4 py-3 cursor-text"
             onClick={() => setComposeExpanded(true)}
           >
-            <div className="w-[28px] h-[28px] rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold text-[13px] flex items-center justify-center shrink-0 overflow-hidden">
+            <div className="w-[28px] h-[28px] rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold text-[14px] flex items-center justify-center shrink-0 overflow-hidden">
               {currentUserAvatarUrl ? (
                 <img src={currentUserAvatarUrl} alt="" className="w-full h-full object-cover" />
               ) : (
@@ -1179,12 +1177,12 @@ export function CommentPanel({
           </div>
         </div>
       ) : (
-        <div className="shrink-0 px-4 py-4 border-b border-[var(--border)]">
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-card)] overflow-hidden focus-within:border-[var(--brand)] focus-within:ring-2 focus-within:ring-[var(--brand)]/20 transition-colors">
+        <div className="shrink-0 px-4 py-4">
+          <div className="rounded-[var(--radius-md)] bg-[var(--surface-card)] shadow-[var(--shadow-sm)] overflow-hidden focus-within:ring-2 focus-within:ring-[var(--brand)]/20 transition-all">
 
             {/* Row 1: Avatar + Tiptap editor */}
             <div className="flex items-start gap-3 px-4 pt-4">
-              <div className="w-[28px] h-[28px] rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold text-[13px] flex items-center justify-center shrink-0 overflow-hidden mt-0.5">
+              <div className="w-[28px] h-[28px] rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold text-[14px] flex items-center justify-center shrink-0 overflow-hidden mt-0.5">
                 {currentUserAvatarUrl ? (
                   <img src={currentUserAvatarUrl} alt="" className="w-full h-full object-cover" />
                 ) : (
@@ -1218,7 +1216,7 @@ export function CommentPanel({
                   return (
                     <div
                       key={i}
-                      className="flex items-center gap-2.5 px-3 py-2.5 bg-[var(--surface-subtle)] border border-[var(--border)] rounded-xl"
+                      className="flex items-center gap-2.5 px-3 py-2.5 bg-[var(--surface-subtle)] rounded-xl"
                     >
                       {isLoading ? (
                         <div className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: getUploadBoxColor(att.file_name) }}>
@@ -1243,9 +1241,9 @@ export function CommentPanel({
                           <Paperclip className="h-4 w-4 text-white" />
                         </div>
                       )}
-                      <span className="flex-1 min-w-0 text-[13px] font-medium text-[var(--text-body)] truncate">
+                      <span className="flex-1 min-w-0 text-[14px] font-medium text-[var(--text-body)] truncate">
                         {att.file_name}
-                        {isLoading && <span className="ml-2 text-[11px] text-[var(--text-tertiary)]">Uploading...</span>}
+                        {isLoading && <span className="ml-2 text-[12px] text-[var(--text-tertiary)]">Uploading...</span>}
                       </span>
                       <button
                         type="button"
@@ -1266,7 +1264,7 @@ export function CommentPanel({
             {composeFileError && (
               <div className="flex items-center gap-2 mx-4 mb-1 px-3 py-2 bg-[var(--color-danger-bg)] border border-[var(--color-danger-border)] rounded-xl">
                 <svg className="h-4 w-4 text-[var(--color-danger)] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                <span className="text-[13px] font-medium text-[var(--color-danger)]">{composeFileError}</span>
+                <span className="text-[14px] font-medium text-[var(--color-danger)]">{composeFileError}</span>
                 <button type="button" onClick={() => setComposeFileError(null)} className="ml-auto p-0.5 rounded text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 transition-colors">
                   <X className="h-3 w-3" />
                 </button>
@@ -1288,8 +1286,6 @@ export function CommentPanel({
                   <AtSign className="h-[18px] w-[18px]" strokeWidth={1.5} />
                 </button>
 
-                <span className="w-px h-4 bg-[var(--border)] mx-1" />
-
                 <button
                   ref={composeEmojiButtonRef}
                   type="button"
@@ -1306,8 +1302,6 @@ export function CommentPanel({
                 >
                   <Smile className="h-[18px] w-[18px]" strokeWidth={1.5} />
                 </button>
-
-                <span className="w-px h-4 bg-[var(--border)] mx-1" />
 
                 <button
                   type="button"
@@ -1414,7 +1408,7 @@ export function CommentPanel({
                     }
                   }}
                   disabled={(!composeHasContent && composePendingAttachments.length === 0) || composePendingAttachments.some(att => (att as any)._loading)}
-                  className="text-[13px] font-semibold text-white bg-[var(--brand)] hover:bg-[var(--brand-hover)] px-4 py-1.5 rounded-full disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer max-w-[280px] truncate"
+                  className="text-[14px] font-semibold text-white bg-[var(--brand)] hover:bg-[var(--brand-hover)] px-4 py-1.5 rounded-full disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer max-w-[280px] truncate"
                 >
                   Comment
                 </button>
@@ -1491,7 +1485,7 @@ export function CommentPanel({
       <aside
         role="complementary"
         aria-label="Comments"
-        className="h-full min-w-0 flex flex-col bg-[var(--canvas-base)] border-l border-[var(--layer-2-border)] box-border overflow-x-hidden"
+        className="h-full min-w-0 flex flex-col bg-transparent box-border overflow-x-hidden"
       >
         {panelContent}
       </aside>
@@ -1509,7 +1503,7 @@ export function CommentPanel({
         role="dialog"
         aria-label="Comments"
         style={{ width: PANEL_WIDTH }}
-        className="fixed top-0 right-0 bottom-0 z-50 flex flex-col bg-[var(--canvas-base)] border-l border-[var(--layer-2-border)] shadow-[var(--elevation-2)] box-border overflow-x-hidden min-w-0 animate-in slide-in-from-right duration-200"
+        className="fixed top-0 right-0 bottom-0 z-50 flex flex-col bg-transparent shadow-[var(--elevation-2)] box-border overflow-x-hidden min-w-0 animate-in slide-in-from-right duration-200"
       >
         {panelContent}
       </aside>

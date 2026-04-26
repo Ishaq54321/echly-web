@@ -38,28 +38,28 @@ export function DiscussionSidebar({
 
       {/* Workspace section */}
       <div className="px-4 pb-1 pt-3 shrink-0">
-        <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-meta">Workspace</p>
+        <p className="text-[12px] font-medium uppercase tracking-[0.06em] text-meta">Workspace</p>
       </div>
       <button
         type="button"
         onClick={() => onProjectChange(null)}
         className={`w-full flex items-center gap-2.5 px-4 py-[7px] text-left text-[14px] transition-all ${
           selectedProjectId === null
-            ? "bg-[#EBF4FF]/70 text-discussion-title font-medium"
-            : "text-discussion-supporting hover:bg-neutral-50 hover:text-discussion-title"
+            ? "bg-[var(--brand-subtle)]/70 text-discussion-title font-medium"
+            : "text-discussion-supporting hover:bg-[var(--surface-hover)] hover:text-discussion-title"
         }`}
       >
         <span
           className={`w-[6px] h-[6px] rounded-full shrink-0 ${
-            selectedProjectId === null ? "bg-[#1775E0]" : "bg-neutral-300"
+            selectedProjectId === null ? "bg-[var(--brand)]" : "bg-neutral-300"
           }`}
         />
         <span className="flex-1 truncate">All projects</span>
         <span
           className={`ml-auto text-[12px] px-[6px] py-0.5 rounded-full font-medium tabular-nums ${
             selectedProjectId === null
-              ? "bg-[#EBF4FF] text-[#1775E0]"
-              : "bg-neutral-100 text-meta"
+              ? "bg-[var(--brand-subtle)] text-[var(--brand)]"
+              : "bg-[var(--surface-hover)] text-meta"
           }`}
         >
           {totalCount}
@@ -70,7 +70,7 @@ export function DiscussionSidebar({
       {projects.length > 0 && (
         <>
           <div className="px-4 pt-4 pb-1 shrink-0">
-            <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-meta">Sessions</p>
+            <p className="text-[12px] font-medium uppercase tracking-[0.06em] text-meta">Sessions</p>
           </div>
           <div className="flex-1 overflow-y-auto min-h-0 pb-2">
             {projects.map((proj) => {
@@ -82,21 +82,21 @@ export function DiscussionSidebar({
                   onClick={() => onProjectChange(proj.id)}
                   className={`w-full flex items-center gap-2.5 px-4 py-[7px] text-left text-[14px] transition-all ${
                     isActive
-                      ? "bg-[#EBF4FF]/70 text-discussion-title font-medium"
-                      : "text-discussion-supporting hover:bg-neutral-50 hover:text-discussion-title"
+                      ? "bg-[var(--brand-subtle)]/70 text-discussion-title font-medium"
+                      : "text-discussion-supporting hover:bg-[var(--surface-hover)] hover:text-discussion-title"
                   }`}
                 >
                   <span
                     className={`w-[6px] h-[6px] rounded-full shrink-0 ${
-                      isActive ? "bg-[#1775E0]" : "bg-neutral-300"
+                      isActive ? "bg-[var(--brand)]" : "bg-neutral-300"
                     }`}
                   />
                   <span className="flex-1 truncate">{proj.name || "Untitled"}</span>
                   <span
                     className={`ml-auto text-[12px] px-[6px] py-0.5 rounded-full font-medium tabular-nums ${
                       isActive
-                        ? "bg-[#EBF4FF] text-[#1775E0]"
-                        : "bg-neutral-100 text-meta"
+                        ? "bg-[var(--brand-subtle)] text-[var(--brand)]"
+                        : "bg-[var(--surface-hover)] text-meta"
                     }`}
                   >
                     {proj.count}

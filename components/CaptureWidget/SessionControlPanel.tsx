@@ -74,7 +74,7 @@ export function SessionControlPanel({
         fontFamily: '"Plus Jakarta Sans", "SF Pro Display", Inter, system-ui, sans-serif',
       }}
     >
-      <span style={{ fontSize: 14, fontWeight: 600, color: "#F3F4F6" }}>
+      <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-on-dark)" }}>
         {sessionPaused ? "Session paused" : "Session started"}
       </span>
       {pausePending ? (

@@ -34,7 +34,7 @@ export function ActivityPanel({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="shrink-0 px-6 pt-4 pb-4 border-b border-[var(--layer-2-border)]">
-        <h2 className="text-[11px] uppercase tracking-[0.08em] text-[hsl(var(--text-tertiary))]">Activity</h2>
+        <h2 className="text-[12px] uppercase tracking-[0.08em] text-[var(--text-tertiary)]">Activity</h2>
       </div>
 
       <div className="shrink-0 px-6 py-4 border-b border-[var(--layer-2-border)]">

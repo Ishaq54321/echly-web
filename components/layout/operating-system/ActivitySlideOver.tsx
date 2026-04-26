@@ -78,13 +78,13 @@ function ActivityPanelContent({
   return (
     <>
       <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-[var(--layer-2-border)]">
-        <h2 className="text-[11px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--text-tertiary))]">
+        <h2 className="text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
           Activity
         </h2>
         <button
           type="button"
           onClick={onClose}
-          className="p-1.5 rounded-md text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+          className="p-1.5 rounded-md text-[var(--text-tertiary)] hover:bg-[var(--layer-2-hover-bg)] hover:text-[var(--text-primary-strong)] transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
           aria-label="Close activity panel"
         >
           <X className="h-4 w-4" strokeWidth={1.5} />
@@ -111,10 +111,10 @@ function ActivityPanelContent({
           />
           {isResolved && (
             <div className="mt-4 pt-4 border-t border-[var(--layer-2-border)]">
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[hsl(var(--text-tertiary))]">
+              <p className="text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--text-tertiary)]">
                 Resolve history
               </p>
-              <p className="mt-1 text-[12px] text-[hsl(var(--text-secondary-soft))]">
+              <p className="mt-1 text-[12px] text-[var(--text-secondary-soft)]">
                 {formatResolvedDate(updatedAt)}
               </p>
             </div>

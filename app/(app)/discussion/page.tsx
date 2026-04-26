@@ -102,7 +102,7 @@ export default function DiscussionPage() {
   if (!user && !loading) {
     return (
       <div className="flex h-full items-center justify-center bg-white">
-        <p className="text-[13px] text-secondary">
+        <p className="text-[14px] text-secondary">
           Please sign in to view discussions.
         </p>
       </div>
@@ -111,9 +111,9 @@ export default function DiscussionPage() {
 
   // ── Layout ─────────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-full overflow-hidden bg-white border-t border-neutral-200">
+    <div className="flex h-full overflow-hidden bg-white border-t border-[var(--border)]">
       {/* ── Panel 1: Sidebar (≥ lg only) ─────────────────────────────────── */}
-      <div className="hidden lg:flex flex-col w-[220px] shrink-0 border-r border-neutral-200">
+      <div className="hidden lg:flex flex-col w-[220px] shrink-0 border-r border-[var(--border)]">
         <DiscussionSidebar
           projects={sidebarProjects}
           totalCount={listItems.length}
@@ -132,7 +132,7 @@ export default function DiscussionPage() {
       */}
       <div
         className={`
-          flex flex-col border-r border-neutral-200
+          flex flex-col border-r border-[var(--border)]
           ${mobileView === "detail" ? "hidden md:flex" : "flex"}
           w-full md:w-[340px] md:shrink-0
         `}
@@ -145,7 +145,7 @@ export default function DiscussionPage() {
               placeholder="Search discussions…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-[7px] text-[14px] bg-neutral-50 border border-neutral-200 rounded-lg text-discussion-body placeholder:text-meta outline-none focus:border-[#1775E0]/50 focus:bg-white transition-colors"
+              className="w-full pl-8 pr-3 py-[7px] text-[14px] bg-[var(--surface-subtle)] border border-[var(--border)] rounded-lg text-discussion-body placeholder:text-meta outline-none focus:border-[var(--brand)]/50 focus:bg-white transition-colors"
             />
           </div>
         </div>
@@ -156,10 +156,10 @@ export default function DiscussionPage() {
             <button
               type="button"
               onClick={() => setSelectedProjectId(null)}
-              className={`text-[11px] px-2.5 py-1 rounded-full border whitespace-nowrap transition-all ${
+              className={`text-[12px] px-2.5 py-1 rounded-full border whitespace-nowrap transition-all ${
                 selectedProjectId === null
-                  ? "bg-[#EBF4FF] text-[#1775E0] border-[#C3DFFE] font-medium"
-                  : "bg-transparent text-secondary border-neutral-200 hover:text-neutral-900"
+                  ? "bg-[var(--brand-subtle)] text-[var(--brand)] border-[var(--brand-muted)] font-medium"
+                  : "bg-transparent text-secondary border-[var(--border)] hover:text-[var(--text-heading)]"
               }`}
             >
               All
@@ -169,10 +169,10 @@ export default function DiscussionPage() {
                 key={proj.id}
                 type="button"
                 onClick={() => setSelectedProjectId(proj.id)}
-                className={`text-[11px] px-2.5 py-1 rounded-full border whitespace-nowrap transition-all ${
+                className={`text-[12px] px-2.5 py-1 rounded-full border whitespace-nowrap transition-all ${
                   selectedProjectId === proj.id
-                    ? "bg-[#EBF4FF] text-[#1775E0] border-[#C3DFFE] font-medium"
-                    : "bg-transparent text-secondary border-neutral-200 hover:text-neutral-900"
+                    ? "bg-[var(--brand-subtle)] text-[var(--brand)] border-[var(--brand-muted)] font-medium"
+                    : "bg-transparent text-secondary border-[var(--border)] hover:text-[var(--text-heading)]"
                 }`}
               >
                 {proj.name || "Untitled"}
@@ -212,7 +212,7 @@ export default function DiscussionPage() {
           <button
             type="button"
             onClick={handleMobileBack}
-            className="md:hidden shrink-0 flex items-center gap-1.5 px-4 py-2.5 border-b border-neutral-200 text-[13px] font-medium text-[#1775E0] bg-white"
+            className="md:hidden shrink-0 flex items-center gap-1.5 px-4 py-2.5 border-b border-[var(--border)] text-[14px] font-medium text-[var(--brand)] bg-white"
           >
             <ChevronLeft className="h-4 w-4 shrink-0" strokeWidth={2} />
             All discussions

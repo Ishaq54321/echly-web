@@ -103,7 +103,7 @@ export default function OnboardingPage() {
 
   if (loading || !authReady) {
     return (
-      <div className="w-8 h-8 border-2 border-[#EBEBEB] border-t-[#466EFF] rounded-full animate-spin" />
+      <div className="w-8 h-8 border-2 border-[var(--border)] border-t-[#466EFF] rounded-full animate-spin" />
     );
   }
 
@@ -118,23 +118,23 @@ export default function OnboardingPage() {
         </header>
         <div className="w-full max-w-[480px] mx-auto px-6 flex flex-col items-center justify-center min-h-screen">
           <motion.div
-            className="w-full rounded-[28px] bg-white/55 backdrop-blur-xl border border-white/40 shadow-[0_18px_40px_rgba(0,0,0,0.10)] p-8"
+            className="w-full rounded-[var(--radius-xl)] bg-white/55 backdrop-blur-xl border border-white/40 shadow-[var(--shadow-xl)] p-8"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35 }}
           >
-            <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mb-1">Welcome to Echly</h1>
-            <p className="text-gray-500 text-sm mb-6">Just one thing before you get started.</p>
+            <h1 className="text-2xl font-semibold text-[var(--text-heading)] tracking-tight mb-1">Welcome to Echly</h1>
+            <p className="text-[var(--text-secondary)] text-sm mb-6">Just one thing before you get started.</p>
             <form onSubmit={handleInviteSubmit} className="space-y-4">
               <div>
-                <label htmlFor="display-name" className="block text-sm font-medium text-gray-700 mb-1">Your name</label>
+                <label htmlFor="display-name" className="block text-sm font-medium text-[var(--text-body)] mb-1">Your name</label>
                 <input
                   id="display-name"
                   type="text"
                   placeholder="e.g. Alex Kim"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  className="w-full h-11 rounded-[10px] border border-[#E5E7EB] bg-white text-gray-900 text-base pl-3 placeholder:text-gray-400 focus:outline-none focus:border-[#466EFF] focus:ring-[3px] focus:ring-[rgba(70,110,255,0.15)]"
+                  className="w-full h-11 rounded-[var(--radius-sm)] border border-[var(--border)] bg-white text-[var(--text-heading)] text-base pl-3 placeholder:text-gray-400 focus:outline-none focus:border-[#466EFF] focus:ring-[3px] focus:ring-[rgba(70,110,255,0.15)]"
                   required
                 />
                 {displayNameError && <p className="mt-1 text-sm text-[var(--color-danger)]">{displayNameError}</p>}
@@ -142,7 +142,7 @@ export default function OnboardingPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full h-12 rounded-[10px] text-white font-medium text-lg disabled:opacity-60 flex items-center justify-center"
+                className="w-full h-12 rounded-[var(--radius-sm)] text-white font-medium text-lg disabled:opacity-50 flex items-center justify-center"
                 style={{ background: "linear-gradient(135deg, #466EFF, #5F7DFF)" }}
               >
                 {submitting ? "Saving…" : "Get started"}
@@ -176,7 +176,7 @@ export default function OnboardingPage() {
       {/* Hero header */}
       <header className="flex flex-col items-center text-center">
         <motion.h1
-          className="text-[44px] font-semibold tracking-tight text-gray-900"
+          className="text-[44px] font-semibold tracking-tight text-[var(--text-heading)]"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
@@ -184,28 +184,28 @@ export default function OnboardingPage() {
           Welcome to Echly
         </motion.h1>
         <motion.p
-          className="text-[18px] text-gray-600 mt-3"
+          className="text-[18px] text-[var(--text-secondary)] mt-3"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.06 }}
         >
           Set up your account in seconds.
         </motion.p>
-        <p className="text-sm text-gray-500 mt-1">You can change everything later.</p>
+        <p className="text-sm text-[var(--text-secondary)] mt-1">You can change everything later.</p>
       </header>
 
       {/* Card wrapper — narrower premium layout */}
       <div className="relative mt-8 max-w-[560px] mx-auto">
         {/* Onboarding card — frosted glass */}
         <motion.div
-          className="relative rounded-[28px] bg-white/55 backdrop-blur-xl border border-white/40 shadow-[0_18px_40px_rgba(0,0,0,0.10)] p-7 transition-all duration-150 ease-out overflow-hidden"
+          className="relative rounded-[var(--radius-xl)] bg-white/55 backdrop-blur-xl border border-white/40 shadow-[var(--shadow-xl)] p-7 transition-all duration-150 ease-out overflow-hidden"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, delay: 0.1 }}
         >
           {/* Inner glass highlight layer */}
           <div
-            className="absolute inset-0 rounded-[28px] pointer-events-none"
+            className="absolute inset-0 rounded-[var(--radius-xl)] pointer-events-none"
             style={{
               background: "linear-gradient(180deg, rgba(255,255,255,0.65) 0%, rgba(255,255,255,0.25) 40%, rgba(255,255,255,0.05) 100%)",
               opacity: 0.55,

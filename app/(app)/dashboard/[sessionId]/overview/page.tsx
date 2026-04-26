@@ -44,12 +44,12 @@ function OverviewSessionHeader({
     <header className="flex items-center justify-between px-6 py-4 border-b border-[var(--layer-1-border)]">
       <div>
         {title?.trim() ? (
-          <h1 className="text-[20px] font-semibold leading-[1.15] tracking-[-0.025em] text-[hsl(var(--text-primary-strong))]">
+          <h1 className="text-[20px] font-semibold leading-[1.15] tracking-[-0.025em] text-[var(--text-primary-strong)]">
             {title}
           </h1>
         ) : null}
         {metaLine ? (
-          <p className="text-[13px] text-[hsl(var(--text-tertiary))] mt-2">
+          <p className="text-[14px] text-[var(--text-tertiary)] mt-2">
             {metaLine}
           </p>
         ) : null}
@@ -59,7 +59,7 @@ function OverviewSessionHeader({
           type="button"
           onClick={onCopy}
           disabled={copyBusy}
-          className="h-9 inline-flex items-center gap-2 text-sm px-3 rounded-lg border border-[var(--layer-2-border)] bg-white hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-150 text-[hsl(var(--text-primary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+          className="h-9 inline-flex items-center gap-2 text-sm px-3 rounded-lg border border-[var(--layer-2-border)] bg-white hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-150 text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {copyBusy ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Share2 size={14} />}
           {copyBusy ? "" : copied ? "Copied" : "Share"}
@@ -74,7 +74,7 @@ function OverviewSessionHeader({
         <button
           type="button"
           aria-label="Settings"
-          className="h-10 w-10 inline-flex items-center justify-center rounded-lg border border-[var(--layer-2-border)] bg-white hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-150 text-[hsl(var(--text-secondary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 cursor-pointer"
+          className="h-10 w-10 inline-flex items-center justify-center rounded-lg border border-[var(--layer-2-border)] bg-white hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-150 text-[var(--text-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 cursor-pointer"
         >
           <Settings size={14} />
         </button>
@@ -95,16 +95,16 @@ function MetricCard({
 }) {
   return (
     <div className="rounded-lg border border-[var(--layer-2-border)] p-4 bg-white">
-      <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[hsl(var(--text-tertiary))]">
+      <p className="text-[12px] font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)]">
         {label}
       </p>
-      <p className="text-[13px] font-medium text-[hsl(var(--text-primary-strong))] mt-1">
+      <p className="text-[14px] font-medium text-[var(--text-primary-strong)] mt-1">
         {value}
       </p>
       {progressPercent !== undefined && (
         <div className="mt-2 h-1 rounded-sm border border-[var(--layer-2-border)] overflow-hidden bg-white">
           <div
-            className="h-full rounded-sm bg-[hsl(var(--text-active))] transition-[width] duration-150"
+            className="h-full rounded-sm bg-[var(--text-active)] transition-[width] duration-150"
             style={{ width: `${Math.min(100, Math.max(0, progressPercent))}%` }}
           />
         </div>
@@ -126,18 +126,18 @@ function FeedbackPreviewRow({
     <div className="flex items-center gap-3 py-2 border-b border-[var(--layer-1-border)] last:border-0">
       <div className="min-w-0 flex-1">
         {item.title?.trim() ? (
-          <p className="text-sm font-medium text-[hsl(var(--text-primary))] truncate">
+          <p className="text-sm font-medium text-[var(--text-primary)] truncate">
             {item.title}
           </p>
         ) : null}
         {createdStr ? (
-          <p className="text-xs text-[hsl(var(--text-muted))] mt-0.5">
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">
             {createdStr}
           </p>
         ) : null}
       </div>
       {showStatus && (
-        <span className="text-xs font-medium text-[hsl(var(--text-secondary))] shrink-0 px-2 py-0.5 rounded-md border border-[var(--layer-2-border)] bg-white">
+        <span className="text-xs font-medium text-[var(--text-secondary)] shrink-0 px-2 py-0.5 rounded-md border border-[var(--layer-2-border)] bg-white">
           {resolutionLabel(item.isResolved ?? false)}
         </span>
       )}
@@ -160,16 +160,16 @@ function StatusSection({
   return (
     <section>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs uppercase tracking-wide text-[hsl(var(--text-muted))]">
+        <span className="text-xs uppercase tracking-wide text-[var(--text-muted)]">
           {label}
         </span>
-        <span className="text-xs font-medium text-[hsl(var(--text-secondary))] px-2 py-0.5 rounded-md border border-[var(--layer-2-border)] bg-white">
+        <span className="text-xs font-medium text-[var(--text-secondary)] px-2 py-0.5 rounded-md border border-[var(--layer-2-border)] bg-white">
           {count}
         </span>
       </div>
       <div className="rounded-lg border border-[var(--layer-2-border)] bg-white divide-y divide-[var(--layer-1-border)]">
         {items.length === 0 ? (
-          <p className="text-sm text-[hsl(var(--text-muted))] py-3 px-3">
+          <p className="text-sm text-[var(--text-muted)] py-3 px-3">
             No items
           </p>
         ) : (
@@ -180,7 +180,7 @@ function StatusSection({
       </div>
       <Link
         href={viewAllHref}
-        className="text-xs font-medium text-[hsl(var(--text-active))] mt-1.5 inline-block cursor-pointer hover:underline"
+        className="text-xs font-medium text-[var(--text-active)] mt-1.5 inline-block cursor-pointer hover:underline"
       >
         View all →
       </Link>
@@ -192,11 +192,11 @@ function StatusSection({
 function TagDistribution({ tagCounts }: { tagCounts: { tag: string; count: number }[] }) {
   return (
     <div className="rounded-lg border border-[var(--layer-2-border)] p-4 bg-white">
-      <h3 className="text-xs uppercase tracking-wide text-[hsl(var(--text-muted))] mb-3">
+      <h3 className="text-xs uppercase tracking-wide text-[var(--text-muted)] mb-3">
         Tag distribution
       </h3>
       {tagCounts.length === 0 ? (
-        <p className="text-sm text-[hsl(var(--text-muted))]">No tags yet</p>
+        <p className="text-sm text-[var(--text-muted)]">No tags yet</p>
       ) : (
         <ul className="space-y-2">
           {tagCounts.map(({ tag, count }) => (
@@ -204,8 +204,8 @@ function TagDistribution({ tagCounts }: { tagCounts: { tag: string; count: numbe
               key={tag}
               className="flex items-center justify-between text-sm"
             >
-              <span className="text-[hsl(var(--text-primary))]">{tag}</span>
-              <span className="text-[hsl(var(--text-muted))] font-medium px-2 py-0.5 rounded-md border border-[var(--layer-2-border)] bg-white">
+              <span className="text-[var(--text-primary)]">{tag}</span>
+              <span className="text-[var(--text-muted)] font-medium px-2 py-0.5 rounded-md border border-[var(--layer-2-border)] bg-white">
                 {count}
               </span>
             </li>
@@ -220,11 +220,11 @@ function TagDistribution({ tagCounts }: { tagCounts: { tag: string; count: numbe
 function RecentActivity({ items }: { items: OverviewActivityItem[] }) {
   return (
     <div className="rounded-lg border border-[var(--layer-2-border)] bg-white">
-      <h3 className="text-xs font-medium uppercase tracking-[0.06em] text-[hsl(var(--text-tertiary))] px-4 py-3 border-b border-[var(--layer-1-border)]">
+      <h3 className="text-xs font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)] px-4 py-3 border-b border-[var(--layer-1-border)]">
         Recent activity
       </h3>
       {items.length === 0 ? (
-        <p className="text-sm text-[hsl(var(--text-muted))] py-4 px-4">
+        <p className="text-sm text-[var(--text-muted)] py-4 px-4">
           No recent activity
         </p>
       ) : (
@@ -235,11 +235,11 @@ function RecentActivity({ items }: { items: OverviewActivityItem[] }) {
             return (
               <li key={i} className="px-4 py-2.5 flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-[hsl(var(--text-primary))]">
+                  <p className="text-sm font-medium text-[var(--text-primary)]">
                     {item.actorName}
                   </p>
                   <p
-                    className="text-xs text-[hsl(var(--text-secondary))] truncate"
+                    className="text-xs text-[var(--text-secondary)] truncate"
                     title={targetTrim ? item.targetTitle : undefined}
                   >
                     {item.action}
@@ -247,7 +247,7 @@ function RecentActivity({ items }: { items: OverviewActivityItem[] }) {
                   </p>
                 </div>
                 {timeLabel ? (
-                  <span className="text-xs text-[hsl(var(--text-muted))] shrink-0">
+                  <span className="text-xs text-[var(--text-muted)] shrink-0">
                     {timeLabel}
                   </span>
                 ) : null}

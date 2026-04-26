@@ -310,7 +310,7 @@ export function ProfileCommandPanel({
                   return (
                     <div
                       key={stat.key}
-                      className="transition-[transform,box-shadow] duration-[120ms] ease-out hover:translate-y-[-1px] hover:shadow-[0_6px_16px_rgba(0,0,0,0.05)]"
+                      className="transition-[transform,box-shadow] duration-[120ms] ease-out hover:translate-y-[-1px] hover:shadow-[var(--shadow-md)]"
                       style={{
                         background: stat.bg,
                         borderRadius: 12,
@@ -351,7 +351,7 @@ export function ProfileCommandPanel({
                       <p
                         style={{
                           fontSize: 11,
-                          color: "#6B7280",
+                          color: "var(--text-secondary)",
                           margin: 0,
                         }}
                       >
@@ -364,7 +364,7 @@ export function ProfileCommandPanel({
 
               {/* Feature discovery — upgrade */}
               <div
-                className="transition-[transform,box-shadow] duration-[120ms] ease-out hover:translate-y-[-1px] hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)]"
+                className="transition-[transform,box-shadow] duration-[120ms] ease-out hover:translate-y-[-1px] hover:shadow-[var(--shadow-md)]"
                 style={{
                   background: "#EFF6FF",
                   border: "1px solid #EBF4FF",
@@ -409,7 +409,7 @@ export function ProfileCommandPanel({
             <div className="flex flex-col min-w-0">
               {/* Profile header */}
               <div className="flex items-start gap-3 mb-4">
-                <div className="h-10 w-10 shrink-0 rounded-full bg-[#F5F5F5]">
+                <div className="h-10 w-10 shrink-0 rounded-full bg-[var(--surface-subtle)]">
                   <UserAvatar
                     avatarUrl={avatarUrl}
                     image={(user as { image?: string | null } | null)?.image}
@@ -428,7 +428,7 @@ export function ProfileCommandPanel({
                   <button
                     type="button"
                     style={{ fontSize: 12, fontWeight: 500 }}
-                    className="mt-2 text-[#1775E0] hover:underline"
+                    className="mt-2 text-[var(--brand)] hover:underline"
                   >
                     Edit profile
                   </button>
@@ -451,7 +451,7 @@ export function ProfileCommandPanel({
                   href="/settings?tab=billing"
                   onClick={onClose}
                   style={{ fontSize: 12, fontWeight: 500, marginTop: 4 }}
-                  className="block text-[#1775E0] hover:underline"
+                  className="block text-[var(--brand)] hover:underline"
                 >
                   View plans →
                 </Link>
@@ -464,7 +464,7 @@ export function ProfileCommandPanel({
                       fontSize: 11,
                       fontWeight: 600,
                       letterSpacing: "0.04em",
-                      color: "#6B7280",
+                      color: "var(--text-secondary)",
                       marginBottom: 6,
                     }}
                   >

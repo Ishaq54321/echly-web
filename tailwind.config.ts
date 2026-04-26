@@ -20,20 +20,20 @@ const config: Config = {
         surface: {
           page:    "#F7F8FA",
           card:    "#FFFFFF",
-          subtle:  "#F1F2F4",
-          hover:   "#F4F5F7",
+          subtle:  "#F6F7F8",
+          hover:   "#F0F1F3",
           active:  "#EBF4FF",
           input:   "#FAFAFA",
         },
         text: {
-          heading:     "#1C1B1F",
+          heading:     "#1C1917",
           body:        "#44403C",
           secondary:   "#78716C",
           tertiary:    "#A8A29E",
           placeholder: "#C4BFBB",
         },
         border: {
-          DEFAULT: "#E8E8E8",
+          DEFAULT: "#E5E7EB",
           strong:  "#D5D5D5",
         },
         success: {

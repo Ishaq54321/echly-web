@@ -74,10 +74,10 @@ export function InviteMemberModal({
           className="rounded-2xl shadow-lg bg-white p-6 max-w-md w-full cursor-default"
           onClick={(e) => e.stopPropagation()}
         >
-          <h2 id="invite-modal-title" className="text-[20px] font-semibold text-neutral-900">
+          <h2 id="invite-modal-title" className="text-[20px] font-semibold text-[var(--text-heading)]">
             Invite a team member
           </h2>
-          <p className="mt-1 text-sm text-neutral-600">
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
             They&apos;ll receive an email with a link to join your workspace.
           </p>
           <form onSubmit={handleSubmit} className="mt-4 space-y-3">
@@ -89,7 +89,7 @@ export function InviteMemberModal({
                 placeholder="email@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#1775E0] focus:border-transparent"
+                className="w-full px-3 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text-heading)] placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:border-transparent"
                 autoFocus
               />
               {error && <p className="mt-1.5 text-sm text-[var(--color-danger)]">{error}</p>}
@@ -98,14 +98,14 @@ export function InviteMemberModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2.5 text-sm font-medium rounded-xl text-neutral-700 hover:bg-neutral-100 transition"
+                className="px-4 py-2.5 text-sm font-medium rounded-xl text-neutral-700 hover:bg-[var(--surface-hover)] transition"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-4 py-2.5 text-sm font-semibold rounded-xl bg-[#1775E0] text-white hover:bg-[#1462C4] transition disabled:opacity-60"
+                className="px-4 py-2.5 text-sm font-semibold rounded-xl bg-[var(--brand)] text-white hover:bg-[var(--brand-hover)] transition disabled:opacity-50"
               >
                 {submitting ? "Sending…" : "Send Invite"}
               </button>

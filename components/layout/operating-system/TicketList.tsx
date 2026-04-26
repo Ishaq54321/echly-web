@@ -1,15 +1,24 @@
 "use client";
 
-import React, { useMemo, useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
-import { createPortal } from "react-dom";
-import { ChevronDown, ChevronRight, Check, Search, MoreVertical, X } from "lucide-react";
+import React, { useMemo, useState, useRef, useEffect, useCallback } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 import type { Feedback } from "@/lib/domain/feedback";
 import { getTicketStatus } from "@/lib/domain/feedback";
 import { TicketItem } from "./TicketItem";
 
+function formatRelativeTime(timestamp: any): string {
+  try {
+    const date = typeof timestamp === 'object' && 'seconds' in timestamp
+      ? new Date(timestamp.seconds * 1000)
+      : new Date(timestamp);
+    return formatDistanceToNow(date, { addSuffix: true });
+  } catch {
+    return "Just now";
+  }
+}
+
 export interface TicketListProps {
-  /** Session header (left sidebar top) */
-  sessionTitle?: string;
   counts: {
     total: number;
     open: number;
@@ -17,14 +26,6 @@ export interface TicketListProps {
   };
   /** True while session counter fields are not yet available (e.g. session doc loading). */
   countsLoading?: boolean;
-  /** Optional: editable session title */
-  isEditingSessionTitle?: boolean;
-  sessionTitleDraft?: string;
-  onSessionTitleChange?: (v: string) => void;
-  onSessionTitleSave?: () => void;
-  onSessionTitleCancel?: () => void;
-  onSessionTitleEdit?: () => void;
-  saveSessionTitleSuccess?: boolean;
   /** List */
   items: Feedback[];
   selectedId: string | null;
@@ -39,10 +40,6 @@ export interface TicketListProps {
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
   /** Called when the scroll container DOM node is attached (so hook can attach observer). */
   onScrollContainerReady?: () => void;
-  /** Mark all tickets in this session as resolved. */
-  onMarkAllTicketsResolved?: () => void;
-  /** Mark all tickets in this session as unresolved. */
-  onMarkAllTicketsUnresolved?: () => void;
   /** When set (e.g. from ?ticket= deep link), expand the section containing this id and scroll to it. */
   scrollToId?: string | null;
   /** When set with `onOpenExpandedChange`, controls the Open section (mutual exclusion is parent’s responsibility). */
@@ -55,18 +52,15 @@ export interface TicketListProps {
   onResolvedExpandedChange?: () => void;
   /** True while the first page of resolved tickets is being fetched. */
   isLoadingResolved?: boolean;
-  /** Controlled sidebar search (SessionPageClient owns query + API). */
-  searchQuery: string;
-  onSearchQueryChange: (value: string) => void;
   /** When true, list rows come from `searchResults` (not lazy-loaded `items`). */
   isSearchMode?: boolean;
   searchResults?: Feedback[];
   /** True while `/api/feedback/search` is in flight. */
   searchLoading?: boolean;
-  /** When false, hides ticket search (e.g. public share). Default true. */
-  showTicketSearch?: boolean;
-  /** When false, hides session ⋮ overflow menu. Default true. */
-  showSessionOverflowMenu?: boolean;
+  sessionTitle?: string;
+  workspaceName?: string;
+  updatedAt?: any;
+  viewCount?: number;
 }
 
 /** Skeleton list for Open / Resolved section bodies while loading. */
@@ -87,16 +81,8 @@ function TicketListSectionLoading() {
 }
 
 function TicketListInner({
-  sessionTitle = "",
   counts,
   countsLoading = false,
-  isEditingSessionTitle = false,
-  sessionTitleDraft,
-  onSessionTitleChange,
-  onSessionTitleSave,
-  onSessionTitleCancel,
-  onSessionTitleEdit,
-  saveSessionTitleSuccess = false,
   items,
   selectedId,
   onSelect,
@@ -107,67 +93,21 @@ function TicketListInner({
   loadMoreRef,
   scrollContainerRef: scrollContainerRefRef,
   onScrollContainerReady,
-  onMarkAllTicketsResolved,
-  onMarkAllTicketsUnresolved,
   scrollToId,
   openExpanded: openExpandedProp,
   onOpenExpandedChange,
   resolvedExpanded: resolvedExpandedProp,
   onResolvedExpandedChange,
   isLoadingResolved: isLoadingResolvedFromParent,
-  searchQuery,
-  onSearchQueryChange,
   isSearchMode = false,
   searchResults = [],
   searchLoading = false,
-  showTicketSearch = true,
-  showSessionOverflowMenu = true,
+  sessionTitle,
+  workspaceName,
+  updatedAt,
+  viewCount,
 }: TicketListProps) {
-  const [sidebarMenuOpen, setSidebarMenuOpen] = useState(false);
-  const [sidebarMenuRect, setSidebarMenuRect] = useState<{
-    top: number;
-    right: number;
-  } | null>(null);
-  const sidebarMenuRef = useRef<HTMLDivElement>(null);
-  const sidebarMenuPortalRef = useRef<HTMLDivElement>(null);
-  const sidebarMenuButtonRef = useRef<HTMLButtonElement>(null);
-  const titleInputRef = useRef<HTMLInputElement>(null);
-  const skipTitleBlurSaveRef = useRef(false);
   const scrollToIdApplied = useRef(false);
-
-  const updateSidebarMenuPosition = () => {
-    const el = sidebarMenuButtonRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    setSidebarMenuRect({ top: r.bottom, right: r.right });
-  };
-
-  useLayoutEffect(() => {
-    if (!sidebarMenuOpen) {
-      setSidebarMenuRect(null);
-      return;
-    }
-    updateSidebarMenuPosition();
-    const onReposition = () => updateSidebarMenuPosition();
-    window.addEventListener("resize", onReposition);
-    window.addEventListener("scroll", onReposition, true);
-    return () => {
-      window.removeEventListener("resize", onReposition);
-      window.removeEventListener("scroll", onReposition, true);
-    };
-  }, [sidebarMenuOpen]);
-
-  useEffect(() => {
-    if (!sidebarMenuOpen) return;
-    const close = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (sidebarMenuRef.current?.contains(t)) return;
-      if (sidebarMenuPortalRef.current?.contains(t)) return;
-      setSidebarMenuOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [sidebarMenuOpen]);
   const [openExpandedInternal, setOpenExpandedInternal] = useState(true);
   const openExpandedControlled =
     typeof openExpandedProp === "boolean" && typeof onOpenExpandedChange === "function";
@@ -189,16 +129,6 @@ function TicketListInner({
   const isUserScrollingRef = useRef(false);
 
   const { total, open, resolved } = counts;
-
-  const meta = (() => {
-    if (countsLoading) return null;
-    const base =
-      total > 0
-        ? [`${total} total`, `${open} open`, `${resolved} resolved`].join(" · ")
-        : "0 total";
-    return base;
-  })();
-
 
   // Detect user-driven scroll so we don't fight the browser during manual navigation.
   useEffect(() => {
@@ -310,27 +240,6 @@ function TicketListInner({
     return () => clearTimeout(t);
   }, [scrollToId, openExpanded, resolvedExpanded]);
 
-  const canEditTitle =
-    typeof onSessionTitleChange === "function" &&
-    typeof onSessionTitleSave === "function" &&
-    typeof onSessionTitleEdit === "function";
-
-  useEffect(() => {
-    if (!isEditingSessionTitle || !canEditTitle) return;
-    const el = titleInputRef.current;
-    if (!el) return;
-    const id = requestAnimationFrame(() => {
-      el.focus();
-      const len = el.value.length;
-      try {
-        el.setSelectionRange(len, len);
-      } catch {
-        /* ignore */
-      }
-    });
-    return () => cancelAnimationFrame(id);
-  }, [isEditingSessionTitle, canEditTitle]);
-
   useEffect(() => {
     const container = internalContainerRef.current;
     if (!container) return;
@@ -348,177 +257,27 @@ function TicketListInner({
   }, [items.length, scrollToId]);
 
   return (
-    <div className="sidebar flex flex-col h-full min-h-0 rounded-none bg-white overflow-hidden">
-      {/* Session header */}
-      <div className="sidebar-inner">
-        <div className="sidebar-header z-20 shrink-0">
-          <div className="flex items-center justify-between gap-2 min-w-0">
-            {isEditingSessionTitle && canEditTitle ? (
-              <div className="min-w-0 flex-1 flex items-center gap-1.5 text-[hsl(var(--text-primary-strong))]">
-                <input
-                  ref={titleInputRef}
-                  type="text"
-                  value={sessionTitleDraft ?? sessionTitle ?? ""}
-                  onChange={(e) => onSessionTitleChange?.(e.target.value)}
-                  onBlur={() => {
-                    if (skipTitleBlurSaveRef.current) {
-                      skipTitleBlurSaveRef.current = false;
-                      return;
-                    }
-                    onSessionTitleSave?.();
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      (e.target as HTMLInputElement).blur();
-                    }
-                    if (e.key === "Escape") {
-                      e.preventDefault();
-                      skipTitleBlurSaveRef.current = true;
-                      onSessionTitleCancel?.();
-                    }
-                  }}
-                  className="session-title-input session-title-input--light-surface min-w-0 flex-1 min-h-[1.875rem] border-0 appearance-none truncate"
-                  aria-label="Edit session title"
-                />
-                <button
-                  type="button"
-                  aria-label="Save title"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => onSessionTitleSave?.()}
-                  className="shrink-0 inline-flex size-7 items-center justify-center rounded-md text-neutral-900 opacity-70 hover:opacity-100 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAFBFC]"
-                >
-                  <Check className="size-[18px] shrink-0" strokeWidth={2} aria-hidden />
-                </button>
-              </div>
-            ) : !sessionTitle?.trim() ? (
-              <span>{sessionTitle}</span>
-            ) : (
-              <>
-                <div className="min-w-0 flex-1 flex items-center gap-2">
-                  {canEditTitle ? (
-                    <button
-                      type="button"
-                      onClick={() => onSessionTitleEdit?.()}
-                      className="min-w-0 flex-1 min-h-[1.35rem] text-left truncate bg-transparent border-0 p-0 shadow-none cursor-text text-[17px] font-bold leading-[1.3] tracking-[-0.02em] text-[#111827] outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAFBFC] rounded-sm"
-                    >
-                      {sessionTitle}
-                    </button>
-                  ) : (
-                    <h1 className="text-[17px] font-bold leading-[1.3] tracking-[-0.02em] text-[#111827] truncate">
-                      {sessionTitle}
-                    </h1>
-                  )}
-                  {saveSessionTitleSuccess && (
-                    <Check className="h-3.5 w-3.5 text-[var(--color-success)] shrink-0" aria-hidden />
-                  )}
-                </div>
-                {showSessionOverflowMenu ? (
-                  <div className="relative shrink-0" ref={sidebarMenuRef}>
-                    <button
-                      ref={sidebarMenuButtonRef}
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (sidebarMenuOpen) {
-                          setSidebarMenuOpen(false);
-                          return;
-                        }
-                        const el = sidebarMenuButtonRef.current;
-                        if (el) {
-                          const r = el.getBoundingClientRect();
-                          setSidebarMenuRect({ top: r.bottom, right: r.right });
-                        }
-                        setSidebarMenuOpen(true);
-                      }}
-                      className="p-2.5 rounded-xl text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration-fast)] cursor-pointer"
-                      aria-label="Session options"
-                      aria-expanded={sidebarMenuOpen}
-                    >
-                      <MoreVertical className="h-[18px] w-[18px]" aria-hidden />
-                    </button>
-                    {typeof document !== "undefined" &&
-                      sidebarMenuOpen &&
-                      sidebarMenuRect != null &&
-                      createPortal(
-                        <div
-                          ref={sidebarMenuPortalRef}
-                          className="p-[6px] w-max min-w-[180px] max-w-[240px] rounded-xl bg-[var(--layer-1-bg)] border border-[var(--layer-1-border)] shadow-[var(--shadow-level-4)] overflow-hidden"
-                          style={{
-                            position: "fixed",
-                            zIndex: 9999,
-                            top: sidebarMenuRect.top + 6,
-                            right: Math.max(8, window.innerWidth - sidebarMenuRect.right),
-                          }}
-                          role="menu"
-                        >
-                          {onMarkAllTicketsResolved && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                onMarkAllTicketsResolved();
-                                setSidebarMenuOpen(false);
-                              }}
-                              className="block w-full my-0.5 rounded-lg text-left whitespace-nowrap py-2 px-2.5 text-[13px] text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] cursor-pointer border-0 bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] focus-visible:ring-inset"
-                            >
-                              Resolve all open tickets
-                            </button>
-                          )}
-                          {onMarkAllTicketsUnresolved && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                onMarkAllTicketsUnresolved();
-                                setSidebarMenuOpen(false);
-                              }}
-                              className="block w-full my-0.5 rounded-lg text-left whitespace-nowrap py-2 px-2.5 text-[13px] text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] cursor-pointer border-0 bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] focus-visible:ring-inset"
-                            >
-                              Reopen all resolved tickets
-                            </button>
-                          )}
-                        </div>,
-                        document.body
-                      )}
-                  </div>
-                ) : null}
-              </>
-            )}
+    <div className="flex flex-col h-full min-h-0 overflow-hidden">
+      {/* Session Info Header */}
+      {sessionTitle && (
+        <div className="shrink-0 px-4 pt-4 pb-3">
+          <div className="flex items-start justify-between gap-2">
+            <h2 className="text-[16px] font-semibold text-[var(--text-heading)] leading-[1.3] truncate flex-1 min-w-0">
+              {sessionTitle}
+            </h2>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-xs)] border border-[var(--border)] text-[12px] font-medium text-[var(--text-body)] tabular-nums shrink-0">
+              {viewCount ?? 0} views
+            </span>
           </div>
-          {meta ? (
-            <p className="mt-2 text-[13px] font-medium text-[#6B7280] leading-normal tracking-[-0.01em]">
-              {meta}
-            </p>
-          ) : null}
-          {showTicketSearch ? (
-            <div className="mt-3">
-              <div className="search-container">
-                <Search className="search-icon" aria-hidden />
-                <input
-                  type="text"
-                  placeholder="Search tickets..."
-                  value={searchQuery}
-                  onChange={(e) => onSearchQueryChange(e.target.value)}
-                  className="search-input placeholder:text-[hsl(var(--text-tertiary))] text-[hsl(var(--text-primary-strong))]"
-                  aria-label="Search tickets"
-                  autoComplete="off"
-                  enterKeyHint="search"
-                />
-                {searchQuery ? (
-                  <button
-                    type="button"
-                    className="clear-icon"
-                    aria-label="Clear search"
-                    onClick={() => onSearchQueryChange("")}
-                  >
-                    <X className="w-4 h-4" strokeWidth={2} aria-hidden />
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
+          <div className="mt-1 flex items-center gap-1 text-[12px] text-[var(--text-tertiary)]">
+            <span className="font-medium text-[var(--text-tertiary)]">{workspaceName}</span>
+            <span>·</span>
+            <span title={updatedAt ? new Date(typeof updatedAt === 'object' && 'seconds' in updatedAt ? updatedAt.seconds * 1000 : updatedAt).toLocaleString() : undefined}>
+              {updatedAt ? formatRelativeTime(updatedAt) : "Just now"}
+            </span>
+          </div>
         </div>
-      </div>
-
+      )}
       {/* Status sections: Open → Resolved. Soft pill badges, no hard blocks. */}
       <div
         ref={(el) => {
@@ -534,13 +293,13 @@ function TicketListInner({
         className="sidebar-list h-full max-h-[100vh] overflow-y-auto flex-1 min-h-0 pb-4"
       >
         {showSearchEmpty && (
-          <div className="px-3 py-4 mt-3 text-[12px] font-normal text-[#9CA3AF]">
+          <div className="px-3 py-4 mt-3 text-[12px] font-normal text-[var(--text-tertiary)]">
             No tickets found
           </div>
         )}
 
         {/* Open */}
-        <section className="pt-1">
+        <section className="pt-3">
           {!countsLoading && (
             <>
               <button
@@ -549,25 +308,25 @@ function TicketListInner({
                     if (openExpandedControlled) onOpenExpandedChange?.();
                     else setOpenExpandedInternal((x) => !x);
                   }}
-                  className="z-10 bg-white relative flex w-full items-center gap-2.5 px-3 py-3 rounded-xl text-left border-none shadow-none hover:bg-[#F3F4F6] transition-colors duration-150 cursor-pointer"
+                  className="z-10 bg-transparent relative flex w-full items-center gap-2.5 px-4 py-2.5 rounded-[var(--radius-sm)] text-left border-none shadow-none hover:bg-[var(--surface-hover)] transition-colors duration-150 cursor-pointer"
                   aria-expanded={openExpanded}
                 >
-                  <span className="flex items-center justify-center min-w-[24px] h-[24px] rounded-full bg-[var(--color-primary-soft)] text-[12px] font-bold tabular-nums text-[var(--color-primary)]">
-                    <span>{open}</span>
+                  <span className="min-w-[20px] h-[20px] rounded-[var(--radius-xs)] flex items-center justify-center text-[12px] font-bold tabular-nums bg-[var(--brand-subtle)] text-[var(--brand)]">
+                    {open}
                   </span>
-                  <span className="text-[13px] font-semibold text-[#374151] tracking-[-0.01em]">
+                  <span className="text-[14px] font-semibold text-[var(--text-heading)] flex-1">
                     Open
                   </span>
-                  <span className="ml-auto shrink-0 text-[hsl(var(--text-tertiary))]">
+                  <span className="ml-auto shrink-0 text-[var(--text-heading)] h-4 w-4">
                     {openExpanded ? (
-                      <ChevronDown className="h-[18px] w-[18px]" aria-hidden />
+                      <ChevronDown className="text-[var(--text-heading)] h-4 w-4" aria-hidden />
                     ) : (
-                      <ChevronRight className="h-[18px] w-[18px]" aria-hidden />
+                      <ChevronRight className="text-[var(--text-heading)] h-4 w-4" aria-hidden />
                     )}
                   </span>
                 </button>
                 {openExpanded && (
-                  <div className="pl-1 pr-1 pt-0.5 pb-2 space-y-0 transition-opacity duration-150 ease-out">
+                  <div className="px-2 pt-0.5 pb-2 space-y-0 transition-opacity duration-150 ease-out">
                     {openItems.map((item, idx) => (
                       <TicketItem
                         key={item.id}
@@ -583,7 +342,7 @@ function TicketListInner({
                     {openItems.length === 0 && !showSearchEmpty && (
                       <>
                         {open === 0 ? (
-                          <p className="px-3 py-3 text-[12px] text-[hsl(var(--text-tertiary))]">
+                          <p className="px-3 py-3 text-[12px] text-[var(--text-tertiary)]">
                             No open tickets
                           </p>
                         ) : isSearchMode && searchLoading ? null : (
@@ -608,25 +367,25 @@ function TicketListInner({
                   if (resolvedExpandedControlled) onResolvedExpandedChange?.();
                   else setResolvedExpandedInternalOnly(!resolvedExpanded);
                 }}
-                  className="z-10 bg-white relative flex w-full items-center gap-2.5 px-3 py-3 rounded-xl text-left border-none shadow-none hover:bg-[#F3F4F6] transition-colors duration-150 cursor-pointer"
+                  className="z-10 bg-transparent relative flex w-full items-center gap-2.5 px-4 py-2.5 rounded-[var(--radius-sm)] text-left border-none shadow-none hover:bg-[var(--surface-hover)] transition-colors duration-150 cursor-pointer"
                   aria-expanded={resolvedExpanded}
                 >
-                  <span className="flex items-center justify-center min-w-[24px] h-[24px] rounded-full bg-[var(--color-success-soft)] text-[12px] font-bold tabular-nums text-[var(--color-success)]">
-                    <span>{resolved}</span>
+                  <span className="min-w-[20px] h-[20px] rounded-[var(--radius-xs)] flex items-center justify-center text-[12px] font-bold tabular-nums bg-[var(--color-success-bg)] text-[var(--color-success)]">
+                    {resolved}
                   </span>
-                  <span className="text-[13px] font-semibold text-[#374151] tracking-[-0.01em]">
+                  <span className="text-[14px] font-semibold text-[var(--text-heading)] flex-1">
                     Resolved
                   </span>
-                  <span className="ml-auto shrink-0 text-[hsl(var(--text-tertiary))]">
+                  <span className="ml-auto shrink-0 text-[var(--text-heading)] h-4 w-4">
                     {resolvedExpanded ? (
-                      <ChevronDown className="h-[18px] w-[18px]" aria-hidden />
+                      <ChevronDown className="text-[var(--text-heading)] h-4 w-4" aria-hidden />
                     ) : (
-                      <ChevronRight className="h-[18px] w-[18px]" aria-hidden />
+                      <ChevronRight className="text-[var(--text-heading)] h-4 w-4" aria-hidden />
                     )}
                   </span>
                 </button>
                 {resolvedExpanded && (
-                  <div className="pl-1 pr-1 pt-0.5 pb-2 space-y-0 transition-opacity duration-150 ease-out">
+                  <div className="px-2 pt-0.5 pb-2 space-y-0 transition-opacity duration-150 ease-out">
                     {resolvedItems.map((item, idx) => (
                       <TicketItem
                         key={item.id}
@@ -642,7 +401,7 @@ function TicketListInner({
                     {resolvedItems.length === 0 && !showSearchEmpty && !(isSearchMode && searchLoading) && (
                       <>
                         {resolved === 0 ? (
-                          <p className="px-3 py-3 text-[12px] text-[hsl(var(--text-tertiary))]">
+                          <p className="px-3 py-3 text-[12px] text-[var(--text-tertiary)]">
                             No resolved tickets
                           </p>
                         ) : null}

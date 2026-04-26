@@ -39,12 +39,12 @@ export default function SessionHeader({
   const dateStr = formatCreatedAt(createdAt ?? null);
 
   return (
-    <div className="flex items-start justify-between py-6 border-b border-[hsl(var(--border))]">
+    <div className="flex items-start justify-between py-6 border-b border-[var(--border)]">
       <div className="flex flex-col gap-1.5">
-        <h1 className="text-2xl font-semibold tracking-tight text-[hsl(var(--text-primary))] leading-snug">
+        <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)] leading-snug">
           {title ?? "Session"}
         </h1>
-        <div className="text-sm text-[hsl(var(--text-secondary))] opacity-[0.92] flex items-center gap-2">
+        <div className="text-sm text-[var(--text-secondary)] opacity-[0.92] flex items-center gap-2">
           <span>{feedbackCount} feedback item{feedbackCount !== 1 ? "s" : ""}</span>
           {sessionId != null && sessionId !== "" && (
             <>
@@ -64,7 +64,7 @@ export default function SessionHeader({
         <button
           type="button"
           onClick={onCopy}
-          className="inline-flex items-center gap-2 text-[14px] px-4 py-2 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration)] font-medium text-[hsl(var(--text-primary-strong))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] cursor-pointer"
+          className="inline-flex items-center gap-2 text-[14px] px-4 py-2 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration)] font-medium text-[var(--text-primary-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] cursor-pointer"
         >
           <Share2 size={16} />
           {copied ? "Copied" : "Share"}

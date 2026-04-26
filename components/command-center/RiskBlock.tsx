@@ -34,7 +34,7 @@ export function RiskBlock({ items, onSelect }: RiskBlockProps) {
             <button
               type="button"
               onClick={() => onSelect(item.id, item.sessionId)}
-              className="w-full text-left px-4 py-2.5 text-[13px] text-[hsl(var(--text-primary-strong))] hover:bg-black/[0.02] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[var(--accent-operational)]"
+              className="w-full text-left px-4 py-2.5 text-[14px] text-[var(--text-primary-strong)] hover:bg-black/[0.02] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[var(--accent-operational)]"
             >
               <span className="truncate">{item.title}</span>
             </button>

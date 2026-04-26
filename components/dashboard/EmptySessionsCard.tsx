@@ -46,7 +46,7 @@ export default function EmptySessionsCard() {
             </span>
           </div>
           {showFallbackHint && (
-            <p className="mt-3 text-[13px] text-[var(--text-tertiary)]" role="status" aria-live="polite">
+            <p className="mt-3 text-[14px] text-[var(--text-tertiary)]" role="status" aria-live="polite">
               Click the Echly extension in your browser toolbar
             </p>
           )}

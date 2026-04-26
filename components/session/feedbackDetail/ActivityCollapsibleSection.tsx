@@ -21,7 +21,7 @@ export function ActivityCollapsibleSection({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center justify-between w-full text-left text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] py-1"
+        className="flex items-center justify-between w-full text-left text-[12px] font-medium uppercase tracking-wider text-[var(--text-tertiary)] hover:text-[var(--text-primary-strong)] py-1"
         aria-expanded={open}
       >
         {title}

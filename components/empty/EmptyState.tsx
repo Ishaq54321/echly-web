@@ -46,8 +46,8 @@ export function EmptyState({
 
   const titleClassName =
     emphasis === "prominent"
-      ? "text-3xl font-semibold text-gray-900 whitespace-nowrap"
-      : "text-2xl font-medium text-gray-900";
+      ? "text-3xl font-semibold text-[var(--text-heading)] whitespace-nowrap"
+      : "text-2xl font-medium text-[var(--text-heading)]";
 
   const isCompact = density === "compact";
   const cardPadding = isCompact ? "p-7" : "p-10";
@@ -57,7 +57,7 @@ export function EmptyState({
   const isMinimal = surface === "minimal";
   const rootClassName = [
     "mx-auto max-w-xl text-center",
-    isMinimal ? "" : `rounded-2xl border border-neutral-200 bg-white ${cardPadding} shadow-sm`,
+    isMinimal ? "" : `rounded-2xl border border-[var(--border)] bg-white ${cardPadding} shadow-sm`,
     className,
   ]
     .filter(Boolean)
@@ -84,12 +84,12 @@ export function EmptyState({
       <div className={bodyClassName}>
         <h2 className={titleClassName}>{title}</h2>
         <p
-          className={`${descriptionTop} ${descriptionMaxW} mx-auto text-center text-base text-gray-600`}
+          className={`${descriptionTop} ${descriptionMaxW} mx-auto text-center text-base text-[var(--text-secondary)]`}
         >
           {description}
         </p>
         {subtext ? (
-          <p className="mt-3 text-xs text-[hsl(var(--text-muted))]">{subtext}</p>
+          <p className="mt-3 text-xs text-[var(--text-muted)]">{subtext}</p>
         ) : null}
       </div>
 

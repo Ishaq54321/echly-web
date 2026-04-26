@@ -139,7 +139,7 @@ function DashboardContent() {
     () => [
       {
         title: "",
-        markerClassName: "bg-[#1775E0]",
+        markerClassName: "bg-[var(--brand)]",
         items: tabFilteredSessions,
       },
     ],
@@ -173,7 +173,7 @@ function DashboardContent() {
                       onClick={triggerCta}
                       disabled={startingRecorder || !isIdentityResolved}
                       aria-busy={startingRecorder}
-                      className="rounded-[9px] bg-[#1775E0] px-4 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#1462C4] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60"
+                      className="rounded-[var(--radius-sm)] bg-[var(--brand)] px-4 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[var(--brand-hover)] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
                     >
                       New Session
                     </button>
@@ -219,7 +219,7 @@ function DashboardContent() {
                           type="button"
                           onClick={() => void loadMoreSessions()}
                           disabled={loadingMoreSessions}
-                          className="rounded-lg border border-[#EBEBEB] bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--text-body)] transition-colors hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {loadingMoreSessions ? "Loading..." : "Load more sessions"}
                         </button>

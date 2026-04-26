@@ -12,10 +12,10 @@ import { AuthLayout } from "@/components/auth/AuthLayout";
 import { AuthCard } from "@/components/auth/AuthCard";
 
 const inputClass =
-  "w-full h-11 rounded-[10px] border border-[#E5E7EB] bg-white text-gray-900 text-base pl-3 placeholder:text-gray-400 focus:outline-none focus:border-[#466EFF] focus:ring-[3px] focus:ring-[rgba(70,110,255,0.15)]";
+  "w-full h-11 rounded-[var(--radius-sm)] border border-[var(--border)] bg-white text-[var(--text-heading)] text-base pl-3 placeholder:text-gray-400 focus:outline-none focus:border-[#466EFF] focus:ring-[3px] focus:ring-[rgba(70,110,255,0.15)]";
 
 const primaryButtonClass =
-  "w-full h-12 rounded-[10px] text-white font-medium text-lg transition-all disabled:opacity-60 hover:brightness-105 flex items-center justify-center";
+  "w-full h-12 rounded-[var(--radius-sm)] text-white font-medium text-lg transition-all disabled:opacity-50 hover:brightness-105 flex items-center justify-center";
 const primaryButtonStyle = {
   background: "linear-gradient(135deg, #466EFF, #5F7DFF)",
 };
@@ -102,20 +102,20 @@ function SignupPageContent() {
             className="h-8 w-auto"
           />
         </Link>
-        <h1 className="text-5xl font-semibold tracking-tight text-gray-900 text-center mb-3">
+        <h1 className="text-5xl font-semibold tracking-tight text-[var(--text-heading)] text-center mb-3">
         Capture Feedback Exactly Where it Happens
         </h1>
-        <p className="text-lg text-gray-500 text-center mb-10 max-w-md">
+        <p className="text-lg text-[var(--text-secondary)] text-center mb-10 max-w-md">
           Turn screenshots into actionable tickets for your team in seconds.
         </p>
         <AuthCard>
-          <h2 className="text-2xl font-semibold text-gray-900 mb-6">Create your Echly account</h2>
+          <h2 className="text-2xl font-semibold text-[var(--text-heading)] mb-6">Create your Echly account</h2>
 
           <button
             type="button"
             onClick={handleGoogle}
             disabled={loading}
-            className="w-full h-12 rounded-[10px] border border-[#E5E7EB] bg-white text-gray-900 font-medium text-base hover:bg-gray-50 transition-colors disabled:opacity-60 flex items-center justify-center gap-3"
+            className="w-full h-12 rounded-[var(--radius-sm)] border border-[var(--border)] bg-white text-[var(--text-heading)] font-medium text-base hover:bg-[var(--surface-hover)] transition-colors disabled:opacity-50 flex items-center justify-center gap-3"
           >
             <GoogleIcon />
             Continue with Google
@@ -123,10 +123,10 @@ function SignupPageContent() {
 
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-[#E5E7EB]" />
+              <div className="w-full border-t border-[var(--border)]" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-3 bg-white text-gray-500">OR</span>
+              <span className="px-3 bg-white text-[var(--text-secondary)]">OR</span>
             </div>
           </div>
 
@@ -159,9 +159,9 @@ function SignupPageContent() {
             </button>
           </form>
 
-          <p className="mt-6 text-center text-gray-500 text-sm">
+          <p className="mt-6 text-center text-[var(--text-secondary)] text-sm">
             Already have an account?{" "}
-            <Link href="/login" className="text-[#466EFF] hover:underline font-medium">
+            <Link href="/login" className="text-[var(--brand)] hover:underline font-medium">
               Sign in
             </Link>
           </p>
@@ -173,7 +173,7 @@ function SignupPageContent() {
 
 export default function SignupPage() {
   return (
-    <Suspense fallback={<div className="w-8 h-8 border-2 border-[#EBEBEB] border-t-[#466EFF] rounded-full animate-spin" />}>
+    <Suspense fallback={<div className="w-8 h-8 border-2 border-[var(--border)] border-t-[#466EFF] rounded-full animate-spin" />}>
       <SignupPageContent />
     </Suspense>
   );

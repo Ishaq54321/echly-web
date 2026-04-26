@@ -107,7 +107,7 @@ export function SelectableText({
           style={{ top: bubblePos.top, left: bubblePos.left }}
         >
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-[11px] font-medium uppercase tracking-wide text-[hsl(var(--text-tertiary))]">+ Comment</span>
+            <span className="text-[12px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">+ Comment</span>
           </div>
           <textarea
             value={draftMessage}
@@ -127,7 +127,7 @@ export function SelectableText({
             <button
               type="button"
               onClick={() => setShowBubble(false)}
-              className="text-[11px] font-medium text-[hsl(var(--text-tertiary))] px-2 py-1 rounded"
+              className="text-[12px] font-medium text-[var(--text-tertiary)] px-2 py-1 rounded"
             >
               Cancel
             </button>
@@ -135,7 +135,7 @@ export function SelectableText({
               type="button"
               onClick={() => void handleSubmit()}
               disabled={!draftMessage.trim() || submitting}
-              className="text-[11px] font-medium text-white bg-[var(--accent-operational)] px-2 py-1 rounded disabled:opacity-50"
+              className="text-[12px] font-medium text-white bg-[var(--accent-operational)] px-2 py-1 rounded disabled:opacity-50"
             >
               {submitting ? "Sending…" : "Comment"}
             </button>

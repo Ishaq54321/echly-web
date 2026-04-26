@@ -36,13 +36,13 @@ function MeterRow({
   return (
     <div className="flex flex-col gap-0.5">
       <div className="flex items-baseline justify-between text-sm">
-        <span className="text-neutral-600">{label}</span>
-        <span className={`tabular-nums font-medium ${showWarning ? "text-amber-600" : "text-neutral-900"}`}>
+        <span className="text-[var(--text-secondary)]">{label}</span>
+        <span className={`tabular-nums font-medium ${showWarning ? "text-amber-600" : "text-[var(--text-heading)]"}`}>
           {limit == null ? `${used}` : `${used} / ${limit}`}
         </span>
       </div>
       {limit != null && limit > 0 && (
-        <div className="h-1.5 w-full rounded-full bg-neutral-100 overflow-hidden">
+        <div className="h-1.5 w-full rounded-full bg-[var(--surface-hover)] overflow-hidden">
           <div
             className="h-full rounded-full transition-all"
             style={{
@@ -71,7 +71,7 @@ export function UsageMeter() {
   if (!workspaceGateReady || realtimeLoading || !isBillingLoaded) {
     return (
       <div
-        className="flex min-h-[120px] items-center justify-center rounded-xl border border-neutral-200 bg-white p-4 shadow-sm"
+        className="flex min-h-[120px] items-center justify-center rounded-xl border border-[var(--border)] bg-white p-4 shadow-sm"
         aria-busy="true"
         aria-live="polite"
       >
@@ -82,7 +82,7 @@ export function UsageMeter() {
 
   if (realtimeError || realtimeUsage == null) {
     return (
-      <div className="rounded-xl border border-neutral-200 bg-white p-4 text-sm text-neutral-500">
+      <div className="rounded-xl border border-[var(--border)] bg-white p-4 text-sm text-neutral-500">
         {realtimeError ? `Usage unavailable: ${realtimeError}` : "Usage unavailable"}
       </div>
     );
@@ -92,9 +92,9 @@ export function UsageMeter() {
   const planLabel = PLAN_LABEL[plan] ?? plan;
 
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+    <div className="rounded-xl border border-[var(--border)] bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-semibold text-neutral-900">Usage</span>
+        <span className="text-sm font-semibold text-[var(--text-heading)]">Usage</span>
         <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide">{planLabel}</span>
       </div>
       <div className="space-y-3">

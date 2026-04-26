@@ -112,12 +112,12 @@ export function WorkspaceCard({
           relative
           w-full
           rounded-xl
-          border border-neutral-200
+          border border-[var(--border)]
           bg-white
           p-5
           overflow-hidden
           shadow-sm
-          hover:bg-neutral-50
+          hover:bg-[var(--surface-hover)]
           hover:!border-[#1775E080]
           hover:ring-1
           hover:ring-[#1775E040]
@@ -132,7 +132,7 @@ export function WorkspaceCard({
       style={{ animationDelay: `${index * 50}ms` } as React.CSSProperties}
       data-session-id={session.id}
     >
-      <div className="absolute top-0 left-0 right-0 h-[3px] bg-[#1775E0]/70 rounded-t-xl" aria-hidden />
+      <div className="absolute top-0 left-0 right-0 h-[3px] bg-[var(--brand)]/70 rounded-t-xl" aria-hidden />
       {(isOptimistic || isOpening) && (
         <div
           className="absolute inset-0 rounded-xl ring-2 ring-[#1775E0]/35 pointer-events-none"
@@ -172,12 +172,12 @@ export function WorkspaceCard({
                 setCopyTooltip(true);
                 setTimeout(() => setCopyTooltip(false), COPIED_TOOLTIP_MS);
               }}
-              triggerClassName="flex items-center justify-center h-10 w-10 rounded-xl text-[hsl(var(--text-tertiary))] transition-colors duration-[var(--motion-duration)] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] cursor-pointer"
+              triggerClassName="flex items-center justify-center h-10 w-10 rounded-xl text-[var(--text-tertiary)] transition-colors duration-[var(--motion-duration)] hover:bg-[var(--layer-2-hover-bg)] hover:text-[var(--text-primary-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] cursor-pointer"
               triggerIconClassName="h-[16px] w-[16px] relative top-[1px] pointer-events-none"
             />
             {showTooltip && !actionsMenuOpen && (
               <span
-                className="workspace-card-tooltip absolute top-full right-0 mt-2 px-3 py-1.5 text-xs rounded-xl bg-[hsl(var(--text-primary-strong))] text-white shadow-[var(--shadow-level-4)] pointer-events-none whitespace-nowrap z-[100]"
+                className="workspace-card-tooltip absolute top-full right-0 mt-2 px-3 py-1.5 text-xs rounded-xl bg-[var(--text-primary-strong)] text-white shadow-[var(--shadow-level-4)] pointer-events-none whitespace-nowrap z-[100]"
                 role="tooltip"
               >
                 More actions…
@@ -186,7 +186,7 @@ export function WorkspaceCard({
           </div>
           {copyTooltip && (
             <span
-              className="workspace-card-tooltip absolute right-12 top-0 mt-2 px-3 py-1.5 text-xs rounded-xl bg-[hsl(var(--text-primary-strong))] text-white shadow-[var(--shadow-level-4)] whitespace-nowrap z-[100] pointer-events-none"
+              className="workspace-card-tooltip absolute right-12 top-0 mt-2 px-3 py-1.5 text-xs rounded-xl bg-[var(--text-primary-strong)] text-white shadow-[var(--shadow-level-4)] whitespace-nowrap z-[100] pointer-events-none"
               role="status"
               aria-live="polite"
             >
@@ -215,7 +215,7 @@ export function WorkspaceCard({
             </div>
             <div className="flex flex-col min-w-0 flex-1">
               {session.title?.trim() ? (
-                <h3 className="font-medium text-neutral-900 text-[15px] leading-tight line-clamp-2 overflow-hidden text-ellipsis min-w-0">
+                <h3 className="font-medium text-[var(--text-heading)] text-[15px] leading-tight line-clamp-2 overflow-hidden text-ellipsis min-w-0">
                   {session.title}
                 </h3>
               ) : null}
@@ -231,7 +231,7 @@ export function WorkspaceCard({
 
           <div className="flex min-h-[28px] flex-wrap items-center gap-2 mb-4">
             {counts != null && counts.total > 0 ? (
-              <span className="px-2.5 py-1 rounded-full text-xs bg-neutral-100 text-neutral-700 tabular-nums">
+              <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--surface-hover)] text-neutral-700 tabular-nums">
                 {counts.total} feedback
               </span>
             ) : null}

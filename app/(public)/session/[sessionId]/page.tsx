@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import PublicSessionNav, { PUBLIC_NAV_HEIGHT } from "@/components/layout/PublicSessionNav";
 import SessionPageClient from "@/app/(app)/dashboard/[sessionId]/SessionPageClient";
-import GlobalRail from "@/components/layout/GlobalRail";
 import PublicViewerBanner from "@/components/session/PublicViewerBanner";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import { setShareToken } from "@/lib/client/shareToken";
@@ -33,8 +32,6 @@ function PublicSessionView({ sessionId }: { sessionId: string }) {
 
   const authShell = (content: React.ReactNode) => (
     <div suppressHydrationWarning className="flex h-screen overflow-hidden">
-      <GlobalRail />
-      <div className="content-divider shrink-0" aria-hidden />
       <main className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white">
         <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
           {content}

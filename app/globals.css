@@ -139,21 +139,14 @@ body {
 .surface-rail {
   background-color: var(--structural-gray-rail);
   box-shadow: var(--shadow-level-1);
-  border-right: 1px solid var(--layer-1-border);
 }
 
-.surface-sidebar {
-  background-color: var(--structural-gray);
-  box-shadow: var(--shadow-level-1);
-  border-right: 1px solid var(--layer-1-border);
-}
 
 .surface-main {
   background: #FFFFFF;
   position: relative;
   z-index: 1;
   border-radius: 0;
-  box-shadow: var(--shadow-level-1);
 }
 
 /* Main content area when it needs a solid surface (e.g. cards on top) */
@@ -239,7 +232,7 @@ button[aria-disabled="true"],
   border-radius: 6px;
 }
 .discussion-list-scroll::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: var(--text-tertiary);
 }
 
 /* Integrations (Settings) — align logo with title */
@@ -385,7 +378,7 @@ button[aria-disabled="true"],
 /* Base track */
 .loader-track {
   fill: none;
-  stroke: #e5e7eb;
+  stroke: var(--border);
   stroke-width: 4;
 }
 
@@ -518,7 +511,7 @@ button[aria-disabled="true"],
 }
 
 .session-actions-dropdown .dropdown-item.delete {
-  color: #9ca3af;
+  color: var(--text-tertiary);
 }
 
 .session-actions-dropdown .dropdown-item.delete:hover {
@@ -527,11 +520,11 @@ button[aria-disabled="true"],
 }
 
 .workspace-card-dropdown.session-actions-dropdown .dropdown-item {
-  color: hsl(var(--text-primary-strong));
+  color: var(--text-heading);
 }
 
 .workspace-card-dropdown.session-actions-dropdown .dropdown-item.delete {
-  color: #9ca3af;
+  color: var(--text-tertiary);
 }
 
 .workspace-card-dropdown.session-actions-dropdown .dropdown-item:hover {
@@ -691,7 +684,7 @@ html.dark .workspace-card-dropdown.session-actions-dropdown .dropdown-item.delet
   transition: background-color 150ms ease-in-out, box-shadow 150ms ease-in-out;
 }
 .sidebar-row-interactive:hover:not([aria-current="true"]) {
-  background-color: rgba(0, 0, 0, 0.025);
+  background-color: var(--surface-hover);
 }
 .sidebar-row-interactive::before {
   content: "";
@@ -708,7 +701,7 @@ html.dark .workspace-card-dropdown.session-actions-dropdown .dropdown-item.delet
 }
 .sidebar-row-interactive:hover::before {
   height: 18px;
-  opacity: 0.5;
+  opacity: 0.6;
 }
 .sidebar-row-interactive[aria-current="true"]::before {
   height: 20px;
@@ -716,7 +709,8 @@ html.dark .workspace-card-dropdown.session-actions-dropdown .dropdown-item.delet
   background: var(--brand);
 }
 .sidebar-row-interactive[aria-current="true"] {
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.4);
+  background: var(--surface-card);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 
 /* ======================================
@@ -995,7 +989,7 @@ textarea:focus-visible {
   height: 36px;
 }
 .echly-voice-pill-text {
-  color: #F3F4F6;
+  color: var(--text-on-dark);
   font-size: 14px;
   font-weight: 500;
   letter-spacing: -0.01em;
@@ -1403,8 +1397,8 @@ textarea:focus-visible {
   --bg-surface-hover: rgba(0, 0, 0, 0.06);
   --glass-highlight: rgba(0, 0, 0, 0.03);
   --border-subtle: rgba(0, 0, 0, 0.08);
-  --text-primary: #111827;
-  --text-secondary: #6b7280;
+  --text-primary: var(--text-heading);
+  --text-secondary: #78716C;
   --color-accent: #155DFC;
   --color-accent-soft: rgba(21, 93, 252, 0.1);
   --color-success: #10B981;
@@ -1413,9 +1407,9 @@ textarea:focus-visible {
   --button-primary-bg: #155DFC;
   --button-primary-text: #ffffff;
   --button-secondary-bg: rgba(0, 0, 0, 0.06);
-  --button-secondary-text: #111827;
+  --button-secondary-text: var(--text-heading);
   --button-secondary-hover-bg: rgba(0, 0, 0, 0.1);
-  --button-secondary-hover-text: #111827;
+  --button-secondary-hover-text: var(--text-heading);
   --shadow-depth: 0 10px 30px rgba(0, 0, 0, 0.08);
   --shadow-strong: 0 14px 40px rgba(0, 0, 0, 0.12);
   --bg-widget-gradient: linear-gradient(
@@ -1428,8 +1422,8 @@ textarea:focus-visible {
   --input-bg: rgba(0, 0, 0, 0.04);
   --input-border: rgba(0, 0, 0, 0.1);
   --input-border-focus: rgba(0, 0, 0, 0.2);
-  --icon-color: #6b7280;
-  --icon-hover: #111827;
+  --icon-color: var(--text-secondary);
+  --icon-hover: var(--text-heading);
   --priority-medium: rgba(0, 0, 0, 0.4);
   --priority-low: rgba(0, 0, 0, 0.25);
   --confirm-icon-hover-bg: rgba(0, 0, 0, 0.06);
@@ -1716,11 +1710,11 @@ textarea:focus-visible {
 /* Light mode: title text and input color */
 .echly-sidebar-surface[data-theme="light"] .echly-session-title-text,
 .light .echly-session-title-text {
-  color: #111827;
+  color: var(--text-heading);
 }
 .echly-sidebar-surface[data-theme="light"] .echly-session-title-input.session-title-input,
 .light .echly-session-title-input.session-title-input {
-  color: #111827;
+  color: var(--text-heading);
   background: rgba(0, 0, 0, 0.03);
   border: none;
   box-shadow: none;
@@ -1777,7 +1771,7 @@ input.session-title-input.session-title-input--light-surface {
   font-weight: 600;
   line-height: 1.35;
   letter-spacing: -0.01em;
-  color: hsl(var(--text-primary-strong));
+  color: var(--text-heading);
   background: rgba(0, 0, 0, 0.03);
   border: none;
   border-radius: 6px;
@@ -2557,7 +2551,7 @@ input.session-title-input.session-title-input--light-surface:focus-visible {
 }
 
 .echly-text-modal.light .echly-btn-cancel {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
 }
 
 .echly-btn-save {
@@ -2724,7 +2718,7 @@ html.dark .echly-capture-card {
 
 .echly-voice-cancel {
   font-size: 11px;
-  color: hsl(var(--text-tertiary, 220 9% 46%));
+  color: var(--text-tertiary);
 }
 
 .echly-capture-visualizer {
@@ -3072,13 +3066,8 @@ html.dark .echly-mic-item.is-active {
 
 /* ---- Session action bar: divider + buttons ---- */
 .echly-command-divider {
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
   margin-top: 14px;
   padding-top: 14px;
-}
-#echly-root[data-theme="dark"] .echly-command-divider,
-#echly-root:not([data-theme]) .echly-command-divider {
-  border-top-color: rgba(255, 255, 255, 0.08);
 }
 .echly-command-actions {
   display: flex;
@@ -3282,12 +3271,10 @@ html.dark .echly-mic-item.is-active {
 .ticket-item.selected::before {
   background: var(--brand-blue);
 }
-.ticket-item:not(:last-child) {
-  border-bottom: 1px solid #E5E7EB;
-}
+
 .ticket-rail {
   width: 3px;
-  background: #E5E7EB;
+  background: var(--border);
   border-radius: 2px;
   height: 100%;
   flex-shrink: 0;
@@ -3300,9 +3287,9 @@ html.dark .echly-mic-item.is-active {
 .skeleton {
   background: linear-gradient(
     90deg,
-    #f5f5f5 25%,
+    var(--surface-subtle) 25%,
     #f0f0f0 37%,
-    #f5f5f5 63%
+    var(--surface-subtle) 63%
   );
   background-size: 400% 100%;
   animation: skeleton-loading 1.2s ease infinite;
@@ -4118,7 +4105,7 @@ html.dark .echly-mic-item.is-active {
 .echly-confirmation-card-heading {
   font-size: 16px;
   font-weight: 600;
-  color: #F3F4F6;
+  color: var(--text-on-dark);
   margin: 0 0 16px;
   line-height: 1.4;
 }
@@ -4130,7 +4117,7 @@ html.dark .echly-mic-item.is-active {
 .echly-confirmation-card-title {
   font-size: 14px;
   font-weight: 600;
-  color: #F3F4F6;
+  color: var(--text-on-dark);
   line-height: 1.45;
 }
 .echly-confirmation-card-desc {
@@ -4169,7 +4156,7 @@ html.dark .echly-mic-item.is-active {
 }
 .echly-confirmation-btn--edit {
   background: rgba(255, 255, 255, 0.08);
-  color: #F3F4F6;
+  color: var(--text-on-dark);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 .echly-confirmation-btn--edit:hover {
@@ -4239,13 +4226,13 @@ html.dark .echly-mic-item.is-active {
   font-size: 20px;
   font-weight: 600;
   letter-spacing: -0.02em;
-  color: #111827;
+  color: var(--text-heading);
   margin: 0 0 8px;
   line-height: 1.35;
 }
 .echly-popup-login .echly-popup-subtitle {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0 0 24px;
   line-height: 1.5;
 }
@@ -4269,7 +4256,7 @@ html.dark .echly-mic-item.is-active {
   cursor: pointer;
   border: 1px solid rgba(0, 0, 0, 0.08);
   background: #fff;
-  color: #111827;
+  color: var(--text-heading);
   transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
@@ -4287,7 +4274,7 @@ html.dark .echly-mic-item.is-active {
 .echly-popup-login .echly-popup-footer {
   font-size: 12px;
   font-weight: 500;
-  color: #9ca3af;
+  color: var(--text-tertiary);
   margin-top: 20px;
   line-height: 1.45;
 }
@@ -4299,7 +4286,7 @@ html.dark .echly-mic-item.is-active {
   justify-content: center;
   padding: 24px;
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-family: var(--echly-font);
 }
 
@@ -4329,7 +4316,7 @@ html.dark .echly-mic-item.is-active {
 .echly-screenshot-placeholder {
   width: 100%;
   height: 240px;
-  background: #f3f4f6;
+  background: var(--surface-hover);
   border-radius: 12px;
   position: relative;
   overflow: hidden;
@@ -4372,7 +4359,7 @@ html.dark .echly-mic-item.is-active {
 .content-divider {
   width: 1px;
   flex-shrink: 0;
-  background: #e5e7eb;
+  background: var(--border);
 }
 
 .top-controls-shell {
@@ -4432,7 +4419,7 @@ html.dark .echly-mic-item.is-active {
 }
 
 .icon-btn:hover {
-  background: #F3F4F6;
+  background: var(--surface-hover);
 }
 
 .copy-link-btn:not(.copy-link-btn--copied) {
@@ -4513,7 +4500,7 @@ html.dark .echly-mic-item.is-active {
   font-size: 16px;
   border-radius: 8px;
   padding: 0 14px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   outline: none;
   background: #ffffff;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -4541,13 +4528,13 @@ html.dark .echly-mic-item.is-active {
   margin: 0 0 8px;
   font-size: 16px;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .search-empty p {
   margin: 0;
   font-size: 14px;
-  color: #9ca3af;
+  color: var(--text-tertiary);
   line-height: 1.5;
 }
 
@@ -4567,7 +4554,7 @@ html.dark .echly-mic-item.is-active {
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #9ca3af;
+  color: var(--text-tertiary);
   padding: 8px 12px 4px;
 }
 
@@ -4581,7 +4568,7 @@ html.dark .echly-mic-item.is-active {
 .search-loading {
   padding: 20px 12px;
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .search-no-match {
@@ -4600,12 +4587,12 @@ html.dark .echly-mic-item.is-active {
   margin: 0 0 6px;
   font-size: 14px;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .search-no-match span {
   font-size: 13px;
-  color: #9ca3af;
+  color: var(--text-tertiary);
 }
 
 .search-result-item {
@@ -4623,7 +4610,7 @@ html.dark .echly-mic-item.is-active {
 }
 
 .search-result-item:hover {
-  background: #f3f4f6;
+  background: var(--surface-hover);
 }
 
 .search-result-item-left {
@@ -4634,7 +4621,7 @@ html.dark .echly-mic-item.is-active {
 .search-result-file-icon {
   width: 18px;
   height: 18px;
-  color: #9ca3af;
+  color: var(--text-tertiary);
 }
 
 .search-result-item-content {
@@ -4649,13 +4636,13 @@ html.dark .echly-mic-item.is-active {
   margin: 0;
   font-size: 14px;
   font-weight: 500;
-  color: #111827;
+  color: var(--text-heading);
   line-height: 1.35;
 }
 
 .search-result-item-meta {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-secondary);
   opacity: 0.85;
 }
 
@@ -4719,7 +4706,7 @@ html.dark .echly-mic-item.is-active {
   font-weight: 600;
   line-height: 1.3;
   letter-spacing: -0.01em;
-  color: #111827;
+  color: var(--text-heading);
 }
 
 .share-modal {
@@ -4743,19 +4730,19 @@ html.dark .echly-mic-item.is-active {
   font-size: 14px;
   font-weight: 600;
   line-height: 1.3;
-  color: #374151;
+  color: var(--text-body);
 }
 
 .share-modal-section-heading--people {
   margin-top: 0;
   margin-bottom: 10px;
-  color: #374151;
+  color: var(--text-body);
 }
 
 .share-modal-section-heading--requests {
   margin-top: 0;
   margin-bottom: 10px;
-  color: #374151;
+  color: var(--text-body);
 }
 
 .share-modal-requests {
@@ -4765,7 +4752,7 @@ html.dark .echly-mic-item.is-active {
 .share-modal-section-heading--general-access {
   margin-top: 0;
   margin-bottom: 0;
-  color: #374151;
+  color: var(--text-body);
 }
 
 .share-modal-shared-with {
@@ -4832,7 +4819,7 @@ html.dark .echly-mic-item.is-active {
 .share-modal-list-loading {
   margin: 14px 0 0;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .share-modal-team {
@@ -4867,7 +4854,7 @@ html.dark .echly-mic-item.is-active {
   margin: 4px 0 0;
   font-size: 12px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .share-member {
@@ -4915,7 +4902,7 @@ html.dark .echly-mic-item.is-active {
 .share-user-avatar-initial {
   font-size: 12px;
   font-weight: 600;
-  color: #374151;
+  color: var(--text-body);
   line-height: 1;
   display: flex;
   align-items: center;
@@ -4931,7 +4918,7 @@ html.dark .echly-mic-item.is-active {
   font-size: 14px;
   font-weight: 500;
   line-height: 20px;
-  color: #111827;
+  color: var(--text-heading);
   text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4942,7 +4929,7 @@ html.dark .echly-mic-item.is-active {
   margin: 4px 0 0;
   font-size: 12px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .share-dropdown {
@@ -4970,11 +4957,11 @@ html.dark .echly-mic-item.is-active {
   gap: 6px;
   padding: 7px 12px;
   border-radius: 999px;
-  background: #f3f4f6;
+  background: var(--surface-hover);
   font-size: 14px;
   font-weight: 500;
   line-height: 1.25;
-  color: #111827;
+  color: var(--text-heading);
   cursor: pointer;
   border: none;
   box-sizing: border-box;
@@ -5038,12 +5025,12 @@ html.dark .echly-mic-item.is-active {
   height: 44px;
   padding: 0 12px;
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   background: #ffffff;
   font-size: 14px;
   font-weight: 500;
   line-height: 1.25;
-  color: #111827;
+  color: var(--text-heading);
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -5072,7 +5059,7 @@ html.dark .echly-mic-item.is-active {
 .share-general-access-globe {
   width: 16px;
   height: 16px;
-  color: #6b7280;
+  color: var(--text-secondary);
   flex-shrink: 0;
 }
 
@@ -5163,7 +5150,7 @@ html.dark .echly-mic-item.is-active {
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  color: #111827;
+  color: var(--text-heading);
 }
 
 .share-dropdown-option:hover {
@@ -5174,7 +5161,7 @@ html.dark .echly-mic-item.is-active {
   width: 100%;
   height: 44px;
   border-radius: 8px;
-  border: 1px solid #E5E7EB;
+  border: 1px solid var(--border);
   padding: 0 14px;
   outline: none;
   font-size: 14px;
@@ -5199,7 +5186,7 @@ html.dark .echly-mic-item.is-active {
   line-height: 1.25;
   border: 1px solid #d1d5db;
   background: #ffffff;
-  color: #374151;
+  color: var(--text-body);
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -5278,7 +5265,7 @@ html.dark .echly-mic-item.is-active {
   font-size: 14px;
   font-weight: 500;
   line-height: 1.45;
-  color: #6b7280;
+  color: var(--text-secondary);
   gap: 10px;
 }
 
@@ -5286,7 +5273,7 @@ html.dark .echly-mic-item.is-active {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #9ca3af;
+  color: var(--text-tertiary);
   opacity: 0.9;
 }
 
@@ -5309,7 +5296,7 @@ html.dark .echly-mic-item.is-active {
   font-size: 12px;
   line-height: 1.45;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .share-modal-actions {
@@ -5338,7 +5325,7 @@ html.dark .echly-mic-item.is-active {
   border-radius: 14px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
   z-index: 60;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   overflow: visible;
 }
 
@@ -5348,13 +5335,13 @@ html.dark .echly-mic-item.is-active {
 
 .notification-panel-header {
   padding: 0 0 8px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
 }
 
 .notification-panel-title {
   font-size: 14px;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-heading);
   margin-bottom: 0;
 }
 
@@ -5368,7 +5355,7 @@ html.dark .echly-mic-item.is-active {
 .notification-panel-tab {
   border: none;
   background: transparent;
-  color: #111827;
+  color: var(--text-heading);
   font-weight: 500;
   font-size: 13px;
   border-radius: 999px;
@@ -5386,7 +5373,7 @@ html.dark .echly-mic-item.is-active {
 }
 
 .notification-panel-tab--active {
-  background: #f3f4f6;
+  background: var(--surface-hover);
 }
 
 .notification-panel-list {
@@ -5433,18 +5420,18 @@ html.dark .echly-mic-item.is-active {
 }
 
 .notification-item:hover {
-  background: #f3f4f6;
+  background: var(--surface-hover);
 }
 
 .notification-item.unread:hover {
-  background: #f3f4f6;
+  background: var(--surface-hover);
 }
 
 .notification-icon {
   flex-shrink: 0;
   width: 18px;
   height: 18px;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin-top: 2px;
   stroke-width: 2;
   opacity: 0.8;
@@ -5466,7 +5453,7 @@ html.dark .echly-mic-item.is-active {
   margin: 0;
   font-weight: 500;
   font-size: 14px;
-  color: #111827;
+  color: var(--text-heading);
   line-height: 1.35;
 }
 
@@ -5486,7 +5473,7 @@ html.dark .echly-mic-item.is-active {
 .notification-item-time {
   font-weight: 500;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .notification-item-time.time {
@@ -5529,7 +5516,7 @@ html.dark .echly-mic-item.is-active {
   border-radius: 50%;
   background-color: transparent;
   border: none;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .notification-btn svg {
@@ -5552,20 +5539,26 @@ html.dark .echly-mic-item.is-active {
 
 .notification-btn:hover,
 .profile-avatar:hover {
-  background-color: #f3f4f6;
+  background-color: var(--surface-hover);
 }
 
 .top-controls button:hover {
   opacity: 1;
 }
 
+/* Top bar gradient separator */
+.page-header {
+  position: relative;
+}
+
 /* Session ticket sidebar (TicketList) */
 .sidebar {
   padding-top: 0;
+  background: var(--surface-subtle);
 }
 
 .sidebar-inner {
-  padding-top: 20px;
+  padding-top: 12px;
 }
 
 .sidebar-header {
@@ -5574,25 +5567,25 @@ html.dark .echly-mic-item.is-active {
   z-index: 5;
   padding: 0 16px 10px;
   margin: 0 0 6px;
-  background: #fafbfc;
+  background: var(--surface-card);
 }
 
 .sidebar-list {
-  padding: 0 10px;
+  padding: 0 8px;
 }
 
 .sidebar-item {
-  padding: 9px 12px;
-  border-radius: 8px;
+  padding: 7px 10px 7px 14px;
+  border-radius: var(--radius-sm);
 }
 
 /* TicketList (sidebar) search */
 .search-container {
   position: relative;
   width: 100%;
-  height: 42px;
-  border: 1px solid #E5E7EB;
-  border-radius: 10px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
   background: var(--layer-2-bg);
   transition: border-color var(--motion-duration-fast) ease, background-color var(--motion-duration-fast) ease,
     box-shadow var(--motion-duration-fast) ease;
@@ -5600,8 +5593,8 @@ html.dark .echly-mic-item.is-active {
 
 .search-container:focus-within {
   background: #fafafa;
-  border-color: #3B82F6;
-  box-shadow: inset 0 0 0 1px #3B82F6;
+  border-color: var(--brand);
+  box-shadow: inset 0 0 0 1px var(--brand);
 }
 
 .search-icon {
@@ -5611,8 +5604,7 @@ html.dark .echly-mic-item.is-active {
   transform: translateY(-50%);
   width: 15px;
   height: 15px;
-  color: #9ca3af;
-  opacity: 0.5;
+  color: var(--text-tertiary);
   pointer-events: none;
 }
 
@@ -5629,21 +5621,21 @@ html.dark .echly-mic-item.is-active {
   padding: 0;
   border: none;
   background: transparent;
-  color: #9ca3af;
+  color: var(--text-tertiary);
   cursor: pointer;
 }
 
 .clear-icon:hover {
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .search-input {
   width: 100%;
-  height: 42px;
+  height: 36px;
   padding-left: 36px;
   padding-right: 12px;
-  border-radius: 10px;
-  font-size: 13.5px;
+  border-radius: 9px;
+  font-size: 14px;
   background: transparent;
   outline: none;
   box-shadow: none;
@@ -5659,7 +5651,7 @@ html.dark .echly-mic-item.is-active {
 .search-input:focus,
 .search-input:focus-visible {
   outline: none;
-  border-color: #e5e7eb;
+  border-color: var(--border);
   box-shadow: none;
   background-color: #fafafa;
 }
@@ -5736,7 +5728,7 @@ html.dark .echly-mic-item.is-active {
 /* Mention dropdown — portalled to body */
 .mention-dropdown {
   background: var(--surface-card, #fff);
-  border: 1px solid var(--border, #e5e7eb);
+  border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.08);
   padding: 4px 0;
@@ -5761,7 +5753,7 @@ html.dark .echly-mic-item.is-active {
 
 .mention-dropdown-item:hover,
 .mention-dropdown-item.active {
-  background: var(--surface-hover, #f4f5f7);
+  background: var(--surface-hover, #F0F1F3);
 }
 
 .mention-dropdown-avatar {
@@ -5792,7 +5784,7 @@ html.dark .echly-mic-item.is-active {
 
 .mention-dropdown-name {
   font-weight: 500;
-  color: var(--text-heading, #1c1b1f);
+  color: var(--text-heading);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -5800,7 +5792,7 @@ html.dark .echly-mic-item.is-active {
 
 .mention-dropdown-email {
   font-size: 11px;
-  color: var(--text-tertiary, #a8a29e);
+  color: var(--text-tertiary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

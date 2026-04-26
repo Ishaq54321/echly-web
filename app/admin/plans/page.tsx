@@ -79,7 +79,7 @@ export default function AdminPlansPage() {
   if (loading) {
     return (
       <div className="p-8">
-        <h1 className="text-2xl font-semibold text-neutral-900 mb-8">Plans</h1>
+        <h1 className="text-2xl font-semibold text-[var(--text-heading)] mb-8">Plans</h1>
         <p className="text-sm text-neutral-500">Loading…</p>
       </div>
     );
@@ -87,33 +87,33 @@ export default function AdminPlansPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold text-neutral-900 mb-1">Plans</h1>
-      <p className="text-sm text-neutral-600 mb-8">
-        Edit plan definitions. Changes are saved to Firestore <code className="bg-neutral-100 px-1 rounded text-xs">plans</code>.
+      <h1 className="text-2xl font-semibold text-[var(--text-heading)] mb-1">Plans</h1>
+      <p className="text-sm text-[var(--text-secondary)] mb-8">
+        Edit plan definitions. Changes are saved to Firestore <code className="bg-[var(--surface-hover)] px-1 rounded text-xs">plans</code>.
       </p>
       {error && (
         <div className="mb-4 rounded-lg bg-[var(--color-danger-bg)] border border-[var(--color-danger-border)] px-4 py-2 text-sm text-[var(--color-danger)]">
           {error}
         </div>
       )}
-      <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden">
+      <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
         <table className="w-full text-left text-sm">
           <thead>
-            <tr className="border-b border-neutral-200 bg-neutral-50">
-              <th className="px-4 py-3 font-semibold text-neutral-900">Name</th>
-              <th className="px-4 py-3 font-semibold text-neutral-900">Price/mo</th>
-              <th className="px-4 py-3 font-semibold text-neutral-900">Price/yr</th>
-              <th className="px-4 py-3 font-semibold text-neutral-900">Max sessions</th>
-              <th className="px-4 py-3 font-semibold text-neutral-900">Max members</th>
-              <th className="px-4 py-3 font-semibold text-neutral-900">Insights</th>
-              <th className="px-4 py-3 font-semibold text-neutral-900 w-24">Actions</th>
+            <tr className="border-b border-[var(--border)] bg-[var(--surface-subtle)]">
+              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Name</th>
+              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Price/mo</th>
+              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Price/yr</th>
+              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Max sessions</th>
+              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Max members</th>
+              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Insights</th>
+              <th className="px-4 py-3 font-semibold text-[var(--text-heading)] w-24">Actions</th>
             </tr>
           </thead>
           <tbody>
             {plans.map((plan) => {
               const isSaving = savingId === plan.id;
               return (
-                <tr key={plan.id} className="border-b border-neutral-100 hover:bg-neutral-50/50">
+                <tr key={plan.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-hover)]/50">
                   <td className="px-4 py-2.5">
                     <input
                       type="text"
@@ -121,7 +121,7 @@ export default function AdminPlansPage() {
                       onChange={(e) => updateField(plan.id, "name", e.target.value)}
                       placeholder={formatPlanName(plan.id, plan.id)}
                       disabled={isSaving}
-                      className="w-full max-w-[120px] rounded-md border border-neutral-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1775E0]/20 disabled:opacity-60 disabled:bg-neutral-50"
+                      className="w-full max-w-[120px] rounded-md border border-[var(--border)] px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20 disabled:opacity-50 disabled:bg-[var(--surface-subtle)]"
                     />
                   </td>
                   <td className="px-4 py-2.5">
@@ -131,7 +131,7 @@ export default function AdminPlansPage() {
                       value={plan.priceMonthly}
                       onChange={(e) => updateField(plan.id, "priceMonthly", Number(e.target.value) || 0)}
                       disabled={isSaving}
-                      className="w-20 rounded-md border border-neutral-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1775E0]/20 disabled:opacity-60 disabled:bg-neutral-50"
+                      className="w-20 rounded-md border border-[var(--border)] px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20 disabled:opacity-50 disabled:bg-[var(--surface-subtle)]"
                     />
                   </td>
                   <td className="px-4 py-2.5">
@@ -141,7 +141,7 @@ export default function AdminPlansPage() {
                       value={plan.priceYearly}
                       onChange={(e) => updateField(plan.id, "priceYearly", Number(e.target.value) || 0)}
                       disabled={isSaving}
-                      className="w-20 rounded-md border border-neutral-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1775E0]/20 disabled:opacity-60 disabled:bg-neutral-50"
+                      className="w-20 rounded-md border border-[var(--border)] px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20 disabled:opacity-50 disabled:bg-[var(--surface-subtle)]"
                     />
                   </td>
                   <td className="px-4 py-2.5">
@@ -157,7 +157,7 @@ export default function AdminPlansPage() {
                         )
                       }
                       disabled={isSaving}
-                      className="w-16 rounded-md border border-neutral-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1775E0]/20 disabled:opacity-60 disabled:bg-neutral-50"
+                      className="w-16 rounded-md border border-[var(--border)] px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20 disabled:opacity-50 disabled:bg-[var(--surface-subtle)]"
                     />
                   </td>
                   <td className="px-4 py-2.5">
@@ -173,7 +173,7 @@ export default function AdminPlansPage() {
                         )
                       }
                       disabled={isSaving}
-                      className="w-16 rounded-md border border-neutral-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1775E0]/20 disabled:opacity-60 disabled:bg-neutral-50"
+                      className="w-16 rounded-md border border-[var(--border)] px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20 disabled:opacity-50 disabled:bg-[var(--surface-subtle)]"
                     />
                   </td>
                   <td className="px-4 py-2.5">
@@ -183,9 +183,9 @@ export default function AdminPlansPage() {
                         checked={plan.insightsEnabled}
                         onChange={(e) => updateField(plan.id, "insightsEnabled", e.target.checked)}
                         disabled={isSaving}
-                        className="rounded border-[#EBEBEB] text-[#1775E0] focus:ring-[#1775E0] disabled:opacity-60"
+                        className="rounded border-[var(--border)] text-[var(--brand)] focus:ring-[var(--brand)] disabled:opacity-50"
                       />
-                      <span className="text-neutral-600">On</span>
+                      <span className="text-[var(--text-secondary)]">On</span>
                     </label>
                   </td>
                   <td className="px-4 py-2.5">
@@ -193,7 +193,7 @@ export default function AdminPlansPage() {
                       type="button"
                       onClick={() => handleSaveClick(plan)}
                       disabled={isSaving}
-                      className="rounded-lg px-3 py-1.5 text-sm font-medium bg-[#1775E0] text-white hover:bg-[#1775E0]/90 disabled:opacity-60"
+                      className="rounded-lg px-3 py-1.5 text-sm font-medium bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 disabled:opacity-50"
                     >
                       {isSaving ? "Saving…" : "Save"}
                     </button>
@@ -212,24 +212,24 @@ export default function AdminPlansPage() {
         ariaLabelledBy="confirm-plan-title"
       >
         <div className="p-6">
-          <h3 id="confirm-plan-title" className="text-lg font-semibold text-neutral-900">
+          <h3 id="confirm-plan-title" className="text-lg font-semibold text-[var(--text-heading)]">
             Confirm plan changes?
           </h3>
-          <p className="mt-2 text-sm text-neutral-600">
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
             Updating plan limits affects all users on this plan.
           </p>
           <div className="mt-6 flex gap-3 justify-end">
             <button
               type="button"
               onClick={() => setConfirmPlan(null)}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-neutral-700 bg-[var(--surface-hover)] hover:bg-[var(--surface-hover)]"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={() => confirmPlan && save(confirmPlan)}
-              className="rounded-lg px-3 py-2 text-sm font-medium bg-[#1775E0] text-white hover:bg-[#1775E0]/90"
+              className="rounded-lg px-3 py-2 text-sm font-medium bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90"
             >
               Confirm Update
             </button>

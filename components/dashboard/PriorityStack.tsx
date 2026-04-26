@@ -43,7 +43,7 @@ export function PriorityStack({ items, onView }: PriorityStackProps) {
       className="rounded-xl border border-[var(--layer-1-border)] bg-white shadow-[var(--elevation-1)] overflow-hidden"
       aria-label="Needs attention"
     >
-      <h2 className="text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))] px-4 py-3 border-b border-[var(--layer-1-border)]">
+      <h2 className="text-[12px] font-medium uppercase tracking-wider text-[var(--text-tertiary)] px-4 py-3 border-b border-[var(--layer-1-border)]">
         Priority stack — needs attention
       </h2>
       <ul className="divide-y divide-[var(--layer-1-border)]">
@@ -67,7 +67,7 @@ export function PriorityStack({ items, onView }: PriorityStackProps) {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     {session.title?.trim() ? (
-                      <span className="text-[14px] font-medium text-[hsl(var(--text-primary-strong))] truncate">
+                      <span className="text-[14px] font-medium text-[var(--text-primary-strong)] truncate">
                         {session.title}
                       </span>
                     ) : null}
@@ -79,7 +79,7 @@ export function PriorityStack({ items, onView }: PriorityStackProps) {
                         style={{ width: `${progressPct}%` }}
                       />
                     </div>
-                    <span className="text-[11px] text-[hsl(var(--text-tertiary))] tabular-nums">
+                    <span className="text-[12px] text-[var(--text-tertiary)] tabular-nums">
                       {progressPct}%
                     </span>
                   </div>
@@ -87,19 +87,19 @@ export function PriorityStack({ items, onView }: PriorityStackProps) {
                 <div className="shrink-0 flex flex-col items-end gap-0.5">
                   {urgency ? (
                     <span
-                      className={`text-[11px] font-medium uppercase ${
+                      className={`text-[12px] font-medium uppercase ${
                         urgency === "High"
                           ? "text-[var(--color-danger)]"
                           : urgency === "Medium"
                             ? "text-[var(--color-warning)]"
-                            : "text-[hsl(var(--text-tertiary))]"
+                            : "text-[var(--text-tertiary)]"
                       }`}
                     >
                       {urgency}
                     </span>
                   ) : null}
                   {lastActivity ? (
-                    <span className="text-[11px] text-[hsl(var(--text-tertiary))] tabular-nums">
+                    <span className="text-[12px] text-[var(--text-tertiary)] tabular-nums">
                       {lastActivity}
                     </span>
                   ) : null}

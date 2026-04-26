@@ -1230,7 +1230,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           borderRadius: 10,
           border: "1px solid #E6F0FF",
           background: "#F8FBFF",
-          color: "#4B5563",
+          color: "var(--text-body)",
           fontSize: 13,
           boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
           display: "flex",
@@ -1261,7 +1261,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
         }}
       >
-        <div style={{ fontSize: 15, fontWeight: 600, color: "#111827", marginBottom: 8 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-heading)", marginBottom: 8 }}>
           Sign in to use Echly
         </div>
         <div style={{ fontSize: 13, color: "#4B5563", marginBottom: 12 }}>

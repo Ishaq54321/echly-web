@@ -47,15 +47,15 @@ import { authFetch } from "@/lib/authFetch";
 
 /* Premium workspace settings: wide layout, strong hierarchy */
 const SETTINGS_CARD =
-  "rounded-[12px] border border-[var(--border-default)] bg-white p-[28px] transition-[border-color,box-shadow] duration-200 ease-out hover:border-[#D5D5D5] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)]";
+  "rounded-[var(--radius-md)] border border-[var(--border-default)] bg-white p-[28px] transition-[border-color,box-shadow] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-md)]";
 const CARD_GAP = "space-y-8"; /* 32px between section cards */
 const ROW_GAP = "space-y-5"; /* 20px between setting rows */
 const SECTION_TITLE = "text-lg font-semibold text-[var(--text-heading)]"; /* H2: section heading */
-const SECTION_SUBTITLE = "text-[16px] font-semibold text-neutral-900"; /* H3 setting labels: 600 for hierarchy */
-const SECTION_DESC = "text-[14px] text-neutral-600 mt-1"; /* body, darker grey */
-const SETTING_DESC = "text-[14px] text-neutral-600 mt-0.5";
-const BTN_PRIMARY = "rounded-[8px] px-4 py-2.5 text-sm font-semibold bg-[#1775E0] text-white hover:bg-[#1462C4] hover:shadow-[0_2px_8px_rgba(23,117,224,0.35)] transition-all duration-200";
-const BTN_SECONDARY = "rounded-[8px] px-4 py-2.5 text-sm font-semibold bg-neutral-100 border border-[#EBEBEB] text-neutral-900 hover:bg-neutral-200 hover:shadow-[0_1px_4px_rgba(0,0,0,0.06)] transition-all duration-200";
+const SECTION_SUBTITLE = "text-[16px] font-semibold text-[var(--text-heading)]"; /* H3 setting labels: 600 for hierarchy */
+const SECTION_DESC = "text-[14px] text-[var(--text-secondary)] mt-1"; /* body, darker grey */
+const SETTING_DESC = "text-[14px] text-[var(--text-secondary)] mt-0.5";
+const BTN_PRIMARY = "rounded-[var(--radius-sm)] px-4 py-2.5 text-sm font-semibold bg-[var(--brand)] text-white hover:bg-[var(--brand-hover)] hover:shadow-[0_2px_8px_rgba(23,117,224,0.35)] transition-all duration-200";
+const BTN_SECONDARY = "rounded-[var(--radius-sm)] px-4 py-2.5 text-sm font-semibold bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--text-heading)] hover:bg-[var(--surface-hover)] hover:shadow-[0_1px_4px_rgba(0,0,0,0.06)] transition-all duration-200";
 
 function SectionHeader({
   title,
@@ -130,8 +130,8 @@ function SettingsPageInner() {
     return (
       <div className="flex flex-1 min-h-0 bg-white overflow-auto">
         <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 max-w-lg mx-auto text-center">
-          <p className="text-lg font-medium text-neutral-900">Workspace unavailable</p>
-          <p className="mt-2 text-sm text-neutral-600">
+          <p className="text-lg font-medium text-[var(--text-heading)]">Workspace unavailable</p>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
             {workspaceError ||
               "Workspace not found. Try refreshing the page or sign in again."}
           </p>
@@ -167,14 +167,14 @@ function SettingsPageInner() {
                 onClick={() => setActiveTab(id)}
                 className={`
                   relative pb-3 text-sm transition-colors duration-200
-                  ${isActive ? "text-[#1775E0] font-bold" : "font-medium text-[var(--text-meta)] hover:text-neutral-700"}
+                  ${isActive ? "text-[var(--brand)] font-bold" : "font-medium text-[var(--text-meta)] hover:text-neutral-700"}
                 `}
                 aria-current={isActive ? "true" : undefined}
               >
                 {label}
                 {isActive && (
                   <span
-                    className="absolute left-0 right-0 bottom-0 h-[3px] bg-[#1775E0] rounded-full"
+                    className="absolute left-0 right-0 bottom-0 h-[3px] bg-[var(--brand)] rounded-full"
                     aria-hidden
                   />
                 )}
@@ -466,9 +466,9 @@ function WorkspaceTab({
                 height: 88,
                 borderRadius: "50%",
                 border: "none",
-                boxShadow: "0 0 0 2px #EBEBEB",
+                boxShadow: "0 0 0 2px var(--border)",
                 overflow: "hidden",
-                background: "#F5F5F5",
+                background: "var(--surface-subtle)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -668,7 +668,7 @@ const UPGRADE_TOOLTIP = "Upgrade your plan to unlock branding features.";
 function UpgradePlanBadge({ onClick, title }: { onClick?: () => void; title?: string }) {
   const tooltip = title ?? UPGRADE_TOOLTIP;
   const base =
-    "inline-flex items-center gap-1.5 rounded-[999px] py-1 px-2.5 bg-[var(--color-success-bg)]/90 text-neutral-900 text-xs font-semibold transition-all duration-200 hover:bg-[var(--color-success-bg)] hover:shadow-sm [&_svg]:text-neutral-900 [&_svg]:stroke-[2.5]";
+    "inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] py-1 px-2.5 bg-[var(--color-success-bg)]/90 text-[var(--text-heading)] text-xs font-semibold transition-all duration-200 hover:bg-[var(--color-success-bg)] hover:shadow-sm [&_svg]:text-[var(--text-heading)] [&_svg]:stroke-[2.5]";
   if (onClick)
     return (
       <button
@@ -738,7 +738,7 @@ function ChangeEmailModal({ onClose }: { onClose: () => void }) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px", borderBottom: "1px solid #EBEBEB" }}>
+        <div style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px", borderBottom: "1px solid var(--border)" }}>
           <span style={{ fontSize: 16, fontWeight: 600, color: "#111" }}>Change email address</span>
           <button type="button" onClick={onClose} style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", borderRadius: 6, cursor: "pointer", color: "#777" }}>
             <X size={16} />
@@ -835,7 +835,7 @@ function DeleteAccountModal({ onClose }: { onClose: () => void }) {
         style={{ background: "white", borderRadius: 20, maxWidth: 420, width: "100%", margin: 16, boxShadow: "0 24px 64px rgba(0,0,0,0.18)", overflow: "hidden" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px", borderBottom: "1px solid #EBEBEB" }}>
+        <div style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px", borderBottom: "1px solid var(--border)" }}>
           <span style={{ fontSize: 16, fontWeight: 600, color: "var(--color-danger)" }}>Delete account</span>
           <button type="button" onClick={onClose} style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", borderRadius: 6, cursor: "pointer", color: "#777" }}>
             <X size={16} />
@@ -1240,7 +1240,7 @@ function MyAccountTab() {
                 type="button"
                 onClick={() => setChangeEmailOpen(true)}
                 style={{ height: 34, padding: "0 14px", borderRadius: 8, border: "1px solid #E5E5E5", background: "white", color: "#555", fontSize: 13, fontWeight: 500, cursor: "pointer", transition: "background 150ms" }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#F5F5F5"; }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--surface-subtle)"; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "white"; }}
               >
                 Change email
@@ -1570,24 +1570,24 @@ function MembersTableRow({
       row.name ? (
         <div className="min-w-0">
           <p
-            className="text-[14px] font-medium text-[#1C1B1F] truncate"
+            className="text-[14px] font-medium text-[var(--text-heading)] truncate"
             style={{ lineHeight: "1.3" }}
           >
             {row.name}
           </p>
-          <p className="text-[13px] text-[#78716C] truncate" style={{ marginTop: 1 }}>
+          <p className="text-[14px] text-[var(--text-secondary)] truncate" style={{ marginTop: 1 }}>
             {row.email}
           </p>
         </div>
       ) : (
-        <p className="text-[14px] font-medium text-[#1C1B1F] truncate min-w-0">{row.email}</p>
+        <p className="text-[14px] font-medium text-[var(--text-heading)] truncate min-w-0">{row.email}</p>
       )
     ) : (
       <div className="min-w-0">
         <p className="text-[14px] text-[#AAAAAA] italic" style={{ lineHeight: "1.3" }}>
           Invited
         </p>
-        <p className="text-[13px] text-[#78716C] truncate" style={{ marginTop: 1 }}>
+        <p className="text-[14px] text-[var(--text-secondary)] truncate" style={{ marginTop: 1 }}>
           {row.email}
         </p>
       </div>
@@ -1611,14 +1611,14 @@ function MembersTableRow({
       <button
         type="button"
         onClick={() => setConfirmingRemoveId(null)}
-        className="text-[13px] text-[#78716C] hover:text-neutral-900 transition-colors px-1"
+        className="text-[14px] text-[var(--text-secondary)] hover:text-[var(--text-heading)] transition-colors px-1"
       >
         Cancel
       </button>
       <button
         type="button"
         onClick={() => onRemove(row.id, row.name ?? row.email)}
-        className="text-[13px] text-[var(--color-danger)]"
+        className="text-[14px] text-[var(--color-danger)]"
         style={{
           background: "var(--color-danger-bg)",
           border: "1px solid var(--color-danger-border)",
@@ -1642,7 +1642,7 @@ function MembersTableRow({
             type="button"
             onClick={() => setConfirmingRemoveId(row.id)}
             title="Remove member"
-            className="w-[30px] h-[30px] flex items-center justify-center rounded-[6px] text-[#A8A29E] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors"
+            className="w-[30px] h-[30px] flex items-center justify-center rounded-[var(--radius-xs)] text-[var(--text-tertiary)] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors"
           >
             <UserMinus size={15} />
           </button>
@@ -1654,7 +1654,7 @@ function MembersTableRow({
             type="button"
             onClick={() => onResend(row.invitationToken!, row.email)}
             title="Resend invite"
-            className="w-[30px] h-[30px] flex items-center justify-center rounded-[6px] text-[#A8A29E] hover:text-[#1775E0] hover:bg-[#EBF4FF] transition-colors"
+            className="w-[30px] h-[30px] flex items-center justify-center rounded-[var(--radius-xs)] text-[var(--text-tertiary)] hover:text-[var(--brand)] hover:bg-[var(--brand-subtle)] transition-colors"
           >
             <RotateCcw size={14} />
           </button>
@@ -1662,7 +1662,7 @@ function MembersTableRow({
             type="button"
             onClick={() => onRevoke(row.invitationToken!, row.email)}
             title="Revoke invite"
-            className="w-[30px] h-[30px] flex items-center justify-center rounded-[6px] text-[#A8A29E] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors"
+            className="w-[30px] h-[30px] flex items-center justify-center rounded-[var(--radius-xs)] text-[var(--text-tertiary)] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors"
           >
             <X size={14} />
           </button>
@@ -1707,16 +1707,16 @@ function MembersTableRow({
             {row.status === "active" ? (
               row.name ? (
                 <>
-                  <p className="text-sm font-medium text-[#1C1B1F] truncate">{row.name}</p>
-                  <p className="text-[13px] text-[#78716C] truncate">{row.email}</p>
+                  <p className="text-sm font-medium text-[var(--text-heading)] truncate">{row.name}</p>
+                  <p className="text-[14px] text-[var(--text-secondary)] truncate">{row.email}</p>
                 </>
               ) : (
-                <p className="text-sm font-medium text-[#1C1B1F] truncate">{row.email}</p>
+                <p className="text-sm font-medium text-[var(--text-heading)] truncate">{row.email}</p>
               )
             ) : (
               <>
                 <p className="text-[14px] text-[#AAAAAA] italic">Invited</p>
-                <p className="text-[13px] text-[#78716C] truncate">{row.email}</p>
+                <p className="text-[14px] text-[var(--text-secondary)] truncate">{row.email}</p>
               </>
             )}
           </div>
@@ -1734,7 +1734,7 @@ function MembersTableRow({
               <button
                 type="button"
                 onClick={() => setConfirmingRemoveId(row.id)}
-                className="flex items-center gap-1.5 text-[13px] text-[#A8A29E] hover:text-[var(--color-danger)] transition-colors"
+                className="flex items-center gap-1.5 text-[14px] text-[var(--text-tertiary)] hover:text-[var(--color-danger)] transition-colors"
               >
                 <UserMinus size={13} />
                 Remove
@@ -1747,7 +1747,7 @@ function MembersTableRow({
             <button
               type="button"
               onClick={() => onResend(row.invitationToken!, row.email)}
-              className="flex items-center gap-1 text-[13px] text-[#78716C] hover:text-[#1775E0] transition-colors"
+              className="flex items-center gap-1 text-[14px] text-[var(--text-secondary)] hover:text-[var(--brand)] transition-colors"
             >
               <RotateCcw size={12} />
               Resend
@@ -1755,7 +1755,7 @@ function MembersTableRow({
             <button
               type="button"
               onClick={() => onRevoke(row.invitationToken!, row.email)}
-              className="flex items-center gap-1 text-[13px] text-[#78716C] hover:text-[var(--color-danger)] transition-colors"
+              className="flex items-center gap-1 text-[14px] text-[var(--text-secondary)] hover:text-[var(--color-danger)] transition-colors"
             >
               <X size={12} />
               Revoke
@@ -1928,7 +1928,7 @@ function MembersTab({
             style={{
               height: 36,
               background: "#F7F8FA",
-              border: "1.5px solid #E8E8E8",
+              border: "1.5px solid var(--border)",
               borderRadius: 10,
               padding: "0 12px 0 34px",
               fontSize: 14,
@@ -1940,7 +1940,7 @@ function MembersTab({
               e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)";
             }}
             onBlur={(e) => {
-              e.target.style.borderColor = "#E8E8E8";
+              e.target.style.borderColor = "var(--border)";
               e.target.style.boxShadow = "none";
             }}
           />
@@ -1954,7 +1954,7 @@ function MembersTab({
             height: 36,
             width: 130,
             background: "white",
-            border: "1.5px solid #E8E8E8",
+            border: "1.5px solid var(--border)",
             borderRadius: 10,
             padding: "0 10px",
             fontSize: 14,
@@ -1974,7 +1974,7 @@ function MembersTab({
             height: 36,
             width: 150,
             background: "white",
-            border: "1.5px solid #E8E8E8",
+            border: "1.5px solid var(--border)",
             borderRadius: 10,
             padding: "0 10px",
             fontSize: 14,
@@ -1991,7 +1991,7 @@ function MembersTab({
       <div
         style={{
           marginTop: 16,
-          border: "1px solid #EBEBEB",
+          border: "1px solid var(--border)",
           borderRadius: 12,
           overflow: "hidden",
         }}
@@ -2003,7 +2003,7 @@ function MembersTab({
             gridTemplateColumns: TABLE_COLS,
             height: 38,
             background: "#F9FAFB",
-            borderBottom: "1px solid #EBEBEB",
+            borderBottom: "1px solid var(--border)",
             padding: "0 16px",
             alignItems: "center",
           }}
@@ -2021,7 +2021,7 @@ function MembersTab({
         ) : fetchError ? (
           <div className="flex flex-col items-center justify-center py-10 gap-3">
             <AlertCircle className="h-7 w-7 text-neutral-400" />
-            <p className="text-sm text-neutral-600">{fetchError}</p>
+            <p className="text-sm text-[var(--text-secondary)]">{fetchError}</p>
             <button type="button" onClick={fetchAll} className={BTN_SECONDARY}>
               Try again
             </button>
@@ -2212,7 +2212,7 @@ function SecurityTab() {
         <div className={`mt-4 pt-4 border-t border-[var(--border-default)] ${ROW_GAP}`}>
           <div className="flex flex-wrap items-center justify-between gap-4 py-1">
             <div className="min-w-0">
-              <p className="text-[15px] font-medium text-neutral-900">Change Password</p>
+              <p className="text-[15px] font-medium text-[var(--text-heading)]">Change Password</p>
               <p className={SETTING_DESC}>Update your account password.</p>
             </div>
             <Button variant="secondary" className={`${BTN_SECONDARY} shrink-0`}>
@@ -2221,7 +2221,7 @@ function SecurityTab() {
           </div>
           <div className="flex flex-wrap items-center justify-between gap-4 pt-5 border-t border-[var(--border-default)]">
             <div className="min-w-0">
-              <p className="text-[15px] font-medium text-neutral-900">Enable Two-Factor Authentication</p>
+              <p className="text-[15px] font-medium text-[var(--text-heading)]">Enable Two-Factor Authentication</p>
               <p className={SETTING_DESC}>Add an extra layer of security.</p>
             </div>
             <Button variant="secondary" className={`${BTN_SECONDARY} shrink-0`}>
@@ -2237,7 +2237,7 @@ function SecurityTab() {
             title="Active Sessions"
             description="Devices where you're currently signed in."
           />
-          <Button variant="ghost" className="text-sm font-semibold text-[#1775E0] hover:underline shrink-0 rounded-lg px-4 py-2.5">
+          <Button variant="ghost" className="text-sm font-semibold text-[var(--brand)] hover:underline shrink-0 rounded-lg px-4 py-2.5">
             Log out of all other sessions
           </Button>
         </div>
@@ -2247,15 +2247,15 @@ function SecurityTab() {
             return (
               <div
                 key={s.id}
-                className="flex items-center gap-3 py-3 px-3 rounded-lg border border-transparent hover:bg-neutral-50/80 hover:border-[var(--border-default)] transition-all duration-200"
+                className="flex items-center gap-3 py-3 px-3 rounded-lg border border-transparent hover:bg-[var(--surface-hover)]/80 hover:border-[var(--border-default)] transition-all duration-200"
               >
                 <Icon className="w-5 h-5 text-neutral-400 shrink-0" strokeWidth={1.8} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-[15px] font-medium text-neutral-900">{s.device}</p>
+                  <p className="text-[15px] font-medium text-[var(--text-heading)]">{s.device}</p>
                   <p className={SETTING_DESC}>{s.browser} · {s.location}</p>
                 </div>
                 {s.current && (
-                  <span className="text-xs font-semibold text-[#1775E0] shrink-0">Current</span>
+                  <span className="text-xs font-semibold text-[var(--brand)] shrink-0">Current</span>
                 )}
               </div>
             );
@@ -2268,7 +2268,7 @@ function SecurityTab() {
         <button
           type="button"
           onClick={() => setAdvancedOpen(!advancedOpen)}
-          className="w-full flex items-center justify-between gap-3 text-left rounded-lg py-2 -my-2 px-2 -mx-2 hover:bg-neutral-50/80 transition-colors duration-200"
+          className="w-full flex items-center justify-between gap-3 text-left rounded-lg py-2 -my-2 px-2 -mx-2 hover:bg-[var(--surface-hover)]/80 transition-colors duration-200"
           aria-expanded={advancedOpen}
         >
           <span className={SECTION_TITLE}>Danger Zone</span>
@@ -2284,13 +2284,13 @@ function SecurityTab() {
             {isWorkspaceOwner && (
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div>
-                  <p className="text-[15px] font-medium text-neutral-900">Transfer Workspace Ownership</p>
+                  <p className="text-[15px] font-medium text-[var(--text-heading)]">Transfer Workspace Ownership</p>
                   <p className={SETTING_DESC}>Assign another member as the workspace owner.</p>
                 </div>
                 <button
                   type="button"
                   onClick={openTransferModal}
-                  className="rounded-[8px] px-4 py-2.5 text-sm font-semibold shrink-0 bg-[var(--color-warning-bg)] text-[var(--color-warning-text)] border border-[var(--color-warning-border)] hover:bg-[var(--color-warning-bg)] transition-all duration-200"
+                  className="rounded-[var(--radius-sm)] px-4 py-2.5 text-sm font-semibold shrink-0 bg-[var(--color-warning-bg)] text-[var(--color-warning-text)] border border-[var(--color-warning-border)] hover:bg-[var(--color-warning-bg)] transition-all duration-200"
                 >
                   Transfer
                 </button>
@@ -2299,12 +2299,12 @@ function SecurityTab() {
             {isWorkspaceOwner && (
               <div className="flex items-center justify-between gap-4 flex-wrap pt-5 border-t border-[var(--border-default)]">
                 <div>
-                  <p className="text-[15px] font-semibold text-neutral-900">Delete Workspace</p>
+                  <p className="text-[15px] font-semibold text-[var(--text-heading)]">Delete Workspace</p>
                   <p className={SETTING_DESC}>Permanently delete this workspace and all its data. This cannot be undone.</p>
                 </div>
                 <button
                   type="button"
-                  className="rounded-[8px] px-4 py-2.5 text-sm font-semibold shrink-0 bg-[var(--color-danger)] text-white hover:opacity-95 hover:shadow-[0_2px_8px_rgba(229,72,77,0.35)] transition-all duration-200"
+                  className="rounded-[var(--radius-sm)] px-4 py-2.5 text-sm font-semibold shrink-0 bg-[var(--color-danger)] text-white hover:opacity-95 hover:shadow-[0_2px_8px_rgba(229,72,77,0.35)] transition-all duration-200"
                   onClick={() => { setDeleteConfirmName(""); setDeleteError(null); setDeleteModalOpen(true); }}
                 >
                   Delete Workspace
@@ -2333,10 +2333,10 @@ function SecurityTab() {
             className="rounded-2xl shadow-lg bg-white p-6 max-w-md w-full cursor-default"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 id="transfer-modal-title" className="text-[20px] font-semibold text-neutral-900">
+            <h3 id="transfer-modal-title" className="text-[20px] font-semibold text-[var(--text-heading)]">
               Transfer Ownership
             </h3>
-            <p className="mt-1 text-sm text-neutral-600">
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
               You will become a regular member after this action.
             </p>
             <form onSubmit={handleTransferSubmit} className="mt-4 space-y-4">
@@ -2353,7 +2353,7 @@ function SecurityTab() {
                     id="transfer-new-owner"
                     value={selectedNewOwnerUid}
                     onChange={(e) => setSelectedNewOwnerUid(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#1775E0] focus:border-transparent"
+                    className="w-full px-3 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text-heading)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:border-transparent"
                   >
                     <option value="">Select a member…</option>
                     {transferMembers.map((m) => (
@@ -2375,7 +2375,7 @@ function SecurityTab() {
                   placeholder={workspaceName ?? ""}
                   value={transferConfirmName}
                   onChange={(e) => setTransferConfirmName(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#1775E0] focus:border-transparent"
+                  className="w-full px-3 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text-heading)] placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:border-transparent"
                 />
                 {transferError && <p className="mt-1.5 text-sm text-[var(--color-danger)]">{transferError}</p>}
               </div>
@@ -2383,14 +2383,14 @@ function SecurityTab() {
                 <button
                   type="button"
                   onClick={() => setTransferModalOpen(false)}
-                  className="px-4 py-2.5 text-sm font-medium rounded-xl text-neutral-700 hover:bg-neutral-100 transition"
+                  className="px-4 py-2.5 text-sm font-medium rounded-xl text-neutral-700 hover:bg-[var(--surface-hover)] transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={transferSubmitting || transferMembers.length === 0}
-                  className="px-4 py-2.5 text-sm font-semibold rounded-xl bg-[#1775E0] text-white hover:bg-[#1462C4] transition disabled:opacity-60"
+                  className="px-4 py-2.5 text-sm font-semibold rounded-xl bg-[var(--brand)] text-white hover:bg-[var(--brand-hover)] transition disabled:opacity-50"
                 >
                   {transferSubmitting ? "Transferring…" : "Transfer Ownership"}
                 </button>
@@ -2416,10 +2416,10 @@ function SecurityTab() {
             className="rounded-2xl shadow-lg bg-white p-6 max-w-md w-full cursor-default"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 id="delete-workspace-title" className="text-[20px] font-semibold text-neutral-900">
+            <h3 id="delete-workspace-title" className="text-[20px] font-semibold text-[var(--text-heading)]">
               Delete workspace?
             </h3>
-            <p className="mt-2 text-sm text-neutral-600">
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">
               This will schedule permanent deletion in 30 days. All sessions, feedback, and members will be removed.
             </p>
             <form onSubmit={handleDeleteSubmit} className="mt-4 space-y-3">
@@ -2434,7 +2434,7 @@ function SecurityTab() {
                   placeholder={workspaceName ?? ""}
                   value={deleteConfirmName}
                   onChange={(e) => setDeleteConfirmName(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-danger)] focus:border-transparent"
+                  className="w-full px-3 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text-heading)] placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-danger)] focus:border-transparent"
                 />
                 {deleteError && <p className="mt-1.5 text-sm text-[var(--color-danger)]">{deleteError}</p>}
               </div>
@@ -2442,7 +2442,7 @@ function SecurityTab() {
                 <button
                   type="button"
                   onClick={() => setDeleteModalOpen(false)}
-                  className="px-4 py-2.5 text-sm font-medium rounded-xl text-neutral-700 hover:bg-neutral-100 transition"
+                  className="px-4 py-2.5 text-sm font-medium rounded-xl text-neutral-700 hover:bg-[var(--surface-hover)] transition"
                 >
                   Cancel
                 </button>
@@ -2452,7 +2452,7 @@ function SecurityTab() {
                   className={`px-4 py-2.5 text-sm font-semibold rounded-xl transition disabled:cursor-not-allowed ${
                     deleteConfirmName === workspaceName
                       ? "bg-[var(--color-danger)] text-white hover:opacity-95"
-                      : "bg-neutral-200 text-neutral-400 disabled:opacity-100"
+                      : "bg-[var(--surface-hover)] text-neutral-400 disabled:opacity-100"
                   }`}
                 >
                   {deleteSubmitting ? "Deleting…" : "Schedule Deletion"}
@@ -2499,7 +2499,7 @@ function IntegrationsTab({ onNavigateToBilling }: { onNavigateToBilling: () => v
               />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-[18px] font-semibold text-neutral-900">{name}</h3>
+                  <h3 className="text-[18px] font-semibold text-[var(--text-heading)]">{name}</h3>
                   {pro && <UpgradePlanBadge onClick={onNavigateToBilling} title={UPGRADE_TOOLTIP} />}
                 </div>
                 <p className={`mt-1 ${SETTING_DESC}`}>{description}</p>
@@ -2759,7 +2759,7 @@ function BillingTab() {
   if (!plans || plans.length === 0) {
     return (
       <div className={`flex flex-col ${BILLING_CONTAINER} pb-20`}>
-        <p className="text-center text-neutral-600">Unable to load plans. Please try again later.</p>
+        <p className="text-center text-[var(--text-secondary)]">Unable to load plans. Please try again later.</p>
       </div>
     );
   }
@@ -2769,7 +2769,7 @@ function BillingTab() {
       {/* Hero */}
       <header className="billing-container text-center" style={{ marginBottom: 32 }}>
         <h2
-          className="text-[44px] font-extrabold leading-[1.1] tracking-[-0.02em] text-neutral-900"
+          className="text-[44px] font-extrabold leading-[1.1] tracking-[-0.02em] text-[var(--text-heading)]"
           style={{ marginBottom: 24 }}
         >
           Choose the plan that fits your feedback workflow
@@ -2787,7 +2787,7 @@ function BillingTab() {
             type="text"
             value={teamSize}
             onChange={(e) => setTeamSize(e.target.value)}
-            className="w-[60px] px-2.5 py-1.5 text-center rounded-[8px] border border-[rgba(0,0,0,0.08)] text-[15px] text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#1775E0]/20"
+            className="w-[60px] px-2.5 py-1.5 text-center rounded-[var(--radius-sm)] border border-[rgba(0,0,0,0.08)] text-[15px] text-[var(--text-heading)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20"
           />
         </div>
         <div className="flex items-center gap-4">
@@ -2799,9 +2799,9 @@ function BillingTab() {
                 name="billing"
                 checked={billingPeriod === "monthly"}
                 onChange={() => setBillingPeriod("monthly")}
-                className="w-4 h-4 text-[#1775E0] focus:ring-[#1775E0]"
+                className="w-4 h-4 text-[var(--brand)] focus:ring-[var(--brand)]"
               />
-              <span className="text-[15px] font-medium text-neutral-900">Monthly</span>
+              <span className="text-[15px] font-medium text-[var(--text-heading)]">Monthly</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -2809,9 +2809,9 @@ function BillingTab() {
                 name="billing"
                 checked={billingPeriod === "annual"}
                 onChange={() => setBillingPeriod("annual")}
-                className="w-4 h-4 text-[#1775E0] focus:ring-[#1775E0]"
+                className="w-4 h-4 text-[var(--brand)] focus:ring-[var(--brand)]"
               />
-              <span className="text-[15px] font-medium text-neutral-900">Annually</span>
+              <span className="text-[15px] font-medium text-[var(--text-heading)]">Annually</span>
             </label>
           </div>
         </div>
@@ -2827,19 +2827,19 @@ function BillingTab() {
             >
               <div className="relative">
                 {plan.badge && (
-                  <span className="absolute -top-1 -right-0 rounded-full bg-[#E8F0FF] px-[10px] py-1 text-xs font-semibold text-neutral-900">
+                  <span className="absolute -top-1 -right-0 rounded-full bg-[#E8F0FF] px-[10px] py-1 text-xs font-semibold text-[var(--text-heading)]">
                     {plan.badge}
                   </span>
                 )}
-                <h3 className="plan-title text-neutral-900">{plan.title}</h3>
+                <h3 className="plan-title text-[var(--text-heading)]">{plan.title}</h3>
               </div>
               <div className="mt-4">
-                <p className="price text-neutral-900">
+                <p className="price text-[var(--text-heading)]">
                   {plan.priceAmount}
                   {plan.priceSuffix && <span className="price-suffix">{plan.priceSuffix}</span>}
                 </p>
                 {plan.priceSubLabel && (
-                  <p className="mt-1 text-[14px] font-medium text-neutral-600">{plan.priceSubLabel}</p>
+                  <p className="mt-1 text-[14px] font-medium text-[var(--text-secondary)]">{plan.priceSubLabel}</p>
                 )}
               </div>
               <ul className="plan-features flex-1">
@@ -2857,7 +2857,7 @@ function BillingTab() {
                   variant={plan.highlight ? "primary" : "secondary"}
                   className={
                     plan.highlight
-                      ? "w-full rounded-[10px] px-4 py-2.5 text-sm font-semibold bg-[#1775E0] text-white hover:brightness-110 border border-transparent"
+                      ? "w-full rounded-[var(--radius-sm)] px-4 py-2.5 text-sm font-semibold bg-[var(--brand)] text-white hover:brightness-110 border border-transparent"
                       : "secondary-cta w-full text-sm"
                   }
                   onClick={() => {
@@ -2878,22 +2878,22 @@ function BillingTab() {
 
         {/* Feature comparison table */}
         <section className="mb-[72px] overflow-x-auto">
-          <div className="rounded-[18px] border overflow-hidden min-w-[640px]" style={{ borderColor: "rgba(0,0,0,0.08)" }}>
+          <div className="rounded-[var(--radius-lg)] border overflow-hidden min-w-[640px]" style={{ borderColor: "rgba(0,0,0,0.08)" }}>
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b bg-neutral-50/80" style={{ borderColor: "rgba(0,0,0,0.05)" }}>
-                  <th className="py-3 px-4 text-[15px] font-semibold text-neutral-900">Feature</th>
-                  <th className="py-3 px-4 text-[15px] font-semibold text-neutral-900">Free</th>
-                  <th className="py-3 px-4 text-[15px] font-semibold text-neutral-900">Starter</th>
-                  <th className="py-3 px-4 text-[15px] font-semibold text-neutral-900">Business</th>
-                  <th className="py-3 px-4 text-[15px] font-semibold text-neutral-900">Enterprise</th>
+                <tr className="border-b bg-[var(--surface-subtle)]/80" style={{ borderColor: "rgba(0,0,0,0.05)" }}>
+                  <th className="py-3 px-4 text-[15px] font-semibold text-[var(--text-heading)]">Feature</th>
+                  <th className="py-3 px-4 text-[15px] font-semibold text-[var(--text-heading)]">Free</th>
+                  <th className="py-3 px-4 text-[15px] font-semibold text-[var(--text-heading)]">Starter</th>
+                  <th className="py-3 px-4 text-[15px] font-semibold text-[var(--text-heading)]">Business</th>
+                  <th className="py-3 px-4 text-[15px] font-semibold text-[var(--text-heading)]">Enterprise</th>
                 </tr>
               </thead>
               <tbody>
                 {COMPARISON_SECTIONS.map(({ section, rows }) => (
                   <Fragment key={section}>
                     <tr className="bg-[#F8FAFC]">
-                      <td colSpan={5} className="py-2.5 px-4 text-[13px] font-semibold tracking-[0.04em] text-neutral-700">
+                      <td colSpan={5} className="py-2.5 px-4 text-[14px] font-semibold tracking-[0.04em] text-neutral-700">
                         {section}
                       </td>
                     </tr>
@@ -2925,7 +2925,7 @@ function BillingTab() {
                             return (
                               <td
                                 key={col}
-                                className="py-3 px-4 text-[15px] text-neutral-600 align-middle"
+                                className="py-3 px-4 text-[15px] text-[var(--text-secondary)] align-middle"
                               >
                                 {v === true ? (
                                   <span className="inline-flex items-center">
@@ -2955,7 +2955,7 @@ function BillingTab() {
 
         {/* FAQ accordion */}
         <section>
-          <h3 className="text-[44px] font-extrabold text-neutral-900 text-center mt-20 mb-12">
+          <h3 className="text-[44px] font-extrabold text-[var(--text-heading)] text-center mt-20 mb-12">
             Frequently Asked Questions
           </h3>
           <div>
@@ -2964,12 +2964,12 @@ function BillingTab() {
               return (
                 <div
                   key={q}
-                  className="bg-[#F5F9FF] rounded-[16px] p-5 mb-4"
+                  className="bg-[var(--brand-subtle)] rounded-[var(--radius-lg)] p-5 mb-4"
                 >
                   <button
                     type="button"
                     onClick={() => setFaqOpenIndex(isOpen ? null : index)}
-                    className="w-full flex items-center justify-between gap-4 text-left text-[18px] font-semibold text-neutral-900"
+                    className="w-full flex items-center justify-between gap-4 text-left text-[18px] font-semibold text-[var(--text-heading)]"
                     aria-expanded={isOpen}
                   >
                     <span>{q}</span>
@@ -2986,7 +2986,7 @@ function BillingTab() {
                       marginTop: isOpen ? 12 : 0,
                     }}
                   >
-                    <p className="text-[16px] text-[#4B5563]" style={{ lineHeight: 1.6 }}>
+                    <p className="text-[16px] text-[var(--text-body)]" style={{ lineHeight: 1.6 }}>
                       {a}
                     </p>
                   </div>

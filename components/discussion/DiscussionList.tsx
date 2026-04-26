@@ -200,10 +200,10 @@ export function DiscussionList({
             key={pill.key}
             type="button"
             onClick={() => setStatusFilter(pill.key)}
-            className={`text-[13px] px-3 py-[5px] rounded-full border whitespace-nowrap transition-all ${
+            className={`text-[14px] px-3 py-[5px] rounded-full border whitespace-nowrap transition-all ${
               statusFilter === pill.key
-                ? "bg-[#EBF4FF] text-[#1775E0] border-[#C3DFFE] font-medium"
-                : "bg-transparent text-discussion-supporting border-[#EBEBEB] hover:border-[#D5D5D5] hover:text-discussion-title"
+                ? "bg-[var(--brand-subtle)] text-[var(--brand)] border-[var(--brand-muted)] font-medium"
+                : "bg-transparent text-discussion-supporting border-[var(--border)] hover:border-[var(--border-strong)] hover:text-discussion-title"
             }`}
           >
             {pill.label}
@@ -230,7 +230,7 @@ export function DiscussionList({
             </p>
             <Link
               href="/dashboard"
-              className="mt-5 inline-flex items-center justify-center rounded-xl bg-[#1775E0] text-white px-5 py-2.5 text-sm font-semibold hover:bg-[#1462C4] transition"
+              className="mt-5 inline-flex items-center justify-center rounded-xl bg-[var(--brand)] text-white px-5 py-2.5 text-sm font-semibold hover:bg-[var(--brand-hover)] transition"
             >
               Open Sessions
             </Link>
@@ -268,13 +268,13 @@ export function DiscussionList({
                     "transition-colors duration-150 ease-out",
                     "focus-visible:ring-2 focus-visible:ring-neutral-200/80 focus-visible:ring-offset-1 focus-visible:ring-offset-white",
                     isSelected
-                      ? "bg-neutral-100"
-                      : "bg-transparent hover:bg-neutral-50",
+                      ? "bg-[var(--surface-hover)]"
+                      : "bg-transparent hover:bg-[var(--surface-hover)]",
                   ].join(" ")}
                 >
                   {/* Avatar — compact so text stays primary */}
                   <div
-                    className="w-7 h-7 min-w-[28px] min-h-[28px] rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0 mt-[1px]"
+                    className="w-7 h-7 min-w-[28px] min-h-[28px] rounded-full flex items-center justify-center text-[12px] font-semibold shrink-0 mt-[1px]"
                     style={{ background: palette.bg, color: palette.text }}
                     aria-hidden
                   >
@@ -287,15 +287,15 @@ export function DiscussionList({
                       <h3 className="min-w-0 flex-1 truncate text-[14px] font-medium leading-snug text-discussion-title">
                         {item.title}
                       </h3>
-                      <span className="shrink-0 whitespace-nowrap pt-[1px] text-[13px] leading-snug text-discussion-supporting">
+                      <span className="shrink-0 whitespace-nowrap pt-[1px] text-[14px] leading-snug text-discussion-supporting">
                         {timeLabel}
                       </span>
                     </div>
-                    <p className="truncate text-[13px] leading-snug text-discussion-supporting">
+                    <p className="truncate text-[14px] leading-snug text-discussion-supporting">
                       {sessionDisplay}
                     </p>
                     {item.lastCommentPreview ? (
-                      <p className="truncate text-[13px] leading-snug text-discussion-supporting">
+                      <p className="truncate text-[14px] leading-snug text-discussion-supporting">
                         {item.lastCommentPreview}
                       </p>
                     ) : null}
@@ -306,7 +306,7 @@ export function DiscussionList({
                         }`}
                         aria-hidden
                       />
-                      <span className="text-[13px] leading-snug text-meta">{replyLabel}</span>
+                      <span className="text-[14px] leading-snug text-meta">{replyLabel}</span>
                     </div>
                   </div>
                 </div>

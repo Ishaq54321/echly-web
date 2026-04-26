@@ -54,17 +54,17 @@ export default function CommentThread({ comments }: Props) {
   }, [comments]);
 
   return (
-    <div className="flex flex-col h-full bg-[hsl(var(--surface-1))] border-l">
+    <div className="flex flex-col h-full bg-[var(--surface-1)] border-l">
       <div
         ref={scrollContainerRef}
         className="flex-1 min-h-0 overflow-y-auto px-8 py-10 space-y-8"
       >
         {threadSummary && (
-          <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-6 py-4 mb-6">
-            <div className="text-xs uppercase tracking-wide text-[hsl(var(--text-muted))] mb-2">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-6 py-4 mb-6">
+            <div className="text-xs uppercase tracking-wide text-[var(--text-muted)] mb-2">
               Thread Summary
             </div>
-            <p className="text-sm text-[hsl(var(--text-muted))] leading-relaxed">
+            <p className="text-sm text-[var(--text-muted)] leading-relaxed">
               {threadSummary}
             </p>
           </div>
@@ -73,7 +73,7 @@ export default function CommentThread({ comments }: Props) {
           <div key={comment.id} className="flex flex-col gap-0">
             {index > 0 && index % 4 === 0 && (
               <div
-                className="border-t border-[hsl(var(--border))] opacity-40 pt-6"
+                className="border-t border-[var(--border)] opacity-40 pt-6"
                 aria-hidden
               />
             )}
@@ -92,7 +92,7 @@ export default function CommentThread({ comments }: Props) {
                 </div>
               ) : (
                 <div
-                  className="w-9 h-9 rounded-full bg-[hsl(var(--surface-2))] flex flex-shrink-0 items-center justify-center text-xs font-medium text-[hsl(var(--text-secondary))]"
+                  className="w-9 h-9 rounded-full bg-[var(--surface-2)] flex flex-shrink-0 items-center justify-center text-xs font-medium text-[var(--text-secondary)]"
                   aria-hidden
                 >
                   {getInitials(comment.name)}
@@ -100,14 +100,14 @@ export default function CommentThread({ comments }: Props) {
               )}
               <div className="flex-1 min-w-0 space-y-0.5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-medium text-[hsl(var(--text-primary))]">
+                  <span className="text-sm font-medium text-[var(--text-primary)]">
                     {comment.name}
                   </span>
-                  <span className="text-xs text-[hsl(var(--text-muted))]/70">
+                  <span className="text-xs text-[var(--text-muted)]/70">
                     {comment.time}
                   </span>
                 </div>
-                <p className="text-sm leading-relaxed text-[hsl(var(--text-secondary))] mt-1">
+                <p className="text-sm leading-relaxed text-[var(--text-secondary)] mt-1">
                   {comment.message}
                 </p>
               </div>

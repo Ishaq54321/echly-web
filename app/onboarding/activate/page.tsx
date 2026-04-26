@@ -294,7 +294,7 @@ export default function ActivationPage() {
         <ReplayDemoButton onReplay={handleReplayDemo} />
       ) : null}
       <div className="text-center max-w-3xl">
-        <h1 className="text-4xl font-semibold tracking-tight whitespace-nowrap text-gray-900">
+        <h1 className="text-4xl font-semibold tracking-tight whitespace-nowrap text-[var(--text-heading)]">
           You&apos;re ready to capture feedback
         </h1>
       </div>
@@ -306,14 +306,14 @@ export default function ActivationPage() {
         className="mt-12 w-full max-w-[920px]"
       >
         {dashboardPhase === "loading" ? (
-          <div className="flex items-center justify-center h-[440px] rounded-2xl border border-[#EBEBEB] bg-white shadow-xl">
+          <div className="flex items-center justify-center h-[440px] rounded-2xl border border-[var(--border)] bg-white shadow-xl">
             <div className="flex flex-col items-center gap-4">
               <Loader2 className="h-8 w-8 animate-spin text-gray-400" aria-hidden />
-              <p className="text-sm font-medium text-gray-600">Loading feedback...</p>
+              <p className="text-sm font-medium text-[var(--text-secondary)]">Loading feedback...</p>
             </div>
           </div>
         ) : dashboardPhase === "ready" ? (
-          <div className="relative overflow-hidden rounded-2xl border border-[#EBEBEB] bg-white shadow-xl min-h-[440px]">
+          <div className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-xl min-h-[440px]">
             <div className="relative">
               <DemoFeedbackDashboard />
             </div>
@@ -350,30 +350,30 @@ export default function ActivationPage() {
       <section className="max-w-[1100px] mx-auto mt-14 mb-6">
         <h2 className="text-2xl font-semibold text-center mb-10">How Echly Works</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="p-7 rounded-xl border border-[#EBEBEB] bg-white transition-all hover:shadow-md hover:-translate-y-1">
+          <div className="p-7 rounded-xl border border-[var(--border)] bg-white transition-all hover:shadow-md hover:-translate-y-1">
             <div className="w-10 h-10 rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] flex items-center justify-center mb-4">
               <Puzzle className="w-5 h-5" />
             </div>
             <h3 className="text-lg font-semibold mb-2">Install the Echly Extension</h3>
-            <p className="text-sm text-gray-600 leading-relaxed">
+            <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
               Capture feedback instantly from any website with a single click.
             </p>
           </div>
-          <div className="p-7 rounded-xl border border-[#EBEBEB] bg-white transition-all hover:shadow-md hover:-translate-y-1">
+          <div className="p-7 rounded-xl border border-[var(--border)] bg-white transition-all hover:shadow-md hover:-translate-y-1">
             <div className="w-10 h-10 rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] flex items-center justify-center mb-4">
               <MousePointerClick className="w-5 h-5" />
             </div>
             <h3 className="text-lg font-semibold mb-2">Capture Feedback</h3>
-            <p className="text-sm text-gray-600 leading-relaxed">
+            <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
               Click anywhere on the page and describe issues using voice or text.
             </p>
           </div>
-          <div className="p-7 rounded-xl border border-[#EBEBEB] bg-white transition-all hover:shadow-md hover:-translate-y-1">
+          <div className="p-7 rounded-xl border border-[var(--border)] bg-white transition-all hover:shadow-md hover:-translate-y-1">
             <div className="w-10 h-10 rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] flex items-center justify-center mb-4">
               <Share2 className="w-5 h-5" />
             </div>
             <h3 className="text-lg font-semibold mb-2">Share Your Session</h3>
-            <p className="text-sm text-gray-600 leading-relaxed">
+            <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
               Your feedback session is ready. Share the link with teammates or clients.
             </p>
           </div>
@@ -382,7 +382,7 @@ export default function ActivationPage() {
 
       <button
         type="button"
-        className="mt-14 h-12 px-10 rounded-full text-white font-medium bg-gradient-to-r from-[#466EFF] to-[#6A8CFF] shadow-[0_10px_30px_rgba(70,110,255,0.35)] hover:scale-[1.04] transition-all"
+        className="mt-14 h-12 px-10 rounded-full text-white font-medium bg-gradient-to-r from-[var(--brand)] to-[var(--brand)] shadow-[0_10px_30px_rgba(70,110,255,0.35)] hover:scale-[1.04] transition-all"
       >
         Go to dashboard
       </button>
@@ -480,8 +480,8 @@ function BrowserDemo({
     : null
 
   return (
-    <div ref={browserDemoRootRef} className="rounded-2xl border border-[#EBEBEB] bg-white shadow-xl overflow-hidden relative">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-[#EBEBEB] bg-white">
+    <div ref={browserDemoRootRef} className="rounded-2xl border border-[var(--border)] bg-white shadow-xl overflow-hidden relative">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)] bg-white">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-red-400 rounded-full" />
           <div className="w-3 h-3 bg-yellow-400 rounded-full" />
@@ -720,14 +720,14 @@ function WebsiteLayout({ stage }: { stage: "opening" | "ready" }) {
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-xl bg-gray-100 flex items-center justify-center text-gray-500">
+          <div className="h-8 w-8 rounded-xl bg-[var(--surface-hover)] flex items-center justify-center text-[var(--text-secondary)]">
             <Globe className="h-4 w-4" />
           </div>
-          <div className="font-semibold text-gray-900">Example Website</div>
+          <div className="font-semibold text-[var(--text-heading)]">Example Website</div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="h-8 w-20 rounded-full bg-gray-100" />
-          <div className="h-8 w-24 rounded-full bg-gray-100" />
+          <div className="h-8 w-20 rounded-full bg-[var(--surface-hover)]" />
+          <div className="h-8 w-24 rounded-full bg-[var(--surface-hover)]" />
         </div>
       </div>
 
@@ -736,11 +736,11 @@ function WebsiteLayout({ stage }: { stage: "opening" | "ready" }) {
           initial={stage === "opening" ? { opacity: 0, y: 6 } : false}
           animate={stage === "opening" ? { opacity: 1, y: 0 } : false}
           transition={{ duration: 0.35, ease: "easeOut" }}
-          className="text-[28px] leading-tight font-semibold text-gray-900 max-w-[620px]"
+          className="text-[28px] leading-tight font-semibold text-[var(--text-heading)] max-w-[620px]"
         >
           Build better products with structured feedback
         </motion.div>
-        <div className="mt-2 text-sm text-gray-600 max-w-[640px]">
+        <div className="mt-2 text-sm text-[var(--text-secondary)] max-w-[640px]">
           Capture website issues instantly and convert them into actionable tickets.
         </div>
       </div>
@@ -751,34 +751,34 @@ function WebsiteLayout({ stage }: { stage: "opening" | "ready" }) {
         transition={{ duration: 0.4, ease: "easeOut", delay: 0.08 }}
         className="mt-8 grid grid-cols-3 gap-4"
       >
-        <div className="rounded-2xl border border-[#EBEBEB] bg-white p-4">
+        <div className="rounded-2xl border border-[var(--border)] bg-white p-4">
           <div className="h-9 w-9 rounded-xl bg-[var(--brand-subtle)] border border-[var(--brand-muted)]" />
-          <div className="mt-3 font-medium text-gray-900 text-sm">Fast setup</div>
-          <div className="mt-1 text-xs text-gray-600">Start capturing feedback in seconds</div>
+          <div className="mt-3 font-medium text-[var(--text-heading)] text-sm">Fast setup</div>
+          <div className="mt-1 text-xs text-[var(--text-secondary)]">Start capturing feedback in seconds</div>
         </div>
-        <div className="rounded-2xl border border-[#EBEBEB] bg-white p-4">
+        <div className="rounded-2xl border border-[var(--border)] bg-white p-4">
           <div className="h-9 w-9 rounded-xl bg-[var(--brand-subtle)] border border-[var(--brand-muted)]" />
-          <div className="mt-3 font-medium text-gray-900 text-sm">Clean UI</div>
-          <div className="mt-1 text-xs text-gray-600">Simple interface designed for teams</div>
+          <div className="mt-3 font-medium text-[var(--text-heading)] text-sm">Clean UI</div>
+          <div className="mt-1 text-xs text-[var(--text-secondary)]">Simple interface designed for teams</div>
         </div>
-        <div className="rounded-2xl border border-[#EBEBEB] bg-white p-4">
+        <div className="rounded-2xl border border-[var(--border)] bg-white p-4">
           <div className="h-9 w-9 rounded-xl bg-[var(--brand-subtle)] border border-[var(--brand-muted)]" />
-          <div className="mt-3 font-medium text-gray-900 text-sm">Better feedback</div>
-          <div className="mt-1 text-xs text-gray-600">Turn comments into structured tickets automatically</div>
+          <div className="mt-3 font-medium text-[var(--text-heading)] text-sm">Better feedback</div>
+          <div className="mt-1 text-xs text-[var(--text-secondary)]">Turn comments into structured tickets automatically</div>
         </div>
       </motion.div>
 
-      <div className="mt-8 rounded-2xl border border-[#EBEBEB] bg-white p-6 flex-1">
-        <div className="h-4 bg-gray-100 rounded w-[260px]" />
+      <div className="mt-8 rounded-2xl border border-[var(--border)] bg-white p-6 flex-1">
+        <div className="h-4 bg-[var(--surface-hover)] rounded w-[260px]" />
         <div className="mt-4 space-y-3">
-          <div className="h-3 bg-gray-100 rounded w-[92%]" />
-          <div className="h-3 bg-gray-100 rounded w-[86%]" />
-          <div className="h-3 bg-gray-100 rounded w-[78%]" />
-          <div className="h-3 bg-gray-100 rounded w-[88%]" />
+          <div className="h-3 bg-[var(--surface-hover)] rounded w-[92%]" />
+          <div className="h-3 bg-[var(--surface-hover)] rounded w-[86%]" />
+          <div className="h-3 bg-[var(--surface-hover)] rounded w-[78%]" />
+          <div className="h-3 bg-[var(--surface-hover)] rounded w-[88%]" />
         </div>
         <div className="mt-6 grid grid-cols-2 gap-4">
-          <div className="h-16 bg-gray-100 rounded-2xl" />
-          <div className="h-16 bg-gray-100 rounded-2xl" />
+          <div className="h-16 bg-[var(--surface-hover)] rounded-2xl" />
+          <div className="h-16 bg-[var(--surface-hover)] rounded-2xl" />
         </div>
       </div>
     </div>
@@ -787,7 +787,7 @@ function WebsiteLayout({ stage }: { stage: "opening" | "ready" }) {
 
 function FigmaCommentBubble() {
   return (
-    <div className="h-6 w-6 rounded-full bg-[#1775E0] text-white text-[12px] font-semibold flex items-center justify-center shadow-[0_10px_24px_rgba(37,99,235,0.35)]">
+    <div className="h-6 w-6 rounded-full bg-[var(--brand)] text-white text-[12px] font-semibold flex items-center justify-center shadow-[0_10px_24px_rgba(37,99,235,0.35)]">
       1
     </div>
   )
@@ -814,14 +814,14 @@ function GuideCursor({
     >
       <div className="-translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
         {cursorMode === "interactive" && !showCommentIcon && (
-          <motion.div className="w-[26px] h-[26px] rounded-full bg-white border-2 border-gray-400 shadow-lg flex items-center justify-center">
-            <div className="w-2 h-2 bg-[#1775E0] rounded-full" />
+          <motion.div className="w-[26px] h-[26px] rounded-full bg-white border-2 border-[var(--border-strong)] shadow-lg flex items-center justify-center">
+            <div className="w-2 h-2 bg-[var(--brand)] rounded-full" />
           </motion.div>
         )}
         {showCommentIcon && <MessageSquare className="w-5 h-5 text-[var(--brand)]" />}
         {cursorMode === "default" && !showCommentIcon && (
-          <div className="w-[26px] h-[26px] rounded-full bg-white border-2 border-gray-400 shadow-lg flex items-center justify-center">
-            <div className="w-2 h-2 bg-[#1775E0] rounded-full" />
+          <div className="w-[26px] h-[26px] rounded-full bg-white border-2 border-[var(--border-strong)] shadow-lg flex items-center justify-center">
+            <div className="w-2 h-2 bg-[var(--brand)] rounded-full" />
           </div>
         )}
       </div>
@@ -897,22 +897,22 @@ function OpenWebsiteSequence({
             >
               <div className="h-full w-full bg-white rounded-sm overflow-hidden flex flex-col">
                 {/* Mini browser chrome */}
-                <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-gray-100 bg-gray-50/80 shrink-0">
-                  <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
-                  <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
-                  <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
-                  <div className="flex-1 min-w-0 h-1.5 bg-gray-200 rounded ml-1" />
+                <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-[var(--border)] bg-[var(--surface-subtle)]/80 shrink-0">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--border)]" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--border)]" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--border)]" />
+                  <div className="flex-1 min-w-0 h-1.5 bg-[var(--surface-hover)] rounded ml-1" />
                 </div>
                 {/* UI card preview: header + content block + highlighted CTA */}
                 <div className="flex-1 p-2 flex flex-col gap-2 min-w-0">
-                  <div className="h-2 w-[70%] bg-gray-200 rounded shrink-0" />
-                  <div className="h-1.5 w-full max-w-[85%] bg-gray-100 rounded shrink-0" />
-                  <div className="flex-1 rounded-md border border-[#EBEBEB] bg-gray-50/60 p-2 flex flex-col gap-1.5">
-                    <div className="h-2 w-12 bg-gray-200 rounded" />
-                    <div className="flex-1 rounded border-2 border-[var(--brand)] bg-[#EBF4FF]/80 flex items-center justify-center shadow-[0_0_0_2px_rgba(23,117,224,0.2)] relative">
+                  <div className="h-2 w-[70%] bg-[var(--surface-hover)] rounded shrink-0" />
+                  <div className="h-1.5 w-full max-w-[85%] bg-[var(--surface-hover)] rounded shrink-0" />
+                  <div className="flex-1 rounded-md border border-[var(--border)] bg-[var(--surface-subtle)]/60 p-2 flex flex-col gap-1.5">
+                    <div className="h-2 w-12 bg-[var(--surface-hover)] rounded" />
+                    <div className="flex-1 rounded border-2 border-[var(--brand)] bg-[var(--brand-subtle)]/80 flex items-center justify-center shadow-[0_0_0_2px_rgba(23,117,224,0.2)] relative">
                       <span className="text-[8px] font-semibold text-[var(--brand-text)]">Get started</span>
                     </div>
-                    <div className="h-1.5 w-14 bg-gray-100 rounded" />
+                    <div className="h-1.5 w-14 bg-[var(--surface-hover)] rounded" />
                   </div>
                 </div>
               </div>
@@ -974,8 +974,8 @@ function WriteFeedbackPopup({ onSubmit }: { onSubmit?: (text?: string) => void }
       className="bg-transparent rounded-2xl overflow-hidden"
     >
       <div className="px-4 py-4">
-        <div className="font-semibold text-gray-900 text-[13px]">Write Feedback</div>
-        <div className="mt-1 text-[12px] text-gray-600">
+        <div className="font-semibold text-[var(--text-heading)] text-[14px]">Write Feedback</div>
+        <div className="mt-1 text-[12px] text-[var(--text-secondary)]">
           Describe the issue — Echly will structure it.
         </div>
 
@@ -984,7 +984,7 @@ function WriteFeedbackPopup({ onSubmit }: { onSubmit?: (text?: string) => void }
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="e.g. The CTA button spacing looks off..."
-          className="mt-4 w-full h-24 rounded-xl border border-[#EBEBEB] bg-white px-3 py-2.5 text-[12px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1775E0] focus:border-transparent resize-none"
+          className="mt-4 w-full h-24 rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-[12px] text-[var(--text-heading)] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:border-transparent resize-none"
           rows={4}
         />
 
@@ -1084,8 +1084,8 @@ function VoiceFeedbackPopup({
         }
       `}</style>
       <div className="px-4 py-4">
-        <div className="font-semibold text-gray-900 text-[13px]">Voice Feedback</div>
-        <div className="mt-1 text-[12px] text-gray-600">
+        <div className="font-semibold text-[var(--text-heading)] text-[14px]">Voice Feedback</div>
+        <div className="mt-1 text-[12px] text-[var(--text-secondary)]">
           Describe the issue — Echly will structure it.
         </div>
 
@@ -1098,7 +1098,7 @@ function VoiceFeedbackPopup({
           </div>
         </div>
 
-        <div className="mt-3 text-[12px] text-gray-600">Listening...</div>
+        <div className="mt-3 text-[12px] text-[var(--text-secondary)]">Listening...</div>
 
         <button
           ref={finishButtonRef}
@@ -1135,9 +1135,9 @@ function ProcessingStack() {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.08 * idx, duration: 0.28 }}
-          className="bg-white/70 backdrop-blur border border-[#EBEBEB] shadow-[0_10px_34px_rgba(0,0,0,0.10)] rounded-2xl px-4 py-3 flex items-center justify-between"
+          className="bg-white/70 backdrop-blur border border-[var(--border)] shadow-[var(--shadow-lg)] rounded-2xl px-4 py-3 flex items-center justify-between"
         >
-          <span className={`text-[12px] ${idx === 0 ? "font-semibold text-gray-900" : "font-medium text-gray-800"}`}>
+          <span className={`text-[12px] ${idx === 0 ? "font-semibold text-[var(--text-heading)]" : "font-medium text-[var(--text-heading)]"}`}>
             {label}
           </span>
           <LoadingIndicator />
@@ -1169,9 +1169,9 @@ function ProcessingPanelCard({
       transition={{ duration: 0.35, ease: "easeOut" }}
       className="w-[280px]"
     >
-      <div className="rounded-2xl border border-[#EBEBEB] bg-white/80 backdrop-blur-md shadow-[0_18px_60px_rgba(0,0,0,0.16)] overflow-hidden pointer-events-auto">
+      <div className="rounded-2xl border border-[var(--border)] bg-white/80 backdrop-blur-md shadow-[var(--shadow-xl)] overflow-hidden pointer-events-auto">
         <div className="p-4">
-          <div className="font-semibold text-gray-900 text-[13px]">Processing</div>
+          <div className="font-semibold text-[var(--text-heading)] text-[14px]">Processing</div>
           <div className="mt-3 space-y-2">
             {items.map((label, idx) => (
               <motion.div
@@ -1179,9 +1179,9 @@ function ProcessingPanelCard({
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.08 * idx, duration: 0.28, ease: "easeOut" }}
-                className="flex items-center justify-between rounded-xl bg-white/70 backdrop-blur border border-[#EBEBEB] shadow-[0_10px_34px_rgba(0,0,0,0.10)] px-4 py-3"
+                className="flex items-center justify-between rounded-xl bg-white/70 backdrop-blur border border-[var(--border)] shadow-[var(--shadow-lg)] px-4 py-3"
               >
-                <span className={`text-[12px] ${idx === 0 ? "font-semibold text-gray-900" : "font-medium text-gray-800"}`}>
+                <span className={`text-[12px] ${idx === 0 ? "font-semibold text-[var(--text-heading)]" : "font-medium text-[var(--text-heading)]"}`}>
                   {label}
                 </span>
                 <LoadingIndicator />
@@ -1195,7 +1195,7 @@ function ProcessingPanelCard({
             transition={{ duration: 0.25, ease: "easeOut" }}
             className="mt-4 overflow-hidden"
           >
-            <div className="text-[11px] font-semibold tracking-wide text-gray-500">GENERATED TASKS</div>
+            <div className="text-[12px] font-semibold tracking-wide text-[var(--text-secondary)]">GENERATED TASKS</div>
             <div className="mt-2 space-y-2 generated-tasks">
               {tasks.map((t, i) => (
                 <motion.div
@@ -1203,9 +1203,9 @@ function ProcessingPanelCard({
                   initial={{ opacity: 0, y: 10 }}
                   animate={tasksStarted ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
                   transition={{ duration: 0.28, ease: "easeOut", delay: i * 0.4 }}
-                  className="rounded-xl bg-white/70 backdrop-blur border border-[#EBEBEB] px-3 py-2.5 shadow-[0_10px_34px_rgba(0,0,0,0.08)]"
+                  className="rounded-xl bg-white/70 backdrop-blur border border-[var(--border)] px-3 py-2.5 shadow-[0_10px_34px_rgba(0,0,0,0.08)]"
                 >
-                  <div className="text-[12px] font-medium text-gray-900">{t.title}</div>
+                  <div className="text-[12px] font-medium text-[var(--text-heading)]">{t.title}</div>
                 </motion.div>
               ))}
             </div>
@@ -1236,9 +1236,9 @@ function CollapsibleTicketGroup({
       <button
         type="button"
         onClick={onToggle}
-        className="w-full flex items-center justify-between text-left py-1.5 px-1 rounded-lg hover:bg-gray-100/80 transition-colors"
+        className="w-full flex items-center justify-between text-left py-1.5 px-1 rounded-lg hover:bg-[var(--surface-hover)]/80 transition-colors"
       >
-        <span className="text-[11px] font-semibold text-gray-700">
+        <span className="text-[12px] font-semibold text-[var(--text-body)]">
           {label} ({count})
         </span>
         <motion.span
@@ -1264,9 +1264,9 @@ function CollapsibleTicketGroup({
               initial={{ opacity: 0, y: 10 }}
               animate={tasksStarted ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
               transition={{ duration: 0.28, ease: "easeOut", delay: i * 0.1 }}
-              className="rounded-xl bg-white/70 backdrop-blur border border-[#EBEBEB] px-3 py-2.5 shadow-[0_10px_34px_rgba(0,0,0,0.08)]"
+              className="rounded-xl bg-white/70 backdrop-blur border border-[var(--border)] px-3 py-2.5 shadow-[0_10px_34px_rgba(0,0,0,0.08)]"
             >
-              <div className="text-[12px] font-medium text-gray-900">{t.title}</div>
+              <div className="text-[12px] font-medium text-[var(--text-heading)]">{t.title}</div>
             </motion.div>
           ))}
         </div>
@@ -1292,7 +1292,7 @@ function VoicePanelCard({
       transition={{ duration: 0.35, ease: "easeOut" }}
       className="w-full max-w-[360px] pointer-events-none"
     >
-      <div className="rounded-2xl border border-[#EBEBEB] bg-white/80 backdrop-blur-md shadow-[0_18px_60px_rgba(0,0,0,0.16)] overflow-hidden pointer-events-auto">
+      <div className="rounded-2xl border border-[var(--border)] bg-white/80 backdrop-blur-md shadow-[var(--shadow-xl)] overflow-hidden pointer-events-auto">
         <div className={["p-4", waveformActive ? "" : "wave-idle"].join(" ")}>
           <VoiceFeedbackPopup onFinish={onFinish} finishButtonRef={finishButtonRef} />
         </div>
@@ -1367,7 +1367,7 @@ function WritePanelCard({ onSubmit }: { onSubmit?: (text?: string) => void }) {
       transition={{ duration: 0.35, ease: "easeOut" }}
       className="w-full max-w-[360px] pointer-events-none"
     >
-      <div className="rounded-2xl border border-[#EBEBEB] bg-white/80 backdrop-blur-md shadow-[0_18px_60px_rgba(0,0,0,0.16)] overflow-hidden pointer-events-auto">
+      <div className="rounded-2xl border border-[var(--border)] bg-white/80 backdrop-blur-md shadow-[var(--shadow-xl)] overflow-hidden pointer-events-auto">
         <div className="p-4">
           <WriteFeedbackPopup onSubmit={onSubmit} />
         </div>

@@ -102,17 +102,17 @@ export default function DemoGuide({
     >
       <div
         ref={tooltipRef}
-        className="relative rounded-[10px] px-[14px] py-[10px] text-[14px] font-medium max-w-[240px]"
+        className="relative rounded-[var(--radius-sm)] px-[14px] py-[10px] text-[14px] font-medium max-w-[240px]"
         style={{
           background: "white",
           color: "#1a1a1a",
           boxShadow: "0 24px 48px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.08)",
-          border: "1px solid #e5e7eb",
+          border: "1px solid var(--border)",
         }}
       >
         {text}
         <span
-          className="absolute w-2 h-2 rotate-45 bg-white border border-[#EBEBEB]"
+          className="absolute w-2 h-2 rotate-45 bg-white border border-[var(--border)]"
           style={{
             ...arrowStyle,
             width: TOOLTIP_ARROW_SIZE,
@@ -301,7 +301,7 @@ export function CursorAnnotation({
       style={{ left, top }}
     >
       <div
-        className="rounded-[10px] px-[14px] py-[10px] text-[14px] font-medium"
+        className="rounded-[var(--radius-sm)] px-[14px] py-[10px] text-[14px] font-medium"
         style={{
           maxWidth: 260,
           whiteSpace: "normal",
@@ -309,7 +309,7 @@ export function CursorAnnotation({
           background: "white",
           color: "#1a1a1a",
           boxShadow: "0 24px 48px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.08)",
-          border: "1px solid #e5e7eb",
+          border: "1px solid var(--border)",
         }}
       >
         {text}

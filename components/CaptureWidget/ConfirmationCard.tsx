@@ -30,11 +30,11 @@ export function ConfirmationCard({ ticket, onConfirm, onEdit }: ConfirmationCard
       exit={{ opacity: 0, scale: 0.98 }}
       transition={{ duration: 0.2, ease: [0.22, 0.61, 0.36, 1] }}
     >
-      <p className="echly-confirmation-card-heading" style={{ fontSize: 16, fontWeight: 600, color: "#F3F4F6", margin: "0 0 16px", lineHeight: 1.4 }}>
+      <p className="echly-confirmation-card-heading" style={{ fontSize: 16, fontWeight: 600, color: "var(--text-on-dark)", margin: "0 0 16px", lineHeight: 1.4 }}>
         I understood
       </p>
       <ul className="echly-confirmation-card-list" style={{ listStyle: "none", margin: "0 0 20px", padding: 0 }}>
-        <li className="echly-confirmation-card-title" style={{ fontSize: 14, fontWeight: 600, color: "#F3F4F6", lineHeight: 1.45 }}>
+        <li className="echly-confirmation-card-title" style={{ fontSize: 14, fontWeight: 600, color: "var(--text-on-dark)", lineHeight: 1.45 }}>
           {ticket.title}
         </li>
         {ticket.actionSteps?.length ? (
@@ -75,7 +75,7 @@ export function ConfirmationCard({ ticket, onConfirm, onEdit }: ConfirmationCard
             fontWeight: 600,
             border: "1px solid rgba(255,255,255,0.08)",
             background: "rgba(255,255,255,0.08)",
-            color: "#F3F4F6",
+            color: "var(--text-on-dark)",
             cursor: "pointer",
           }}
           whileHover={{ scale: 1.02 }}

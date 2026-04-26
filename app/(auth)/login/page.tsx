@@ -16,10 +16,10 @@ function getReturnPath(searchParams: ReturnType<typeof useSearchParams>): string
 }
 
 const inputClass =
-  "w-full h-11 rounded-[10px] border border-[#E5E7EB] bg-white text-gray-900 text-base pl-3 placeholder:text-gray-400 focus:outline-none focus:border-[#466EFF] focus:ring-[3px] focus:ring-[rgba(70,110,255,0.15)]";
+  "w-full h-11 rounded-[var(--radius-sm)] border border-[var(--border)] bg-white text-[var(--text-heading)] text-base pl-3 placeholder:text-gray-400 focus:outline-none focus:border-[#466EFF] focus:ring-[3px] focus:ring-[rgba(70,110,255,0.15)]";
 
 const primaryButtonClass =
-  "w-full h-11 rounded-[10px] text-white font-medium text-base transition-all disabled:opacity-60 hover:brightness-105 flex items-center justify-center";
+  "w-full h-11 rounded-[var(--radius-sm)] text-white font-medium text-base transition-all disabled:opacity-50 hover:brightness-105 flex items-center justify-center";
 
 const primaryButtonStyle = {
   background: "linear-gradient(135deg,#466EFF,#5F7DFF)",
@@ -105,7 +105,7 @@ function LoginPageContent() {
   };
 
   return (
-    <div className="relative h-full bg-[#f9fafc] overflow-hidden">
+    <div className="relative h-full bg-[var(--surface-subtle)] overflow-hidden">
 
       {/* ===== Premium SaaS Gradient Background ===== */}
      {/* ===== Premium SaaS Gradient Background ===== */}
@@ -184,11 +184,11 @@ function LoginPageContent() {
 
         <div className="max-w-[980px] w-full">
 
-          <h1 className="text-[44px] font-semibold tracking-tight text-gray-900 whitespace-nowrap">
+          <h1 className="text-[44px] font-semibold tracking-tight text-[var(--text-heading)] whitespace-nowrap">
             Capture Feedback Exactly Where It Happens
           </h1>
 
-          <p className="text-lg text-gray-700 mt-3 font-medium">
+          <p className="text-lg text-[var(--text-body)] mt-3 font-medium">
             Turn screenshots into actionable tickets for your team in seconds.
           </p>
 
@@ -217,7 +217,7 @@ function LoginPageContent() {
 
             <AuthCard>
 
-              <h2 className="text-xl font-semibold text-gray-900 text-center mb-6">
+              <h2 className="text-xl font-semibold text-[var(--text-heading)] text-center mb-6">
                 Sign in to Echly
               </h2>
 
@@ -225,7 +225,7 @@ function LoginPageContent() {
                 type="button"
                 onClick={handleGoogle}
                 disabled={loading}
-                className="w-full h-11 rounded-[10px] border border-[#E5E7EB] bg-[#F8F9FA] text-gray-900 font-medium text-base hover:bg-[#F1F3F5] transition-colors disabled:opacity-60 flex items-center justify-center gap-3"
+                className="w-full h-11 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--text-heading)] font-medium text-base hover:bg-[var(--surface-hover)] transition-colors disabled:opacity-50 flex items-center justify-center gap-3"
               >
                 <GoogleIcon/>
                 Continue with Google
@@ -233,10 +233,10 @@ function LoginPageContent() {
 
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-[#E5E7EB]" />
+                  <div className="w-full border-t border-[var(--border)]" />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-3 bg-white text-gray-500">OR</span>
+                  <span className="px-3 bg-white text-[var(--text-secondary)]">OR</span>
                 </div>
               </div>
 
@@ -275,11 +275,11 @@ function LoginPageContent() {
 
               </form>
 
-              <p className="mt-6 text-center text-gray-500 text-sm">
+              <p className="mt-6 text-center text-[var(--text-secondary)] text-sm">
                 Don't have an account?{" "}
                 <Link
                   href="/signup"
-                  className="text-[#466EFF] hover:underline font-medium"
+                  className="text-[var(--brand)] hover:underline font-medium"
                 >
                   Sign up
                 </Link>
@@ -287,7 +287,7 @@ function LoginPageContent() {
 
             </AuthCard>
 
-            <p className="text-gray-500 text-sm mt-6">
+            <p className="text-[var(--text-secondary)] text-sm mt-6">
               Trusted by teams who ship faster. Capture feedback in context and keep everyone aligned.
             </p>
 
@@ -304,7 +304,7 @@ function LoginPageContent() {
 function LoginSuspenseFallback() {
   return (
     <div
-      className="relative h-full bg-[#f9fafc] flex items-center justify-center"
+      className="relative h-full bg-[var(--surface-subtle)] flex items-center justify-center"
       aria-busy="true"
     >
       <Loader2 className="h-8 w-8 animate-spin text-gray-400" aria-hidden />

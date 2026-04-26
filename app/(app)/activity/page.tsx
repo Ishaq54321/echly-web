@@ -305,14 +305,14 @@ const ACTIVITY_TYPE_PILL_ACTIVE_STYLES: Record<ActivityFilterCategoryId, React.C
 
 /** Shared pill geometry + motion; hover applied via FILTER_PILL_DEFAULT when not active. */
 const FILTER_PILL_BASE =
-  "inline-flex shrink-0 cursor-pointer items-center gap-[5px] rounded-full border border-[#EBEBEB] bg-transparent px-[10px] py-[3px] text-sm font-medium text-[#78716C] whitespace-nowrap transition-all duration-[140ms] ease focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+  "inline-flex shrink-0 cursor-pointer items-center gap-[5px] rounded-full border border-[var(--border)] bg-transparent px-[10px] py-[3px] text-sm font-medium text-[var(--text-secondary)] whitespace-nowrap transition-all duration-[140ms] ease focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
 const FILTER_PILL_DEFAULT =
-  "hover:border-[#D5D5D5] hover:text-[#44403C] hover:bg-[#F4F5F7]";
+  "hover:border-[var(--border-strong)] hover:text-[var(--text-body)] hover:bg-[var(--surface-hover)]";
 
 /** Session / Members active pill — neutral light fill. */
 const FILTER_PILL_SESSION_ACTIVE =
-  "bg-[#F1F2F4] border-[#F1F2F4] text-[#44403C]";
+  "bg-[var(--surface-subtle)] border-[var(--surface-subtle)] text-[var(--text-body)]";
 
 /** Auto-fill + infinite scroll: stop chaining loads once this many rows exist and the page scrolls. */
 const ACTIVITY_FEED_MIN_VISIBLE_ROWS = 8;
@@ -804,13 +804,13 @@ function ActivityFeed() {
                   }`}
                 >
                   <Filter
-                    className="h-3.5 w-3.5 shrink-0 text-neutral-600 opacity-60"
+                    className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)] opacity-60"
                     strokeWidth={2}
                     aria-hidden
                   />
                   <span className="min-w-0 flex-1 truncate">{selectedSessionLabel}</span>
                   <ChevronDown
-                    className={`h-3.5 w-3.5 shrink-0 text-neutral-600 opacity-60 transition-transform duration-150 ${sessionMenuOpen ? "rotate-180" : ""}`}
+                    className={`h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)] opacity-60 transition-transform duration-150 ${sessionMenuOpen ? "rotate-180" : ""}`}
                     strokeWidth={2}
                     aria-hidden
                   />
@@ -818,7 +818,7 @@ function ActivityFeed() {
 
                 {sessionMenuOpen ? (
                   <div
-                    className="absolute left-1/2 top-full z-[200] mt-1 w-max min-w-[220px] max-w-[min(100vw-2rem,320px)] -translate-x-1/2 rounded-xl border border-neutral-200/80 bg-neutral-100 p-1.5 text-neutral-900 shadow-[var(--shadow-level-4)] dark:border-neutral-200/80 dark:bg-neutral-100 dark:text-neutral-900"
+                    className="absolute left-1/2 top-full z-[200] mt-1 w-max min-w-[220px] max-w-[min(100vw-2rem,320px)] -translate-x-1/2 rounded-xl border border-[var(--border)] bg-[var(--surface-hover)] p-1.5 text-[var(--text-heading)] shadow-[var(--shadow-level-4)] dark:border-[var(--border)] dark:bg-[var(--surface-hover)] dark:text-[var(--text-heading)]"
                     role="listbox"
                     aria-label="Sessions"
                   >
@@ -826,7 +826,7 @@ function ActivityFeed() {
                     type="button"
                     role="option"
                     aria-selected={!selectedSessionId}
-                    className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-neutral-900 transition-colors hover:bg-neutral-200/50 ${!selectedSessionId ? "bg-neutral-200/60 font-medium" : "font-normal"}`}
+                    className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-[var(--text-heading)] transition-colors hover:bg-[var(--surface-hover)]/50 ${!selectedSessionId ? "bg-[var(--surface-hover)]/60 font-medium" : "font-normal"}`}
                     onClick={() => {
                       onSessionFilterChange("");
                       setSessionMenuOpen(false);
@@ -835,7 +835,7 @@ function ActivityFeed() {
                     <span className="min-w-0 flex-1 truncate">All sessions</span>
                     {!selectedSessionId ? (
                       <Check
-                        className="h-3.5 w-3.5 shrink-0 text-neutral-600 opacity-70"
+                        className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)] opacity-70"
                         strokeWidth={2}
                         aria-hidden
                       />
@@ -849,7 +849,7 @@ function ActivityFeed() {
                         type="button"
                         role="option"
                         aria-selected={selected}
-                        className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-neutral-900 transition-colors hover:bg-neutral-200/50 ${selected ? "bg-neutral-200/60 font-medium" : "font-normal"}`}
+                        className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-[var(--text-heading)] transition-colors hover:bg-[var(--surface-hover)]/50 ${selected ? "bg-[var(--surface-hover)]/60 font-medium" : "font-normal"}`}
                         onClick={() => {
                           onSessionFilterChange(s.id);
                           setSessionMenuOpen(false);
@@ -858,7 +858,7 @@ function ActivityFeed() {
                         <span className="min-w-0 flex-1 truncate">{s.title}</span>
                         {selected ? (
                           <Check
-                            className="h-3.5 w-3.5 shrink-0 text-neutral-600 opacity-70"
+                            className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)] opacity-70"
                             strokeWidth={2}
                             aria-hidden
                           />
@@ -920,7 +920,7 @@ function ActivityFeed() {
                     >
                       <span className="flex-1 text-left">All</span>
                       {selectedMemberId === null && (
-                        <Check className="h-3.5 w-3.5 text-[#1775E0] flex-shrink-0" />
+                        <Check className="h-3.5 w-3.5 text-[var(--brand)] flex-shrink-0" />
                       )}
                     </button>
 
@@ -945,7 +945,7 @@ function ActivityFeed() {
                           }}
                           className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/40 text-left${selectedMemberId === member.uid ? " font-medium text-foreground" : ""}`}
                         >
-                          <div className="w-5 h-5 rounded-full bg-muted flex-shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-medium text-muted-foreground">
+                          <div className="w-5 h-5 rounded-full bg-muted flex-shrink-0 overflow-hidden flex items-center justify-center text-[12px] font-medium text-muted-foreground">
                             {member.avatarUrl ? (
                               <img
                                 src={member.avatarUrl}

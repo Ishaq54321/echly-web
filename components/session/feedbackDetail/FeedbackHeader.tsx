@@ -116,7 +116,7 @@ export function FeedbackHeader({
   return (
     <div className="pt-0 pb-4">
       {showPosition ? (
-        <div className="text-[13px] text-[hsl(var(--text-tertiary))] mb-1.5">
+        <div className="text-[14px] text-[var(--text-tertiary)] mb-1.5">
           {item.index} of {item.total}
         </div>
       ) : null}
@@ -132,10 +132,10 @@ export function FeedbackHeader({
                 onBlur={handleTitleBlur}
                 onFocus={(e) => e.currentTarget.select()}
                 onKeyDown={handleTitleKeyDown}
-                className="w-full text-[20px] font-semibold leading-[1.25] tracking-[-0.02em] text-[hsl(var(--text-primary-strong))] bg-[var(--layer-1-bg)] border border-[var(--layer-2-border)] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-[var(--motion-duration)]"
+                className="w-full text-[20px] font-semibold leading-[1.25] tracking-[-0.02em] text-[var(--text-primary-strong)] bg-[var(--layer-1-bg)] border border-[var(--layer-2-border)] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-[var(--motion-duration)]"
                 aria-label="Edit title"
               />
-              <p className="text-[14px] text-[hsl(var(--text-tertiary))] mt-1">
+              <p className="text-[14px] text-[var(--text-tertiary)] mt-1">
                 Enter to save
               </p>
             </>
@@ -154,7 +154,7 @@ export function FeedbackHeader({
               aria-label={onSaveTitle ? "Edit title" : undefined}
             >
               {item.title?.trim() ? (
-                <h1 className="text-[20px] font-semibold leading-[1.15] tracking-[-0.025em] text-[hsl(var(--text-primary-strong))] truncate">
+                <h1 className="text-[20px] font-semibold leading-[1.15] tracking-[-0.025em] text-[var(--text-primary-strong)] truncate">
                   {item.title}
                 </h1>
               ) : null}
@@ -189,7 +189,7 @@ export function FeedbackHeader({
             <button
               type="button"
               onClick={onRequestDelete}
-              className="flex items-center gap-2 px-3 py-2 text-[14px] font-medium text-[hsl(var(--text-tertiary))] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)] transition-colors duration-[var(--motion-duration)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] rounded-xl cursor-pointer"
+              className="flex items-center gap-2 px-3 py-2 text-[14px] font-medium text-[var(--text-tertiary)] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)] transition-colors duration-[var(--motion-duration)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] rounded-xl cursor-pointer"
               aria-label="Delete"
             >
               <Trash2 size={14} />
@@ -199,8 +199,8 @@ export function FeedbackHeader({
           <button
             type="button"
             onClick={onToggleActivity}
-            className={`flex items-center gap-2 px-3 py-2 text-[14px] font-medium text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] rounded-xl cursor-pointer ${
-              isActivityOpen ? "text-[hsl(var(--text-secondary-soft))]" : ""
+            className={`flex items-center gap-2 px-3 py-2 text-[14px] font-medium text-[var(--text-tertiary)] hover:text-[var(--text-primary-strong)] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] rounded-xl cursor-pointer ${
+              isActivityOpen ? "text-[var(--text-secondary-soft)]" : ""
             }`}
             aria-pressed={isActivityOpen}
           >
@@ -210,7 +210,7 @@ export function FeedbackHeader({
         </div>
       </div>
       {metaLine != null && (
-        <div className="mt-1 text-[13px] text-[hsl(var(--text-tertiary))]">
+        <div className="mt-1 text-[14px] text-[var(--text-tertiary)]">
           {metaLine}
         </div>
       )}

@@ -196,10 +196,10 @@ function SessionWorkspaceRow({
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         className={[
-          "group flex w-full items-center justify-between rounded-lg px-4 py-4 transition-all duration-150 hover:bg-gray-50",
-          isSelectionMode ? "hover:bg-gray-100 cursor-pointer" : "",
+          "group flex w-full items-center justify-between rounded-lg px-4 py-4 transition-all duration-150 hover:bg-[var(--surface-hover)]",
+          isSelectionMode ? "hover:bg-[var(--surface-hover)] cursor-pointer" : "",
           isSelected ? "bg-[var(--brand-subtle)] hover:bg-[var(--brand-subtle)]" : "",
-          openingId === session.id ? "bg-gray-50" : "",
+          openingId === session.id ? "bg-[var(--surface-subtle)]" : "",
         ]
           .filter(Boolean)
           .join(" ")}
@@ -228,12 +228,12 @@ function SessionWorkspaceRow({
             {(hovered || isSelectionMode) ? (
               <div
                 className={[
-                  "w-[22px] h-[22px] rounded-[6px] border flex items-center justify-center transition-all duration-150",
+                  "w-[22px] h-[22px] rounded-[var(--radius-xs)] border flex items-center justify-center transition-all duration-150",
                   "cursor-pointer",
                   "hover:scale-[1.06] active:scale-[0.97]",
                   isSelected
-                    ? "bg-[#1775E0] border-[var(--brand)]"
-                    : "bg-white border-gray-400 hover:border-gray-600 hover:bg-gray-50",
+                    ? "bg-[var(--brand)] border-[var(--brand)]"
+                    : "bg-white border-[var(--border-strong)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]",
                 ].join(" ")}
               >
                 <Check
@@ -241,7 +241,7 @@ function SessionWorkspaceRow({
                     "w-4 h-4",
                     isSelected
                       ? "text-white opacity-100"
-                      : "text-gray-500 opacity-60",
+                      : "text-[var(--text-secondary)] opacity-60",
                   ].join(" ")}
                   strokeWidth={3}
                   aria-hidden
@@ -254,7 +254,7 @@ function SessionWorkspaceRow({
 
           <div className="min-w-0">
             {session.title?.trim() ? (
-              <span className="truncate block text-[15px] font-medium text-gray-900">
+              <span className="truncate block text-[15px] font-medium text-[var(--text-heading)]">
                 {session.title}
               </span>
             ) : null}
@@ -264,22 +264,22 @@ function SessionWorkspaceRow({
         <div className="flex min-h-[36px] items-center shrink-0 gap-3.5">
           <>
             {open != null && open > 0 && (
-              <div className="rounded-[9px] bg-white px-3 py-1.5 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
+              <div className="rounded-[var(--radius-sm)] bg-white px-3 py-1.5 text-sm text-[var(--text-body)] inline-flex items-center justify-center gap-1.5">
                 <CircleDashed className="h-4 w-4 shrink-0 text-[var(--brand)]" aria-hidden />
                 <span className="whitespace-nowrap font-medium tracking-tight">{open} open</span>
               </div>
             )}
             {resolved != null && resolved > 0 && (
-              <div className="rounded-[9px] bg-white px-3 py-1.5 text-sm text-gray-700 inline-flex items-center justify-center gap-1.5">
+              <div className="rounded-[var(--radius-sm)] bg-white px-3 py-1.5 text-sm text-[var(--text-body)] inline-flex items-center justify-center gap-1.5">
                 <Check className="h-4 w-4 shrink-0 text-[var(--color-success)]" strokeWidth={2.5} aria-hidden />
                 <span className="whitespace-nowrap font-medium tracking-tight">{resolved} resolved</span>
               </div>
             )}
           </>
           {updatedShort ? (
-            <div className="inline-flex min-h-[36px] min-w-[5.5rem] items-center gap-1.5 rounded-[9px] bg-white px-3 py-1.5 text-sm">
+            <div className="inline-flex min-h-[36px] min-w-[5.5rem] items-center gap-1.5 rounded-[var(--radius-sm)] bg-white px-3 py-1.5 text-sm">
               <Calendar className="h-4 w-4 shrink-0 text-[var(--color-warning)]" strokeWidth={2.5} aria-hidden />
-              <span className="whitespace-nowrap font-medium tracking-tight text-gray-700">
+              <span className="whitespace-nowrap font-medium tracking-tight text-[var(--text-body)]">
                 {updatedShort}
               </span>
             </div>
@@ -314,14 +314,14 @@ function SessionWorkspaceRow({
                 type="button"
                 disabled={isOptimistic || copyLinkBusy}
                 onClick={handleCopyLinkClick}
-                className="w-8 h-8 rounded-md flex items-center justify-center text-gray-600 hover:bg-gray-100 hover:text-gray-800 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30 disabled:opacity-50 disabled:pointer-events-none"
+                className="w-8 h-8 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30 disabled:opacity-50 disabled:pointer-events-none"
                 aria-label={
                   copyLinkBusy ? "Generating link…" : copied ? "Copied" : "Copy link"
                 }
                 title={copyLinkBusy ? "Generating link…" : copied ? "Copied" : "Copy link"}
               >
                 {copyLinkBusy ? (
-                  <Loader2 className="h-5 w-5 animate-spin text-gray-500" aria-hidden />
+                  <Loader2 className="h-5 w-5 animate-spin text-[var(--text-secondary)]" aria-hidden />
                 ) : copied ? (
                   <Check className="h-5 w-5" strokeWidth={2.5} aria-hidden />
                 ) : (
@@ -341,7 +341,7 @@ function SessionWorkspaceRow({
                   variant="list"
                   flipPlacement
                   disabled={isOptimistic}
-                  triggerClassName="w-8 h-8 rounded-md flex items-center justify-center text-gray-600 hover:bg-gray-100 hover:text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30"
+                  triggerClassName="w-8 h-8 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30"
                   triggerIconClassName="h-5 w-5"
                   triggerAriaLabel="Session actions"
                 />
@@ -473,11 +473,11 @@ export function SessionsWorkspace({
 
       {flatItemCount === 0 ? (
         <section
-          className="w-full rounded-xl border border-dashed border-[#EBEBEB] bg-gray-50/60 px-6 py-14 text-center"
+          className="w-full rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-subtle)]/60 px-6 py-14 text-center"
           aria-live="polite"
         >
-          <p className="text-sm font-medium text-gray-800">No sessions match the current filters</p>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="text-sm font-medium text-[var(--text-heading)]">No sessions match the current filters</p>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
             Try another time range or clear your search.
           </p>
         </section>
@@ -494,12 +494,12 @@ export function SessionsWorkspace({
             <div className="mb-2 flex items-center justify-between px-0">
               <div className="flex items-center gap-2">
                 <div
-                  className={`h-2 w-2 shrink-0 rounded-full ${section.markerClassName ?? "bg-[#1775E0]"}`}
+                  className={`h-2 w-2 shrink-0 rounded-full ${section.markerClassName ?? "bg-[var(--brand)]"}`}
                   aria-hidden
                 />
                 <span
                   id={headingId}
-                  className="text-[16px] font-semibold text-neutral-900"
+                  className="text-[16px] font-semibold text-[var(--text-heading)]"
                 >
                   {section.title}
                 </span>
@@ -634,10 +634,10 @@ export function SessionsWorkspace({
           role="alertdialog"
         >
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 cursor-default">
-            <h2 id="bulk-delete-title" className="text-[18px] font-semibold text-gray-900">
+            <h2 id="bulk-delete-title" className="text-[18px] font-semibold text-[var(--text-heading)]">
               Delete sessions?
             </h2>
-            <p className="mt-2 text-[14px] leading-[1.5] text-gray-600">
+            <p className="mt-2 text-[14px] leading-[1.5] text-[var(--text-secondary)]">
               This will permanently delete {selectedSessions.length} session(s). This action cannot be undone.
             </p>
 
@@ -646,7 +646,7 @@ export function SessionsWorkspace({
                 type="button"
                 onClick={() => setDeleteModalOpen(false)}
                 disabled={bulkDeleting}
-                className="px-4 py-2.5 text-[14px] font-medium rounded-xl bg-gray-100 text-gray-900 hover:bg-gray-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                className="px-4 py-2.5 text-[14px] font-medium rounded-xl bg-[var(--surface-hover)] text-[var(--text-heading)] hover:bg-[var(--surface-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
@@ -654,7 +654,7 @@ export function SessionsWorkspace({
                 type="button"
                 onClick={() => void confirmBulkDelete()}
                 disabled={bulkDeleting || selectedSessions.length === 0 || !onDeleteSession}
-                className="px-4 py-2.5 text-[14px] font-semibold rounded-xl bg-[var(--color-danger)] text-white hover:opacity-95 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                className="px-4 py-2.5 text-[14px] font-semibold rounded-xl bg-[var(--color-danger)] text-white hover:opacity-95 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {bulkDeleting ? "Deleting…" : "Delete"}
               </button>

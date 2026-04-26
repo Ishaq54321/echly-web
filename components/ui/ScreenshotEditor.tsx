@@ -782,7 +782,7 @@ export function ScreenshotEditor({
 
         {activeTool === "crop" && !cropRect && (
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[60] pointer-events-none">
-            <div className="bg-black/90 text-white text-[13px] font-medium px-4 py-2.5 rounded-xl shadow-2xl backdrop-blur-sm whitespace-nowrap">
+            <div className="bg-black/90 text-white text-[14px] font-medium px-4 py-2.5 rounded-xl shadow-2xl backdrop-blur-sm whitespace-nowrap">
               Click and drag to select area
             </div>
           </div>

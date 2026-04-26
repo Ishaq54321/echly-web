@@ -293,12 +293,12 @@ export function SessionActionsDropdown({
   const menuItemClass =
     variant === "card"
       ? "dropdown-item transition-colors duration-[var(--motion-duration)] cursor-pointer flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)]"
-      : "dropdown-item text-neutral-900 transition-colors cursor-pointer flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30";
+      : "dropdown-item text-[var(--text-heading)] transition-colors cursor-pointer flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30";
 
   const menuShellClass =
     variant === "card"
       ? "workspace-card-dropdown session-actions-dropdown dropdown-menu border border-[var(--layer-1-border)] bg-[var(--layer-1-bg)]"
-      : "session-actions-dropdown session-actions-dropdown-portal dropdown-menu border border-neutral-200 bg-white";
+      : "session-actions-dropdown session-actions-dropdown-portal dropdown-menu border border-[var(--border)] bg-white";
 
   const deleteItemClass =
     variant === "card"
@@ -308,7 +308,7 @@ export function SessionActionsDropdown({
   const separatorClass =
     variant === "card"
       ? "my-1 border-t border-[var(--glass-1-border)]"
-      : "my-1 border-t border-neutral-200";
+      : "my-1 border-t border-[var(--border)]";
 
   const transformOrigin =
     dropdownPlacement === "above" ? "bottom right" : "top right";
@@ -413,16 +413,16 @@ export function SessionActionsDropdown({
                       disabled={archiving || !onSetArchived}
                       className={[
                         menuItemClass,
-                        "disabled:opacity-60",
+                        "disabled:opacity-50",
                         isArchived
-                          ? "group text-gray-900 hover:bg-gray-100 hover:text-gray-900"
+                          ? "group text-[var(--text-heading)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)]"
                           : "",
                       ].join(" ")}
                       role="menuitem"
                     >
                       {isArchived ? (
                         <RotateCcw
-                          className="shrink-0 text-gray-700 group-hover:text-gray-900"
+                          className="shrink-0 text-[var(--text-body)] group-hover:text-[var(--text-heading)]"
                           strokeWidth={1.6}
                           aria-hidden
                         />

@@ -213,7 +213,7 @@ export function ResumeSessionModal({
               margin: loginRequired ? 0 : "0 0 16px",
               fontSize: 18,
               fontWeight: 600,
-              color: isLight ? "#1F2937" : "#F3F4F6",
+              color: isLight ? "var(--text-heading)" : "var(--text-on-dark)",
             }}
           >
             {loginRequired ? "Previous Sessions" : "Resume Feedback Session"}
@@ -233,7 +233,7 @@ export function ResumeSessionModal({
                   borderRadius: 10,
                   border: isLight ? "1px solid rgba(0,0,0,0.08)" : "1px solid rgba(255,255,255,0.08)",
                   background: isLight ? "rgba(0,0,0,0.04)" : "rgba(255,255,255,0.06)",
-                  color: isLight ? "#1F2937" : "#F3F4F6",
+                  color: isLight ? "var(--text-heading)" : "var(--text-on-dark)",
                   fontSize: 14,
                 }}
               />
@@ -248,7 +248,7 @@ export function ResumeSessionModal({
                       borderRadius: 10,
                       border: filter === key ? "1px solid rgba(59,130,246,.45)" : "1px solid transparent",
                       background: filter === key ? "rgba(59,130,246,.18)" : isLight ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.08)",
-                      color: filter === key ? "#60A5FA" : isLight ? "#1F2937" : "#F3F4F6",
+                      color: filter === key ? "#60A5FA" : isLight ? "var(--text-heading)" : "var(--text-on-dark)",
                       fontSize: 12,
                       fontWeight: 500,
                       cursor: "pointer",
@@ -277,7 +277,7 @@ export function ResumeSessionModal({
                 margin: "0 0 8px",
                 fontSize: 18,
                 fontWeight: 600,
-                color: isLight ? "#1F2937" : "#F3F4F6",
+                color: isLight ? "var(--text-heading)" : "var(--text-on-dark)",
               }}>
                 Sign in to continue
               </h3>
@@ -354,7 +354,7 @@ export function ResumeSessionModal({
                       borderRadius: 14,
                       border: "none",
                       background: "transparent",
-                      color: isLight ? "#1F2937" : "#F3F4F6",
+                      color: isLight ? "var(--text-heading)" : "var(--text-on-dark)",
                       fontSize: 14,
                       cursor: "pointer",
                       display: "flex",
@@ -367,7 +367,7 @@ export function ResumeSessionModal({
                       style={{
                         width: 18,
                         height: 18,
-                        color: isLight ? "#111827" : "white",
+                        color: isLight ? "var(--text-heading)" : "white",
                         opacity: 0.9,
                         flexShrink: 0,
                         marginTop: 2,

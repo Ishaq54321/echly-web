@@ -26,18 +26,18 @@ export default function AdminLayout({
   const pathname = usePathname();
 
   return (
-    <div className="flex h-full bg-neutral-50">
+    <div className="flex h-full bg-[var(--surface-subtle)]">
       <aside
-        className="w-56 border-r border-neutral-200 flex flex-col bg-white shrink-0"
+        className="w-56 border-r border-[var(--border)] flex flex-col bg-white shrink-0"
         aria-label="Admin navigation"
       >
-        <div className="flex items-center gap-2 h-14 px-4 border-b border-neutral-200">
+        <div className="flex items-center gap-2 h-14 px-4 border-b border-[var(--border)]">
           <Link
             href="/admin"
             className="flex items-center gap-2 rounded-md py-1 pr-2"
             aria-label="Echly Admin"
           >
-            <span className="relative block w-8 h-8 bg-[#1775E0] rounded-md overflow-hidden">
+            <span className="relative block w-8 h-8 bg-[var(--brand)] rounded-md overflow-hidden">
               <Image
                 src="/Echly_logo.svg"
                 alt=""
@@ -46,7 +46,7 @@ export default function AdminLayout({
                 className="object-cover"
               />
             </span>
-            <span className="text-sm font-semibold text-neutral-900">
+            <span className="text-sm font-semibold text-[var(--text-heading)]">
               Echly Admin
             </span>
           </Link>
@@ -60,8 +60,8 @@ export default function AdminLayout({
                 href={href}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
                   active
-                    ? "bg-[#EBF4FF] text-[#1775E0]"
-                    : "text-neutral-700 hover:bg-neutral-100"
+                    ? "bg-[var(--brand-subtle)] text-[var(--brand)]"
+                    : "text-neutral-700 hover:bg-[var(--surface-hover)]"
                 }`}
                 aria-current={active ? "page" : undefined}
               >
@@ -71,10 +71,10 @@ export default function AdminLayout({
             );
           })}
         </nav>
-        <div className="mt-auto p-3 border-t border-neutral-200">
+        <div className="mt-auto p-3 border-t border-[var(--border)]">
           <Link
             href="/dashboard"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-neutral-600 hover:bg-neutral-100 transition"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] transition"
           >
             ← Back to app
           </Link>

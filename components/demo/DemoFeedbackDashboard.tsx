@@ -20,14 +20,14 @@ const MOCK_TICKETS: TicketItem[] = [
 ]
 
 function UITicketPreview({ ticketId }: { ticketId: string }) {
-  const wrapper = "absolute inset-2 rounded border border-[#EBEBEB] bg-white overflow-hidden flex flex-col";
+  const wrapper = "absolute inset-2 rounded border border-[var(--border)] bg-white overflow-hidden flex flex-col";
   if (ticketId === "1") {
     return (
       <div className={wrapper}>
         <div className="flex-1 p-3 flex flex-col items-center justify-center gap-2 min-h-0">
-          <div className="h-2.5 w-[75%] max-w-[120px] bg-gray-200 rounded shrink-0" />
-          <div className="h-1.5 w-full max-w-[90%] bg-gray-100 rounded shrink-0" />
-          <div className="rounded-md border-2 border-[var(--brand)] bg-[#EBF4FF]/80 px-3 py-1.5 shadow-[0_0_0_2px_rgba(23,117,224,0.2)]">
+          <div className="h-2.5 w-[75%] max-w-[120px] bg-[var(--surface-hover)] rounded shrink-0" />
+          <div className="h-1.5 w-full max-w-[90%] bg-[var(--surface-hover)] rounded shrink-0" />
+          <div className="rounded-md border-2 border-[var(--brand)] bg-[var(--brand-subtle)]/80 px-3 py-1.5 shadow-[0_0_0_2px_rgba(23,117,224,0.2)]">
             <span className="text-[9px] font-semibold text-[var(--brand-text)]">Get started</span>
           </div>
         </div>
@@ -39,10 +39,10 @@ function UITicketPreview({ ticketId }: { ticketId: string }) {
       <div className={wrapper}>
         <div className="flex-1 p-2 flex gap-1.5 items-stretch min-h-0">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="flex-1 rounded border border-[#EBEBEB] bg-gray-50/80 flex flex-col gap-1 p-1.5">
-              <div className="h-1.5 w-8 bg-gray-200 rounded shrink-0" />
-              <div className="h-1 w-full bg-gray-100 rounded shrink-0" />
-              <div className="flex-1 min-h-0 rounded bg-gray-100/80" />
+            <div key={i} className="flex-1 rounded border border-[var(--border)] bg-[var(--surface-subtle)]/80 flex flex-col gap-1 p-1.5">
+              <div className="h-1.5 w-8 bg-[var(--surface-hover)] rounded shrink-0" />
+              <div className="h-1 w-full bg-[var(--surface-hover)] rounded shrink-0" />
+              <div className="flex-1 min-h-0 rounded bg-[var(--surface-hover)]/80" />
             </div>
           ))}
         </div>
@@ -53,16 +53,16 @@ function UITicketPreview({ ticketId }: { ticketId: string }) {
     return (
       <div className={wrapper}>
         <div className="flex-1 p-3 flex flex-col gap-2.5 justify-center min-h-0">
-          <div className="h-2 w-14 bg-gray-200 rounded shrink-0" />
-          <div className="h-5 rounded border border-[#EBEBEB] bg-gray-50/80" />
-          <div className="h-5 rounded border border-[#EBEBEB] bg-gray-50/80" />
+          <div className="h-2 w-14 bg-[var(--surface-hover)] rounded shrink-0" />
+          <div className="h-5 rounded border border-[var(--border)] bg-[var(--surface-subtle)]/80" />
+          <div className="h-5 rounded border border-[var(--border)] bg-[var(--surface-subtle)]/80" />
         </div>
       </div>
     )
   }
   return (
     <div className={`${wrapper} items-center justify-center`}>
-      <div className="h-2 w-12 bg-gray-100 rounded" />
+      <div className="h-2 w-12 bg-[var(--surface-hover)] rounded" />
     </div>
   )
 }
@@ -95,7 +95,7 @@ function TicketGroup({
         onClick={onToggle}
         className={`w-full flex items-center justify-between text-left py-2 px-2 rounded-lg border transition-colors ${groupStyles}`}
       >
-        <span className="text-[11px] font-semibold">
+        <span className="text-[12px] font-semibold">
           {label} ({count})
         </span>
         <motion.span
@@ -115,12 +115,12 @@ function TicketGroup({
               onClick={() => onSelect(ticket.id)}
               className={`w-full text-left px-3 py-2.5 rounded-xl transition-colors ${
                 selectedId === ticket.id
-                  ? "bg-[#466EFF]/10 border border-[#466EFF]/30 text-gray-900"
-                  : "hover:bg-gray-100 text-gray-700 border border-transparent"
+                  ? "bg-[var(--brand)]/10 border border-[#466EFF]/30 text-[var(--text-heading)]"
+                  : "hover:bg-[var(--surface-hover)] text-[var(--text-body)] border border-transparent"
               }`}
             >
               <div className="text-[12px] font-medium truncate">{ticket.title}</div>
-              <div className="text-[10px] text-gray-500 mt-0.5">{ticket.status}</div>
+              <div className="text-[12px] text-[var(--text-secondary)] mt-0.5">{ticket.status}</div>
             </button>
           ))}
         </div>
@@ -142,10 +142,10 @@ export default function DemoFeedbackDashboard() {
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
-      className="rounded-2xl border border-[#EBEBEB] bg-white shadow-xl overflow-hidden"
+      className="rounded-2xl border border-[var(--border)] bg-white shadow-xl overflow-hidden"
     >
       {/* Browser chrome */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-[#EBEBEB] bg-white">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)] bg-white">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-red-400 rounded-full" />
           <div className="w-3 h-3 bg-yellow-400 rounded-full" />
@@ -156,10 +156,10 @@ export default function DemoFeedbackDashboard() {
 
       <div className="flex h-[440px]">
         {/* Left sidebar - ticket list with collapsible groups */}
-        <div className="w-[260px] border-r border-[#EBEBEB] bg-gray-50/60 flex flex-col">
-          <div className="px-4 py-3 border-b border-[#EBEBEB]">
-            <h2 className="text-[13px] font-semibold text-gray-900 flex items-center gap-2">
-              <MessageSquare className="h-4 w-4 text-[#466EFF]" />
+        <div className="w-[260px] border-r border-[var(--border)] bg-[var(--surface-subtle)]/60 flex flex-col">
+          <div className="px-4 py-3 border-b border-[var(--border)]">
+            <h2 className="text-[14px] font-semibold text-[var(--text-heading)] flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-[var(--brand)]" />
               Tickets
             </h2>
           </div>
@@ -189,22 +189,22 @@ export default function DemoFeedbackDashboard() {
         <div className="flex-1 flex flex-col bg-white min-w-0">
           {selected ? (
             <>
-              <div className="px-5 py-4 border-b border-[#EBEBEB]">
-                <h3 className="text-[15px] font-semibold text-gray-900">{selected.title}</h3>
-                <span className="inline-block mt-1.5 text-[11px] font-medium text-[#466EFF] bg-[#466EFF]/10 px-2 py-0.5 rounded-full">
+              <div className="px-5 py-4 border-b border-[var(--border)]">
+                <h3 className="text-[15px] font-semibold text-[var(--text-heading)]">{selected.title}</h3>
+                <span className="inline-block mt-1.5 text-[12px] font-medium text-[var(--brand)] bg-[var(--brand)]/10 px-2 py-0.5 rounded-full">
                   {selected.status}
                 </span>
               </div>
               <div className="flex-1 overflow-y-auto p-5">
-                <div className="rounded-xl border border-[#EBEBEB] bg-gray-50/80 p-4">
-                  <div className="flex items-center gap-2 text-[11px] font-semibold text-gray-500 mb-2">
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)]/80 p-4">
+                  <div className="flex items-center gap-2 text-[12px] font-semibold text-[var(--text-secondary)] mb-2">
                     <FileText className="h-3.5 w-3.5" />
                     Action Steps
                   </div>
                   <ul className="space-y-1.5">
                     {(selected.actionSteps ?? MOCK_ACTION_STEPS).map((step, i) => (
-                      <li key={i} className="text-[12px] text-gray-700 flex items-center gap-2">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#466EFF]/10 text-[10px] font-semibold text-[#466EFF]">
+                      <li key={i} className="text-[12px] text-[var(--text-body)] flex items-center gap-2">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--brand)]/10 text-[12px] font-semibold text-[var(--brand)]">
                           {i + 1}
                         </span>
                         {step}
@@ -212,10 +212,10 @@ export default function DemoFeedbackDashboard() {
                     ))}
                   </ul>
                 </div>
-                <div className="mt-4 rounded-xl border border-[#EBEBEB] bg-gray-50/50 p-4">
-                  <div className="h-[160px] rounded-lg bg-gradient-to-br from-gray-50 to-white border border-gray-100 p-2 flex items-center justify-center relative overflow-hidden">
+                <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)]/50 p-4">
+                  <div className="h-[160px] rounded-lg bg-gradient-to-br from-gray-50 to-white border border-[var(--border)] p-2 flex items-center justify-center relative overflow-hidden">
                     <UITicketPreview ticketId={selected.id} />
-                    <div className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-[#1775E0] text-white text-[9px] font-semibold flex items-center justify-center shadow-sm">
+                    <div className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-[var(--brand)] text-white text-[9px] font-semibold flex items-center justify-center shadow-sm">
                       1
                     </div>
                   </div>

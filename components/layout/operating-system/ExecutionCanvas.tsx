@@ -54,7 +54,7 @@ function StatusPill({ status }: { status: FeedbackStatus }) {
   };
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium uppercase tracking-wide border ${styles[status]}`}
+      className={`inline-flex items-center px-2 py-0.5 rounded-md text-[12px] font-medium uppercase tracking-wide border ${styles[status]}`}
     >
       {status}
     </span>
@@ -124,7 +124,7 @@ export function ExecutionCanvas({
     return (
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-[var(--canvas-base)]">
         <div className="flex-1 min-h-0 flex items-center justify-center p-8">
-          <p className="text-[15px] text-[hsl(var(--text-tertiary))]">
+          <p className="text-[15px] text-[var(--text-tertiary)]">
             Select a feedback item from the queue
           </p>
         </div>
@@ -136,10 +136,10 @@ export function ExecutionCanvas({
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-[var(--canvas-base)]">
       {/* Breadcrumb */}
       <div className="shrink-0 px-6 pt-4 pb-2">
-        <nav className="flex items-center gap-1 text-[12px] text-[hsl(var(--text-tertiary))]" aria-label="Breadcrumb">
+        <nav className="flex items-center gap-1 text-[12px] text-[var(--text-tertiary)]" aria-label="Breadcrumb">
           <Link
             href="/dashboard"
-            className="hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-120"
+            className="hover:text-[var(--text-primary-strong)] transition-colors duration-120"
           >
             {workspaceName}
           </Link>
@@ -149,7 +149,7 @@ export function ExecutionCanvas({
               {sessionId ? (
                 <Link
                   href={`/session/${sessionId}`}
-                  className="hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-120 truncate"
+                  className="hover:text-[var(--text-primary-strong)] transition-colors duration-120 truncate"
                 >
                   {sessionTitleTrim}
                 </Link>
@@ -161,7 +161,7 @@ export function ExecutionCanvas({
           {showTicketPosition ? (
             <>
               <ChevronRight className="h-3.5 w-3 shrink-0" aria-hidden />
-              <span className="text-[hsl(var(--text-primary-strong))] truncate">
+              <span className="text-[var(--text-primary-strong)] truncate">
                 Ticket {index} of {total}
               </span>
             </>
@@ -188,7 +188,7 @@ export function ExecutionCanvas({
                     titleInputRef.current?.blur();
                   }
                 }}
-                className="w-full text-[22px] font-semibold leading-[1.25] tracking-[-0.02em] text-[hsl(var(--text-primary-strong))] bg-white border border-[var(--layer-2-border)] rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]"
+                className="w-full text-[22px] font-semibold leading-[1.25] tracking-[-0.02em] text-[var(--text-primary-strong)] bg-white border border-[var(--layer-2-border)] rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]"
                 aria-label="Edit title"
               />
             ) : (
@@ -205,19 +205,19 @@ export function ExecutionCanvas({
                 }}
               >
                 {item.title?.trim() ? (
-                  <h1 className="text-[22px] font-semibold leading-[1.25] tracking-[-0.02em] text-[hsl(var(--text-primary-strong))] truncate">
+                  <h1 className="text-[22px] font-semibold leading-[1.25] tracking-[-0.02em] text-[var(--text-primary-strong)] truncate">
                     {item.title}
                   </h1>
                 ) : null}
                 {onSaveTitle && (
-                  <Pencil className="h-4 w-4 shrink-0 text-[hsl(var(--text-tertiary))] opacity-0 group-hover:opacity-70 transition-opacity duration-120" aria-hidden />
+                  <Pencil className="h-4 w-4 shrink-0 text-[var(--text-tertiary)] opacity-0 group-hover:opacity-70 transition-opacity duration-120" aria-hidden />
                 )}
               </div>
             )}
             <div className="flex flex-wrap items-center gap-3 mt-2">
               {status && <StatusPill status={status} />}
               {item.impactScore != null && (
-                <span className="text-[11px] tabular-nums text-[hsl(var(--text-tertiary))]">
+                <span className="text-[12px] tabular-nums text-[var(--text-tertiary)]">
                   Impact {item.impactScore}
                 </span>
               )}
@@ -228,7 +228,7 @@ export function ExecutionCanvas({
               <button
                 type="button"
                 onClick={() => setActionsOpen((o) => !o)}
-                className="h-10 w-10 flex items-center justify-center rounded-lg text-[hsl(var(--text-tertiary))] hover:bg-[var(--layer-2-hover-bg)] hover:text-[hsl(var(--text-primary-strong))] transition-colors duration-120 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+                className="h-10 w-10 flex items-center justify-center rounded-lg text-[var(--text-tertiary)] hover:bg-[var(--layer-2-hover-bg)] hover:text-[var(--text-primary-strong)] transition-colors duration-120 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
                 aria-label="More actions"
                 aria-expanded={actionsOpen}
               >
@@ -247,7 +247,7 @@ export function ExecutionCanvas({
                         setActionsOpen(false);
                         onRequestDelete();
                       }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors duration-120 text-left"
+                      className="w-full flex items-center gap-2 px-3 py-2 text-[14px] text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors duration-120 text-left"
                     >
                       <Trash2 className="h-4 w-4 shrink-0" strokeWidth={1.5} />
                       Delete
@@ -266,7 +266,7 @@ export function ExecutionCanvas({
           <button
             type="button"
             onClick={() => setContextOpen((o) => !o)}
-            className="w-full flex items-center justify-between px-6 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))] hover:bg-[var(--structural-gray-ticket)] transition-colors duration-120"
+            className="w-full flex items-center justify-between px-6 py-2 text-left text-[12px] font-medium uppercase tracking-wider text-[var(--text-tertiary)] hover:bg-[var(--structural-gray-ticket)] transition-colors duration-120"
             aria-expanded={contextOpen}
           >
             <span className="flex items-center gap-2">
@@ -276,34 +276,34 @@ export function ExecutionCanvas({
             <ChevronDown className={`h-4 w-4 transition-transform duration-120 ${contextOpen ? "rotate-180" : ""}`} strokeWidth={1.5} />
           </button>
           {contextOpen && (
-            <div className="px-6 pb-4 pt-1 space-y-3 text-[12px] text-[hsl(var(--text-secondary-soft))] bg-[var(--structural-gray-ticket)]/50">
+            <div className="px-6 pb-4 pt-1 space-y-3 text-[12px] text-[var(--text-secondary-soft)] bg-[var(--structural-gray-ticket)]/50">
               {systemAnalysis.relatedSignalIds && systemAnalysis.relatedSignalIds.length > 0 && (
                 <div>
-                  <span className="text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))]">Related signals</span>
+                  <span className="text-[12px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Related signals</span>
                   <p className="mt-0.5">{systemAnalysis.relatedSignalIds.length} linked</p>
                 </div>
               )}
               {systemAnalysis.similarPatterns && (
                 <div>
-                  <span className="text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))]">Similar patterns</span>
+                  <span className="text-[12px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Similar patterns</span>
                   <p className="mt-0.5">{systemAnalysis.similarPatterns}</p>
                 </div>
               )}
               {systemAnalysis.historicalResolutionPath && (
                 <div>
-                  <span className="text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))]">Historical resolution</span>
+                  <span className="text-[12px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Historical resolution</span>
                   <p className="mt-0.5">{systemAnalysis.historicalResolutionPath}</p>
                 </div>
               )}
               {systemAnalysis.estimatedEffortBand && (
                 <div>
-                  <span className="text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))]">Estimated effort</span>
+                  <span className="text-[12px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Estimated effort</span>
                   <p className="mt-0.5">{systemAnalysis.estimatedEffortBand}</p>
                 </div>
               )}
               {systemAnalysis.escalationProbability && (
                 <div>
-                  <span className="text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))]">Escalation probability</span>
+                  <span className="text-[12px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">Escalation probability</span>
                   <p className="mt-0.5">{systemAnalysis.escalationProbability}</p>
                 </div>
               )}
@@ -320,7 +320,7 @@ export function ExecutionCanvas({
             onClick={() => onResolve(!item.isResolved)}
             className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] ${
               item.isResolved
-                ? "border border-[var(--layer-2-border)] bg-white text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)]"
+                ? "border border-[var(--layer-2-border)] bg-white text-[var(--text-secondary-soft)] hover:bg-[var(--layer-2-hover-bg)]"
                 : "bg-[var(--accent-operational)] text-white border border-transparent hover:opacity-92"
             }`}
           >
@@ -330,14 +330,14 @@ export function ExecutionCanvas({
         )}
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium border border-[var(--layer-2-border)] bg-white text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium border border-[var(--layer-2-border)] bg-white text-[var(--text-secondary-soft)] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
         >
           <UserPlus className="h-3.5 w-3.5" strokeWidth={1.5} />
           Assign
         </button>
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium border border-[var(--layer-2-border)] bg-white text-[hsl(var(--text-secondary-soft))] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium border border-[var(--layer-2-border)] bg-white text-[var(--text-secondary-soft)] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
         >
           <Clock className="h-3.5 w-3.5" strokeWidth={1.5} />
           Defer
@@ -349,7 +349,7 @@ export function ExecutionCanvas({
         <div className="min-h-0 overflow-y-auto flex-[0_0_70%] border-r border-[var(--layer-2-border)]" style={{ maxWidth: "70%" }}>
           <div className="p-6">{leftContent}</div>
         </div>
-        <div className="min-h-0 overflow-y-auto flex-[1_1_30%] bg-[var(--structural-gray-ticket)]/50 text-[13px]" style={{ minWidth: 0 }}>
+        <div className="min-h-0 overflow-y-auto flex-[1_1_30%] bg-[var(--structural-gray-ticket)]/50 text-[14px]" style={{ minWidth: 0 }}>
           <div className="p-4">{rightContent}</div>
         </div>
       </div>

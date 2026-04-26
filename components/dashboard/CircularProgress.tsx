@@ -12,7 +12,7 @@ export function CircularProgress({ value }: { value: number }) {
       <div
         className="absolute inset-0 rounded-full"
         style={{
-          background: `conic-gradient(var(--color-warning-dot) ${pct}%, #e5e7eb ${pct}%)`,
+          background: `conic-gradient(var(--color-warning-dot) ${pct}%, var(--border) ${pct}%)`,
         }}
         aria-hidden
       />

@@ -4,7 +4,7 @@ export default function OnboardingLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="relative h-full bg-[#f9fafc] overflow-hidden">
+    <div className="relative h-full bg-[var(--surface-subtle)] overflow-hidden">
       {/* Premium SaaS gradient background (matches login) */}
       <div className="absolute inset-0 -z-10 overflow-hidden" aria-hidden>
         <div

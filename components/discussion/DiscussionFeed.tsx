@@ -127,7 +127,7 @@ export function DiscussionFeed({
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <MessageSquare className="w-12 h-12 text-neutral-300 mb-4" />
-        <h2 className="text-lg font-semibold text-neutral-900">
+        <h2 className="text-lg font-semibold text-[var(--text-heading)]">
           No discussions yet
         </h2>
         <p className="mt-2 text-sm text-secondary max-w-[280px]">
@@ -150,15 +150,15 @@ export function DiscussionFeed({
             className={`
               w-full text-left rounded-xl border p-4 transition-all duration-200
               bg-white
-              border-neutral-200
+              border-[var(--border)]
               hover:border-[#1775E080]
               hover:shadow-md
               hover:-translate-y-[1px]
-              ${isSelected ? "border-[#1775E0] ring-1 ring-[#1775E040] shadow-md" : ""}
+              ${isSelected ? "border-[var(--brand)] ring-1 ring-[#1775E040] shadow-md" : ""}
             `}
           >
             {item.title ? (
-              <h3 className="font-medium text-neutral-900 text-[15px] leading-tight line-clamp-2">
+              <h3 className="font-medium text-[var(--text-heading)] text-[15px] leading-tight line-clamp-2">
                 {item.title}
               </h3>
             ) : null}
@@ -174,7 +174,7 @@ export function DiscussionFeed({
               </p>
             )}
             {ts > 0 && (
-              <p className="mt-1.5 text-[11px] text-meta">
+              <p className="mt-1.5 text-[12px] text-meta">
                 Updated {formatRelativeTime(new Date(ts))}
               </p>
             )}

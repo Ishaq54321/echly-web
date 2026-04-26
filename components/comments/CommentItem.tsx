@@ -357,14 +357,14 @@ export function CommentItem({
           ariaLabelledBy="delete-comment-title"
         >
           <div className="w-[420px] max-w-[calc(100vw-2rem)] rounded-xl bg-white shadow-xl p-6 cursor-default" onKeyDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
-            <h2 id="delete-comment-title" className="text-lg font-semibold text-neutral-900">
+            <h2 id="delete-comment-title" className="text-lg font-semibold text-[var(--text-heading)]">
               Delete comment
             </h2>
             <p className="mt-2 text-sm text-secondary">
               Are you sure you want to delete this comment?
               This action cannot be undone.
             </p>
-            <div className="mt-4 p-3 rounded-lg border border-neutral-200 bg-neutral-50/80">
+            <div className="mt-4 p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)]/80">
               <div className="flex gap-3">
                 <div
                   className={`${avatarSize} shrink-0 rounded-full bg-[var(--surface-subtle)] flex items-center justify-center text-xs font-medium text-discussion-supporting overflow-hidden`}
@@ -382,7 +382,7 @@ export function CommentItem({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium text-neutral-900">
+                    <span className="text-sm font-medium text-[var(--text-heading)]">
                       {comment.userName ?? "User"}
                     </span>
                     <span className={`text-meta ${metaSize}`}>
@@ -399,7 +399,7 @@ export function CommentItem({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setDeleteModalOpen(false); }}
-                className="px-4 py-2.5 text-sm font-medium rounded-xl border border-[#EBEBEB] text-neutral-700 hover:bg-neutral-50"
+                className="px-4 py-2.5 text-sm font-medium rounded-xl border border-[var(--border)] text-neutral-700 hover:bg-[var(--surface-hover)]"
               >
                 Cancel
               </button>

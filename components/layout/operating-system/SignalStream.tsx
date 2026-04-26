@@ -100,14 +100,14 @@ export function SignalStream({
           placeholder="Search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full h-8 px-3 text-[13px] rounded-md bg-white border border-[var(--layer-2-border)] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]"
+          className="w-full h-8 px-3 text-[14px] rounded-md bg-white border border-[var(--layer-2-border)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]"
           aria-label="Search"
         />
         <div className="flex items-center justify-between gap-2">
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter((e.target.value || "") as SignalStatus | "")}
-            className="h-7 px-2 text-[12px] text-[hsl(var(--text-secondary-soft))] bg-transparent border-0 rounded focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]"
+            className="h-7 px-2 text-[12px] text-[var(--text-secondary-soft)] bg-transparent border-0 rounded focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]"
             aria-label="Status filter"
           >
             <option value="">All</option>
@@ -117,7 +117,7 @@ export function SignalStream({
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SignalStreamSortBy)}
-            className="h-7 px-2 text-[12px] text-[hsl(var(--text-secondary-soft))] bg-transparent border-0 rounded focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]"
+            className="h-7 px-2 text-[12px] text-[var(--text-secondary-soft)] bg-transparent border-0 rounded focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]"
             aria-label="Sort by"
           >
             <option value="impact">Impact</option>
@@ -128,7 +128,7 @@ export function SignalStream({
           <button
             type="button"
             onClick={() => { setSelectionMode((m) => !m); if (selectionMode) setSelectedIds(new Set()); }}
-            className={`text-[12px] text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] ${selectionMode ? "text-[var(--accent-operational)]" : ""}`}
+            className={`text-[12px] text-[var(--text-tertiary)] hover:text-[var(--text-primary-strong)] ${selectionMode ? "text-[var(--accent-operational)]" : ""}`}
           >
             {selectionMode ? "Done" : "Select"}
           </button>
@@ -137,7 +137,7 @@ export function SignalStream({
 
       {selectionMode && bulkCount > 0 && (
         <div className="shrink-0 flex items-center gap-2 px-3 py-2 border-t border-[var(--layer-2-border)] bg-white/80">
-          <span className="text-[12px] text-[hsl(var(--text-secondary-soft))]">{bulkCount} selected</span>
+          <span className="text-[12px] text-[var(--text-secondary-soft)]">{bulkCount} selected</span>
           <button type="button" className="text-[12px] text-[var(--accent-operational)] hover:underline" onClick={() => setSelectedIds(new Set())}>Clear</button>
           {onBulkResolve && <button type="button" className="text-[12px] text-[var(--accent-operational)] hover:underline" onClick={() => onBulkResolve()}>Resolve</button>}
         </div>
@@ -146,7 +146,7 @@ export function SignalStream({
       <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto focus:outline-none" tabIndex={0} role="listbox" aria-label="Signals">
         <div className="py-1 px-2">
           {filtered.length === 0 ? (
-            <p className="py-8 text-center text-[13px] text-[hsl(var(--text-tertiary))]">No signals</p>
+            <p className="py-8 text-center text-[14px] text-[var(--text-tertiary)]">No signals</p>
           ) : (
             filtered.map((s) => {
               const isSelected = s.id === selectedId;
@@ -176,7 +176,7 @@ export function SignalStream({
                       onClick={(e) => { e.stopPropagation(); setSelectedIds((prev) => { const n = new Set(prev); if (n.has(s.id)) n.delete(s.id); else n.add(s.id); return n; }); }}
                       aria-label={isChecked ? "Deselect" : "Select"}
                     >
-                      {isChecked ? <CheckSquare className="h-4 w-4 text-[var(--accent-operational)]" strokeWidth={1.5} /> : <Square className="h-4 w-4 text-[hsl(var(--text-tertiary))]" strokeWidth={1.5} />}
+                      {isChecked ? <CheckSquare className="h-4 w-4 text-[var(--accent-operational)]" strokeWidth={1.5} /> : <Square className="h-4 w-4 text-[var(--text-tertiary)]" strokeWidth={1.5} />}
                     </button>
                   ) : (
                     <span className="shrink-0 w-2 flex items-center justify-center mt-1.5" aria-hidden>
@@ -186,12 +186,12 @@ export function SignalStream({
                   <div className="min-w-0 flex-1">
                     {s.title?.trim() ? (
                       <div
-                        className={`text-[13px] truncate leading-tight ${isUnread ? "font-semibold text-[hsl(var(--text-primary-strong))]" : "font-medium text-[hsl(var(--text-primary-strong))]"}`}
+                        className={`text-[14px] truncate leading-tight ${isUnread ? "font-semibold text-[var(--text-primary-strong)]" : "font-medium text-[var(--text-primary-strong)]"}`}
                       >
                         {s.title}
                       </div>
                     ) : null}
-                    <div className="flex items-center gap-2 mt-1 text-[11px] text-[hsl(var(--text-tertiary))] flex-wrap">
+                    <div className="flex items-center gap-2 mt-1 text-[12px] text-[var(--text-tertiary)] flex-wrap">
                       {s.impactScore != null ? (
                         <span className="tabular-nums">{s.impactScore}</span>
                       ) : null}
@@ -204,7 +204,7 @@ export function SignalStream({
                       ) : null}
                     </div>
                     {/* Cluster only on hover */}
-                    <div className="mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-120 text-[10px] text-[hsl(var(--text-tertiary))]">
+                    <div className="mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-120 text-[12px] text-[var(--text-tertiary)]">
                       {s.clusterLabel && <span>{s.clusterLabel}</span>}
                     </div>
                   </div>

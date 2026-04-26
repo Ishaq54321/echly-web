@@ -39,7 +39,7 @@ export default function DashboardCaptureHost({ open, onClose }: DashboardCapture
 
   return (
     <div
-      className={`fixed bottom-6 right-6 z-[2147483647] w-[340px] rounded-2xl p-5 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] ${isClosing ? "animate-extension-tray-out" : "animate-extension-tray-in"}`}
+      className={`fixed bottom-6 right-6 z-[2147483647] w-[340px] rounded-2xl p-5 bg-white dark:bg-neutral-900 border border-[var(--border)] dark:border-neutral-700 shadow-[var(--shadow-lg)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] ${isClosing ? "animate-extension-tray-out" : "animate-extension-tray-in"}`}
       role="dialog"
       aria-label="Install Echly extension"
     >
@@ -56,7 +56,7 @@ export default function DashboardCaptureHost({ open, onClose }: DashboardCapture
         <button
           type="button"
           onClick={handleClose}
-          className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 dark:hover:text-neutral-300 dark:hover:bg-neutral-800 transition-colors"
+          className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-700 hover:bg-[var(--surface-hover)] dark:hover:text-neutral-300 dark:hover:bg-neutral-800 transition-colors"
           aria-label="Close"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -66,8 +66,8 @@ export default function DashboardCaptureHost({ open, onClose }: DashboardCapture
       </div>
 
       {/* Illustration placeholder */}
-      <div className="h-[120px] rounded-xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mb-4">
-        <div className="w-12 h-12 rounded-full bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center">
+      <div className="h-[120px] rounded-xl bg-[var(--surface-hover)] dark:bg-neutral-800 flex items-center justify-center mb-4">
+        <div className="w-12 h-12 rounded-full bg-[var(--surface-hover)] dark:bg-neutral-700 flex items-center justify-center">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-neutral-500 dark:text-neutral-400">
             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -75,12 +75,12 @@ export default function DashboardCaptureHost({ open, onClose }: DashboardCapture
       </div>
 
       {/* Title */}
-      <h2 className="text-lg font-semibold text-neutral-900 dark:text-white mb-2">
+      <h2 className="text-lg font-semibold text-[var(--text-heading)] dark:text-white mb-2">
         Capture feedback anywhere
       </h2>
 
       {/* Description */}
-      <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4 leading-relaxed">
+      <p className="text-sm text-[var(--text-secondary)] dark:text-neutral-400 mb-4 leading-relaxed">
         Install the Echly extension to capture feedback across any website, with pixel-perfect screenshots and real-time annotations.
       </p>
 
@@ -92,7 +92,7 @@ export default function DashboardCaptureHost({ open, onClose }: DashboardCapture
           "Voice & AI-powered feedback",
         ].map((item) => (
           <li key={item} className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#1775E0] shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--brand)] shrink-0" />
             {item}
           </li>
         ))}
@@ -102,7 +102,7 @@ export default function DashboardCaptureHost({ open, onClose }: DashboardCapture
       <button
         type="button"
         onClick={handleInstall}
-        className="w-full h-11 rounded-[10px] font-medium text-white bg-gradient-to-r from-[#1775E0] to-[#1462C4] hover:from-[#1775E0] hover:to-[#1775E0] active:scale-[0.98] transition-all duration-150 shadow-sm"
+        className="w-full h-11 rounded-[var(--radius-sm)] font-medium text-white bg-gradient-to-r from-[#1775E0] to-[#1462C4] hover:from-[#1775E0] hover:to-[#1775E0] active:scale-[0.98] transition-all duration-150 shadow-sm"
       >
         Install Chrome Extension
       </button>
@@ -111,7 +111,7 @@ export default function DashboardCaptureHost({ open, onClose }: DashboardCapture
       <button
         type="button"
         onClick={handleClose}
-        className="w-full mt-3 h-10 rounded-[10px] text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 active:scale-[0.98] transition-all duration-150"
+        className="w-full mt-3 h-10 rounded-[var(--radius-sm)] text-sm font-medium text-[var(--text-secondary)] dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-[var(--surface-hover)] dark:hover:bg-neutral-800 active:scale-[0.98] transition-all duration-150"
       >
         Maybe later
       </button>

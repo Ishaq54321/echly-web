@@ -62,7 +62,7 @@ export function TicketDetailsPanel({ feedbackId }: TicketDetailsPanelProps) {
 
   if (!feedbackId) {
     return (
-      <div className="w-[320px] shrink-0 flex flex-col items-center justify-center p-8 bg-white text-center border-r border-neutral-200">
+      <div className="w-[320px] shrink-0 flex flex-col items-center justify-center p-8 bg-white text-center border-r border-[var(--border)]">
         <p className="text-sm text-secondary">
           Select a discussion to view ticket details
         </p>
@@ -72,7 +72,7 @@ export function TicketDetailsPanel({ feedbackId }: TicketDetailsPanelProps) {
 
   if (loading || !ticket) {
     return (
-      <div className="flex h-full min-h-[200px] w-[320px] shrink-0 flex-col items-center justify-center border-r border-neutral-200 bg-white p-8">
+      <div className="flex h-full min-h-[200px] w-[320px] shrink-0 flex-col items-center justify-center border-r border-[var(--border)] bg-white p-8">
         <MinimalLoader label="Loading details…" />
       </div>
     );
@@ -82,14 +82,14 @@ export function TicketDetailsPanel({ feedbackId }: TicketDetailsPanelProps) {
   const hasSteps = steps && Array.isArray(steps) && steps.length > 0;
 
   return (
-    <div className="w-[320px] shrink-0 flex flex-col overflow-hidden border-r border-neutral-200 bg-white font-sans">
+    <div className="w-[320px] shrink-0 flex flex-col overflow-hidden border-r border-[var(--border)] bg-white font-sans">
       <div className="flex-1 overflow-y-auto min-h-0 p-6">
-        <h2 className="text-[17px] font-semibold text-neutral-900 mb-4">
+        <h2 className="text-[17px] font-semibold text-[var(--text-heading)] mb-4">
           {ticket.title}
         </h2>
 
         {hasSteps && (
-          <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+          <div className="rounded-xl border border-[var(--border)] bg-white p-4 shadow-sm">
             <p className="text-[12px] uppercase font-semibold tracking-wide text-secondary mb-2">
               Action steps
             </p>

@@ -9,9 +9,9 @@ export interface MomentumBlockProps {
 }
 
 const config = {
-  up: { icon: TrendingUp, label: "Resolution velocity ↑", className: "text-[hsl(var(--text-secondary-soft))]" },
-  flat: { icon: Minus, label: "Resolution velocity →", className: "text-[hsl(var(--text-tertiary))]" },
-  down: { icon: TrendingDown, label: "Resolution velocity ↓", className: "text-[hsl(var(--text-tertiary))]" },
+  up: { icon: TrendingUp, label: "Resolution velocity ↑", className: "text-[var(--text-secondary-soft)]" },
+  flat: { icon: Minus, label: "Resolution velocity →", className: "text-[var(--text-tertiary)]" },
+  down: { icon: TrendingDown, label: "Resolution velocity ↓", className: "text-[var(--text-tertiary)]" },
 };
 
 export function MomentumBlock({ resolutionVelocity }: MomentumBlockProps) {
@@ -24,7 +24,7 @@ export function MomentumBlock({ resolutionVelocity }: MomentumBlockProps) {
     >
       <div className="px-4 py-3 flex items-center gap-2">
         <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
-        <span className={`text-[13px] ${className}`}>{label}</span>
+        <span className={`text-[14px] ${className}`}>{label}</span>
       </div>
     </section>
   );

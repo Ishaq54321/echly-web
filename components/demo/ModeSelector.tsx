@@ -19,14 +19,14 @@ export default function ModeSelector({ selectedMode, onSelect, disabled }: ModeS
         disabled={disabled}
         className={`rounded-xl px-3 py-2.5 flex items-center gap-2 transition-colors ${
           selectedMode === "voice"
-            ? "bg-[#1775E0] text-white shadow-[0_10px_24px_rgba(23,117,224,0.22)]"
-            : "bg-white border border-[#EBEBEB] text-gray-800 hover:border-[#D5D5D5] hover:bg-gray-50"
+            ? "bg-[var(--brand)] text-white shadow-[0_10px_24px_rgba(23,117,224,0.22)]"
+            : "bg-white border border-[var(--border)] text-[var(--text-heading)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]"
         }`}
       >
         <Mic className="h-4 w-4" />
         <div className="leading-tight text-left">
           <div className="text-[12px] font-semibold">Voice</div>
-          <div className={`text-[10px] ${selectedMode === "voice" ? "opacity-90" : "text-gray-500"}`}>
+          <div className={`text-[12px] ${selectedMode === "voice" ? "opacity-90" : "text-[var(--text-secondary)]"}`}>
             Recommended
           </div>
         </div>
@@ -37,14 +37,14 @@ export default function ModeSelector({ selectedMode, onSelect, disabled }: ModeS
         disabled={disabled}
         className={`rounded-xl px-3 py-2.5 flex items-center gap-2 transition-colors ${
           selectedMode === "write"
-            ? "bg-[#1775E0] text-white shadow-[0_10px_24px_rgba(23,117,224,0.22)]"
-            : "bg-white border border-[#EBEBEB] text-gray-800 hover:border-[#D5D5D5] hover:bg-gray-50"
+            ? "bg-[var(--brand)] text-white shadow-[0_10px_24px_rgba(23,117,224,0.22)]"
+            : "bg-white border border-[var(--border)] text-[var(--text-heading)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]"
         }`}
       >
         <Pencil className="h-4 w-4" />
         <div className="leading-tight text-left">
           <div className="text-[12px] font-semibold">Write</div>
-          <div className={`text-[10px] ${selectedMode === "write" ? "opacity-90" : "text-gray-500"}`}>
+          <div className={`text-[12px] ${selectedMode === "write" ? "opacity-90" : "text-[var(--text-secondary)]"}`}>
             Manual
           </div>
         </div>

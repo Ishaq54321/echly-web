@@ -61,10 +61,10 @@ function StatusDot({ status }: { status: FeedbackStatus }) {
 
 function PriorityBadge({ priority }: { priority: FeedbackPriority }) {
   const styles: Record<FeedbackPriority, string> = {
-    Low: "text-[10px] text-[hsl(var(--text-tertiary))]",
-    Medium: "text-[10px] text-[hsl(var(--text-secondary-soft))]",
-    High: "text-[10px] font-medium text-[var(--color-warning-text)]",
-    Critical: "text-[10px] font-medium text-[var(--color-danger)]",
+    Low: "text-[12px] text-[var(--text-tertiary)]",
+    Medium: "text-[12px] text-[var(--text-secondary-soft)]",
+    High: "text-[12px] font-medium text-[var(--color-warning-text)]",
+    Critical: "text-[12px] font-medium text-[var(--color-danger)]",
   };
   return (
     <span className={`shrink-0 uppercase tracking-wide ${styles[priority]}`}>
@@ -171,7 +171,7 @@ export function FeedbackCommandPanel({
       <div className="shrink-0 p-2 border-b border-[var(--layer-1-border)] space-y-2">
         <div className="relative">
           <Search
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[hsl(var(--text-tertiary))]"
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-tertiary)]"
             strokeWidth={1.5}
             aria-hidden
           />
@@ -180,7 +180,7 @@ export function FeedbackCommandPanel({
             placeholder="Search issues…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-8 pl-8 pr-3 text-[13px] rounded-md bg-white border border-[var(--layer-2-border)] placeholder:text-[hsl(var(--text-tertiary))] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)] transition-[box-shadow] duration-120"
+            className="w-full h-8 pl-8 pr-3 text-[14px] rounded-md bg-white border border-[var(--layer-2-border)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)] transition-[box-shadow] duration-120"
             aria-label="Search issues"
           />
         </div>
@@ -189,7 +189,7 @@ export function FeedbackCommandPanel({
             <button
               type="button"
               onClick={() => setFilterDropdownOpen((o) => !o)}
-              className="flex items-center gap-1.5 h-7 px-2 rounded-md text-[12px] text-[hsl(var(--text-secondary-soft))] hover:bg-black/[0.04] border border-[var(--layer-2-border)]"
+              className="flex items-center gap-1.5 h-7 px-2 rounded-md text-[12px] text-[var(--text-secondary-soft)] hover:bg-black/[0.04] border border-[var(--layer-2-border)]"
               aria-expanded={filterDropdownOpen}
               aria-haspopup="true"
             >
@@ -233,7 +233,7 @@ export function FeedbackCommandPanel({
             <button
               type="button"
               onClick={() => setSortDropdownOpen((o) => !o)}
-              className="flex items-center gap-1 h-7 px-2 rounded-md text-[12px] text-[hsl(var(--text-secondary-soft))] hover:bg-black/[0.04] border border-[var(--layer-2-border)]"
+              className="flex items-center gap-1 h-7 px-2 rounded-md text-[12px] text-[var(--text-secondary-soft)] hover:bg-black/[0.04] border border-[var(--layer-2-border)]"
               aria-expanded={sortDropdownOpen}
             >
               Sort
@@ -271,7 +271,7 @@ export function FeedbackCommandPanel({
           </div>
           <button
             type="button"
-            className="ml-auto flex items-center gap-1 h-7 px-2 rounded-md text-[12px] text-[hsl(var(--text-tertiary))] hover:bg-black/[0.04]"
+            className="ml-auto flex items-center gap-1 h-7 px-2 rounded-md text-[12px] text-[var(--text-tertiary)] hover:bg-black/[0.04]"
             title="Save view"
           >
             <Save className="h-3 w-3" strokeWidth={1.5} />
@@ -283,7 +283,7 @@ export function FeedbackCommandPanel({
       {/* Bulk action toolbar */}
       {bulkCount > 0 && (
         <div className="shrink-0 flex items-center gap-2 px-2 py-1.5 border-b border-[var(--layer-1-border)] bg-[var(--accent-operational-muted)]">
-          <span className="text-[12px] font-medium text-[hsl(var(--text-primary-strong))]">
+          <span className="text-[12px] font-medium text-[var(--text-primary-strong)]">
             {bulkCount} selected
           </span>
           <button
@@ -315,7 +315,7 @@ export function FeedbackCommandPanel({
       >
         <div className="py-1">
           {filtered.length === 0 ? (
-            <div className="px-3 py-8 text-center text-[13px] text-[hsl(var(--text-tertiary))]">
+            <div className="px-3 py-8 text-center text-[14px] text-[var(--text-tertiary)]">
               No issues match filters.
             </div>
           ) : (
@@ -355,7 +355,7 @@ export function FeedbackCommandPanel({
                 >
                   <button
                     type="button"
-                    className="shrink-0 mt-0.5 p-0.5 rounded text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))] hover:bg-black/[0.04] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+                    className="shrink-0 mt-0.5 p-0.5 rounded text-[var(--text-tertiary)] hover:text-[var(--text-primary-strong)] hover:bg-black/[0.04] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
                     onClick={(e) => {
                       e.stopPropagation();
                       toggleSelect(item.id);
@@ -372,12 +372,12 @@ export function FeedbackCommandPanel({
                   <PriorityBadge priority={priority} />
                   <div className="min-w-0 flex-1">
                     {item.title?.trim() ? (
-                      <div className="text-[13px] font-medium text-[hsl(var(--text-primary-strong))] truncate leading-tight">
+                      <div className="text-[14px] font-medium text-[var(--text-primary-strong)] truncate leading-tight">
                         {item.title}
                       </div>
                     ) : null}
                     {item.contextSummary && (
-                      <div className="text-[11px] text-[hsl(var(--text-tertiary))] truncate mt-0.5 leading-tight">
+                      <div className="text-[12px] text-[var(--text-tertiary)] truncate mt-0.5 leading-tight">
                         {item.contextSummary}
                       </div>
                     )}
@@ -385,13 +385,13 @@ export function FeedbackCommandPanel({
                       {(item.suggestedTags ?? []).slice(0, 2).map((tag) => (
                         <span
                           key={tag}
-                          className="inline-flex items-center max-w-full truncate rounded-full border px-2 py-0.5 text-[10px] font-medium bg-gray-50 text-gray-700 border-[#EBEBEB]"
+                          className="inline-flex items-center max-w-full truncate rounded-full border px-2 py-0.5 text-[12px] font-medium bg-[var(--surface-subtle)] text-[var(--text-body)] border-[var(--border)]"
                         >
                           {tag}
                         </span>
                       ))}
                       {createdRel ? (
-                        <span className="text-[10px] text-[hsl(var(--text-tertiary))] tabular-nums">
+                        <span className="text-[12px] text-[var(--text-tertiary)] tabular-nums">
                           {createdRel}
                         </span>
                       ) : null}

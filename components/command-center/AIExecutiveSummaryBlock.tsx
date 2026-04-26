@@ -12,7 +12,7 @@ export interface AIExecutiveSummaryBlockProps {
 function MomentumIndicator({ direction }: { direction: MomentumDirection }) {
   const config = {
     improving: { icon: TrendingUp, label: "Improving", className: "text-[var(--color-success)]" },
-    stable: { icon: Minus, label: "Stable", className: "text-[hsl(var(--text-tertiary))]" },
+    stable: { icon: Minus, label: "Stable", className: "text-[var(--text-tertiary)]" },
     slowing: { icon: TrendingDown, label: "Slowing", className: "text-[var(--color-warning)]" },
   };
   const { icon: Icon, label, className } = config[direction];
@@ -31,7 +31,7 @@ export function AIExecutiveSummaryBlock({ summary, onSelectSignal }: AIExecutive
       aria-label="AI Executive Summary"
     >
       <header className="flex items-center justify-between px-4 py-3 border-b border-[var(--layer-1-border)] bg-[var(--structural-gray-ticket)]">
-        <h2 className="flex items-center gap-2 text-[12px] font-medium uppercase tracking-wider text-[hsl(var(--text-primary-strong))]">
+        <h2 className="flex items-center gap-2 text-[12px] font-medium uppercase tracking-wider text-[var(--text-primary-strong)]">
           <Sparkles className="h-4 w-4 text-[var(--accent-operational)]" strokeWidth={1.5} />
           AI Executive Summary
         </h2>
@@ -40,7 +40,7 @@ export function AIExecutiveSummaryBlock({ summary, onSelectSignal }: AIExecutive
       <div className="p-4 space-y-4">
         {summary.highImpactItems.length > 0 && (
           <div>
-            <h3 className="text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))] mb-1.5">
+            <h3 className="text-[12px] font-medium uppercase tracking-wider text-[var(--text-tertiary)] mb-1.5">
               High impact (3)
             </h3>
             <ul className="space-y-1">
@@ -49,9 +49,9 @@ export function AIExecutiveSummaryBlock({ summary, onSelectSignal }: AIExecutive
                   <button
                     type="button"
                     onClick={() => onSelectSignal?.(item.id, item.sessionId)}
-                    className="w-full text-left text-[13px] text-[hsl(var(--text-primary-strong))] hover:text-[var(--accent-operational)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] rounded px-2 py-1 -mx-2 -my-1"
+                    className="w-full text-left text-[14px] text-[var(--text-primary-strong)] hover:text-[var(--accent-operational)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] rounded px-2 py-1 -mx-2 -my-1"
                   >
-                    <span className="tabular-nums text-[hsl(var(--text-tertiary))] mr-2">
+                    <span className="tabular-nums text-[var(--text-tertiary)] mr-2">
                       {item.impactScore}
                     </span>
                     {item.title}
@@ -63,7 +63,7 @@ export function AIExecutiveSummaryBlock({ summary, onSelectSignal }: AIExecutive
         )}
         {summary.riskAlerts.length > 0 && (
           <div>
-            <h3 className="text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))] mb-1.5">
+            <h3 className="text-[12px] font-medium uppercase tracking-wider text-[var(--text-tertiary)] mb-1.5">
               Risk alerts (2)
             </h3>
             <ul className="space-y-1">
@@ -72,9 +72,9 @@ export function AIExecutiveSummaryBlock({ summary, onSelectSignal }: AIExecutive
                   <button
                     type="button"
                     onClick={() => onSelectSignal?.(item.id, item.sessionId)}
-                    className="w-full text-left text-[13px] text-[hsl(var(--text-primary-strong))] hover:text-[var(--accent-operational)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] rounded px-2 py-1 -mx-2 -my-1"
+                    className="w-full text-left text-[14px] text-[var(--text-primary-strong)] hover:text-[var(--accent-operational)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] rounded px-2 py-1 -mx-2 -my-1"
                   >
-                    <span className="text-[var(--color-danger)] font-medium text-[11px] uppercase mr-2">
+                    <span className="text-[var(--color-danger)] font-medium text-[12px] uppercase mr-2">
                       {String(item.riskLevel).replace(/^./, (c) => c.toUpperCase())}
                     </span>
                     {item.title}
@@ -86,20 +86,20 @@ export function AIExecutiveSummaryBlock({ summary, onSelectSignal }: AIExecutive
         )}
         {summary.emergingPattern && (
           <div>
-            <h3 className="text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))] mb-1">
+            <h3 className="text-[12px] font-medium uppercase tracking-wider text-[var(--text-tertiary)] mb-1">
               Emerging pattern
             </h3>
-            <p className="text-[13px] text-[hsl(var(--text-secondary-soft))]">
+            <p className="text-[14px] text-[var(--text-secondary-soft)]">
               {summary.emergingPattern}
             </p>
           </div>
         )}
         {summary.bottleneck && (
           <div>
-            <h3 className="text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))] mb-1">
+            <h3 className="text-[12px] font-medium uppercase tracking-wider text-[var(--text-tertiary)] mb-1">
               Bottleneck
             </h3>
-            <p className="text-[13px] text-[hsl(var(--text-secondary-soft))]">
+            <p className="text-[14px] text-[var(--text-secondary-soft)]">
               {summary.bottleneck}
             </p>
           </div>
@@ -108,7 +108,7 @@ export function AIExecutiveSummaryBlock({ summary, onSelectSignal }: AIExecutive
           summary.riskAlerts.length === 0 &&
           !summary.emergingPattern &&
           !summary.bottleneck && (
-            <p className="text-[13px] text-[hsl(var(--text-tertiary))]">
+            <p className="text-[14px] text-[var(--text-tertiary)]">
               No signals yet. Open a session to start.
             </p>
           )}

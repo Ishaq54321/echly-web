@@ -13,24 +13,25 @@
   --brand-text:         #0F5BB5;
 
   /* ─── TEXT ───────────────────────────────── */
-  --text-heading:       #1C1B1F;
+  --text-heading:       #1C1917;
   --text-body:          #44403C;
   --text-secondary:     #78716C;
   --text-body-strong: #57534E;
   --text-tertiary:      #A8A29E;
   --text-placeholder:   #C4BFBB;
+  --text-on-dark:       #F3F4F6;
 
   /* ─── SURFACES ───────────────────────────── */
   --surface-page:       #FFFFFF;
   --surface-card:       #FFFFFF;
-  --surface-subtle:     #F1F2F4;
-  --surface-hover:      #F4F5F7;
+  --surface-subtle:     #FDFDFC;
+  --surface-hover:      #F0F1F3;
   --surface-active:     #EBF4FF;
   --surface-input:      #FAFAFA;
   --surface-overlay:    rgba(15, 15, 20, 0.45);
 
   /* ─── BORDERS ────────────────────────────── */
-  --border:             #EBEBEB;
+  --border:             #E5E7EB;
   --border-strong:      #D5D5D5;
   --border-focus:       #1775E0;
 
@@ -152,7 +153,7 @@
   --surface-raised: var(--surface-card);
   --surface-inset:  var(--surface-subtle);
   --surface-sunken: var(--surface-subtle);
-  --border-soft:    var(--border);
+  --border-soft:    #F0F1F3;
   --border-default: var(--border);
   --border-brand:   var(--brand);
   --border-focus:   var(--brand);
@@ -581,7 +582,7 @@ body {
   width: 36px !important;
   height: 36px !important;
   border-radius: var(--radius-sm) !important;
-  color: #44403C !important;
+  color: var(--text-body) !important;
   transition: background var(--duration-fast) var(--ease) !important;
   display: inline-flex !important;
   align-items: center !important;

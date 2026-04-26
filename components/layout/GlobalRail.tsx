@@ -57,7 +57,7 @@ const RAIL_ICON_STROKE = 2.2 as const;
 function WorkspaceInitialsAvatar({ name }: { name: string }) {
   const initial = name.trim().charAt(0).toUpperCase() || "W";
   return (
-    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1775E0] text-white text-sm font-semibold select-none">
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--brand)] text-white text-sm font-semibold select-none">
       {initial}
     </span>
   );
@@ -114,6 +114,10 @@ export default function GlobalRail() {
     };
   }, [workspacePopoverOpen]);
 
+  // ALL hooks are now called above. Safe to bail out.
+  const isSessionPage = pathname?.match(/^\/dashboard\/[^/]+/) !== null || pathname?.match(/^\/session\/[^/]+/) !== null;
+  if (isSessionPage) return null;
+
   return (
     <>
     <div
@@ -134,8 +138,8 @@ export default function GlobalRail() {
             onClick={() => setIsCollapsed((prev) => !prev)}
             aria-label="Toggle sidebar"
             className={cn(
-              "h-7 w-7 rounded-md border border-[#EBEBEB] bg-white shadow-sm",
-              "flex items-center justify-center text-neutral-800 hover:text-neutral-900",
+              "h-7 w-7 rounded-md border border-[var(--border)] bg-white shadow-sm",
+              "flex items-center justify-center text-neutral-800 hover:text-[var(--text-heading)]",
               "transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
               "hover:scale-105",
               "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0] focus-visible:ring-offset-2"
@@ -169,7 +173,7 @@ export default function GlobalRail() {
               >
                 <Link
                   href="/dashboard"
-                  className="relative w-10 h-10 bg-[#1775E0] rounded-md flex items-center justify-center overflow-hidden shrink-0 block"
+                  className="relative w-10 h-10 bg-[var(--brand)] rounded-md flex items-center justify-center overflow-hidden shrink-0 block"
                   aria-label="Echly home"
                 >
                   <Image
@@ -188,7 +192,7 @@ export default function GlobalRail() {
                   "absolute inset-0 flex items-center justify-center rounded-md",
                   "transition-opacity duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
                   "opacity-0 pointer-events-none group-hover/logo:pointer-events-auto group-hover/logo:opacity-100",
-                  "text-neutral-800 hover:text-neutral-900",
+                  "text-neutral-800 hover:text-[var(--text-heading)]",
                   "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0] focus-visible:ring-offset-2"
                 )}
                 aria-label="Expand sidebar"
@@ -203,7 +207,7 @@ export default function GlobalRail() {
           ) : (
             <Link
               href="/dashboard"
-              className="relative w-10 h-10 bg-[#1775E0] rounded-md flex items-center justify-center overflow-hidden shrink-0"
+              className="relative w-10 h-10 bg-[var(--brand)] rounded-md flex items-center justify-center overflow-hidden shrink-0"
               aria-label="Echly home"
             >
               <Image
@@ -256,7 +260,7 @@ export default function GlobalRail() {
                 }}
               >
                 <UserPlus
-                  className="h-[22px] w-[22px] shrink-0 transition-colors duration-[160ms] group-hover:text-[#1C1B1F]"
+                  className="h-[22px] w-[22px] shrink-0 transition-colors duration-[160ms] group-hover:text-[var(--text-heading)]"
                   strokeWidth={2.2}
                   style={{ color: "var(--text-body)" }}
                   aria-hidden
@@ -322,7 +326,7 @@ export default function GlobalRail() {
                 onClick={() => setWorkspacePopoverOpen((v) => !v)}
                 className={cn(
                   "flex items-center rounded-md transition-colors duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0] focus-visible:ring-offset-2",
-                  "text-[#44403C] hover:text-[#1C1B1F] hover:bg-[#F4F5F7]",
+                  "text-[var(--text-body)] hover:text-[var(--text-heading)] hover:bg-[var(--surface-hover)]",
                   "justify-start gap-2 px-3 py-2 w-full"
                 )}
                 aria-label="Workspace menu"
@@ -365,7 +369,7 @@ export default function GlobalRail() {
 
         {!isCollapsed && (
           <div
-            className="h-px bg-[#E8E8E8] my-1 shrink-0 mx-3"
+            className="h-px bg-[var(--border)] my-1 shrink-0 mx-3"
             aria-hidden
           />
         )}
@@ -392,8 +396,8 @@ export default function GlobalRail() {
                     "w-full flex items-center px-3 py-2 rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0] focus-visible:ring-offset-2",
                     isCollapsed ? "justify-center gap-0" : "gap-3",
                     active
-                      ? "bg-[#EBF4FF] text-[#0F5BB5]"
-                      : "text-[#44403C] hover:text-[#1C1B1F] hover:bg-[#F4F5F7]"
+                      ? "bg-[var(--brand-subtle)] text-[var(--brand-text)]"
+                      : "text-[var(--text-body)] hover:text-[var(--text-heading)] hover:bg-[var(--surface-hover)]"
                   )}
                   aria-label={label}
                   aria-current={active ? "page" : undefined}
@@ -416,7 +420,7 @@ export default function GlobalRail() {
                 </Link>
                 {isCollapsed ? (
                   <span
-                    className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2 py-1 text-xs text-[#44403C] rounded-md bg-white border border-[#EBEBEB] shadow-[0_1px_2px_rgba(0,0,0,0.06)] opacity-0 pointer-events-none z-10 transition-opacity duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:opacity-100 group-focus-within:opacity-100"
+                    className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2 py-1 text-xs text-[var(--text-body)] rounded-md bg-white border border-[var(--border)] shadow-[var(--shadow-sm)] opacity-0 pointer-events-none z-10 transition-opacity duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:opacity-100 group-focus-within:opacity-100"
                     role="tooltip"
                   >
                     {label}
@@ -451,8 +455,8 @@ export default function GlobalRail() {
               </p>
               {isLoadingWorkspaces ? (
                 <>
-                  <div className="h-[38px] rounded-lg bg-neutral-100 animate-pulse mb-1" />
-                  <div className="h-[38px] rounded-lg bg-neutral-100 animate-pulse mb-1" />
+                  <div className="h-[38px] rounded-lg bg-[var(--surface-hover)] animate-pulse mb-1" />
+                  <div className="h-[38px] rounded-lg bg-[var(--surface-hover)] animate-pulse mb-1" />
                 </>
               ) : (
                 allWorkspaces.map((ws) => {
@@ -470,7 +474,7 @@ export default function GlobalRail() {
                           setSwitchingTo(null);
                         }
                       }}
-                      className="w-full flex items-center gap-2 px-2.5 rounded-lg text-sm font-medium text-[#44403C] hover:bg-[#F4F5F7] transition text-left"
+                      className="w-full flex items-center gap-2 px-2.5 rounded-lg text-sm font-medium text-[var(--text-body)] hover:bg-[var(--surface-hover)] transition text-left"
                       style={{ height: 38 }}
                     >
                       {ws.logoUrl ? (
@@ -485,7 +489,7 @@ export default function GlobalRail() {
                           }
                         </span>
                       ) : (
-                        <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center bg-[#1775E0] text-white text-xs font-semibold select-none" style={{ borderRadius: "50%" }}>
+                        <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center bg-[var(--brand)] text-white text-xs font-semibold select-none" style={{ borderRadius: "50%" }}>
                           {initial}
                         </span>
                       )}
@@ -493,13 +497,13 @@ export default function GlobalRail() {
                       {switchingTo === ws.workspaceId ? (
                         <Loader2 className="h-3 w-3 animate-spin text-muted-foreground ml-auto" aria-hidden />
                       ) : isActive ? (
-                        <Check className="h-4 w-4 shrink-0 text-[#1775E0]" strokeWidth={2.5} aria-hidden />
+                        <Check className="h-4 w-4 shrink-0 text-[var(--brand)]" strokeWidth={2.5} aria-hidden />
                       ) : null}
                     </button>
                   );
                 })
               )}
-              <div className="h-px bg-[#E8E8E8] my-2" aria-hidden />
+              <div className="h-px bg-[var(--border)] my-2" aria-hidden />
             </>
           )}
 
@@ -522,7 +526,7 @@ export default function GlobalRail() {
               <WorkspaceInitialsAvatar name={displayName} />
             )}
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-neutral-900 truncate">
+              <p className="text-sm font-medium text-[var(--text-heading)] truncate">
                 {displayName}
               </p>
             </div>
@@ -531,14 +535,14 @@ export default function GlobalRail() {
             <a
               href="/settings?tab=general"
               onClick={() => setWorkspacePopoverOpen(false)}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-[#44403C] hover:bg-[#F4F5F7] transition"
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-[var(--text-body)] hover:bg-[var(--surface-hover)] transition"
             >
               Workspace settings
             </a>
             <a
               href="/settings?tab=members"
               onClick={() => setWorkspacePopoverOpen(false)}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-[#44403C] hover:bg-[#F4F5F7] transition"
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-[var(--text-body)] hover:bg-[var(--surface-hover)] transition"
             >
               Members
             </a>
@@ -549,7 +553,7 @@ export default function GlobalRail() {
                   setWorkspacePopoverOpen(false);
                   setInviteModalOpen(true);
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-[#44403C] hover:bg-[#EBF4FF] hover:text-[#1775E0] transition text-left"
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-[var(--text-body)] hover:bg-[var(--brand-subtle)] hover:text-[var(--brand)] transition text-left"
               >
                 <UserPlus className="h-4 w-4 shrink-0" strokeWidth={2} />
                 Invite teammate
@@ -558,7 +562,7 @@ export default function GlobalRail() {
           </div>
 
           {/* Create new workspace */}
-          <div className="h-px bg-[#E8E8E8] mt-2 mb-1" aria-hidden />
+          <div className="h-px bg-[var(--border)] mt-2 mb-1" aria-hidden />
           <button
             type="button"
             onClick={() => {
@@ -591,7 +595,7 @@ export default function GlobalRail() {
           >
             <h2
               id="invite-modal-title"
-              className="text-[20px] font-semibold leading-tight text-neutral-900"
+              className="text-[20px] font-semibold leading-tight text-[var(--text-heading)]"
             >
               Invite your coworkers
             </h2>
@@ -604,7 +608,7 @@ export default function GlobalRail() {
               placeholder="email@example.com"
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
-              className="mt-4 w-full px-3 py-2.5 rounded-xl border border-[#EBEBEB] text-[#1C1B1F] placeholder:text-[#C4BFBB] focus:outline-none focus:ring-2 focus:ring-[#1775E0] focus:border-transparent"
+              className="mt-4 w-full px-3 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text-heading)] placeholder:text-[#C4BFBB] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:border-transparent"
             />
             {inviteError && (
               <p className="mt-2 text-sm text-[var(--color-danger)]">{inviteError}</p>
@@ -616,7 +620,7 @@ export default function GlobalRail() {
               <button
                 type="button"
                 onClick={() => { setInviteModalOpen(false); setInviteEmail(""); setInviteError(null); setInviteSent(false); }}
-                className="px-4 py-2.5 text-sm font-medium rounded-xl text-[#44403C] hover:bg-[#F4F5F7] transition"
+                className="px-4 py-2.5 text-sm font-medium rounded-xl text-[var(--text-body)] hover:bg-[var(--surface-hover)] transition"
               >
                 Cancel
               </button>
@@ -649,7 +653,7 @@ export default function GlobalRail() {
                     setInviteSubmitting(false);
                   }
                 }}
-                className="px-4 py-2.5 text-sm font-medium rounded-xl bg-[#1775E0] text-white hover:bg-[#1462C4] transition disabled:opacity-60"
+                className="px-4 py-2.5 text-sm font-medium rounded-xl bg-[var(--brand)] text-white hover:bg-[var(--brand-hover)] transition disabled:opacity-50"
               >
                 {inviteSubmitting ? "Sending…" : "Send Invite"}
               </button>

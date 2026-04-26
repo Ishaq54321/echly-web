@@ -6,7 +6,7 @@
 const SEMANTIC = {
   layout: {
     pill: "bg-[var(--brand-subtle)] text-[var(--brand-text)] border-[var(--brand-muted)]",
-    dot: "bg-[#1775E0]",
+    dot: "bg-[var(--brand)]",
   },
   ux: {
     pill: "bg-purple-50 text-purple-700 border-purple-200",
@@ -25,7 +25,7 @@ const SEMANTIC = {
     dot: "bg-orange-500",
   },
   default: {
-    pill: "bg-gray-50 text-gray-700 border-[#EBEBEB]",
+    pill: "bg-[var(--surface-subtle)] text-[var(--text-body)] border-[var(--border)]",
     dot: "bg-gray-400",
   },
 } as const;
@@ -82,7 +82,7 @@ export function getTagDotClass(name: string): string {
 
 /** Shared interactive chip shell (premium pills + hover). */
 export const TAG_CHIP_BASE_CLASS =
-  "inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium border";
+  "inline-flex items-center px-3.5 py-1.5 rounded-[var(--radius-sm)] text-[14px] font-medium border";
 
 /** All available tags for the add-tag dropdown. Order defines display order. */
 export const AVAILABLE_TAGS = [

@@ -95,7 +95,7 @@ export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeMod
             role="dialog"
             aria-modal="true"
             aria-labelledby="upgrade-modal-title"
-            className="relative w-full max-w-lg rounded-2xl border border-neutral-200/80 bg-white py-8 px-7 shadow-2xl"
+            className="relative w-full max-w-lg rounded-2xl border border-[var(--border)] bg-white py-8 px-7 shadow-2xl"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
@@ -114,7 +114,7 @@ export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeMod
 
             {/* Plan badge */}
             <div>
-              <span className="inline-flex items-center rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-600">
+              <span className="inline-flex items-center rounded-full bg-[var(--surface-hover)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)]">
                 Current Plan: {currentPlanLabel}
               </span>
             </div>
@@ -122,7 +122,7 @@ export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeMod
             {/* Title */}
             <h2
               id="upgrade-modal-title"
-              className="mt-4 text-xl font-semibold tracking-tight text-neutral-900 sm:text-2xl"
+              className="mt-4 text-xl font-semibold tracking-tight text-[var(--text-heading)] sm:text-2xl"
             >
               {isOverLimit
                 ? "You have exceeded your plan limit."
@@ -141,14 +141,14 @@ export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeMod
               <div className="mt-5">
 
                 <div className="flex items-baseline justify-between text-sm">
-                  <span className="text-neutral-600">Sessions used</span>
+                  <span className="text-[var(--text-secondary)]">Sessions used</span>
 
-                  <span className="tabular-nums font-medium text-neutral-900">
+                  <span className="tabular-nums font-medium text-[var(--text-heading)]">
                     {sessionsUsed} / {sessionsMax} sessions
                   </span>
                 </div>
 
-                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-neutral-100">
+                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-hover)]">
                   <motion.div
                     className="h-full rounded-full"
                     style={{
@@ -166,14 +166,14 @@ export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeMod
             )}
 
             {/* Benefits */}
-            <div className="mt-5 rounded-xl bg-neutral-50/80 p-4">
+            <div className="mt-5 rounded-xl bg-[var(--surface-subtle)]/80 p-4">
               <ul className="space-y-2.5" role="list">
                 {VALUE_BULLETS.map((bullet) => (
                   <li
                     key={bullet}
                     className="flex items-center gap-2.5 text-sm text-neutral-700"
                   >
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#1775E0]/10 text-[#1775E0]">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--brand)]/10 text-[var(--brand)]">
                       <Check
                         className="h-3 w-3"
                         strokeWidth={2.5}
@@ -193,7 +193,7 @@ export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeMod
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-xl border border-neutral-200 px-5 py-2.5 text-sm font-medium text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 transition"
+                className="rounded-xl border border-[var(--border)] px-5 py-2.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition"
               >
                 Maybe Later
               </button>
@@ -201,7 +201,7 @@ export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeMod
               <button
                 type="button"
                 onClick={handlePrimary}
-                className="rounded-xl bg-[#1775E0] px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#1462C4] focus:outline-none focus:ring-2 focus:ring-[#1775E0] focus:ring-offset-2 transition"
+                className="rounded-xl bg-[var(--brand)] px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[var(--brand-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:ring-offset-2 transition"
               >
                 {ctaLabel}
               </button>

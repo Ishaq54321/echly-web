@@ -71,11 +71,11 @@ export function SessionNavigator({
           {isUnread && <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-warning-dot)]/90" />}
         </span>
         {s.session.title?.trim() ? (
-          <span className="truncate text-[13px] text-[hsl(var(--text-primary-strong))]">
+          <span className="truncate text-[14px] text-[var(--text-primary-strong)]">
             {s.session.title}
           </span>
         ) : null}
-        <span className="shrink-0 text-[11px] tabular-nums text-[hsl(var(--text-tertiary))]">
+        <span className="shrink-0 text-[12px] tabular-nums text-[var(--text-tertiary)]">
           {open}
         </span>
       </>
@@ -105,7 +105,7 @@ export function SessionNavigator({
         <button
           type="button"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); togglePinned(s.session.id); }}
-          className="shrink-0 p-1 rounded opacity-0 group-hover:opacity-70 text-[hsl(var(--text-tertiary))] hover:text-[hsl(var(--text-primary-strong))]"
+          className="shrink-0 p-1 rounded opacity-0 group-hover:opacity-70 text-[var(--text-tertiary)] hover:text-[var(--text-primary-strong)]"
           aria-label={isPinned ? "Unpin" : "Pin"}
         >
           {isPinned ? <PinOff className="h-3 w-3" strokeWidth={1.5} /> : <Pin className="h-3 w-3" strokeWidth={1.5} />}
@@ -120,32 +120,32 @@ export function SessionNavigator({
       aria-label="Sessions"
     >
       <div className="shrink-0 px-3 pt-3 pb-2">
-        <h2 className="text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))]">
+        <h2 className="text-[12px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
           Sessions
         </h2>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-4">
         {pinned.length > 0 && (
           <section className="mb-3">
-            <h3 className="text-[10px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))] px-1 pb-1">
+            <h3 className="text-[12px] font-medium uppercase tracking-wider text-[var(--text-tertiary)] px-1 pb-1">
               Pinned
             </h3>
             {pinned.map((s) => renderRow(s))}
           </section>
         )}
         <section className="mb-3">
-          <h3 className="text-[10px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))] px-1 pb-1">
+          <h3 className="text-[12px] font-medium uppercase tracking-wider text-[var(--text-tertiary)] px-1 pb-1">
             Active
           </h3>
           {activeUnpinned.length === 0 && pinned.length === 0 ? (
-            <p className="text-[12px] text-[hsl(var(--text-tertiary))] px-2 py-1">None</p>
+            <p className="text-[12px] text-[var(--text-tertiary)] px-2 py-1">None</p>
           ) : (
             activeUnpinned.map((s) => renderRow(s))
           )}
         </section>
         {archived.length > 0 && (
           <section>
-            <h3 className="text-[10px] font-medium uppercase tracking-wider text-[hsl(var(--text-tertiary))] px-1 pb-1">
+            <h3 className="text-[12px] font-medium uppercase tracking-wider text-[var(--text-tertiary)] px-1 pb-1">
               Archived
             </h3>
             {archived.map((s) => renderRow(s))}

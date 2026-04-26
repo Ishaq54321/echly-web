@@ -19,7 +19,7 @@ export function ActiveSessionsSection({ items, onView }: ActiveSessionsSectionPr
       className="rounded-xl border border-[var(--layer-1-border)] bg-[var(--layer-1-bg)] py-5 px-5 shadow-[var(--shadow-level-1)]"
       aria-label="Active Sessions"
     >
-      <h2 className="text-[16px] font-semibold leading-[1.35] tracking-[-0.01em] text-[hsl(var(--text-primary-strong))] mb-4">
+      <h2 className="text-[16px] font-semibold leading-[1.35] tracking-[-0.01em] text-[var(--text-primary-strong)] mb-4">
         Active Sessions
       </h2>
       <ul className="flex flex-col gap-0.5">
@@ -38,14 +38,14 @@ export function ActiveSessionsSection({ items, onView }: ActiveSessionsSectionPr
                 className="w-full text-left px-3 py-2.5 rounded-lg bg-transparent hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-150 ease-out focus:outline-none focus:ring-1 focus:ring-[var(--color-primary-ring)] flex items-center justify-between gap-4"
               >
                 {session.title?.trim() ? (
-                  <span className="text-[14px] font-semibold leading-[1.4] text-[hsl(var(--text-primary-strong))] truncate min-w-0">
+                  <span className="text-[14px] font-semibold leading-[1.4] text-[var(--text-primary-strong)] truncate min-w-0">
                     {session.title}
                   </span>
                 ) : (
                   <span className="min-w-0 flex-1" />
                 )}
                 {metaParts.length > 0 ? (
-                  <span className="text-[12px] text-[hsl(var(--text-tertiary))] shrink-0 tabular-nums">
+                  <span className="text-[12px] text-[var(--text-tertiary)] shrink-0 tabular-nums">
                     {metaParts.join(" · ")}
                   </span>
                 ) : null}

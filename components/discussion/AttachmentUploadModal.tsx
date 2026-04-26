@@ -185,14 +185,14 @@ export function AttachmentUploadModal({
           aria-hidden
         />
         <div
-          className="relative w-full max-w-[520px] rounded-xl border border-neutral-200 bg-white shadow-lg"
+          className="relative w-full max-w-[520px] rounded-xl border border-[var(--border)] bg-white shadow-lg"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between px-6 pt-6 pb-2">
             <div>
               <h2
                 id="upload-attachment-title"
-                className="text-lg font-semibold text-neutral-900"
+                className="text-lg font-semibold text-[var(--text-heading)]"
               >
                 Upload attachment
               </h2>
@@ -203,7 +203,7 @@ export function AttachmentUploadModal({
             <button
               type="button"
               onClick={handleClose}
-              className="p-2 rounded-lg text-secondary hover:bg-neutral-100 hover:text-neutral-700 transition-colors"
+              className="p-2 rounded-lg text-secondary hover:bg-[var(--surface-hover)] hover:text-neutral-700 transition-colors"
               aria-label="Close"
             >
               <X className="h-5 w-5" strokeWidth={1.5} />
@@ -220,7 +220,7 @@ export function AttachmentUploadModal({
                 className={`
                   flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10
                   cursor-pointer transition-colors duration-150
-                  ${dragOver ? "border-[var(--brand)] bg-[var(--brand-subtle)]" : "border-[#EBEBEB] hover:border-[var(--brand)] hover:bg-[var(--brand-subtle)]"}
+                  ${dragOver ? "border-[var(--brand)] bg-[var(--brand-subtle)]" : "border-[var(--border)] hover:border-[var(--brand)] hover:bg-[var(--brand-subtle)]"}
                 `}
               >
                 <input
@@ -239,7 +239,7 @@ export function AttachmentUploadModal({
                 <p className="text-sm text-secondary mt-0.5">or</p>
                 <button
                   type="button"
-                  className="mt-2 px-4 py-2 rounded-lg bg-neutral-100 text-neutral-700 text-sm font-medium hover:bg-neutral-200 transition-colors"
+                  className="mt-2 px-4 py-2 rounded-lg bg-[var(--surface-hover)] text-neutral-700 text-sm font-medium hover:bg-[var(--surface-hover)] transition-colors"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleChooseFile();
@@ -272,7 +272,7 @@ export function AttachmentUploadModal({
                     <img
                       src={imagePreviewUrl}
                       alt=""
-                      className="max-h-[220px] w-auto rounded-lg object-contain bg-neutral-50"
+                      className="max-h-[220px] w-auto rounded-lg object-contain bg-[var(--surface-subtle)]"
                     />
                     <p className="mt-2 text-sm font-medium text-neutral-700 truncate max-w-full">
                       {selectedFile.name}
@@ -282,8 +282,8 @@ export function AttachmentUploadModal({
                     </p>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-3 p-4 rounded-xl border border-neutral-200 bg-neutral-50">
-                    <div className="shrink-0 w-10 h-10 rounded-lg bg-neutral-200 flex items-center justify-center text-secondary">
+                  <div className="flex items-center gap-3 p-4 rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)]">
+                    <div className="shrink-0 w-10 h-10 rounded-lg bg-[var(--surface-hover)] flex items-center justify-center text-secondary">
                       <FileIcon className="h-5 w-5" strokeWidth={1.5} />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -299,9 +299,9 @@ export function AttachmentUploadModal({
 
                 {uploading && (
                   <div className="mt-4">
-                    <div className="h-[6px] rounded-full bg-neutral-200 overflow-hidden">
+                    <div className="h-[6px] rounded-full bg-[var(--surface-hover)] overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-[#1775E0] transition-all duration-300"
+                        className="h-full rounded-full bg-[var(--brand)] transition-all duration-300"
                         style={{
                           width: `${uploadProgress ?? 0}%`,
                         }}
@@ -329,7 +329,7 @@ export function AttachmentUploadModal({
               <button
                 type="button"
                 onClick={handleClose}
-                className="px-4 py-2.5 rounded-lg text-sm font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 transition-colors"
+                className="px-4 py-2.5 rounded-lg text-sm font-medium text-neutral-700 bg-[var(--surface-hover)] hover:bg-[var(--surface-hover)] transition-colors"
               >
                 Cancel
               </button>
@@ -337,7 +337,7 @@ export function AttachmentUploadModal({
                 type="button"
                 onClick={handleSend}
                 disabled={uploading || !uploadedAttachment}
-                className="px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-[#1775E0] hover:bg-[#1462C4] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Attach
               </button>

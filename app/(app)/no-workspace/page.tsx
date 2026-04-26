@@ -22,7 +22,7 @@ export default function NoWorkspacePage() {
         </div>
 
         <h1
-          className="text-gray-900 font-semibold"
+          className="text-[var(--text-heading)] font-semibold"
           style={{ fontSize: 24, letterSpacing: "-0.3px", marginBottom: 12 }}
         >
           You&apos;re not in any workspace
@@ -48,7 +48,7 @@ export default function NoWorkspacePage() {
           <button
             type="button"
             onClick={handleSignOut}
-            className="w-full flex items-center justify-center text-gray-700 font-medium rounded-xl border border-[#EBEBEB] bg-white hover:bg-gray-50 transition"
+            className="w-full flex items-center justify-center text-[var(--text-body)] font-medium rounded-xl border border-[var(--border)] bg-white hover:bg-[var(--surface-hover)] transition"
             style={{ height: 40, fontSize: 15 }}
           >
             Sign out

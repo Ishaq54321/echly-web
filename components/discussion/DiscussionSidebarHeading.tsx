@@ -10,7 +10,7 @@ export function DiscussionSidebarHeading({
   statsLoading: boolean;
 }) {
   return (
-    <div className="px-4 pt-4 pb-3 shrink-0 border-b border-neutral-100">
+    <div className="px-4 pt-4 pb-3 shrink-0 border-b border-[var(--border)]">
       <h2 className="text-sm font-semibold text-discussion-title leading-tight">
         Discussions
       </h2>

@@ -41,7 +41,7 @@ export function ScreenshotBlock({
 
   const outerFrame = embeddedInCard
     ? "rounded-lg overflow-hidden transition-transform duration-200 hover:scale-[1.005] group"
-    : "rounded-[var(--radius-xl)] overflow-hidden border border-[#E5E7EB] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-transform duration-200 hover:scale-[1.005] group";
+    : "rounded-[var(--radius-xl)] overflow-hidden border border-[var(--border)] shadow-[var(--shadow-sm)] transition-transform duration-200 hover:scale-[1.005] group";
   const innerRadius = embeddedInCard ? "rounded-lg" : "rounded-[var(--radius-xl)]";
 
   return (
@@ -66,11 +66,11 @@ export function ScreenshotBlock({
 
         {(loading && !url) || (Boolean(screenshotId) && !url && !error) ? (
           <div className="absolute inset-0 w-full h-full flex items-center justify-center z-10 bg-[var(--layer-2-bg)]/80">
-            <Loader2 className="h-6 w-6 animate-spin text-[hsl(var(--text-tertiary))]" strokeWidth={1.8} aria-hidden />
+            <Loader2 className="h-6 w-6 animate-spin text-[var(--text-tertiary)]" strokeWidth={1.8} aria-hidden />
           </div>
         ) : null}
         {!loading && screenshotId && !url && (
-          <div className="absolute inset-0 w-full h-full flex items-center justify-center z-10 bg-[var(--layer-2-bg)] text-[12px] text-[hsl(var(--text-tertiary))]">
+          <div className="absolute inset-0 w-full h-full flex items-center justify-center z-10 bg-[var(--layer-2-bg)] text-[12px] text-[var(--text-tertiary)]">
             {error ?? "Screenshot unavailable"}
           </div>
         )}
@@ -84,7 +84,7 @@ export function ScreenshotBlock({
                   e.stopPropagation();
                   onEdit();
                 }}
-                className="absolute top-3 right-[3.75rem] p-3 rounded-xl bg-white/95 text-[hsl(var(--text-primary-strong))] shadow-[var(--shadow-level-2)] hover:bg-white hover:shadow-[var(--shadow-level-3)] transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)]"
+                className="absolute top-3 right-[3.75rem] p-3 rounded-xl bg-white/95 text-[var(--text-primary-strong)] shadow-[var(--shadow-level-2)] hover:bg-white hover:shadow-[var(--shadow-level-3)] transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)]"
                 aria-label="Edit screenshot"
               >
                 <Pencil className="h-[1.375rem] w-[1.375rem]" strokeWidth={1.5} />
@@ -93,7 +93,7 @@ export function ScreenshotBlock({
             <button
               type="button"
               onClick={onExpand}
-              className="absolute top-3 right-3 p-3 rounded-xl bg-white/95 text-[hsl(var(--text-primary-strong))] shadow-[var(--shadow-level-2)] hover:bg-white hover:shadow-[var(--shadow-level-3)] transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)]"
+              className="absolute top-3 right-3 p-3 rounded-xl bg-white/95 text-[var(--text-primary-strong)] shadow-[var(--shadow-level-2)] hover:bg-white hover:shadow-[var(--shadow-level-3)] transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)]"
               aria-label="Expand screenshot"
             >
               <ZoomIn className="h-[1.375rem] w-[1.375rem]" strokeWidth={1.5} />

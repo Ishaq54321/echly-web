@@ -281,7 +281,7 @@ export function ImageCropModal({
             alignItems: "center",
             justifyContent: "space-between",
             padding: "0 20px",
-            borderBottom: "1px solid #EBEBEB",
+            borderBottom: "1px solid var(--border)",
           }}
         >
           <span style={{ fontSize: 16, fontWeight: 600, color: "#111" }}>{title}</span>
@@ -384,7 +384,7 @@ export function ImageCropModal({
         <div
           style={{
             padding: "16px 20px",
-            borderTop: "1px solid #EBEBEB",
+            borderTop: "1px solid var(--border)",
             display: "flex",
             justifyContent: "flex-end",
             gap: 8,
@@ -399,7 +399,7 @@ export function ImageCropModal({
               borderRadius: 10,
               border: "1px solid #D1D5DB",
               background: "white",
-              color: "#374151",
+              color: "var(--text-body)",
               fontSize: 14,
               fontWeight: 500,
               cursor: "pointer",

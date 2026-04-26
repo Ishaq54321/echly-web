@@ -15,7 +15,7 @@ export function Section({ title, children, titleMuted, titleSemantic }: SectionP
       ? "text-semantic-insight"
       : titleSemantic === "attention"
         ? "text-semantic-attention"
-        : "text-[#9CA3AF]";
+        : "text-[var(--text-tertiary)]";
   const mutedClass = titleMuted && !titleSemantic ? "opacity-80" : "";
   const hasTitle = title.trim().length > 0;
   return (
@@ -27,7 +27,7 @@ export function Section({ title, children, titleMuted, titleSemantic }: SectionP
           {title}
         </h2>
       ) : null}
-      <div className="gap-2 flex flex-col text-[15px] leading-[1.7] text-[hsl(var(--text-primary-strong))]">
+      <div className="gap-2 flex flex-col text-[15px] leading-[1.7] text-[var(--text-primary-strong)]">
         {children}
       </div>
     </section>

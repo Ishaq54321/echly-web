@@ -77,7 +77,7 @@ function ActivityContextBlock({ children }: { children: ReactNode }) {
   return (
     <div className="relative mt-2 pl-4">
       <div
-        className="absolute bottom-0 left-0 top-0 w-[2px] rounded-full bg-[#1775E0]/60"
+        className="absolute bottom-0 left-0 top-0 w-[2px] rounded-full bg-[var(--brand)]/60"
         aria-hidden
       />
       <div className="py-1">{children}</div>
@@ -444,34 +444,34 @@ function deriveGroupRowModel(g: Extract<GroupedActivity, { type: "group" }>): Ro
 const PILL_STYLES: Record<string, { label: string; className: string; icon?: "check" | "reopen" }> = {
   "feedback.resolved": {
     label: "Resolved",
-    className: "bg-[#EAF3DE] text-[#3B6D11] border-[#C0DD97]",
+    className: "bg-[var(--color-success-bg)] text-[var(--color-success)] border-[var(--color-success-border)]",
     icon: "check",
   },
   "feedback.reopened": {
     label: "Reopened",
-    className: "bg-[#FAEEDA] text-[#854F0B] border-[#FAC775]",
+    className: "bg-[var(--color-warning-bg)] text-[var(--color-warning-text)] border-[var(--color-warning-border)]",
     icon: "reopen",
   },
   "feedback.created": {
     label: "New",
-    className: "bg-[#EEEDFE] text-[#534AB7] border-[#CECBF6]",
+    className: "bg-[var(--color-insight-bg)] text-[var(--color-insight)] border-[var(--color-insight-border)]",
   },
   "session.created": {
     label: "Session",
-    className: "bg-[#E6F1FB] text-[#185FA5] border-[#B5D4F4]",
+    className: "bg-[var(--color-info-bg)] text-[var(--color-info)] border-[var(--color-info-border)]",
   },
   "session.archived": {
     label: "Archived",
-    className: "bg-neutral-100 text-muted-foreground border-neutral-200",
+    className: "bg-[var(--surface-hover)] text-muted-foreground border-[var(--border)]",
   },
   "access_request.approved": {
     label: "Approved",
-    className: "bg-[#EAF3DE] text-[#3B6D11] border-[#C0DD97]",
+    className: "bg-[var(--color-success-bg)] text-[var(--color-success)] border-[var(--color-success-border)]",
     icon: "check",
   },
   "access_request.rejected": {
     label: "Rejected",
-    className: "bg-[#FCEBEB] text-[#A32D2D] border-[#F7C1C1]",
+    className: "bg-[var(--color-danger-bg)] text-[var(--color-danger)] border-[var(--color-danger-border)]",
   },
 };
 

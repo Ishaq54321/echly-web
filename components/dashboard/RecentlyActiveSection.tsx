@@ -30,7 +30,7 @@ export function RecentlyActiveSection({ sessions, onView }: RecentlyActiveSectio
       className="rounded-xl border border-[var(--layer-1-border)] bg-[var(--layer-1-bg)] py-5 px-5 shadow-[var(--shadow-level-1)]"
       aria-label="Recently Active"
     >
-      <h2 className="text-[16px] font-semibold leading-[1.35] tracking-[-0.01em] text-[hsl(var(--text-primary-strong))] mb-4">
+      <h2 className="text-[16px] font-semibold leading-[1.35] tracking-[-0.01em] text-[var(--text-primary-strong)] mb-4">
         Recently Active
       </h2>
       <ul className="flex flex-col gap-0.5">
@@ -53,18 +53,18 @@ export function RecentlyActiveSection({ sessions, onView }: RecentlyActiveSectio
               >
                 <div className="min-w-0 flex-1">
                   {session.title?.trim() ? (
-                    <div className="text-[14px] font-semibold leading-[1.4] text-[hsl(var(--text-primary-strong))] truncate">
+                    <div className="text-[14px] font-semibold leading-[1.4] text-[var(--text-primary-strong)] truncate">
                       {session.title}
                     </div>
                   ) : null}
                   {subParts.length > 0 ? (
-                    <div className="text-[12px] text-[hsl(var(--text-tertiary))] mt-0.5 tabular-nums">
+                    <div className="text-[12px] text-[var(--text-tertiary)] mt-0.5 tabular-nums">
                       {subParts.join(" · ")}
                     </div>
                   ) : null}
                 </div>
                 {last ? (
-                  <span className="text-[12px] text-[hsl(var(--text-tertiary))] shrink-0 tabular-nums">
+                  <span className="text-[12px] text-[var(--text-tertiary)] shrink-0 tabular-nums">
                     {last}
                   </span>
                 ) : null}

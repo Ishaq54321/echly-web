@@ -35,10 +35,10 @@ const PRIORITIES: PriorityConfig[] = [
   {
     value: "low",
     label: "Low",
-    color: "#6B7280",
+    color: "var(--text-secondary)",
     bg: "#F9FAFB",
-    border: "#E5E7EB",
-    icon: <Flag size={14} style={{ fill: "#6B7280", color: "#6B7280" }} />,
+    border: "var(--border)",
+    icon: <Flag size={14} style={{ fill: "var(--text-secondary)", color: "var(--text-secondary)" }} />,
   },
 ];
 
@@ -49,6 +49,7 @@ interface PriorityDropdownProps {
   onSaveStateChange?: (state: 'saving' | 'saved' | 'error' | 'hidden') => void;
   disabled?: boolean;
   readOnly?: boolean;
+  iconOnly?: boolean;
 }
 
 export function PriorityDropdown({
@@ -58,6 +59,7 @@ export function PriorityDropdown({
   onSaveStateChange,
   disabled = false,
   readOnly = false,
+  iconOnly = false,
 }: PriorityDropdownProps) {
   const [open, setOpen] = useState(false);
   const [animate, setAnimate] = useState(false);
@@ -132,6 +134,25 @@ export function PriorityDropdown({
     if (currentPriority) {
       const activePriorityRO = PRIORITIES.find(p => p.value === currentPriority);
       if (!activePriorityRO) return null;
+      if (iconOnly) {
+        return (
+          <div
+            title={`${activePriorityRO.label} Priority`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 36,
+              height: 36,
+              borderRadius: 'var(--radius-sm)',
+              color: activePriorityRO.color,
+              cursor: 'default',
+              flexShrink: 0,
+            }}>
+            <Flag size={16} strokeWidth={1.8} style={{ flexShrink: 0, fill: 'currentColor' }} />
+          </div>
+        );
+      }
       return (
         <div style={{
           display: 'inline-flex',
@@ -174,31 +195,56 @@ export function PriorityDropdown({
       }
     : {};
 
-  const noPriorityCls = `inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[9px] text-[14px] font-medium border border-[#EBEBEB] bg-white text-[#44403C] hover:bg-[#F4F5F7] hover:border-[#D5D5D5] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`;
+  const noPriorityCls = `inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[var(--radius-sm)] text-[14px] font-medium border border-[var(--border)] bg-white text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`;
 
   return (
     <div ref={containerRef} style={{ position: "relative", display: "inline-block" }}>
-      <button
-        type="button"
-        style={activePriority ? activeStyle : undefined}
-        className={!activePriority ? noPriorityCls : undefined}
-        disabled={disabled || isSaving}
-        onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
-      >
-        {activePriority ? (
-          <>
-            <span style={{ color: activePriority.color, display: "flex", alignItems: "center", flexShrink: 0 }}>
-              {activePriority.icon}
-            </span>
-            {activePriority.label} Priority
-          </>
+      {iconOnly ? (
+        activePriority ? (
+          <button
+            type="button"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--surface-hover)] transition-colors cursor-pointer"
+            style={{ color: activePriority.color }}
+            title={`${activePriority.label} Priority`}
+            disabled={disabled || isSaving}
+            onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
+          >
+            <Flag size={16} strokeWidth={1.8} className="shrink-0" fill="currentColor" />
+          </button>
         ) : (
-          <>
-            <Flag size={16} style={{ flexShrink: 0 }} aria-hidden />
-            Priority
-          </>
-        )}
-      </button>
+          <button
+            type="button"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors cursor-pointer"
+            title="Set priority"
+            disabled={disabled || isSaving}
+            onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
+          >
+            <Flag size={16} strokeWidth={1.8} className="shrink-0" />
+          </button>
+        )
+      ) : (
+        <button
+          type="button"
+          style={activePriority ? activeStyle : undefined}
+          className={!activePriority ? noPriorityCls : undefined}
+          disabled={disabled || isSaving}
+          onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
+        >
+          {activePriority ? (
+            <>
+              <span style={{ color: activePriority.color, display: "flex", alignItems: "center", flexShrink: 0 }}>
+                {activePriority.icon}
+              </span>
+              {activePriority.label} Priority
+            </>
+          ) : (
+            <>
+              <Flag size={16} style={{ flexShrink: 0 }} aria-hidden />
+              Priority
+            </>
+          )}
+        </button>
+      )}
 
       {open && (
         <div

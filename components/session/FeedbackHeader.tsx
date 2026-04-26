@@ -15,7 +15,7 @@ import {
   MessageSquare,
   Trash2,
   Lock,
-  Minus,
+  Flag,
 } from "lucide-react";
 import { AssignDropdown } from "@/components/feedback/AssignDropdown";
 import { PriorityDropdown } from "@/components/feedback/PriorityDropdown";
@@ -27,23 +27,26 @@ const iconBtn = {
 } as const;
 
 const resolveBtn =
-  "inline-flex h-9 items-center gap-1.5 px-4 rounded-[9px] text-[14px] font-semibold border border-transparent bg-[#1775E0] text-white shadow-[0_1px_3px_rgba(23,117,224,0.25)] hover:bg-[#1462C4] hover:shadow-[0_2px_8px_rgba(23,117,224,0.30)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/40 transition-all duration-150 ease cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
+  "inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--brand)] text-white shadow-[0_1px_3px_rgba(23,117,224,0.2)] hover:bg-[var(--brand-hover)] hover:shadow-[0_2px_6px_rgba(23,117,224,0.25)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
 
 const requestResolveAccessBtn =
-  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[9px] text-[14px] font-medium border border-[#C3DFFE] bg-[#EBF4FF] text-[#1775E0] shadow-none hover:bg-[#EBF4FF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/40 transition-all duration-150 ease cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
+  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[var(--radius-sm)] text-[15px] font-medium border border-[var(--brand-muted)] bg-[var(--brand-subtle)] text-[var(--brand)] shadow-none hover:bg-[var(--brand-subtle)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/40 transition-all duration-150 ease cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
 
 // Blue variant for AUTH VIEWER on the dashboard surface
 const requestResolveAccessBtnOrange =
-  "inline-flex h-9 items-center gap-1.5 px-[14px] rounded-[9px] text-[14px] font-semibold border-none bg-[#1775E0] text-white shadow-[0_1px_3px_rgba(23,117,224,0.25)] hover:bg-[#1462C4] hover:shadow-[0_2px_8px_rgba(23,117,224,0.30)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/40 transition-all duration-[140ms] ease cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
+  "inline-flex h-9 items-center gap-1.5 px-[14px] rounded-[var(--radius-sm)] text-[15px] font-semibold border-none bg-[var(--brand)] text-white shadow-[0_1px_3px_rgba(23,117,224,0.25)] hover:bg-[var(--brand-hover)] hover:shadow-[0_2px_8px_rgba(23,117,224,0.30)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/40 transition-all duration-[140ms] ease cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
 
 const pendingResolveAccessBtn =
-  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[9px] text-[14px] font-medium border border-[#EBEBEB] bg-[#F1F2F4] text-[#A8A29E] cursor-default opacity-95 pointer-events-none select-none";
+  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[var(--radius-sm)] text-[15px] font-medium border border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--text-tertiary)] cursor-default opacity-95 pointer-events-none select-none";
 
 const secondaryBtn =
-  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[9px] text-[14px] font-medium border border-[#EBEBEB] bg-white text-[#44403C] hover:bg-[#F4F5F7] hover:border-[#D5D5D5] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease cursor-pointer";
+  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[var(--radius-sm)] text-[15px] font-medium border border-[var(--border)] bg-white text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:border-[var(--border)] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease cursor-pointer";
+
+const ghostIconBtn =
+  "inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors cursor-pointer";
 
 const btnDelete =
-  "group inline-flex h-9 items-center px-2.5 rounded-[9px] text-[14px] font-medium border border-[#EBEBEB] bg-white text-[#44403C] hover:bg-[var(--color-danger-bg)] hover:text-[var(--color-danger)] hover:border-[var(--color-danger-border)] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease cursor-pointer";
+  "inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-tertiary)] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors cursor-pointer";
 
 function StatusBadge({ status }: { status: FeedbackStatus }) {
   const base =
@@ -55,11 +58,11 @@ function StatusBadge({ status }: { status: FeedbackStatus }) {
   }
   if (status === "Open") {
     return (
-      <span className={`${base} bg-[#EBF4FF] text-[#0F5BB5]`}>Open</span>
+      <span className={`${base} bg-[var(--brand-subtle)] text-[var(--brand)]`}>Open</span>
     );
   }
   const styles: Record<Exclude<FeedbackStatus, "Open" | "Resolved">, string> = {
-    "In Progress": "bg-[#F1F2F4] text-[#78716C]",
+    "In Progress": "bg-[var(--surface-subtle)] text-[var(--text-secondary)]",
     Blocked: "bg-[var(--color-danger-bg)] text-[var(--color-danger)]",
   };
   return <span className={`${base} ${styles[status]}`}>{status}</span>;
@@ -206,20 +209,20 @@ export function SessionFeedbackHeader({
   };
 
   return (
-    <header className="sticky top-0 z-20 shrink-0 bg-white/95 backdrop-blur-[2px] pt-4 px-6 -mx-6 pb-0">
-      <div className="flex items-start justify-between gap-3 min-w-0 mb-5">
+    <header className="sticky top-0 z-20 shrink-0 bg-[var(--surface-subtle)] pt-4 px-0 pb-0">
+      <div className="flex items-start justify-between gap-4 min-w-0 mb-6">
+        {/* Left: title + meta */}
         <div className="min-w-0 flex-1">
           {titleTrim ? (
             <h1
-              className="text-[24px] font-bold tracking-[-0.4px] text-[#1C1B1F] truncate leading-tight"
-              title={titleTrim}
+              className="text-[18px] font-semibold tracking-[-0.01em] text-[var(--text-heading)] leading-[1.3]"
             >
               {titleTrim}
             </h1>
           ) : null}
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
             {positionLabel != null ? (
-              <span className="ticket-pill inline-flex items-center bg-[#F1F2F4] px-2.5 py-1 rounded-full text-xs font-medium text-[#A8A29E]">
+              <span className="ticket-pill inline-flex items-center bg-[var(--surface-subtle)] px-2.5 py-0.5 rounded-full text-[14px] font-medium text-[var(--text-secondary)]">
                 {positionLabel}
               </span>
             ) : null}
@@ -235,20 +238,15 @@ export function SessionFeedbackHeader({
               </span>
             ) : null}
             {item != null && impactScore != null ? (
-              <span className="text-xs tabular-nums text-[#A8A29E] font-medium">
+              <span className="text-[14px] tabular-nums text-[var(--text-secondary)] font-medium">
                 Impact {impactScore}
               </span>
             ) : null}
           </div>
         </div>
-      </div>
 
-      <div
-        className={`flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap ${
-          shareGating ? "mb-3" : "mb-5"
-        }`}
-      >
-        <div className="left flex flex-wrap items-center gap-2.5 min-w-0">
+        {/* Right: action buttons */}
+        <div className="flex items-center gap-1.5 shrink-0 pt-1.5">
           {shareGating ? (
             isActionable ? (
               <>
@@ -257,6 +255,7 @@ export function SessionFeedbackHeader({
                     type="button"
                     onClick={gateResolve}
                     disabled={isResolved}
+                    title={isResolved ? "Unresolve" : "Resolve"}
                     className={
                       isResolved
                         ? `${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`
@@ -264,17 +263,16 @@ export function SessionFeedbackHeader({
                     }
                   >
                     <CheckCircle {...iconBtn} aria-hidden />
-                    <span>{isResolved ? "Resolved" : "Resolve"}</span>
                   </button>
                 ) : shareGating.onRequestResolveAccess ? (
                   isResolved ? (
                     <button
                       type="button"
                       disabled
+                      title="Resolved"
                       className={`${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                       <CheckCircle {...iconBtn} aria-hidden />
-                      <span>Resolved</span>
                     </button>
                   ) : shareGating.pendingResolve ? (
                     <button type="button" disabled className={pendingResolveAccessBtn}>
@@ -297,6 +295,7 @@ export function SessionFeedbackHeader({
                     type="button"
                     onClick={gateResolve}
                     disabled={isResolved}
+                    title={isResolved ? "Unresolve" : "Resolve"}
                     className={
                       isResolved
                         ? `${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`
@@ -304,20 +303,16 @@ export function SessionFeedbackHeader({
                     }
                   >
                     <CheckCircle {...iconBtn} aria-hidden />
-                    <span>{isResolved ? "Resolved" : "Resolve"}</span>
                   </button>
                 )}
-                <button type="button" className={secondaryBtn} onClick={gateAssign}>
+                <button type="button" className={ghostIconBtn} onClick={gateAssign} aria-label="Assign">
                   <UserPlus {...iconBtn} aria-hidden />
-                  Assign
                 </button>
-                <button type="button" className={secondaryBtn} onClick={gateDefer}>
-                  <Minus {...iconBtn} aria-hidden />
-                  Priority
+                <button type="button" className={ghostIconBtn} onClick={gateDefer} aria-label="Priority">
+                  <Flag size={16} strokeWidth={1.8} className="shrink-0" aria-hidden />
                 </button>
-                <button type="button" className={secondaryBtn} onClick={gateComment}>
+                <button type="button" className={ghostIconBtn} onClick={gateComment} aria-label="Comment">
                   <MessageSquare {...iconBtn} aria-hidden />
-                  Comment
                 </button>
               </>
             ) : null
@@ -336,17 +331,16 @@ export function SessionFeedbackHeader({
                     }
                   >
                     <CheckCircle {...iconBtn} aria-hidden />
-                    <span>{isResolved ? "Resolved" : "Resolve"}</span>
                   </button>
                 ) : accessResolve != null ? (
                   isResolved ? (
                     <button
                       type="button"
                       disabled
+                      title="Resolved"
                       className={`${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                       <CheckCircle {...iconBtn} aria-hidden />
-                      <span>Resolved</span>
                     </button>
                   ) : accessResolve.pendingResolve ? (
                     <button type="button" disabled className={pendingResolveAccessBtn}>
@@ -370,10 +364,10 @@ export function SessionFeedbackHeader({
                     type="button"
                     disabled
                     title="Not available on shared links yet"
-                    className={`${secondaryBtn} opacity-60 cursor-not-allowed`}
+                    className={`${ghostIconBtn} opacity-60 cursor-not-allowed`}
+                    aria-label="Comment"
                   >
                     <MessageSquare {...iconBtn} aria-hidden />
-                    Comment
                   </button>
                 ) : isAnonymousViewer ? (
                   <button
@@ -383,10 +377,10 @@ export function SessionFeedbackHeader({
                         window.location.pathname + window.location.search
                       )}`;
                     }}
-                    className={secondaryBtn}
+                    className={ghostIconBtn}
+                    aria-label="Sign in to comment"
                   >
                     <MessageSquare {...iconBtn} aria-hidden />
-                    Sign in to comment
                   </button>
                 ) : null}
                 {item && assigneeId && (
@@ -399,6 +393,7 @@ export function SessionFeedbackHeader({
                     onAssigned={() => {}}
                     disabled={true}
                     readOnly={true}
+                    iconOnly
                   />
                 )}
                 {item && priority && (
@@ -408,6 +403,7 @@ export function SessionFeedbackHeader({
                     onPriorityChanged={() => {}}
                     disabled={true}
                     readOnly={true}
+                    iconOnly
                   />
                 )}
               </>
@@ -425,10 +421,10 @@ export function SessionFeedbackHeader({
                     <button
                       type="button"
                       disabled
+                      title="Resolved"
                       className={`${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                       <CheckCircle {...iconBtn} aria-hidden />
-                      <span>Resolved</span>
                     </button>
                   ) : accessResolve.pendingResolve ? (
                     <button type="button" disabled className={pendingResolveAccessBtn}>
@@ -452,6 +448,7 @@ export function SessionFeedbackHeader({
                     type="button"
                     onClick={() => onResolvedChange(true)}
                     disabled={isResolved || resolveSubmitting}
+                    title={isResolved ? "Resolved" : "Resolve"}
                     className={
                       isResolved
                         ? `${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`
@@ -459,7 +456,6 @@ export function SessionFeedbackHeader({
                     }
                   >
                     <CheckCircle {...iconBtn} aria-hidden />
-                    <span>{isResolved ? "Resolved" : "Resolve"}</span>
                   </button>
                 )
               ) : null}
@@ -484,6 +480,7 @@ export function SessionFeedbackHeader({
                     onSaveStateChange={canManage ? onSaveStateChange : undefined}
                     disabled={!canManage}
                     readOnly={!canManage}
+                    iconOnly
                   />
                 );
               })()}
@@ -504,6 +501,7 @@ export function SessionFeedbackHeader({
                     onSaveStateChange={canManage ? onSaveStateChange : undefined}
                     disabled={!canManage}
                     readOnly={!canManage}
+                    iconOnly
                   />
                 );
               })()}
@@ -513,39 +511,33 @@ export function SessionFeedbackHeader({
                   onClick={() =>
                     isCommentMode ? onCloseCommentMode?.() : onOpenComment()
                   }
-                  className={`${secondaryBtn} ${
-                    isCommentMode ? "bg-[#F1F2F4] border-[#D5D5D5] text-[#1C1B1F]" : ""
+                  className={`${ghostIconBtn} ${
+                    isCommentMode ? "bg-[var(--surface-subtle)] text-[var(--text-heading)]" : ""
                   }`}
+                  aria-label="Comment"
                 >
                   <MessageSquare {...iconBtn} aria-hidden />
-                  Comment
+                </button>
+              ) : null}
+              {onDelete ? (
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  className={btnDelete}
+                  aria-label="Delete ticket"
+                  title="Delete ticket"
+                >
+                  <Trash2
+                    size={16}
+                    strokeWidth={1.8}
+                    aria-hidden
+                    className="shrink-0 text-inherit"
+                  />
                 </button>
               ) : null}
             </>
           ) : null}
         </div>
-
-        {onDelete && !shareGating && isActionable ? (
-          <div className="right shrink-0">
-            <button
-              type="button"
-              onClick={onDelete}
-              className={btnDelete}
-              aria-label="Delete ticket"
-              title="Delete ticket"
-            >
-              <Trash2
-                size={16}
-                strokeWidth={1.8}
-                aria-hidden
-                className="shrink-0 text-inherit transition-all duration-150 group-hover:w-0 group-hover:opacity-0 group-hover:overflow-hidden"
-              />
-              <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-150 ease group-hover:max-w-[100px] group-hover:opacity-100 pr-1 pl-0.5">
-                Delete ticket
-              </span>
-            </button>
-          </div>
-        ) : null}
       </div>
     </header>
   );

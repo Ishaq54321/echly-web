@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import dynamic from "next/dynamic";
-import { Check, Link as LinkIcon, Loader2 } from "lucide-react";
+import { Check, Link as LinkIcon, Loader2, PanelLeftOpen, Search } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ShareButton } from "@/components/share/ShareButton";
 
@@ -36,6 +37,18 @@ export function TopControlBar({
   pendingRequestsCount = 0,
   onShareModalOpen,
   sessionLoaded = false,
+  openCount,
+  resolvedCount,
+  searchQuery,
+  onSearchChange,
+  isEditingTitle,
+  onTitleClick,
+  onTitleChange,
+  onTitleSave,
+  onTitleCancel,
+  titleDraft,
+  canEditTitle,
+  onToggleNavPanel,
 }: {
   sessionId: string;
   sessionTitle?: string;
@@ -63,6 +76,18 @@ export function TopControlBar({
   onShareModalOpen?: () => void;
   /** True once the session bundle fetch has resolved (success or error). Gates share/actions buttons. */
   sessionLoaded?: boolean;
+  openCount?: number;
+  resolvedCount?: number;
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
+  isEditingTitle?: boolean;
+  onTitleClick?: () => void;
+  onTitleChange?: (value: string) => void;
+  onTitleSave?: () => void;
+  onTitleCancel?: () => void;
+  titleDraft?: string;
+  canEditTitle?: boolean;
+  onToggleNavPanel?: () => void;
 }) {
   const { authUid, isIdentityResolved } = useWorkspace();
   const copyTimerRef = useRef<number | null>(null);
@@ -122,11 +147,61 @@ export function TopControlBar({
 
   return (
     <>
-      <div className="page-header sticky top-0 z-50 flex h-16 w-full shrink-0 items-center justify-end gap-4 bg-[var(--layer-1-bg)] px-6">
-        <div className="right flex shrink-0 items-center gap-2.5">
-          {/* Share button with notification dot */}
-          <div style={{ position: "relative", display: "inline-flex" }}>
+      <div className="page-header sticky top-0 z-50 flex h-14 w-full shrink-0 items-center px-5 bg-[var(--surface-card)]">
+        {/* Left: Panel Toggle + Logo */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={onToggleNavPanel}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors cursor-pointer"
+            title="Open navigation"
+          >
+            <PanelLeftOpen size={18} strokeWidth={1.5} />
+          </button>
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2 shrink-0"
+            title="Go to dashboard"
+          >
+            <div className="relative w-7 h-7 bg-[var(--brand)] rounded-md flex items-center justify-center overflow-hidden shrink-0">
+              <Image src="/Echly_logo.svg" alt="" fill sizes="28px" className="object-cover" />
+            </div>
+            <span className="text-[15px] font-bold text-[var(--text-heading)] tracking-[-0.01em]">Echly</span>
+          </Link>
+        </div>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Center: Search */}
+        <div className="relative shrink-0">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)]" strokeWidth={1.5} />
+          <input
+            type="text"
+            value={searchQuery ?? ""}
+            onChange={(e) => onSearchChange?.(e.target.value)}
+            placeholder="Search tickets..."
+            className="w-[220px] h-[34px] pl-9 pr-3 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-card)] text-[14px] text-[var(--text-body)] placeholder:text-[var(--text-secondary)] focus:outline-none focus:border-[var(--brand)] focus:ring-[1.5px] focus:ring-[var(--brand)]/15 transition-all font-[inherit]"
+          />
+        </div>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Right: Actions */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Share + Link grouped pill */}
+          <div className="relative inline-flex items-center bg-[var(--brand)] rounded-[var(--radius-sm)] overflow-hidden shadow-[0_1px_3px_rgba(23,117,224,0.2)]">
             <ShareButton onClick={handleShareOpen} disabled={!sessionLoaded} />
+            <button
+              type="button"
+              className="flex items-center justify-center h-[34px] w-[38px] text-white/80 hover:text-white hover:bg-[var(--brand-hover)] transition-colors border-l border-white/20"
+              onClick={copyCurrentLink}
+              title="Copy link"
+              disabled={linkCopyBusy}
+            >
+              <LinkIcon size={15} strokeWidth={2} />
+            </button>
             {pendingRequestsCount > 0 && (
               <span
                 style={{
@@ -200,24 +275,6 @@ export function TopControlBar({
               currentUserUid={authUid ?? undefined}
             />
           ) : null}
-          <button
-            type="button"
-            className={`icon-btn copy-link-btn ${linkCopied ? "copy-link-btn--copied" : ""}`}
-            aria-label={linkCopyBusy ? "Generating link…" : linkCopied ? "Copied" : "Copy link"}
-            disabled={linkCopyBusy}
-            onClick={copyCurrentLink}
-          >
-            {linkCopyBusy ? (
-              <Loader2 size={20} strokeWidth={2} className="animate-spin" aria-hidden />
-            ) : linkCopied ? (
-              <>
-                <Check size={18} strokeWidth={2.5} aria-hidden />
-                <span className="copy-link-label">Copied</span>
-              </>
-            ) : (
-              <LinkIcon size={20} strokeWidth={2} aria-hidden />
-            )}
-          </button>
 
           {session !== null && (isWorkspaceMember || canManageAccess) ? (
             <div
@@ -241,7 +298,7 @@ export function TopControlBar({
           ) : null}
 
           <span
-            className="divider mx-1.5 h-5 w-px shrink-0 bg-[#E8E8E8]"
+            className="w-[3px] h-[3px] rounded-full bg-[var(--border)] mx-0.5"
             aria-hidden
           />
 

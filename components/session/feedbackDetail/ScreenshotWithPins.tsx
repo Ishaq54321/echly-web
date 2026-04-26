@@ -22,7 +22,7 @@ const POPOVER_GAP_PX = 8;
 const TOOLTIP_MAX_LEN = 60;
 const POPOVER_Z_INDEX = 10050;
 const POPOVER_STYLE =
-  "rounded-xl bg-white border border-neutral-200/80 shadow-[0_12px_40px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.04)] min-w-[300px] max-w-[380px] w-[min(380px,90vw)] p-6 animate-in fade-in zoom-in-95 duration-[120ms] ease-out";
+  "rounded-xl bg-white border border-[var(--border)] shadow-[var(--shadow-lg)] min-w-[300px] max-w-[380px] w-[min(380px,90vw)] p-6 animate-in fade-in zoom-in-95 duration-[120ms] ease-out";
 
 interface ScreenshotWithPinsProps {
   screenshotId: string | null | undefined;
@@ -161,7 +161,7 @@ const PinMarker = memo(function PinMarker({
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
       </svg>
       {showTooltip && preview && (
-        <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1.5 rounded bg-neutral-800 text-white text-[11px] leading-snug whitespace-nowrap overflow-hidden max-w-[200px] truncate pointer-events-none z-30 shadow-lg">
+        <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1.5 rounded bg-neutral-800 text-white text-[12px] leading-snug whitespace-nowrap overflow-hidden max-w-[200px] truncate pointer-events-none z-30 shadow-lg">
           {preview}
         </span>
       )}
@@ -339,8 +339,8 @@ const ScreenshotWithPinsInner = ({
 
   const outerCard = embeddedInCard
     ? "block"
-    : "rounded-xl border border-[#E5E7EB] bg-white backdrop-blur-[6px] p-2.5 shadow-none";
-  const innerBorder = embeddedInCard ? "border-0" : "border border-[#E5E7EB]";
+    : "rounded-xl border border-[var(--border)] bg-white backdrop-blur-[6px] p-2.5 shadow-none";
+  const innerBorder = embeddedInCard ? "border-0" : "border border-[var(--border)]";
 
   return (
     <div className={outerCard}>
@@ -373,11 +373,11 @@ const ScreenshotWithPinsInner = ({
           {(screenshotLoading && !url) ||
           (Boolean(screenshotId) && !url && !screenshotError) ? (
             <div className="absolute inset-0 w-full h-full flex items-center justify-center pointer-events-none z-10 bg-[var(--layer-2-bg)]/80">
-              <Loader2 className="h-6 w-6 animate-spin text-[hsl(var(--text-tertiary))]" strokeWidth={1.8} aria-hidden />
+              <Loader2 className="h-6 w-6 animate-spin text-[var(--text-tertiary)]" strokeWidth={1.8} aria-hidden />
             </div>
           ) : null}
           {!screenshotLoading && screenshotId && !url && (
-            <div className="absolute inset-0 w-full h-full flex items-center justify-center z-10 bg-[var(--layer-2-bg)] text-[12px] text-[hsl(var(--text-tertiary))]">
+            <div className="absolute inset-0 w-full h-full flex items-center justify-center z-10 bg-[var(--layer-2-bg)] text-[12px] text-[var(--text-tertiary)]">
               {screenshotError ?? "Screenshot unavailable"}
             </div>
           )}
@@ -444,7 +444,7 @@ const ScreenshotWithPinsInner = ({
 
                 {/* Row 1: Avatar + textarea */}
                 <div className="flex items-start gap-3 px-4 pt-4">
-                  <div className="w-[28px] h-[28px] rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold text-[13px] flex items-center justify-center shrink-0 overflow-hidden mt-0.5">
+                  <div className="w-[28px] h-[28px] rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold text-[14px] flex items-center justify-center shrink-0 overflow-hidden mt-0.5">
                     {userAvatar ? (
                       <Image src={userAvatar} alt="" width={28} height={28} className="w-full h-full object-cover" unoptimized />
                     ) : (
@@ -494,9 +494,9 @@ const ScreenshotWithPinsInner = ({
                               <Paperclip className="h-4 w-4 text-white" />
                             </div>
                           )}
-                          <span className="flex-1 min-w-0 text-[13px] font-medium text-[var(--text-body)] truncate">
+                          <span className="flex-1 min-w-0 text-[14px] font-medium text-[var(--text-body)] truncate">
                             {att.file_name}
-                            {isLoading && <span className="ml-2 text-[11px] text-[var(--text-tertiary)]">Uploading...</span>}
+                            {isLoading && <span className="ml-2 text-[12px] text-[var(--text-tertiary)]">Uploading...</span>}
                           </span>
                           <button type="button" onClick={() => setDraftPendingAttachments(prev => prev.filter((_, idx) => idx !== i))}
                             className="p-1 rounded-md text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors shrink-0">
@@ -510,7 +510,7 @@ const ScreenshotWithPinsInner = ({
 
                 {draftFileError && (
                   <div className="flex items-center gap-2 mx-4 mb-1 px-3 py-2 bg-[var(--color-danger-bg)] border border-[var(--color-danger-border)] rounded-xl">
-                    <span className="text-[13px] font-medium text-[var(--color-danger)]">{draftFileError}</span>
+                    <span className="text-[14px] font-medium text-[var(--color-danger)]">{draftFileError}</span>
                     <button type="button" onClick={() => setDraftFileError(null)} className="ml-auto p-0.5 rounded text-[var(--color-danger)]">
                       <X className="h-3 w-3" />
                     </button>
@@ -567,7 +567,7 @@ const ScreenshotWithPinsInner = ({
                     <button
                       type="button"
                       onClick={handleCancelDraft}
-                      className="text-[13px] font-semibold text-[var(--text-body)] hover:text-[var(--text-heading)] px-2 py-1 transition-colors cursor-pointer"
+                      className="text-[14px] font-semibold text-[var(--text-body)] hover:text-[var(--text-heading)] px-2 py-1 transition-colors cursor-pointer"
                     >
                       Cancel
                     </button>
@@ -575,7 +575,7 @@ const ScreenshotWithPinsInner = ({
                       type="button"
                       onClick={() => void handleSubmitDraft()}
                       disabled={(!draftMessage.trim() && draftPendingAttachments.length === 0) || submitting}
-                      className="text-[13px] font-semibold text-white bg-[var(--brand)] hover:bg-[var(--brand-hover)] px-4 py-1.5 rounded-full disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer"
+                      className="text-[14px] font-semibold text-white bg-[var(--brand)] hover:bg-[var(--brand-hover)] px-4 py-1.5 rounded-full disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer"
                     >
                       {submitting ? "Sending..." : "Comment"}
                     </button>

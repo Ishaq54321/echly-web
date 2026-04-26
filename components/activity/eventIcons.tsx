@@ -20,7 +20,7 @@ export type EventIconEntry = {
 };
 
 export const eventIconMap: Record<string, EventIconEntry> = {
-  "comment.added":            { icon: MessageCircle, badgeClass: "bg-[#1775E0]" },
+  "comment.added":            { icon: MessageCircle, badgeClass: "bg-[var(--brand)]" },
   "feedback.created":         { icon: Plus,          badgeClass: "bg-[var(--color-insight)]" },
   "feedback.resolved":        { icon: Check,         badgeClass: "bg-[var(--color-success)]" },
   "feedback.reopened":        { icon: RotateCcw,     badgeClass: "bg-[var(--color-warning-dot)]" },
