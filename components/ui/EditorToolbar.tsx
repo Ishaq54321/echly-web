@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useRef, useEffect } from "react";
 import {
@@ -563,7 +563,7 @@ export function EditorToolbar({
             <button
               type="button"
               onClick={onApplyCrop}
-              className="h-10 px-4 bg-[var(--color-success-solid)] hover:bg-[var(--color-success)] text-white text-[14px] font-medium rounded-xl transition-colors flex items-center gap-1.5"
+              className="h-[38px] px-4 bg-[var(--color-success-solid)] hover:bg-[var(--color-success)] text-white text-[14px] font-medium rounded-[var(--radius-btn)] transition-colors flex items-center gap-1.5"
             >
               <Check className="h-4 w-4" strokeWidth={2} />
               Apply Crop
@@ -587,7 +587,7 @@ export function EditorToolbar({
           type="button"
           onClick={onSave}
           disabled={saving}
-          className="h-10 px-5 bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white text-[15px] font-medium rounded-xl transition-colors disabled:opacity-50 flex items-center gap-1.5"
+          className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
         >
           {saving ? (
             <Loader2 className="h-4 w-4 animate-spin" />

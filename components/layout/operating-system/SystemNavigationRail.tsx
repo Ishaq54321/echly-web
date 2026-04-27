@@ -106,7 +106,7 @@ export function SystemNavigationRail({ onOpenCommandPalette }: SystemNavigationR
                   key={item.label}
                   type="button"
                   onClick={onOpenCommandPalette}
-                  className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  className="w-[38px] h-[38px] rounded-[var(--radius-btn)] flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                   aria-label={title}
                   title={title}
                 >

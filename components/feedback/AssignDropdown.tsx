@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { UserPlus, UserMinus, Check, ChevronDown, Search } from "lucide-react";
@@ -324,11 +324,11 @@ export function AssignDropdown({
     display: "inline-flex",
     alignItems: "center",
     gap: 6,
-    height: 36,
-    padding: "0 14px",
+    height: 38,
+    padding: "0 16px",
     background: "var(--brand-subtle)",
     border: "1.5px solid var(--brand-muted)",
-    borderRadius: 9,
+    borderRadius: 'var(--radius-btn)',
     cursor: disabled ? "not-allowed" : "pointer",
     opacity: disabled ? 0.5 : 1,
     fontSize: 14,
@@ -336,7 +336,7 @@ export function AssignDropdown({
     color: "var(--brand)",
   };
 
-  const unassignedCls = `inline-flex items-center gap-1.5 px-3.5 rounded-[var(--radius-sm)] text-[14px] font-medium border border-[var(--border)] bg-white text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"} h-9`;
+  const unassignedCls = `inline-flex items-center gap-1.5 px-4 rounded-[var(--radius-btn)] text-[14px] font-medium border border-[var(--border)] bg-white text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"} h-[38px]`;
 
   const displayName = currentAssigneeName
     ? currentAssigneeName
@@ -354,23 +354,24 @@ export function AssignDropdown({
           hasAssignee ? (
             <button
               type="button"
-              className="inline-flex h-9 items-center gap-1.5 px-2.5 rounded-[var(--radius-sm)] text-[var(--text-body)] hover:bg-[var(--surface-hover)] transition-colors cursor-pointer"
+              className="inline-flex h-[42px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] text-[var(--text-body)] text-[14px] font-medium hover:bg-[var(--surface-hover)] transition-all cursor-pointer"
               title={tooltipText}
               disabled={disabled || isSaving}
               onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
             >
-              <Avatar name={displayName} avatarUrl={currentAssigneeAvatarUrl} size={20} />
-              <span className="text-[14px] font-medium truncate max-w-[80px]">{firstName}</span>
+              <Avatar name={displayName} avatarUrl={currentAssigneeAvatarUrl} size={22} />
+              <span className="truncate max-w-[80px]">{firstName}</span>
             </button>
           ) : (
             <button
               type="button"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors cursor-pointer"
+              className="inline-flex h-[42px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] text-[var(--text-body)] text-[14px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all cursor-pointer"
               title="Assign"
               disabled={disabled || isSaving}
               onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
             >
-              <UserPlus size={16} strokeWidth={1.8} className="shrink-0" />
+              <UserPlus size={18} strokeWidth={1.8} className="shrink-0" />
+              Assign
             </button>
           )
         ) : (
@@ -385,7 +386,7 @@ export function AssignDropdown({
             {hasAssignee ? (
               <>
                 <Avatar name={displayName} avatarUrl={currentAssigneeAvatarUrl} size={20} />
-                <span style={{ maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span style={{ maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {firstName}
                 </span>
                 <ChevronDown size={12} style={{ flexShrink: 0, color: "var(--brand)" }} />
@@ -611,7 +612,7 @@ export function AssignDropdown({
                   justifyContent: 'center',
                   flexShrink: 0,
                 }}>
-                  <UserPlus size={13} strokeWidth={1.8} color="var(--text-secondary)" />
+                  <UserPlus size={13} strokeWidth={1.8} color="var(--text-body)" />
                 </div>
                 Invite members to workspace
               </button>

@@ -24,7 +24,7 @@
   /* ─── SURFACES ───────────────────────────── */
   --surface-page:       #FFFFFF;
   --surface-card:       #FFFFFF;
-  --surface-subtle:     #FDFDFC;
+  --surface-subtle:     #F8F8F8;
   --surface-hover:      #F0F1F3;
   --surface-active:     #EBF4FF;
   --surface-input:      #FAFAFA;
@@ -65,6 +65,7 @@
   --radius-lg:    16px;
   --radius-xl:    22px;
   --radius-pill:  9999px;
+  --radius-btn:   20px;
 
   /* ─── TYPOGRAPHY ─────────────────────────── */
   --text-xs:      12px;
@@ -76,7 +77,7 @@
   --text-2xl:      28px;
   --text-3xl:      32px;
   --text-display:  44px;
-  --font-sans:    'Plus Jakarta Sans', sans-serif;
+  --font-sans:    'DM Sans', sans-serif;
 
   /* ─── SHADOWS ────────────────────────────── */
   --shadow-sm:    0 1px 3px rgba(0,0,0,0.06),
@@ -87,6 +88,12 @@
                   0 2px 8px rgba(0,0,0,0.06);
   --shadow-xl:    0 16px 48px rgba(0,0,0,0.14),
                   0 4px 14px rgba(0,0,0,0.08);
+  --shadow-card:  0 1px 0 rgba(28,25,23,0.04),
+                  0 6px 24px -16px rgba(28,25,23,0.10);
+
+  /* ─── WARM BORDERS (session page) ────────── */
+  --hair:         #E7E5E4;
+  --hair-strong:  #D6D3D1;
 
   /* ─── Z-INDEX ────────────────────────────── */
   --z-base:       1;
@@ -107,9 +114,9 @@
 
   /* ─── LAYOUT ─────────────────────────────── */
   --rail-width: 220px;
-  --rail-collapsed: 56px;
+  --rail-collapsed: 64px;
   --rail-expanded:  220px;
-  --topbar-height: 52px;
+  --topbar-height: 60px;
   --content-max-width: 1280px;
 
   /* ─── WEIGHT SCALE ───────────────────────── */
@@ -579,41 +586,44 @@ body {
 
 /* ─── Icon button ────────────────────────── */
 .icon-btn {
-  width: 36px !important;
-  height: 36px !important;
-  border-radius: var(--radius-sm) !important;
-  color: var(--text-body) !important;
-  transition: background var(--duration-fast) var(--ease) !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  border: none !important;
-  background: transparent !important;
-  cursor: pointer !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-btn);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
 }
 .icon-btn:hover {
-  background: var(--surface-hover) !important;
-  color: var(--text-heading) !important;
+  background: var(--surface-hover);
+  color: var(--text-heading);
 }
-.icon-btn svg { width: 18px !important; height: 18px !important; }
+.icon-btn svg { width: 18px; height: 18px; }
 
 /* ─── Primary button utility ─────────────── */
 .primary-btn {
-  background: var(--brand) !important;
-  border-radius: var(--radius-sm) !important;
-  height: 36px !important;
-  padding: 0 16px !important;
-  font-size: var(--text-sm) !important;
-  font-weight: var(--weight-semibold) !important;
-  color: #FFFFFF !important;
-  border: none !important;
-  cursor: pointer !important;
-  box-shadow: 0 1px 3px rgba(23,117,224,0.25) !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 20px;
+  border-radius: var(--radius-btn);
+  border: none;
+  background: var(--text-heading);
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.12s;
 }
-.primary-btn:hover {
-  background: var(--brand-hover) !important;
-  box-shadow: 0 2px 8px rgba(23,117,224,0.30) !important;
-}
+.primary-btn:hover { opacity: 0.85; }
+.primary-btn:disabled { opacity: 0.5; pointer-events: none; }
 
 .copy-link-btn.copy-link-btn--copied { color: var(--color-success) !important; }
 

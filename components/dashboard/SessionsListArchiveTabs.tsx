@@ -32,7 +32,7 @@ export function SessionsListArchiveTabs({
         className={`
               relative border-0 bg-transparent p-0 pb-3 text-[16px] transition-colors duration-200
               focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30 focus-visible:ring-offset-2 rounded-sm
-              ${isActive ? "z-10 font-semibold text-[var(--brand)]" : "font-medium text-neutral-500 hover:text-neutral-800"}
+              ${isActive ? "z-10 font-semibold text-[var(--text-heading)]" : "font-medium text-[var(--text-secondary)] hover:text-[var(--text-heading)]"}
             `}
       >
         {label}
@@ -49,7 +49,7 @@ export function SessionsListArchiveTabs({
   if (actions != null) {
     return (
       <div className="mb-6 w-full min-w-0">
-        <div className="relative flex w-full min-w-0 flex-wrap items-end justify-between gap-x-4 gap-y-3 border-b border-[#E6EAF0]">
+        <div className="relative flex w-full min-w-0 flex-wrap items-end justify-between gap-x-4 gap-y-3 border-b border-[var(--border)]">
           <nav
             className="flex min-w-0 items-center gap-10"
             role="tablist"
@@ -66,7 +66,7 @@ export function SessionsListArchiveTabs({
   return (
     <div className="mb-6 w-full">
       <nav
-        className="relative flex w-full items-center gap-10 border-b border-[#E6EAF0]"
+        className="relative flex w-full items-center gap-10 border-b border-[var(--border)]"
         role="tablist"
         aria-label="Sessions and archived"
       >

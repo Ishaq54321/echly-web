@@ -1,7 +1,6 @@
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { requireAdmin } from "@/lib/server/adminAuth";
-import { getWorkspaceSessionCountRepo } from "@/lib/repositories/sessionsRepository.server";
 import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
 import type { Workspace } from "@/lib/domain/workspace";
 import type { PlanId } from "@/lib/billing/plans";
@@ -13,21 +12,25 @@ export interface WorkspaceRow {
   ownerEmail: string | null;
   ownerName: string | null;
   plan: string;
-  sessionsUsed: number;
   members: number;
+  seats: number;
   createdAt: string | null;
-  usage: { sessionsCreated: number; feedbackCreated: number; members: number };
+  usage: {
+    feedbackCreated: number;
+    feedbackCreatedThisMonth: number;
+    members: number;
+  };
   billing: Workspace["billing"];
   entitlements: Workspace["entitlements"];
-  /** Plan default session limit (from catalog). null = unlimited. */
-  planLimitSessions: number | null;
+  /** Plan default ticket limit (from catalog). null = unlimited. */
+  planLimitFeedback: number | null;
   /** Workspace override: undefined = use plan default, null = unlimited, number = custom limit. */
-  overrideLimit: number | null | undefined;
+  overrideFeedbackLimit: number | null | undefined;
 }
 
 /**
  * GET /api/admin/workspaces
- * Returns all workspaces with owner info and session count.
+ * Returns all workspaces with owner info and ticket usage.
  */
 export async function GET(req: Request) {
   try {
@@ -42,10 +45,11 @@ export async function GET(req: Request) {
     for (const d of workspacesSnap.docs) {
       const data = d.data() as Omit<Workspace, "id">;
       const workspaceId = d.id;
-      const plan = (data.billing?.plan ?? "free") as PlanId;
-      const planEntry = catalog[plan] ?? catalog.free;
-      const planLimitSessions = planEntry.maxSessions ?? null;
-      const overrideLimit = data.entitlements?.maxSessions;
+      const plan = (data.billing?.plan ?? "starter") as PlanId;
+      const planEntry = catalog[plan] ?? catalog.starter;
+      const planLimitFeedback = planEntry.maxFeedbackPerMonth;
+      const overrideFeedbackLimit = data.entitlements?.maxFeedbackPerMonth;
+
       let ownerEmail: string | null = null;
       let ownerName: string | null = null;
       if (data.ownerId) {
@@ -56,29 +60,42 @@ export async function GET(req: Request) {
           ownerName = u.name ?? null;
         }
       }
-      const workspaceData = { id: workspaceId, ...data } as Workspace;
-      const sessionsUsed = await getWorkspaceSessionCountRepo(workspaceId, workspaceData);
-      const members = Array.isArray(data.members) ? data.members.length : 0;
-      const createdAt = data.createdAt && typeof (data.createdAt as { toDate?: () => Date }).toDate === "function"
-        ? (data.createdAt as { toDate: () => Date }).toDate().toISOString()
-        : (data.createdAt && typeof (data.createdAt as { seconds?: number }).seconds === "number"
+
+      const members = Array.isArray(data.members) ? data.members.length : (data.usage?.members ?? 0);
+      const seats = data.billing?.seats ?? 1;
+
+      const createdAt =
+        data.createdAt && typeof (data.createdAt as { toDate?: () => Date }).toDate === "function"
+          ? (data.createdAt as { toDate: () => Date }).toDate().toISOString()
+          : data.createdAt && typeof (data.createdAt as { seconds?: number }).seconds === "number"
           ? new Date((data.createdAt as { seconds: number }).seconds * 1000).toISOString()
-          : null);
+          : null;
+
       rows.push({
         id: workspaceId,
         name: data.name ?? "Unnamed",
         ownerId: data.ownerId ?? "",
         ownerEmail,
         ownerName,
-        plan: data.billing?.plan ?? "free",
-        sessionsUsed,
+        plan: data.billing?.plan ?? "starter",
         members,
+        seats,
         createdAt,
-        usage: data.usage ?? { sessionsCreated: 0, feedbackCreated: 0, members: 0 },
-        billing: data.billing ?? { plan: "free", billingCycle: "monthly", seats: 1, stripeCustomerId: null, stripeSubscriptionId: null },
+        usage: {
+          feedbackCreated: data.usage?.feedbackCreated ?? 0,
+          feedbackCreatedThisMonth: data.usage?.feedbackCreatedThisMonth ?? 0,
+          members: data.usage?.members ?? 0,
+        },
+        billing: data.billing ?? {
+          plan: "starter",
+          billingCycle: "monthly",
+          seats: 1,
+          stripeCustomerId: null,
+          stripeSubscriptionId: null,
+        },
         entitlements: data.entitlements ?? {},
-        planLimitSessions,
-        overrideLimit,
+        planLimitFeedback,
+        overrideFeedbackLimit,
       });
     }
     return apiSuccess(rows);

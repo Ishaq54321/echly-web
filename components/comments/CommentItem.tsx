@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Pencil, Trash2, CheckCircle2, Smile } from "lucide-react";
+import { Pencil, Trash2, Check, Smile } from "lucide-react";
 import EmojiPicker from "emoji-picker-react";
 import type { Comment } from "@/lib/domain/comment";
 import { formatCommentDate } from "@/lib/utils/formatCommentDate";
@@ -189,7 +189,7 @@ export function CommentItem({
                         }
                         setReactionPickerOpen(v => !v);
                       }}
-                      className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
+                      className="p-1.5 rounded-[var(--radius-btn)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
                       title="React"
                     >
                       <Smile className="h-4 w-4" strokeWidth={1.5} />
@@ -204,7 +204,7 @@ export function CommentItem({
                     className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
                     title={comment.resolved ? "Mark as unresolved" : "Mark as resolved"}
                   >
-                    <CheckCircle2 className="h-4 w-4" strokeWidth={1.5} />
+                    <Check className="h-4 w-4" strokeWidth={1.5} />
                   </button>
                 )}
 
@@ -399,14 +399,14 @@ export function CommentItem({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setDeleteModalOpen(false); }}
-                className="px-4 py-2.5 text-sm font-medium rounded-xl border border-[var(--border)] text-neutral-700 hover:bg-[var(--surface-hover)]"
+                className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[14px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); handleDelete(); }}
-                className="px-4 py-2.5 text-sm font-semibold rounded-xl bg-[var(--color-danger)] text-white hover:opacity-95"
+                className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--color-danger)] text-white text-[14px] font-medium hover:opacity-95 transition-all cursor-pointer"
               >
                 Delete
               </button>

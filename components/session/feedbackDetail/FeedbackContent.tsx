@@ -90,7 +90,7 @@ export function FeedbackContent({
       ) : null}
       {hasAttachmentContent ? (
         <section className="min-w-0">
-          <div className="attachments rounded-[var(--radius-md)] overflow-hidden space-y-3 border border-[var(--border)] shadow-[var(--shadow-sm)]">
+          <div className="attachments rounded-[14px] overflow-hidden space-y-3 border border-[var(--hair)] shadow-[0_10px_30px_-16px_rgba(28,25,23,0.18)]">
             {item.screenshotId ? (
               sendPinComment != null ? (
                 <ScreenshotWithPins
@@ -158,8 +158,8 @@ export function FeedbackContent({
       />
       {(onSaveTags != null || (Array.isArray(item.suggestedTags) && item.suggestedTags.length > 0)) && (
         <section className="mt-12 min-w-0">
-          <h2 className="text-[16px] font-semibold text-[var(--text-heading)] mb-3">Tags</h2>
-          <div className="flex flex-wrap justify-start gap-2 max-w-full min-w-0">
+          <h2 className="text-[17px] font-semibold text-[var(--text-heading)] mb-3">Tags</h2>
+          <div className="flex flex-wrap justify-start gap-3 max-w-full min-w-0">
             {tags.map((tag, i) => (
               <Tag
                 key={`${tag}-${i}`}
@@ -204,7 +204,7 @@ export function FeedbackContent({
                 <button
                   type="button"
                   onClick={() => setIsAddingTag(true)}
-                  className="inline-flex items-center px-3.5 py-1.5 rounded-[var(--radius-sm)] border border-dashed border-[var(--border)] text-[var(--text-tertiary)] hover:border-[var(--text-secondary)] hover:text-[var(--text-secondary)] text-[14px] font-medium cursor-pointer transition-colors"
+                  className="inline-flex items-center px-3 py-1.5 rounded-[var(--radius-sm)] border border-dashed border-[var(--hair-strong)] text-[14px] font-medium text-[var(--text-tertiary)] hover:text-[var(--text-heading)] hover:border-[var(--text-secondary)] transition-colors cursor-pointer"
                 >
                   + Add tag
                 </button>

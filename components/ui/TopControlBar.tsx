@@ -3,9 +3,9 @@
 import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
-import { Check, Link as LinkIcon, Loader2, PanelLeftOpen, Search } from "lucide-react";
+import { Check, Link as LinkIcon, Loader2, PanelLeftOpen, Search, Bell, MoreHorizontal, UserPlus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ShareButton } from "@/components/share/ShareButton";
+
 
 const ShareModal = dynamic(
   () => import("@/components/share/ShareModal").then((m) => m.ShareModal),
@@ -132,7 +132,7 @@ export function TopControlBar({
 
   if (publicViewer) {
     return (
-      <div className="page-header sticky top-0 z-50 flex h-16 w-full shrink-0 items-center justify-end gap-4 bg-[var(--layer-1-bg)] px-6">
+      <div className="page-header sticky top-0 z-50 flex h-16 w-full shrink-0 items-center justify-end gap-4 bg-[var(--surface-subtle)] px-6">
         <div className="right flex shrink-0 items-center gap-2.5">
           <Link
             href={`/login?returnUrl=${encodeURIComponent(`/session/${sessionId}`)}`}
@@ -147,61 +147,70 @@ export function TopControlBar({
 
   return (
     <>
-      <div className="page-header sticky top-0 z-50 flex h-14 w-full shrink-0 items-center px-5 bg-[var(--surface-card)]">
+      <header
+        className="shrink-0 bg-[var(--surface-subtle)] grid items-center px-5"
+        style={{ height: '60px', gridTemplateColumns: 'auto 1fr auto', gap: '24px' }}
+      >
         {/* Left: Panel Toggle + Logo */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex items-center gap-3.5">
           <button
             type="button"
             onClick={onToggleNavPanel}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors cursor-pointer"
+            className="w-10 h-10 rounded-lg grid place-items-center text-[var(--text-body)] hover:bg-black/[0.04] hover:text-[var(--text-heading)] transition-colors cursor-pointer border-0 bg-transparent shrink-0"
             title="Open navigation"
           >
-            <PanelLeftOpen size={18} strokeWidth={1.5} />
+            <PanelLeftOpen size={22} strokeWidth={2} />
           </button>
           <Link
             href="/dashboard"
-            className="flex items-center gap-2 shrink-0"
+            className="flex items-center gap-2.5 font-bold text-[var(--text-heading)] text-[18px] tracking-[-0.02em] no-underline shrink-0"
             title="Go to dashboard"
           >
-            <div className="relative w-7 h-7 bg-[var(--brand)] rounded-md flex items-center justify-center overflow-hidden shrink-0">
-              <Image src="/Echly_logo.svg" alt="" fill sizes="28px" className="object-cover" />
+            <div className="w-[32px] h-[32px] rounded-[9px] bg-[var(--brand)] flex items-center justify-center overflow-hidden shrink-0">
+              <Image src="/Echly_logo.svg" alt="" width={32} height={32} sizes="32px" className="object-cover" />
             </div>
-            <span className="text-[15px] font-bold text-[var(--text-heading)] tracking-[-0.01em]">Echly</span>
+            Echly
           </Link>
         </div>
 
-        {/* Spacer */}
-        <div className="flex-1" />
-
         {/* Center: Search */}
-        <div className="relative shrink-0">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)]" strokeWidth={1.5} />
-          <input
-            type="text"
-            value={searchQuery ?? ""}
-            onChange={(e) => onSearchChange?.(e.target.value)}
-            placeholder="Search tickets..."
-            className="w-[220px] h-[34px] pl-9 pr-3 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-card)] text-[14px] text-[var(--text-body)] placeholder:text-[var(--text-secondary)] focus:outline-none focus:border-[var(--brand)] focus:ring-[1.5px] focus:ring-[var(--brand)]/15 transition-all font-[inherit]"
-          />
+        <div className="justify-self-center w-full max-w-[420px] relative">
+          <div className="h-[34px] bg-white/70 border border-[var(--hair)] rounded-[9px] flex items-center gap-2.5 px-3 cursor-text hover:bg-white hover:border-[var(--hair-strong)] transition-all">
+            <Search size={16} strokeWidth={2} className="shrink-0 text-[var(--text-body)]" />
+            <input
+              type="text"
+              value={searchQuery ?? ""}
+              onChange={(e) => onSearchChange?.(e.target.value)}
+              placeholder="Search tickets, comments, sessions…"
+              className="flex-1 border-0 outline-0 bg-transparent text-[14px] text-[var(--text-heading)] placeholder:text-[var(--text-tertiary)] font-[inherit] min-w-0"
+            />
+          </div>
         </div>
 
-        {/* Spacer */}
-        <div className="flex-1" />
-
         {/* Right: Actions */}
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Share + Link grouped pill */}
-          <div className="relative inline-flex items-center bg-[var(--brand)] rounded-[var(--radius-sm)] overflow-hidden shadow-[0_1px_3px_rgba(23,117,224,0.2)]">
-            <ShareButton onClick={handleShareOpen} disabled={!sessionLoaded} />
-            <button
-              type="button"
-              className="flex items-center justify-center h-[34px] w-[38px] text-white/80 hover:text-white hover:bg-[var(--brand-hover)] transition-colors border-l border-white/20"
-              onClick={copyCurrentLink}
-              title="Copy link"
-              disabled={linkCopyBusy}
-            >
-              <LinkIcon size={15} strokeWidth={2} />
-            </button>
+        <div className="flex items-center gap-3">
+          {/* Share + Copy link merged pill */}
+          <div className="relative">
+            <div className={`flex items-center bg-[var(--brand)] rounded-[var(--radius-btn)] shadow-[0_1px_0_rgba(255,255,255,0.2)_inset,0_1px_2px_rgba(23,117,224,0.3)] overflow-hidden hover:bg-[var(--brand-hover)] transition-colors${!sessionLoaded ? ' opacity-50 pointer-events-none' : ''}`}>
+              <button
+                type="button"
+                onClick={handleShareOpen}
+                className="flex items-center gap-1.5 h-[38px] px-4 text-white text-[14px] font-semibold tracking-[-0.005em] border-0 bg-transparent cursor-pointer"
+              >
+                <UserPlus size={16} strokeWidth={2} />
+                Share
+              </button>
+              <div className="w-[1.5px] self-stretch bg-white/30" />
+              <button
+                type="button"
+                onClick={copyCurrentLink}
+                className="flex items-center justify-center h-[38px] w-[40px] text-white border-0 bg-transparent cursor-pointer hover:bg-white/10 transition-colors"
+                title="Copy link"
+                disabled={linkCopyBusy}
+              >
+                {linkCopied ? <Check size={16} strokeWidth={2} /> : <LinkIcon size={16} strokeWidth={2} />}
+              </button>
+            </div>
             {pendingRequestsCount > 0 && (
               <span
                 style={{
@@ -290,32 +299,29 @@ export function TopControlBar({
                 onRenameSuccess={onSessionRenameSuccess}
                 onSetArchived={onSetSessionArchived}
                 onRequestDelete={onRequestDeleteSession}
-                triggerClassName="icon-btn"
+                triggerClassName="w-8 h-8 rounded-lg grid place-items-center text-[var(--text-body)] hover:bg-black/[0.04] cursor-pointer border-0 bg-transparent"
                 triggerIconClassName="h-5 w-5"
                 triggerAriaLabel="Session actions"
               />
             </div>
           ) : null}
 
-          <span
-            className="w-[3px] h-[3px] rounded-full bg-[var(--border)] mx-0.5"
-            aria-hidden
-          />
-
           <GlobalSearchButton
             onBeforeOpen={() => {
               setNotificationsOpen(false);
             }}
           />
-          <GlobalNotificationButton
-            open={notificationsOpen}
-            onOpenChange={(next) => {
-              setNotificationsOpen(next);
-            }}
-          />
+          <div className="relative">
+            <GlobalNotificationButton
+              open={notificationsOpen}
+              onOpenChange={(next) => {
+                setNotificationsOpen(next);
+              }}
+            />
+          </div>
           <ProfileDropdown />
         </div>
-      </div>
+      </header>
 
     </>
   );

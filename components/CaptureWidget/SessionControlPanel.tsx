@@ -71,7 +71,7 @@ export function SessionControlPanel({
         boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
         zIndex: 2147483646,
         border: "1px solid rgba(255,255,255,0.08)",
-        fontFamily: '"Plus Jakarta Sans", "SF Pro Display", Inter, system-ui, sans-serif',
+        fontFamily: '"DM Sans", "SF Pro Display", Inter, system-ui, sans-serif',
       }}
     >
       <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-on-dark)" }}>

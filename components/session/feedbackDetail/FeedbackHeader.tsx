@@ -114,7 +114,7 @@ export function FeedbackHeader({
           : null;
 
   return (
-    <div className="pt-0 pb-4">
+    <div className="pt-0 pb-1">
       {showPosition ? (
         <div className="text-[14px] text-[var(--text-tertiary)] mb-1.5">
           {item.index} of {item.total}
@@ -189,22 +189,22 @@ export function FeedbackHeader({
             <button
               type="button"
               onClick={onRequestDelete}
-              className="flex items-center gap-2 px-3 py-2 text-[14px] font-medium text-[var(--text-tertiary)] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)] transition-colors duration-[var(--motion-duration)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] rounded-xl cursor-pointer"
+              className="flex items-center gap-2 px-3 py-2 text-[14px] font-medium text-[var(--text-body)] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)] transition-colors duration-[var(--motion-duration)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] rounded-[var(--radius-sm)] cursor-pointer"
               aria-label="Delete"
             >
-              <Trash2 size={14} />
+              <Trash2 size={16} strokeWidth={2} />
               Delete
             </button>
           )}
           <button
             type="button"
             onClick={onToggleActivity}
-            className={`flex items-center gap-2 px-3 py-2 text-[14px] font-medium text-[var(--text-tertiary)] hover:text-[var(--text-primary-strong)] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] rounded-xl cursor-pointer ${
-              isActivityOpen ? "text-[var(--text-secondary-soft)]" : ""
+            className={`inline-flex items-center gap-2 h-[42px] px-4 text-[14px] font-medium text-[var(--text-body)] border border-[var(--border)] rounded-[var(--radius-btn)] bg-white hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] cursor-pointer ${
+              isActivityOpen ? "text-[var(--text-heading)]" : ""
             }`}
             aria-pressed={isActivityOpen}
           >
-            <MessageSquare size={14} />
+            <MessageSquare size={18} strokeWidth={1.8} />
             Activity
           </button>
         </div>

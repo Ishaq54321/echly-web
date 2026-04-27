@@ -305,14 +305,14 @@ const ACTIVITY_TYPE_PILL_ACTIVE_STYLES: Record<ActivityFilterCategoryId, React.C
 
 /** Shared pill geometry + motion; hover applied via FILTER_PILL_DEFAULT when not active. */
 const FILTER_PILL_BASE =
-  "inline-flex shrink-0 cursor-pointer items-center gap-[5px] rounded-full border border-[var(--border)] bg-transparent px-[10px] py-[3px] text-sm font-medium text-[var(--text-secondary)] whitespace-nowrap transition-all duration-[140ms] ease focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+  "inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-[var(--radius-btn)] border px-4 h-[34px] text-[14px] font-medium whitespace-nowrap transition-all duration-150 ease focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
 const FILTER_PILL_DEFAULT =
-  "hover:border-[var(--border-strong)] hover:text-[var(--text-body)] hover:bg-[var(--surface-hover)]";
+  "bg-white border-[var(--border)] text-[var(--text-body)] hover:border-[var(--border-strong)] hover:text-[var(--text-heading)] hover:bg-[var(--surface-hover)]";
 
 /** Session / Members active pill — neutral light fill. */
 const FILTER_PILL_SESSION_ACTIVE =
-  "bg-[var(--surface-subtle)] border-[var(--surface-subtle)] text-[var(--text-body)]";
+  "bg-[var(--text-body)] border-[var(--text-body)] text-white";
 
 /** Auto-fill + infinite scroll: stop chaining loads once this many rows exist and the page scrolls. */
 const ACTIVITY_FEED_MIN_VISIBLE_ROWS = 8;
@@ -345,6 +345,8 @@ function ActivityFeed() {
   const sessionMenuRef = useRef<HTMLDivElement>(null);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [memberDropdownOpen, setMemberDropdownOpen] = useState(false);
+  const [sessionFilterTouched, setSessionFilterTouched] = useState(false);
+  const [memberFilterTouched, setMemberFilterTouched] = useState(false);
   const memberDropdownRef = useRef<HTMLDivElement>(null);
   const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
@@ -800,17 +802,17 @@ function ActivityFeed() {
                   aria-haspopup="listbox"
                   aria-label={`Filter by session, ${selectedSessionLabel}`}
                   className={`${FILTER_PILL_BASE} max-w-[min(100vw-8rem,220px)] ${
-                    selectedSessionId ? FILTER_PILL_SESSION_ACTIVE : FILTER_PILL_DEFAULT
+                    (selectedSessionId || sessionFilterTouched) ? FILTER_PILL_SESSION_ACTIVE : FILTER_PILL_DEFAULT
                   }`}
                 >
                   <Filter
-                    className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)] opacity-60"
+                    className={`h-3.5 w-3.5 shrink-0 ${(selectedSessionId || sessionFilterTouched) ? 'text-white opacity-100' : 'text-[var(--text-secondary)] opacity-60'}`}
                     strokeWidth={2}
                     aria-hidden
                   />
                   <span className="min-w-0 flex-1 truncate">{selectedSessionLabel}</span>
                   <ChevronDown
-                    className={`h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)] opacity-60 transition-transform duration-150 ${sessionMenuOpen ? "rotate-180" : ""}`}
+                    className={`h-3.5 w-3.5 shrink-0 ${(selectedSessionId || sessionFilterTouched) ? 'text-white opacity-100' : 'text-[var(--text-secondary)] opacity-60'} transition-transform duration-150 ${sessionMenuOpen ? "rotate-180" : ""}`}
                     strokeWidth={2}
                     aria-hidden
                   />
@@ -818,7 +820,7 @@ function ActivityFeed() {
 
                 {sessionMenuOpen ? (
                   <div
-                    className="absolute left-1/2 top-full z-[200] mt-1 w-max min-w-[220px] max-w-[min(100vw-2rem,320px)] -translate-x-1/2 rounded-xl border border-[var(--border)] bg-[var(--surface-hover)] p-1.5 text-[var(--text-heading)] shadow-[var(--shadow-level-4)] dark:border-[var(--border)] dark:bg-[var(--surface-hover)] dark:text-[var(--text-heading)]"
+                    className="absolute left-1/2 top-full z-[200] mt-1 w-max min-w-[220px] max-w-[min(100vw-2rem,320px)] -translate-x-1/2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-card)] p-1.5 text-[var(--text-heading)] shadow-none"
                     role="listbox"
                     aria-label="Sessions"
                   >
@@ -828,6 +830,7 @@ function ActivityFeed() {
                     aria-selected={!selectedSessionId}
                     className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-[var(--text-heading)] transition-colors hover:bg-[var(--surface-hover)]/50 ${!selectedSessionId ? "bg-[var(--surface-hover)]/60 font-medium" : "font-normal"}`}
                     onClick={() => {
+                      setSessionFilterTouched(false);
                       onSessionFilterChange("");
                       setSessionMenuOpen(false);
                     }}
@@ -851,6 +854,7 @@ function ActivityFeed() {
                         aria-selected={selected}
                         className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-[var(--text-heading)] transition-colors hover:bg-[var(--surface-hover)]/50 ${selected ? "bg-[var(--surface-hover)]/60 font-medium" : "font-normal"}`}
                         onClick={() => {
+                          setSessionFilterTouched(true);
                           onSessionFilterChange(s.id);
                           setSessionMenuOpen(false);
                         }}
@@ -874,6 +878,7 @@ function ActivityFeed() {
                 <button
                   type="button"
                   onClick={() => {
+                    setMemberFilterTouched(true);
                     if (selectedCategory === "member") {
                       if (selectedMemberId !== null) {
                         setMemberDropdownOpen((prev) => !prev);
@@ -887,7 +892,7 @@ function ActivityFeed() {
                     }
                   }}
                   className={`${FILTER_PILL_BASE} ${
-                    selectedCategory === "member" ? "bg-[#F0F0F0] border-[#F0F0F0] text-[#444444]" : FILTER_PILL_DEFAULT
+                    (selectedCategory === "member" || memberFilterTouched) ? "bg-[var(--text-body)] border-[var(--text-body)] text-white" : FILTER_PILL_DEFAULT
                   }`}
                 >
                   {selectedMemberId
@@ -908,12 +913,13 @@ function ActivityFeed() {
 
                 {(selectedCategory === "member" && selectedMemberId === null) ||
                 memberDropdownOpen ? (
-                  <div className="absolute top-full left-0 mt-1 w-56 bg-background border border-border rounded-lg shadow-md z-50 py-1">
+                  <div className="absolute top-full left-0 mt-1 w-56 bg-[var(--surface-card)] border border-[var(--border)] rounded-[var(--radius-md)] shadow-none z-50 py-1">
                     <button
                       type="button"
                       onClick={() => {
                         setSelectedMemberId(null);
                         setSelectedCategory(null);
+                        setMemberFilterTouched(false);
                         setMemberDropdownOpen(false);
                       }}
                       className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/40${selectedMemberId === null ? " font-medium text-foreground" : ""}`}
@@ -1205,7 +1211,7 @@ function ActivityFeed() {
                 autoFillAttemptsRef.current = 0;
                 void loadMore();
               }}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-border rounded-lg bg-background hover:bg-muted/40 text-foreground transition-colors"
+              className="inline-flex items-center gap-2 px-5 py-2.5 text-[14px] font-medium border border-[var(--border)] rounded-[var(--radius-btn)] bg-white hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] text-[var(--text-body)] transition-colors"
             >
               Load more activity
             </button>

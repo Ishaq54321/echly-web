@@ -1,15 +1,14 @@
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { requireAdmin } from "@/lib/server/adminAuth";
-import { getWorkspaceSessionCountRepo } from "@/lib/repositories/sessionsRepository.server";
-import type { Workspace } from "@/lib/domain/workspace";
 
 export interface UsageStats {
   totalWorkspaces: number;
-  freeWorkspaces: number;
+  starterWorkspaces: number;
   paidWorkspaces: number;
-  totalSessions: number;
   totalFeedbackCaptured: number;
+  totalFeedbackThisMonth: number;
+  avgFeedbackTicketsThisMonth: number;
 }
 
 /**
@@ -25,39 +24,34 @@ export async function GET(req: Request) {
   try {
     const workspacesSnap = await adminDb.collection("workspaces").get();
     const docs = workspacesSnap.docs;
-    let freeWorkspaces = 0;
+    let starterWorkspaces = 0;
     let paidWorkspaces = 0;
     let totalFeedbackCaptured = 0;
+    let totalFeedbackThisMonth = 0;
 
     for (const d of docs) {
       const data = d.data();
-      const plan = data.billing?.plan ?? "free";
-      if (plan === "free") freeWorkspaces++;
+      const plan = data.billing?.plan ?? "starter";
+      if (plan === "starter") starterWorkspaces++;
       else paidWorkspaces++;
       totalFeedbackCaptured += data.usage?.feedbackCreated ?? 0;
+      totalFeedbackThisMonth += data.usage?.feedbackCreatedThisMonth ?? 0;
     }
 
-    const sessionCounts = await Promise.all(
-      docs.map((d) =>
-        getWorkspaceSessionCountRepo(d.id, { id: d.id, ...d.data() } as Workspace)
-      )
-    );
-    const totalSessions = sessionCounts.reduce((a, b) => a + b, 0);
+    const avgFeedbackTicketsThisMonth =
+      docs.length > 0 ? Math.round(totalFeedbackThisMonth / docs.length) : 0;
 
     const stats: UsageStats = {
       totalWorkspaces: workspacesSnap.size,
-      freeWorkspaces,
+      starterWorkspaces,
       paidWorkspaces,
-      totalSessions,
       totalFeedbackCaptured,
+      totalFeedbackThisMonth,
+      avgFeedbackTicketsThisMonth,
     };
     return apiSuccess(stats);
   } catch (err) {
     console.error("GET /api/admin/usage:", err);
-    return apiError({
-      code: "INTERNAL_ERROR",
-      message: "Failed to get usage",
-      status: 500,
-    });
+    return apiError({ code: "INTERNAL_ERROR", message: "Failed to get usage", status: 500 });
   }
 }

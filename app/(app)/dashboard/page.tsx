@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 // deep_data_latency_trace_phase3b_v2
 import { useEffect, useMemo, useState } from "react";
@@ -74,7 +74,7 @@ function DashboardContent() {
     setSessionArchived,
     deleteSession,
   } = useWorkspaceStore();
-  const { authUid, isIdentityResolved } = useWorkspace();
+  const { authUid, isIdentityResolved, authDisplayName, workspaceName } = useWorkspace();
   const stableSessions = useStableState(sessions, true, authUid);
   const { search } = useSessionsSearch();
   const [debouncedSearch, setDebouncedSearch] = useState(search);
@@ -152,11 +152,14 @@ function DashboardContent() {
 
   return (
     <div className="relative flex min-h-0 w-full flex-1 flex-col bg-white">
-      <div className="mx-auto w-full max-w-[1280px] px-6 pb-10 pt-3">
-        <SessionsHeader />
+      <div className="mx-auto w-full max-w-[1280px] px-6 pb-10 pt-10">
+        <SessionsHeader
+          workspaceName={workspaceName ?? undefined}
+          firstName={authDisplayName?.split(" ")[0] ?? undefined}
+        />
 
         <main className="flex-1">
-          <div className="pt-3">
+          <div className="pt-6">
             <div>
               <SessionsListArchiveTabs
                 value={listArchiveTab}
@@ -173,7 +176,7 @@ function DashboardContent() {
                       onClick={triggerCta}
                       disabled={startingRecorder || !isIdentityResolved}
                       aria-busy={startingRecorder}
-                      className="rounded-[var(--radius-sm)] bg-[var(--brand)] px-4 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[var(--brand-hover)] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
+                      className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
                     >
                       New Session
                     </button>

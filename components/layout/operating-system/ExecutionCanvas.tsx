@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { ChevronRight, MoreHorizontal, CheckCircle2, Pencil, Trash2, UserPlus, Clock, ChevronDown, LayoutGrid } from "lucide-react";
+import { ChevronRight, MoreHorizontal, Check, Pencil, Trash2, UserPlus, Clock, ChevronDown, LayoutGrid } from "lucide-react";
 import Link from "next/link";
 import { statusFromResolved } from "@/lib/domain/feedback-display";
 import type { FeedbackStatus } from "@/lib/domain/feedback-display";
@@ -228,7 +228,7 @@ export function ExecutionCanvas({
               <button
                 type="button"
                 onClick={() => setActionsOpen((o) => !o)}
-                className="h-10 w-10 flex items-center justify-center rounded-lg text-[var(--text-tertiary)] hover:bg-[var(--layer-2-hover-bg)] hover:text-[var(--text-primary-strong)] transition-colors duration-120 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+                className="h-[38px] w-[38px] flex items-center justify-center rounded-[var(--radius-btn)] text-[var(--text-tertiary)] hover:bg-[var(--layer-2-hover-bg)] hover:text-[var(--text-primary-strong)] transition-colors duration-120 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
                 aria-label="More actions"
                 aria-expanded={actionsOpen}
               >
@@ -318,26 +318,26 @@ export function ExecutionCanvas({
           <button
             type="button"
             onClick={() => onResolve(!item.isResolved)}
-            className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)] ${
+            className={`inline-flex items-center gap-1.5 h-[34px] px-3 rounded-[var(--radius-btn)] text-[13px] font-medium transition-all cursor-pointer ${
               item.isResolved
-                ? "border border-[var(--layer-2-border)] bg-white text-[var(--text-secondary-soft)] hover:bg-[var(--layer-2-hover-bg)]"
-                : "bg-[var(--accent-operational)] text-white border border-transparent hover:opacity-92"
+                ? "border border-[var(--border)] bg-transparent text-[var(--text-heading)] hover:bg-[var(--surface-hover)]"
+                : "border-none bg-[var(--brand)] text-white hover:bg-[var(--brand-hover)]"
             }`}
           >
-            <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+            <Check className="h-3.5 w-3.5" strokeWidth={1.5} />
             {item.isResolved ? "Reopen" : "Resolve"}
           </button>
         )}
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium border border-[var(--layer-2-border)] bg-white text-[var(--text-secondary-soft)] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+          className="inline-flex items-center gap-1.5 h-[34px] px-3 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-secondary)] text-[13px] font-medium hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-all cursor-pointer"
         >
           <UserPlus className="h-3.5 w-3.5" strokeWidth={1.5} />
           Assign
         </button>
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium border border-[var(--layer-2-border)] bg-white text-[var(--text-secondary-soft)] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-operational)]"
+          className="inline-flex items-center gap-1.5 h-[34px] px-3 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-secondary)] text-[13px] font-medium hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-all cursor-pointer"
         >
           <Clock className="h-3.5 w-3.5" strokeWidth={1.5} />
           Defer

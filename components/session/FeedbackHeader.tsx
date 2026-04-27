@@ -9,56 +9,50 @@ import type { FeedbackItemShape } from "@/components/session/feedbackDetail/type
 import type { ShareSurfacePermissions } from "@/lib/access/resolveAccess";
 import type { Priority } from "@/lib/domain/feedback";
 import {
-  CheckCircle,
+  Check,
   UserPlus,
   Clock,
   MessageSquare,
-  Trash2,
   Lock,
   Flag,
+  Trash2,
 } from "lucide-react";
 import { AssignDropdown } from "@/components/feedback/AssignDropdown";
 import { PriorityDropdown } from "@/components/feedback/PriorityDropdown";
 
-const iconBtn = {
-  size: 16,
-  strokeWidth: 1.8,
-  className: "shrink-0 text-inherit",
-} as const;
+const actionBtn =
+  "inline-flex h-[34px] items-center gap-2 px-3.5 rounded-[7px] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[13px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
 
-const resolveBtn =
-  "inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--brand)] text-white shadow-[0_1px_3px_rgba(23,117,224,0.2)] hover:bg-[var(--brand-hover)] hover:shadow-[0_2px_6px_rgba(23,117,224,0.25)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
+const actionBtnBlack =
+  "inline-flex h-[34px] items-center gap-2 px-3.5 rounded-[7px] bg-[var(--brand)] text-white text-[13px] font-medium border border-transparent cursor-pointer hover:bg-[var(--brand-hover)] transition-colors disabled:opacity-50 disabled:pointer-events-none";
 
-const requestResolveAccessBtn =
-  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[var(--radius-sm)] text-[15px] font-medium border border-[var(--brand-muted)] bg-[var(--brand-subtle)] text-[var(--brand)] shadow-none hover:bg-[var(--brand-subtle)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/40 transition-all duration-150 ease cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
+const actionBtnActive =
+  "inline-flex h-[34px] items-center gap-2 px-3.5 rounded-[7px] border border-[var(--border)] bg-[var(--surface-hover)] text-[var(--text-heading)] text-[13px] font-medium transition-all cursor-pointer";
 
-// Blue variant for AUTH VIEWER on the dashboard surface
-const requestResolveAccessBtnOrange =
-  "inline-flex h-9 items-center gap-1.5 px-[14px] rounded-[var(--radius-sm)] text-[15px] font-semibold border-none bg-[var(--brand)] text-white shadow-[0_1px_3px_rgba(23,117,224,0.25)] hover:bg-[var(--brand-hover)] hover:shadow-[0_2px_8px_rgba(23,117,224,0.30)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/40 transition-all duration-[140ms] ease cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
+const actionBtnDelete =
+  "inline-flex h-[34px] w-[34px] items-center justify-center rounded-[7px] border border-[var(--border)] bg-transparent text-[var(--text-secondary)] hover:text-[var(--color-danger)] hover:border-[var(--color-danger)]/30 hover:bg-[var(--color-danger-bg)] transition-all cursor-pointer";
 
-const pendingResolveAccessBtn =
-  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[var(--radius-sm)] text-[15px] font-medium border border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--text-tertiary)] cursor-default opacity-95 pointer-events-none select-none";
-
-const secondaryBtn =
-  "inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[var(--radius-sm)] text-[15px] font-medium border border-[var(--border)] bg-white text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:border-[var(--border)] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease cursor-pointer";
-
-const ghostIconBtn =
-  "inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors cursor-pointer";
-
-const btnDelete =
-  "inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-tertiary)] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors cursor-pointer";
+// Resize AssignDropdown/PriorityDropdown trigger buttons to match action row height
+const dropdownBtnOverride =
+  "[&>div>button]:!h-[34px] [&>div>button]:!rounded-[7px] [&>div>button]:!text-[13px] [&>div>button]:!font-medium [&>div>button]:!px-3.5 [&>div>button]:!gap-2 [&>div>button]:!border [&>div>button]:!border-[var(--border)]";
 
 function StatusBadge({ status }: { status: FeedbackStatus }) {
   const base =
-    "inline-flex items-center rounded-full px-2.5 py-0.5 text-[12px] font-medium";
+    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-[3px] text-[11.5px] font-semibold tracking-[-0.005em]";
   if (status === "Resolved") {
     return (
-      <span className={`${base} bg-[var(--color-success-bg)] text-[var(--color-success)]`}>Resolved</span>
+      <span className={`${base} bg-[var(--color-success-bg)] text-[var(--color-success)]`}>
+        <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-success)]" />
+        Resolved
+      </span>
     );
   }
   if (status === "Open") {
     return (
-      <span className={`${base} bg-[var(--brand-subtle)] text-[var(--brand)]`}>Open</span>
+      <span className={`${base} bg-[var(--brand-subtle)] text-[var(--brand)]`}>
+        <span className="w-1.5 h-1.5 rounded-full bg-[var(--brand)]" />
+        Open
+      </span>
     );
   }
   const styles: Record<Exclude<FeedbackStatus, "Open" | "Resolved">, string> = {
@@ -70,7 +64,6 @@ function StatusBadge({ status }: { status: FeedbackStatus }) {
 
 export interface SessionFeedbackHeaderProps {
   item: (FeedbackItemShape & { index: number; total: number }) | null;
-  /** Increment when resolve is applied optimistically; drives a short status cue. */
   resolveAffirmationKey?: number;
   impactScore?: number | null;
   onResolvedChange?: (isResolved: boolean) => void;
@@ -79,56 +72,35 @@ export interface SessionFeedbackHeaderProps {
   onCloseCommentMode?: () => void;
   isCommentMode?: boolean;
   onDelete?: () => void;
-  /**
-   * Public share (or other read-only surfaces): show the same action row shape as the dashboard,
-   * but actions are non-interactive and gated by `readOnlyPermissions`.
-   */
   readOnly?: boolean;
   readOnlyPermissions?: { canResolve: boolean; canComment: boolean };
-  /**
-   * Public share: same action bar as dashboard; clicks respect permissions then prompt to use the app.
-   * When set, `readOnly` / `readOnlyPermissions` are ignored for the action row, and Delete is hidden.
-   */
   shareGating?: {
     permissions: ShareSurfacePermissions;
     onBlocked: (detail: {
       reason: "tier" | "app";
       action: "resolve" | "comment" | "assign" | "defer";
     }) => void;
-    /** When set with {@link shareGating.onRequestResolveAccess}, resolve affordance follows request/pending UI. */
     pendingResolve?: boolean;
     onRequestResolveAccess?: () => void;
   };
-  /**
-   * Dashboard/authenticated: reflects `access.capabilities.canResolve` and `request.pendingResolve`; does not grant capability.
-   */
   accessResolve?: {
     canResolve: boolean;
     pendingResolve: boolean;
     onRequestAccess: () => void;
   };
-  /** True while POST /request-access is in flight (dashboard). */
   accessResolveSubmitting?: boolean;
-  /** True for unauthenticated viewers; shows sign-in affordances instead of disabled buttons. */
   isAnonymousViewer?: boolean;
-  /** Assign dropdown data */
   assigneeId?: string | null;
   assigneeName?: string | null;
   assigneeAvatarUrl?: string | null;
   onAssigned?: (assigneeId: string | null, assigneeName: string | null, assigneeAvatarUrl: string | null) => void;
-  /** Priority dropdown data */
   priority?: Priority | null;
   onPriorityChanged?: (priority: Priority | null) => void;
   onSaveStateChange?: (state: 'saving' | 'saved' | 'error' | 'hidden') => void;
-  /** Permission gates for new controls */
   canAssignTicket?: boolean;
   isWorkspaceMember?: boolean;
 }
 
-/**
- * Premium session ticket header: title + ticket meta, status badge, action bar (Resolve / Assign / … + Delete).
- * Session-level ⋮ (rename / archive / delete) lives in TopControlBar.
- */
 export function SessionFeedbackHeader({
   item,
   resolveAffirmationKey = 0,
@@ -209,85 +181,76 @@ export function SessionFeedbackHeader({
   };
 
   return (
-    <header className="sticky top-0 z-20 shrink-0 bg-[var(--surface-subtle)] pt-4 px-0 pb-0">
-      <div className="flex items-start justify-between gap-4 min-w-0 mb-6">
-        {/* Left: title + meta */}
-        <div className="min-w-0 flex-1">
-          {titleTrim ? (
-            <h1
-              className="text-[18px] font-semibold tracking-[-0.01em] text-[var(--text-heading)] leading-[1.3]"
-            >
-              {titleTrim}
-            </h1>
+    <header className="sticky top-0 z-20 shrink-0 bg-[var(--surface-card)] pt-0 px-0 pb-0">
+      <div className="mb-6">
+        {/* Row 1: Eyebrow */}
+        <div className="flex items-center gap-2.5 mb-3">
+          {positionLabel != null ? (
+            <span className="text-[11.5px] font-medium text-[var(--text-secondary)] bg-[var(--surface-hover)] px-2.5 py-[3px] rounded-full tabular-nums">
+              {positionLabel}
+            </span>
           ) : null}
-          <div className="mt-2.5 flex flex-wrap items-center gap-2">
-            {positionLabel != null ? (
-              <span className="ticket-pill inline-flex items-center bg-[var(--surface-subtle)] px-2.5 py-0.5 rounded-full text-[14px] font-medium text-[var(--text-secondary)]">
-                {positionLabel}
-              </span>
-            ) : null}
-            {item != null ? (
-              <span
-                className={`inline-flex transition-all duration-200 ease-out ${
-                  resolveFlash && isResolved
-                    ? "scale-105 opacity-100 ring-2 ring-[var(--color-success-border)] ring-offset-2 ring-offset-white rounded-full"
-                    : "scale-100 opacity-100"
-                }`}
-              >
-                <StatusBadge status={status} />
-              </span>
-            ) : null}
-            {item != null && impactScore != null ? (
-              <span className="text-[14px] tabular-nums text-[var(--text-secondary)] font-medium">
-                Impact {impactScore}
-              </span>
-            ) : null}
-          </div>
+          {item != null ? (
+            <span
+              className={`inline-flex transition-all duration-200 ease-out ${
+                resolveFlash && isResolved
+                  ? "scale-105 opacity-100 ring-2 ring-[var(--color-success-border)] ring-offset-2 ring-offset-white rounded-full"
+                  : "scale-100 opacity-100"
+              }`}
+            >
+              <StatusBadge status={status} />
+            </span>
+          ) : null}
+          {item != null && impactScore != null ? (
+            <span className="text-[11.5px] tabular-nums text-[var(--text-secondary)] font-medium">
+              Impact {impactScore}
+            </span>
+          ) : null}
         </div>
 
-        {/* Right: action buttons */}
-        <div className="flex items-center gap-1.5 shrink-0 pt-1.5">
+        {/* Row 2: Title */}
+        {titleTrim ? (
+          <h1 className="text-[21px] font-semibold text-[var(--text-heading)] tracking-[-0.018em] leading-[1.25] m-0 mb-4">
+            {titleTrim}
+          </h1>
+        ) : null}
+
+        {/* Row 3: Action buttons */}
+        <div className="flex items-center gap-2">
           {shareGating ? (
             isActionable ? (
               <>
+                {/* Resolve */}
                 {shareGating.permissions.canResolve ? (
                   <button
                     type="button"
                     onClick={gateResolve}
                     disabled={isResolved}
-                    title={isResolved ? "Unresolve" : "Resolve"}
-                    className={
-                      isResolved
-                        ? `${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`
-                        : resolveBtn
-                    }
+                    className={isResolved ? actionBtnActive : actionBtnBlack}
                   >
-                    <CheckCircle {...iconBtn} aria-hidden />
+                    <Check size={14} strokeWidth={1.7} />
+                    {isResolved ? "Resolved" : "Resolve"}
                   </button>
                 ) : shareGating.onRequestResolveAccess ? (
                   isResolved ? (
-                    <button
-                      type="button"
-                      disabled
-                      title="Resolved"
-                      className={`${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
-                      <CheckCircle {...iconBtn} aria-hidden />
+                    <button type="button" disabled className={`${actionBtnActive} opacity-50`}>
+                      <Check size={14} strokeWidth={1.7} />
+                      Resolved
                     </button>
                   ) : shareGating.pendingResolve ? (
-                    <button type="button" disabled className={pendingResolveAccessBtn}>
-                      <Clock {...iconBtn} aria-hidden />
-                      <span>Pending approval</span>
+                    <button type="button" disabled className={`${actionBtn} opacity-60`}>
+                      <Clock size={14} strokeWidth={1.5} />
+                      Pending
                     </button>
                   ) : (
                     <button
                       type="button"
                       onClick={shareGating.onRequestResolveAccess}
                       disabled={accessResolveSubmitting}
-                      className={requestResolveAccessBtn}
+                      className={actionBtnBlack}
                     >
-                      <Lock {...iconBtn} aria-hidden />
-                      <span>Request resolve access</span>
+                      <Lock size={14} />
+                      Request Access
                     </button>
                   )
                 ) : (
@@ -295,79 +258,74 @@ export function SessionFeedbackHeader({
                     type="button"
                     onClick={gateResolve}
                     disabled={isResolved}
-                    title={isResolved ? "Unresolve" : "Resolve"}
-                    className={
-                      isResolved
-                        ? `${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`
-                        : resolveBtn
-                    }
+                    className={isResolved ? actionBtnActive : actionBtnBlack}
                   >
-                    <CheckCircle {...iconBtn} aria-hidden />
+                    <Check size={14} strokeWidth={1.7} />
+                    {isResolved ? "Resolved" : "Resolve"}
                   </button>
                 )}
-                <button type="button" className={ghostIconBtn} onClick={gateAssign} aria-label="Assign">
-                  <UserPlus {...iconBtn} aria-hidden />
+                {/* Assign */}
+                <button type="button" className={actionBtn} onClick={gateAssign}>
+                  <UserPlus size={14} strokeWidth={1.5} />
+                  Assign
                 </button>
-                <button type="button" className={ghostIconBtn} onClick={gateDefer} aria-label="Priority">
-                  <Flag size={16} strokeWidth={1.8} className="shrink-0" aria-hidden />
+                {/* Priority */}
+                <button type="button" className={actionBtn} onClick={gateDefer}>
+                  <Flag size={14} strokeWidth={1.5} />
+                  Priority
                 </button>
-                <button type="button" className={ghostIconBtn} onClick={gateComment} aria-label="Comment">
-                  <MessageSquare {...iconBtn} aria-hidden />
+                {/* Comment */}
+                <button type="button" className={actionBtn} onClick={gateComment}>
+                  <MessageSquare size={14} strokeWidth={1.5} />
+                  Comment
                 </button>
               </>
             ) : null
           ) : ro ? (
             isActionable ? (
               <>
+                {/* Resolve (read-only) */}
                 {readOnlyPermissions?.canResolve ? (
                   <button
                     type="button"
                     disabled
-                    title="Not available on shared links yet"
-                    className={
-                      isResolved
-                        ? `${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`
-                        : `${resolveBtn} opacity-60 cursor-not-allowed`
-                    }
+                    className={`${actionBtnBlack} opacity-60 cursor-not-allowed`}
                   >
-                    <CheckCircle {...iconBtn} aria-hidden />
+                    <Check size={14} strokeWidth={1.7} />
+                    Resolve
                   </button>
                 ) : accessResolve != null ? (
                   isResolved ? (
-                    <button
-                      type="button"
-                      disabled
-                      title="Resolved"
-                      className={`${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
-                      <CheckCircle {...iconBtn} aria-hidden />
+                    <button type="button" disabled className={`${actionBtnActive} opacity-50`}>
+                      <Check size={14} strokeWidth={1.7} />
+                      Resolved
                     </button>
                   ) : accessResolve.pendingResolve ? (
-                    <button type="button" disabled className={pendingResolveAccessBtn}>
-                      <Clock {...iconBtn} aria-hidden />
-                      <span>Pending approval</span>
+                    <button type="button" disabled className={`${actionBtn} opacity-60`}>
+                      <Clock size={14} strokeWidth={1.5} />
+                      Pending
                     </button>
                   ) : (
                     <button
                       type="button"
                       onClick={accessResolve.onRequestAccess}
                       disabled={accessResolveSubmitting}
-                      className={requestResolveAccessBtnOrange}
+                      className={actionBtnBlack}
                     >
-                      <Lock size={14} color="#FFFFFF" aria-hidden />
-                      <span>Request resolve access</span>
+                      <Lock size={14} />
+                      Request Access
                     </button>
                   )
                 ) : null}
+                {/* Comment (read-only) */}
                 {readOnlyPermissions?.canComment ? (
                   <button
                     type="button"
                     disabled
-                    title="Not available on shared links yet"
-                    className={`${ghostIconBtn} opacity-60 cursor-not-allowed`}
-                    aria-label="Comment"
+                    className={`${actionBtn} opacity-60 cursor-not-allowed`}
                   >
-                    <MessageSquare {...iconBtn} aria-hidden />
+                    <MessageSquare size={14} strokeWidth={1.5} />
+                    Comment
                   </button>
                 ) : isAnonymousViewer ? (
                   <button
@@ -377,162 +335,144 @@ export function SessionFeedbackHeader({
                         window.location.pathname + window.location.search
                       )}`;
                     }}
-                    className={ghostIconBtn}
-                    aria-label="Sign in to comment"
+                    className={actionBtn}
                   >
-                    <MessageSquare {...iconBtn} aria-hidden />
+                    <MessageSquare size={14} strokeWidth={1.5} />
+                    Comment
                   </button>
                 ) : null}
+                {/* Assign (read-only dropdown) */}
                 {item && assigneeId && (
-                  <AssignDropdown
-                    feedbackId={item.id}
-                    sessionId={""}
-                    currentAssigneeId={assigneeId}
-                    currentAssigneeName={assigneeName ?? null}
-                    currentAssigneeAvatarUrl={assigneeAvatarUrl ?? null}
-                    onAssigned={() => {}}
-                    disabled={true}
-                    readOnly={true}
-                    iconOnly
-                  />
+                  <div className={dropdownBtnOverride}>
+                    <AssignDropdown
+                      feedbackId={item.id}
+                      sessionId={""}
+                      currentAssigneeId={assigneeId}
+                      currentAssigneeName={assigneeName ?? null}
+                      currentAssigneeAvatarUrl={assigneeAvatarUrl ?? null}
+                      onAssigned={() => {}}
+                      disabled={true}
+                      readOnly={true}
+                      iconOnly
+                    />
+                  </div>
                 )}
+                {/* Priority (read-only dropdown) */}
                 {item && priority && (
-                  <PriorityDropdown
-                    feedbackId={item.id}
-                    currentPriority={priority}
-                    onPriorityChanged={() => {}}
-                    disabled={true}
-                    readOnly={true}
-                    iconOnly
-                  />
+                  <div className={dropdownBtnOverride}>
+                    <PriorityDropdown
+                      feedbackId={item.id}
+                      currentPriority={priority}
+                      onPriorityChanged={() => {}}
+                      disabled={true}
+                      readOnly={true}
+                      iconOnly
+                    />
+                  </div>
                 )}
               </>
             ) : null
           ) : isActionable ? (
-            // Permission table (dashboard surface):
-            // OWNER     canDeleteTicket=true  canResolve=true  → accessResolve=undefined → Resolve ✅ Assign ✅ Defer ✅ Comment ✅ Delete ✅
-            // RESOLVER  canResolve=true       canDeleteTicket=false → accessResolve=undefined → Resolve ✅ Assign ✅ Defer ✅ Comment ✅ Delete ❌
-            // AUTH VIEWER canResolve=false    canComment=true  → accessResolve set       → 🔒Request ✅ Assign ❌ Defer ❌ Comment ✅ Delete ❌
-            // ANON VIEWER canResolve=false    canComment=false → readOnly=true (ro branch above)
             <>
+              {/* Resolve */}
               {onResolvedChange ? (
                 accessResolve != null && !accessResolve.canResolve ? (
                   isResolved ? (
-                    <button
-                      type="button"
-                      disabled
-                      title="Resolved"
-                      className={`${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
-                      <CheckCircle {...iconBtn} aria-hidden />
+                    <button type="button" disabled className={`${actionBtnActive} opacity-50`}>
+                      <Check size={14} strokeWidth={1.7} />
+                      Resolved
                     </button>
                   ) : accessResolve.pendingResolve ? (
-                    <button type="button" disabled className={pendingResolveAccessBtn}>
-                      <Clock {...iconBtn} aria-hidden />
-                      <span>Pending approval</span>
+                    <button type="button" disabled className={`${actionBtn} opacity-60`}>
+                      <Clock size={14} strokeWidth={1.5} />
+                      Pending
                     </button>
                   ) : (
-                    // AUTH VIEWER: orange "Request resolve access" button
                     <button
                       type="button"
                       onClick={accessResolve.onRequestAccess}
                       disabled={accessResolveSubmitting}
-                      className={requestResolveAccessBtnOrange}
+                      className={actionBtnBlack}
                     >
-                      <Lock size={14} color="#FFFFFF" aria-hidden />
-                      <span>Request resolve access</span>
+                      <Lock size={14} />
+                      Request Access
                     </button>
                   )
                 ) : (
                   <button
                     type="button"
-                    onClick={() => onResolvedChange(true)}
-                    disabled={isResolved || resolveSubmitting}
-                    title={isResolved ? "Resolved" : "Resolve"}
-                    className={
-                      isResolved
-                        ? `${secondaryBtn} disabled:opacity-50 disabled:cursor-not-allowed`
-                        : resolveBtn
-                    }
+                    onClick={() => !isResolved && onResolvedChange(true)}
+                    disabled={resolveSubmitting}
+                    className={isResolved ? actionBtnActive : actionBtnBlack}
                   >
-                    <CheckCircle {...iconBtn} aria-hidden />
+                    <Check size={14} strokeWidth={1.7} />
+                    {isResolved ? "Resolved" : "Resolve"}
                   </button>
                 )
               ) : null}
-              {/* Assign: full dropdown for workspace members, read-only chip for others */}
+              {/* Assign */}
               {item && (() => {
-                const canManage = !!(canAssignTicket &&
-                                     isWorkspaceMember &&
-                                     onAssigned);
-                const isAnon = isAnonymousViewer === true;
-
-                if (isAnon) return null;
-
+                const canManage = !!(canAssignTicket && isWorkspaceMember && onAssigned);
+                if (isAnonymousViewer) return null;
                 return (
-                  <AssignDropdown
-                    key={`assign-${item.id}`}
-                    feedbackId={item.id}
-                    sessionId={""}
-                    currentAssigneeId={assigneeId ?? null}
-                    currentAssigneeName={assigneeName ?? null}
-                    currentAssigneeAvatarUrl={assigneeAvatarUrl ?? null}
-                    onAssigned={onAssigned ?? (() => {})}
-                    onSaveStateChange={canManage ? onSaveStateChange : undefined}
-                    disabled={!canManage}
-                    readOnly={!canManage}
-                    iconOnly
-                  />
+                  <div className={dropdownBtnOverride}>
+                    <AssignDropdown
+                      key={`assign-${item.id}`}
+                      feedbackId={item.id}
+                      sessionId={""}
+                      currentAssigneeId={assigneeId ?? null}
+                      currentAssigneeName={assigneeName ?? null}
+                      currentAssigneeAvatarUrl={assigneeAvatarUrl ?? null}
+                      onAssigned={onAssigned ?? (() => {})}
+                      onSaveStateChange={canManage ? onSaveStateChange : undefined}
+                      disabled={!canManage}
+                      readOnly={!canManage}
+                      iconOnly
+                    />
+                  </div>
                 );
               })()}
-              {/* Priority: full dropdown for workspace members, read-only pill for others */}
+              {/* Priority */}
               {item && (() => {
-                const canManage = !!(isWorkspaceMember &&
-                                     onPriorityChanged);
-                const isAnon = isAnonymousViewer === true;
-
-                if (isAnon) return null;
-
+                const canManage = !!(isWorkspaceMember && onPriorityChanged);
+                if (isAnonymousViewer) return null;
                 return (
-                  <PriorityDropdown
-                    key={`priority-${item.id}`}
-                    feedbackId={item.id}
-                    currentPriority={priority ?? null}
-                    onPriorityChanged={onPriorityChanged ?? (() => {})}
-                    onSaveStateChange={canManage ? onSaveStateChange : undefined}
-                    disabled={!canManage}
-                    readOnly={!canManage}
-                    iconOnly
-                  />
+                  <div className={dropdownBtnOverride}>
+                    <PriorityDropdown
+                      key={`priority-${item.id}`}
+                      feedbackId={item.id}
+                      currentPriority={priority ?? null}
+                      onPriorityChanged={onPriorityChanged ?? (() => {})}
+                      onSaveStateChange={canManage ? onSaveStateChange : undefined}
+                      disabled={!canManage}
+                      readOnly={!canManage}
+                      iconOnly
+                    />
+                  </div>
                 );
               })()}
+              {/* Comment */}
               {onOpenComment ? (
                 <button
                   type="button"
-                  onClick={() =>
-                    isCommentMode ? onCloseCommentMode?.() : onOpenComment()
-                  }
-                  className={`${ghostIconBtn} ${
-                    isCommentMode ? "bg-[var(--surface-subtle)] text-[var(--text-heading)]" : ""
-                  }`}
-                  aria-label="Comment"
+                  onClick={() => isCommentMode ? onCloseCommentMode?.() : onOpenComment()}
+                  className={isCommentMode ? actionBtnActive : actionBtn}
                 >
-                  <MessageSquare {...iconBtn} aria-hidden />
+                  <MessageSquare size={14} strokeWidth={1.5} />
+                  Comment
                 </button>
               ) : null}
+              {/* Spacer */}
+              <div className="flex-1" />
+              {/* Delete */}
               {onDelete ? (
                 <button
                   type="button"
                   onClick={onDelete}
-                  className={btnDelete}
-                  aria-label="Delete ticket"
-                  title="Delete ticket"
+                  className={actionBtnDelete}
+                  title="Delete"
                 >
-                  <Trash2
-                    size={16}
-                    strokeWidth={1.8}
-                    aria-hidden
-                    className="shrink-0 text-inherit"
-                  />
+                  <Trash2 size={14} strokeWidth={1.5} />
                 </button>
               ) : null}
             </>

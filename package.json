@@ -15,7 +15,6 @@
     "build:extension:js": "node esbuild-extension.mjs"
   },
   "dependencies": {
-    "@fontsource-variable/plus-jakarta-sans": "^5.2.8",
     "@tiptap/extension-mention": "^3.22.4",
     "@tiptap/extension-placeholder": "^3.22.4",
     "@tiptap/react": "^3.22.4",
@@ -43,7 +42,6 @@
     "use-image": "^1.1.4"
   },
   "devDependencies": {
-    "@fontsource/plus-jakarta-sans": "^5.2.8",
     "@resvg/resvg-js": "^2.6.2",
     "@tailwindcss/postcss": "^4",
     "@types/chrome": "^0.1.37",

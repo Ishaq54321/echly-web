@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
@@ -230,7 +230,7 @@ export function DiscussionList({
             </p>
             <Link
               href="/dashboard"
-              className="mt-5 inline-flex items-center justify-center rounded-xl bg-[var(--brand)] text-white px-5 py-2.5 text-sm font-semibold hover:bg-[var(--brand-hover)] transition"
+              className="mt-5 inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer"
             >
               Open Sessions
             </Link>

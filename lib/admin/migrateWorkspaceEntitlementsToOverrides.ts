@@ -13,13 +13,12 @@ import type { PlanId } from "@/lib/billing/plans";
 export type MigrationResult = {
   workspaceId: string;
   plan: PlanId;
-  removed: ("maxSessions" | "maxMembers" | "insightsAccess")[];
+  removed: ("maxFeedbackPerMonth" | "maxMembers" | "insightsAccess")[];
 };
 
 /**
- * Runs the migration: for each workspace, removes entitlements.maxSessions,
- * entitlements.maxMembers, entitlements.insightsAccess when they equal the
- * current plan catalog value. Does not remove true overrides.
+ * Runs the migration: for each workspace, removes entitlement overrides when
+ * they equal the current plan catalog value. Does not remove true overrides.
  *
  * @param dryRun If true, returns what would be changed without writing.
  */
@@ -36,18 +35,21 @@ export async function migrateWorkspaceEntitlementsToOverrides(dryRun: boolean): 
   for (const wsDoc of workspacesSnap.docs) {
     const workspaceId = wsDoc.id;
     const data = wsDoc.data();
-    const plan = (data.billing?.plan ?? "free") as PlanId;
-    const entry = catalog[plan] ?? catalog.free;
+    const plan = (data.billing?.plan ?? "starter") as PlanId;
+    const entry = catalog[plan] ?? catalog.starter;
     const entitlements = data.entitlements as {
-      maxSessions?: number | null;
+      maxFeedbackPerMonth?: number | null;
       maxMembers?: number | null;
       insightsAccess?: boolean;
     } | undefined;
 
-    const toRemove: ("maxSessions" | "maxMembers" | "insightsAccess")[] = [];
+    const toRemove: ("maxFeedbackPerMonth" | "maxMembers" | "insightsAccess")[] = [];
 
-    if (entitlements?.maxSessions !== undefined && entitlements.maxSessions === entry.maxSessions) {
-      toRemove.push("maxSessions");
+    if (
+      entitlements?.maxFeedbackPerMonth !== undefined &&
+      entitlements.maxFeedbackPerMonth === entry.maxFeedbackPerMonth
+    ) {
+      toRemove.push("maxFeedbackPerMonth");
     }
     if (entitlements?.maxMembers !== undefined && entitlements.maxMembers === entry.maxMembers) {
       toRemove.push("maxMembers");
@@ -67,7 +69,7 @@ export async function migrateWorkspaceEntitlementsToOverrides(dryRun: boolean): 
       const updates: Record<string, unknown> = {
         updatedAt: FieldValue.serverTimestamp(),
       };
-      if (toRemove.includes("maxSessions")) updates["entitlements.maxSessions"] = FieldValue.delete();
+      if (toRemove.includes("maxFeedbackPerMonth")) updates["entitlements.maxFeedbackPerMonth"] = FieldValue.delete();
       if (toRemove.includes("maxMembers")) updates["entitlements.maxMembers"] = FieldValue.delete();
       if (toRemove.includes("insightsAccess")) updates["entitlements.insightsAccess"] = FieldValue.delete();
       await adminDb.collection("workspaces").doc(workspaceId).update(updates);

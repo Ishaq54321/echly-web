@@ -14,7 +14,7 @@ interface ActionStepsSectionProps {
 const cardClass = "mt-12 mb-2";
 
 const titleClass =
-  "text-[16px] font-semibold text-[var(--text-heading)] mb-3";
+  "text-[17px] font-semibold text-[var(--text-heading)] mb-3";
 
 export function ActionItemsSection({
   actionSteps,
@@ -92,7 +92,7 @@ export function ActionItemsSection({
           <button
             type="button"
             onClick={startAdd}
-            className="flex items-center gap-2 px-1 py-1.5 text-[15px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-heading)] transition-colors duration-150 cursor-pointer"
+            className="flex items-center gap-2 px-1 py-1.5 text-[17px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-heading)] transition-colors duration-150 cursor-pointer"
           >
             <Plus size={14} />
             Add action step
@@ -109,7 +109,7 @@ export function ActionItemsSection({
                 if (e.key === "Escape") cancelAdd();
               }}
               placeholder="New action step…"
-              className="flex-1 min-w-0 text-[16px] leading-relaxed px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface-card)] focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]/20 transition-colors"
+              className="flex-1 min-w-0 text-[17px] leading-relaxed px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface-card)] focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]/20 transition-colors"
               autoFocus
               aria-label="New action step"
             />
@@ -119,17 +119,17 @@ export function ActionItemsSection({
     );
   }
 
-  const numberClass = "font-sans font-semibold text-[var(--text-tertiary)] text-[14px] tabular-nums min-w-[18px] pt-px";
+  const numberClass = "font-sans font-semibold text-[var(--text-tertiary)] text-[17px] tabular-nums min-w-[18px] pt-px";
   return (
     <div className={cardClass}>
       <h2 className={titleClass}>Action steps</h2>
-      <ul className="list-none space-y-0 p-0 m-0 text-base leading-relaxed text-[var(--text-heading)]">
+      <ul className="list-none space-y-0 p-0 m-0 text-base leading-relaxed text-[var(--text-heading)] w-full overflow-hidden">
         {items.map((text, i) => (
           <li key={i} className="group flex items-start gap-3 py-2.5">
             <span className={numberClass}>{i + 1}.</span>
             {isReadOnly ? (
               <span
-                className={`flex-1 min-w-0 text-[15px] leading-[1.55] ${
+                className={`flex-1 min-w-0 text-[17px] leading-[1.55] ${
                   isResolved
                     ? "line-through text-[var(--text-tertiary)]"
                     : "text-[var(--text-body)] font-[450]"
@@ -148,7 +148,7 @@ export function ActionItemsSection({
                     if (e.key === "Enter") void saveEdit();
                     if (e.key === "Escape") cancelEdit();
                   }}
-                  className="flex-1 min-w-0 text-[16px] leading-relaxed px-2 py-1 rounded border border-[var(--border)] bg-white text-[var(--text-primary-strong)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]/20 transition-[box-shadow] duration-[120ms]"
+                  className="flex-1 min-w-0 text-[17px] leading-relaxed px-2 py-1 rounded border border-[var(--border)] bg-white text-[var(--text-primary-strong)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]/20 transition-[box-shadow] duration-[120ms]"
                   autoFocus
                   aria-label={`Edit action step ${i + 1}`}
                 />
@@ -165,7 +165,7 @@ export function ActionItemsSection({
                 <button
                   type="button"
                   onClick={() => startEdit(i)}
-                  className={`flex-1 text-left px-0 py-0 min-w-0 cursor-pointer text-[15px] leading-[1.55] ${
+                  className={`flex-1 text-left px-0 py-0 min-w-0 cursor-pointer text-[17px] leading-[1.55] ${
                     isResolved
                       ? "line-through text-[var(--text-tertiary)]"
                       : "text-[var(--text-body)] font-[450]"
@@ -186,7 +186,7 @@ export function ActionItemsSection({
           </li>
         ))}
         {isAdding && (
-          <li className="flex items-start gap-3 py-2.5">
+          <li className="flex items-start gap-3 py-2.5 w-full overflow-hidden">
             <span className={numberClass}>{items.length + 1}.</span>
             <input
               type="text"
@@ -198,7 +198,7 @@ export function ActionItemsSection({
                 if (e.key === "Escape") cancelAdd();
               }}
               placeholder="New action step…"
-              className="flex-1 min-w-0 text-[16px] leading-relaxed px-2 py-1 rounded border border-[var(--border)] bg-white text-[var(--text-primary-strong)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]/20 transition-[box-shadow] duration-[120ms]"
+              className="flex-1 min-w-0 text-[17px] leading-relaxed px-2 py-1 rounded border border-[var(--border)] bg-white text-[var(--text-primary-strong)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]/20 transition-[box-shadow] duration-[120ms]"
               autoFocus
               aria-label="New action step"
             />
@@ -209,7 +209,7 @@ export function ActionItemsSection({
         <button
           type="button"
           onClick={startAdd}
-          className="mt-3 flex items-center gap-2 px-1 py-1.5 text-[15px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-heading)] cursor-pointer transition-colors"
+          className="mt-3 flex items-center gap-2 px-1 py-1.5 text-[17px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-heading)] cursor-pointer transition-colors"
         >
           <Plus size={14} />
           Add action step

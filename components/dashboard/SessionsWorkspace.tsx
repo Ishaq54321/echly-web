@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Avatar } from "@/components/ui/Avatar";
@@ -210,7 +210,7 @@ function SessionWorkspaceRow({
             type="button"
             aria-label={isSelected ? "Deselect session" : "Select session"}
             className={[
-              "relative flex h-8 w-8 items-center justify-center",
+              "relative flex h-[38px] w-[38px] items-center justify-center",
               (hovered || isSelectionMode) ? "cursor-pointer" : "cursor-default",
               (hovered || isSelectionMode) ? "transition-all duration-150" : "",
             ].join(" ")}
@@ -314,7 +314,7 @@ function SessionWorkspaceRow({
                 type="button"
                 disabled={isOptimistic || copyLinkBusy}
                 onClick={handleCopyLinkClick}
-                className="w-8 h-8 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30 disabled:opacity-50 disabled:pointer-events-none"
+                className="w-[38px] h-[38px] rounded-[var(--radius-btn)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30 disabled:opacity-50 disabled:pointer-events-none"
                 aria-label={
                   copyLinkBusy ? "Generating link…" : copied ? "Copied" : "Copy link"
                 }
@@ -646,7 +646,7 @@ export function SessionsWorkspace({
                 type="button"
                 onClick={() => setDeleteModalOpen(false)}
                 disabled={bulkDeleting}
-                className="px-4 py-2.5 text-[14px] font-medium rounded-xl bg-[var(--surface-hover)] text-[var(--text-heading)] hover:bg-[var(--surface-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[14px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
               >
                 Cancel
               </button>
@@ -654,7 +654,7 @@ export function SessionsWorkspace({
                 type="button"
                 onClick={() => void confirmBulkDelete()}
                 disabled={bulkDeleting || selectedSessions.length === 0 || !onDeleteSession}
-                className="px-4 py-2.5 text-[14px] font-semibold rounded-xl bg-[var(--color-danger)] text-white hover:opacity-95 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--color-danger)] text-white text-[14px] font-medium hover:opacity-95 transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
               >
                 {bulkDeleting ? "Deleting…" : "Delete"}
               </button>

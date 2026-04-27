@@ -170,8 +170,8 @@ export function FeedbackListPanel({
       {selectionMode && bulkCount > 0 && onSelectedIdsChange && (
         <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-[var(--layer-2-border)] bg-[var(--structural-gray-ticket)]">
           <span className="text-[12px] text-[var(--text-tertiary)]">{bulkCount} selected</span>
-          <button type="button" className="text-[12px] text-[var(--accent-operational)] hover:underline" onClick={() => onSelectedIdsChange(new Set())}>Clear</button>
-          {onBulkResolve && <button type="button" className="text-[12px] text-[var(--accent-operational)] hover:underline" onClick={() => onBulkResolve()}>Resolve</button>}
+          <button type="button" className="text-[14px] text-[var(--accent-operational)] hover:underline" onClick={() => onSelectedIdsChange(new Set())}>Clear</button>
+          {onBulkResolve && <button type="button" className="text-[14px] text-[var(--accent-operational)] hover:underline" onClick={() => onBulkResolve()}>Resolve</button>}
         </div>
       )}
 

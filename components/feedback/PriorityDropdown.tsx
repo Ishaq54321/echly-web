@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef } from "react";
 import { Flag, Ban } from "lucide-react";
@@ -38,7 +38,7 @@ const PRIORITIES: PriorityConfig[] = [
     color: "var(--text-secondary)",
     bg: "#F9FAFB",
     border: "var(--border)",
-    icon: <Flag size={14} style={{ fill: "var(--text-secondary)", color: "var(--text-secondary)" }} />,
+    icon: <Flag size={14} style={{ fill: "var(--text-body)", color: "var(--text-body)" }} />,
   },
 ];
 
@@ -195,7 +195,7 @@ export function PriorityDropdown({
       }
     : {};
 
-  const noPriorityCls = `inline-flex h-9 items-center gap-1.5 px-3.5 rounded-[var(--radius-sm)] text-[14px] font-medium border border-[var(--border)] bg-white text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`;
+  const noPriorityCls = `inline-flex h-[38px] items-center gap-1.5 px-4 rounded-[var(--radius-btn)] text-[14px] font-medium border border-[var(--border)] bg-white text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`;
 
   return (
     <div ref={containerRef} style={{ position: "relative", display: "inline-block" }}>
@@ -203,23 +203,25 @@ export function PriorityDropdown({
         activePriority ? (
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] hover:bg-[var(--surface-hover)] transition-colors cursor-pointer"
-            style={{ color: activePriority.color }}
+            className="inline-flex h-[42px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border text-[var(--text-body)] text-[14px] font-medium transition-all cursor-pointer"
+            style={{ borderColor: `${activePriority.color}30` }}
             title={`${activePriority.label} Priority`}
             disabled={disabled || isSaving}
             onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
           >
-            <Flag size={16} strokeWidth={1.8} className="shrink-0" fill="currentColor" />
+            <Flag size={18} strokeWidth={1.8} className="shrink-0" fill={activePriority.color} style={{ color: activePriority.color }} />
+            {activePriority.label}
           </button>
         ) : (
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors cursor-pointer"
+            className="inline-flex h-[42px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] text-[var(--text-body)] text-[14px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all cursor-pointer"
             title="Set priority"
             disabled={disabled || isSaving}
             onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
           >
-            <Flag size={16} strokeWidth={1.8} className="shrink-0" />
+            <Flag size={18} strokeWidth={1.8} className="shrink-0" />
+            Priority
           </button>
         )
       ) : (
@@ -329,14 +331,14 @@ export function PriorityDropdown({
                   border: "none",
                   background: "transparent",
                   fontSize: 14,
-                  color: "var(--text-tertiary)",
+                  color: "var(--text-secondary)",
                   textAlign: "left",
                   marginBottom: 4,
                 }}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--surface-hover)"; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
               >
-                <Ban size={13} color="var(--text-tertiary)" style={{ flexShrink: 0 }} />
+                <Ban size={13} color="var(--text-secondary)" style={{ flexShrink: 0 }} />
                 Clear priority
               </button>
             </>

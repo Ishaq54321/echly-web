@@ -4,16 +4,23 @@ import { apiSuccess } from "@/lib/server/apiResponse";
 
 export const dynamic = "force-dynamic";
 
-const PLAN_ORDER: PlanId[] = ["free", "starter", "business", "enterprise"];
+const PLAN_ORDER: PlanId[] = ["starter", "business", "enterprise"];
 
 export interface PlansCatalogResponseItem {
   id: PlanId;
   name: string;
-  priceMonthly: number;
-  priceYearly: number;
-  maxSessions: number | null;
+  pricePerSeat: number | null;
+  annualPricePerSeat: number | null;
+  maxFeedbackPerMonth: number | null;
   maxMembers: number | null;
   insightsEnabled: boolean;
+  customBranding: boolean;
+  prioritySupport: boolean;
+  displayLimits: {
+    sessions: string;
+    members: string;
+    feedbackTickets: string;
+  };
 }
 
 export async function GET() {
@@ -25,17 +32,18 @@ export async function GET() {
       return {
         id: entry.id,
         name: entry.name,
-        priceMonthly: entry.priceMonthly,
-        priceYearly: entry.priceYearly,
-        maxSessions: entry.maxSessions,
+        pricePerSeat: entry.pricePerSeat,
+        annualPricePerSeat: entry.annualPricePerSeat,
+        maxFeedbackPerMonth: entry.maxFeedbackPerMonth,
         maxMembers: entry.maxMembers,
         insightsEnabled: entry.insightsEnabled,
+        customBranding: entry.customBranding,
+        prioritySupport: entry.prioritySupport,
+        displayLimits: entry.displayLimits,
       };
     }).filter(Boolean) as PlansCatalogResponseItem[];
     return apiSuccess(plans);
   } catch {
-    // getPlanCatalog already has its own fallbacks; in the unlikely case of
-    // total failure, return an empty list rather than crashing the product.
     return apiSuccess([], undefined, { status: 200 });
   }
 }

@@ -24,9 +24,7 @@ export default function AdminUsagePage() {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   if (loading) {
@@ -49,19 +47,20 @@ export default function AdminUsagePage() {
 
   const cards = [
     { label: "Total workspaces", value: stats.totalWorkspaces },
-    { label: "Free users", value: stats.freeWorkspaces },
-    { label: "Paid users", value: stats.paidWorkspaces },
-    { label: "Total sessions", value: stats.totalSessions },
-    { label: "Total feedback captured", value: stats.totalFeedbackCaptured },
+    { label: "Starter (free) workspaces", value: stats.starterWorkspaces },
+    { label: "Paid workspaces", value: stats.paidWorkspaces },
+    { label: "Total feedback tickets", value: stats.totalFeedbackCaptured },
+    { label: "Tickets this month", value: stats.totalFeedbackThisMonth },
+    { label: "Avg tickets / workspace / mo", value: stats.avgFeedbackTicketsThisMonth },
   ];
 
   return (
     <div className="p-8">
       <h1 className="text-2xl font-semibold text-[var(--text-heading)] mb-1">Usage</h1>
       <p className="text-sm text-[var(--text-secondary)] mb-8">
-        Platform-wide usage. Charts optional.
+        Platform-wide usage. Ticket counts reset on the 1st of each month.
       </p>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map(({ label, value }) => (
           <div
             key={label}

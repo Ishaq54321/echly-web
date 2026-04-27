@@ -59,7 +59,7 @@ export function GlobalNotificationButton({
         aria-label="Notifications"
         onClick={() => setOpen(!open)}
       >
-        <Bell size={20} strokeWidth={2} />
+        <Bell size={20} strokeWidth={2} className="text-[var(--text-body)]" />
         {unreadCount > 0 && <span className="badge">{unreadCount > 99 ? "99+" : unreadCount}</span>}
       </button>
       <NotificationPanel

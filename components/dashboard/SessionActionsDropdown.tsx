@@ -331,7 +331,7 @@ export function SessionActionsDropdown({
     >
       <MoreHorizontal
         className={triggerIconClassName}
-        strokeWidth={1.6}
+        strokeWidth={2}
         aria-hidden
       />
     </button>

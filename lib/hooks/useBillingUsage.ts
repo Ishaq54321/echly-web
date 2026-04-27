@@ -14,7 +14,6 @@ function scheduleIdleTask(task: () => void): number {
   if (typeof window !== "undefined" && "requestIdleCallback" in window) {
     return window.requestIdleCallback(() => task(), { timeout: 1200 });
   }
-  // Use globalThis to keep this type-safe even when `window` is not narrowed.
   return globalThis.setTimeout(task, 250) as unknown as number;
 }
 
@@ -28,9 +27,9 @@ function cancelIdleTask(handle: number): void {
 
 export interface BillingUsageData {
   plan: string;
-  limits: {
-    maxSessions: number | null;
-  };
+  feedbackTicketsUsed: number;
+  feedbackTicketsLimit: number | null;
+  seats: number;
 }
 
 export type UseBillingUsageOptions = {
@@ -40,8 +39,7 @@ export type UseBillingUsageOptions = {
 
 /**
  * Subscribes to the workspace document and refetches billing usage whenever
- * the workspace changes (e.g. admin updates plan/entitlements). So plan
- * changes apply immediately without requiring the user to log out.
+ * the workspace changes. Plan changes apply immediately without requiring logout.
  */
 export function useBillingUsage(
   options: UseBillingUsageOptions = {}
@@ -66,7 +64,7 @@ export function useBillingUsage(
         setError("Failed to load usage");
         return;
       }
-      setData(json);
+      setData(json as BillingUsageData);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
     } finally {
@@ -84,9 +82,7 @@ export function useBillingUsage(
 
     let cancelled = false;
     let releaseFirestore: (() => void) | null = null;
-    const workspaceStoreUnsub: { current: (() => void) | null } = {
-      current: null,
-    };
+    const workspaceStoreUnsub: { current: (() => void) | null } = { current: null };
     let idleHandle: number | null = null;
 
     const queueRefetch = () => {

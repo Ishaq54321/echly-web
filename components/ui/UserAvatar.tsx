@@ -77,7 +77,7 @@ export function UserAvatar({
         </span>
       ) : (
         <span className="flex h-full w-full items-center justify-center rounded-full bg-[var(--surface-hover)]">
-          <User className="h-5 w-5 text-[var(--text-secondary)]" aria-hidden />
+          <User className="h-5 w-5 text-[var(--text-body)]" aria-hidden />
         </span>
       )}
     </span>

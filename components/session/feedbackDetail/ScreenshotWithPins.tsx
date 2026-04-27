@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useCallback, useRef, memo, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
@@ -575,7 +575,7 @@ const ScreenshotWithPinsInner = ({
                       type="button"
                       onClick={() => void handleSubmitDraft()}
                       disabled={(!draftMessage.trim() && draftPendingAttachments.length === 0) || submitting}
-                      className="text-[14px] font-semibold text-white bg-[var(--brand)] hover:bg-[var(--brand-hover)] px-4 py-1.5 rounded-full disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer"
+                      className="inline-flex h-[34px] items-center gap-1.5 px-3 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[13px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
                     >
                       {submitting ? "Sending..." : "Comment"}
                     </button>
@@ -596,7 +596,7 @@ const ScreenshotWithPinsInner = ({
                   e.stopPropagation();
                   onEdit();
                 }}
-                className="absolute top-2.5 right-[50px] flex items-center justify-center h-9 w-9 rounded-md bg-neutral-800 text-white hover:bg-neutral-700 opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer focus:outline-none z-10 shadow-sm"
+                className="absolute top-2.5 right-[50px] flex items-center justify-center h-[38px] w-[38px] rounded-[var(--radius-btn)] bg-neutral-800 text-white hover:bg-neutral-700 opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer focus:outline-none z-10 shadow-sm"
                 aria-label="Edit screenshot"
               >
                 <Pencil className="h-4 w-4" strokeWidth={2} />
@@ -608,7 +608,7 @@ const ScreenshotWithPinsInner = ({
                 e.stopPropagation();
                 onExpand();
               }}
-              className="absolute top-2.5 right-2.5 flex items-center justify-center h-9 w-9 rounded-md bg-neutral-800 text-white hover:bg-neutral-700 opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer focus:outline-none z-10 shadow-sm"
+              className="absolute top-2.5 right-2.5 flex items-center justify-center h-[38px] w-[38px] rounded-[var(--radius-btn)] bg-neutral-800 text-white hover:bg-neutral-700 opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer focus:outline-none z-10 shadow-sm"
               aria-label="Expand screenshot"
             >
               <Expand className="h-4 w-4" strokeWidth={2} />

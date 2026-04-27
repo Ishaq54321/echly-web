@@ -629,8 +629,8 @@ function ActivityItemBase(props: ActivityItemProps) {
         {/* Action line — timestamp column fixed right */}
         <div className="flex w-full min-w-0 items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 leading-snug text-[15px]">
-            <span className="text-muted-foreground">{actorName}</span>
-            <span className="text-foreground">{row.actionPhrase}</span>
+            <span className="text-[var(--text-heading)]">{actorName}</span>
+            <span className="text-[var(--text-heading)]">{row.actionPhrase}</span>
 
             {hasEntityChip && entityLabel ? (
               handleEntityClick ? (
@@ -699,10 +699,10 @@ function ActivityItemBase(props: ActivityItemProps) {
               e.stopPropagation();
               props.onToggleExpand(props.group);
             }}
-            className="mt-2 flex w-fit cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="mt-2 flex w-fit cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-xs text-[var(--text-body)] transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <ChevronDown
-              className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-150 ${props.isExpanded ? "rotate-180" : ""}`}
+              className={`h-4 w-4 shrink-0 text-[var(--text-heading)] transition-transform duration-150 ${props.isExpanded ? "rotate-180" : ""}`}
               aria-hidden
             />
             {props.isExpanded ? "Show less" : "Show all"}
@@ -779,10 +779,10 @@ function ActivityItemBase(props: ActivityItemProps) {
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="flex min-w-0 flex-wrap items-center gap-2 text-[15px] leading-relaxed">
-                        <span className="text-muted-foreground">
+                        <span className="text-[var(--text-heading)]">
                           {ev.actor?.name?.trim() || "A teammate"}
                         </span>
-                        <span className="text-foreground">
+                        <span className="text-[var(--text-heading)]">
                           {evRow.actionPhrase}
                         </span>
                         {subHasEntityChip && subEntityLabel ? (

@@ -9,14 +9,12 @@ import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
 import type { PlanId } from "@/lib/billing/plans";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 
-const VALID_PLANS: PlanId[] = ["free", "starter", "business", "enterprise"];
+const VALID_PLANS: PlanId[] = ["starter", "business", "enterprise"];
 
 /**
  * POST /api/admin/update-plan
  * Body: { newPlan: PlanId }
- * Workspace is resolved server-side from the authenticated user.
- * Updates workspace.billing.plan. Limits come from plan catalog (source of truth).
- * Only allowed if the authenticated user is the workspace owner.
+ * Changes workspace.billing.plan. Only allowed for the workspace owner.
  */
 export async function POST(req: Request) {
   let user;
@@ -50,7 +48,7 @@ export async function POST(req: Request) {
   if (!VALID_PLANS.includes(newPlan as PlanId)) {
     return apiError({
       code: "INVALID_INPUT",
-      message: "newPlan must be one of: free, starter, business, enterprise",
+      message: "newPlan must be one of: starter, business, enterprise",
       status: 400,
     });
   }
@@ -72,21 +70,15 @@ export async function POST(req: Request) {
     await updateWorkspacePlanRepo(workspaceId, newPlan as PlanId);
     invalidateWorkspaceCache(user.uid);
     const catalog = await getPlanCatalog();
-    const entry = catalog[newPlan as PlanId] ?? catalog.free;
+    const entry = catalog[newPlan as PlanId] ?? catalog.starter;
     return apiSuccess({
       plan: newPlan,
-      limits: {
-        maxSessions: entry.maxSessions,
-        maxMembers: entry.maxMembers,
-        insightsAccess: entry.insightsEnabled,
-      },
+      feedbackTicketsLimit: entry.maxFeedbackPerMonth,
+      maxMembers: entry.maxMembers,
+      insightsAccess: entry.insightsEnabled,
     });
   } catch (err) {
     console.error("POST /api/admin/update-plan:", err);
-    return apiError({
-      code: "INTERNAL_ERROR",
-      message: "Failed to update plan",
-      status: 500,
-    });
+    return apiError({ code: "INTERNAL_ERROR", message: "Failed to update plan", status: 500 });
   }
 }

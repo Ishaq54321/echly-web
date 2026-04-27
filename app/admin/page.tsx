@@ -58,9 +58,9 @@ export default function AdminPage() {
       href: null,
     },
     {
-      label: "Free Workspaces",
-      value: stats?.freeWorkspaces ?? 0,
-      href: "/admin/customers?plan=free",
+      label: "Starter Workspaces",
+      value: stats?.starterWorkspaces ?? 0,
+      href: "/admin/customers?plan=starter",
     },
     {
       label: "Paid Workspaces",
@@ -68,8 +68,8 @@ export default function AdminPage() {
       href: "/admin/customers?plan=paid",
     },
     {
-      label: "Total Sessions",
-      value: stats?.totalSessions ?? 0,
+      label: "Feedback Tickets (month)",
+      value: stats?.totalFeedbackThisMonth ?? 0,
       href: null,
     },
   ];

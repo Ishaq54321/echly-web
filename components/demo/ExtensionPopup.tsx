@@ -69,7 +69,7 @@ export default function ExtensionPopup({
             onClick={onStartSession}
             disabled={selectedMode == null}
             className={
-              "echly-start-session h-10 rounded-[var(--radius-md)] text-[12px] font-semibold transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed " +
+              "echly-start-session h-[38px] px-4 rounded-[var(--radius-btn)] text-[14px] font-semibold transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed " +
               (startSessionActive
                 ? "bg-[#FF4B14] text-white hover:bg-[#FF4B14] active:bg-[#E64112]"
                 : "bg-[var(--border)] text-[var(--text-body)] hover:bg-[#D1D5DB] active:bg-[#D1D5DB]")
@@ -79,7 +79,7 @@ export default function ExtensionPopup({
           </button>
           <button
             type="button"
-            className="h-10 rounded-xl bg-[var(--surface-hover)] hover:bg-[var(--surface-hover)] text-[var(--text-heading)] text-[12px] font-semibold"
+            className="h-[38px] px-4 rounded-[var(--radius-btn)] bg-[var(--surface-hover)] hover:bg-[var(--surface-hover)] text-[var(--text-heading)] text-[14px] font-semibold"
           >
             Previous Sessions
           </button>

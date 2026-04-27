@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronRight, Eye, UsersRound, PencilLine } from "lucide-react";
+import { InviteMemberModal } from "@/components/workspace/InviteMemberModal";
 import { formatDistanceToNow } from "date-fns";
 import type { Feedback } from "@/lib/domain/feedback";
 import { getTicketStatus } from "@/lib/domain/feedback";
@@ -61,6 +62,8 @@ export interface TicketListProps {
   workspaceName?: string;
   updatedAt?: any;
   viewCount?: number;
+  canRenameTitle?: boolean;
+  onRenameTitle?: (title: string) => Promise<void>;
 }
 
 /** Skeleton list for Open / Resolved section bodies while loading. */
@@ -68,7 +71,7 @@ function TicketListSectionLoading() {
   return (
     <div className="flex flex-col gap-0" aria-busy="true">
       {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="flex flex-col gap-1 px-6 py-2.5">
+        <div key={i} className="flex flex-col gap-0.5 px-6 py-2.5">
           <div
             className="h-3.5 rounded-md bg-muted-foreground/15 animate-pulse"
             style={{ width: `${55 + (i % 4) * 10}%` }}
@@ -106,6 +109,8 @@ function TicketListInner({
   workspaceName,
   updatedAt,
   viewCount,
+  canRenameTitle,
+  onRenameTitle,
 }: TicketListProps) {
   const scrollToIdApplied = useRef(false);
   const [openExpandedInternal, setOpenExpandedInternal] = useState(true);
@@ -127,6 +132,43 @@ function TicketListInner({
   const scrollContainerReadySent = useRef(false);
   const internalContainerRef = useRef<HTMLDivElement | null>(null);
   const isUserScrollingRef = useRef(false);
+
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(sessionTitle || '');
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isEditingTitle) setTitleDraft(sessionTitle || '');
+  }, [sessionTitle, isEditingTitle]);
+
+  useEffect(() => {
+    if (isEditingTitle && titleInputRef.current) {
+      titleInputRef.current.focus();
+      titleInputRef.current.select();
+    }
+  }, [isEditingTitle]);
+
+  const handleTitleSave = async () => {
+    const trimmed = titleDraft.trim();
+    if (!trimmed || trimmed === sessionTitle) {
+      setIsEditingTitle(false);
+      setTitleDraft(sessionTitle || '');
+      return;
+    }
+    setIsEditingTitle(false);
+    await onRenameTitle?.(trimmed);
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleTitleSave();
+    }
+    if (e.key === 'Escape') {
+      setIsEditingTitle(false);
+      setTitleDraft(sessionTitle || '');
+    }
+  };
 
   const { total, open, resolved } = counts;
 
@@ -256,28 +298,72 @@ function TicketListInner({
     return () => cancelAnimationFrame(rafId);
   }, [items.length, scrollToId]);
 
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden">
-      {/* Session Info Header */}
+    <div className="flex flex-col h-full min-h-0 overflow-hidden p-4">
+      {/* Session / Views row */}
+      <div className="flex items-center justify-between px-3 py-2">
+        <span className="text-[14px] font-semibold text-[var(--text-heading)] truncate">{workspaceName || 'Workspace'}</span>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-heading)] transition-colors border-0 bg-transparent cursor-pointer"
+        >
+          <Eye size={14} strokeWidth={2} />
+          0 Views
+        </button>
+      </div>
+
+      {/* Hero card */}
       {sessionTitle && (
-        <div className="shrink-0 px-4 pt-4 pb-3">
-          <div className="flex items-start justify-between gap-2">
-            <h2 className="text-[16px] font-semibold text-[var(--text-heading)] leading-[1.3] truncate flex-1 min-w-0">
-              {sessionTitle}
-            </h2>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-xs)] border border-[var(--border)] text-[12px] font-medium text-[var(--text-body)] tabular-nums shrink-0">
-              {viewCount ?? 0} views
-            </span>
-          </div>
-          <div className="mt-1 flex items-center gap-1 text-[12px] text-[var(--text-tertiary)]">
-            <span className="font-medium text-[var(--text-tertiary)]">{workspaceName}</span>
-            <span>·</span>
-            <span title={updatedAt ? new Date(typeof updatedAt === 'object' && 'seconds' in updatedAt ? updatedAt.seconds * 1000 : updatedAt).toLocaleString() : undefined}>
-              {updatedAt ? formatRelativeTime(updatedAt) : "Just now"}
-            </span>
-          </div>
+        <div
+          className="mb-4 p-4 pb-3.5 rounded-[12px] relative overflow-hidden shrink-0"
+          style={{
+            background: 'radial-gradient(120% 110% at 100% 0%, rgba(23,117,224,0.10) 0%, rgba(23,117,224,0) 55%), linear-gradient(180deg, #F5F9FE 0%, #FFFFFF 100%)',
+            border: '1px solid rgba(23,117,224,0.10)',
+          }}
+        >
+          {isEditingTitle ? (
+            <input
+              ref={titleInputRef}
+              type="text"
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={handleTitleSave}
+              onKeyDown={handleTitleKeyDown}
+              className="text-[18px] font-semibold text-[var(--text-heading)] tracking-[-0.012em] leading-[1.35] mb-1 w-full bg-transparent border-0 border-b-2 border-[var(--brand)] outline-none px-0 py-0"
+            />
+          ) : (
+            <div
+              className={`group/title flex items-center gap-2 mb-1 ${canRenameTitle ? 'cursor-pointer' : ''}`}
+              onClick={() => canRenameTitle && setIsEditingTitle(true)}
+            >
+              <h3 className={`text-[18px] font-semibold text-[var(--text-heading)] tracking-[-0.012em] leading-[1.35] transition-colors ${canRenameTitle ? 'group-hover/title:text-[var(--brand)]' : ''}`}>
+                {sessionTitle}
+              </h3>
+              {canRenameTitle && (
+                <PencilLine
+                  size={14}
+                  strokeWidth={1.5}
+                  className="shrink-0 text-[var(--text-tertiary)] opacity-0 group-hover/title:opacity-100 group-hover/title:text-[var(--brand)] transition-all"
+                />
+              )}
+            </div>
+          )}
+          <p className="text-[14px] text-[var(--text-secondary)] leading-[1.5] mb-3 max-w-[80%]">
+            {total} ticket{total !== 1 ? 's' : ''} in this session. Walk through, leave notes, resolve as you go.
+          </p>
+          <button
+            type="button"
+            onClick={() => setInviteModalOpen(true)}
+            className="inline-flex items-center gap-1.5 h-8 px-4 rounded-[7px] bg-[var(--text-heading)] text-white text-[13px] font-semibold tracking-[-0.005em] border-0 cursor-pointer hover:bg-black transition-colors"
+          >
+            <UsersRound size={14} strokeWidth={2} />
+            Invite Team
+          </button>
         </div>
       )}
+
       {/* Status sections: Open → Resolved. Soft pill badges, no hard blocks. */}
       <div
         ref={(el) => {
@@ -290,7 +376,7 @@ function TicketListInner({
             onScrollContainerReady?.();
           }
         }}
-        className="sidebar-list h-full max-h-[100vh] overflow-y-auto flex-1 min-h-0 pb-4"
+        className="h-full overflow-y-auto flex-1 min-h-0 pb-2 -mx-4 px-4"
       >
         {showSearchEmpty && (
           <div className="px-3 py-4 mt-3 text-[12px] font-normal text-[var(--text-tertiary)]">
@@ -299,66 +385,59 @@ function TicketListInner({
         )}
 
         {/* Open */}
-        <section className="pt-3">
+        <section className="mb-4">
           {!countsLoading && (
             <>
               <button
-                  type="button"
-                  onClick={() => {
-                    if (openExpandedControlled) onOpenExpandedChange?.();
-                    else setOpenExpandedInternal((x) => !x);
-                  }}
-                  className="z-10 bg-transparent relative flex w-full items-center gap-2.5 px-4 py-2.5 rounded-[var(--radius-sm)] text-left border-none shadow-none hover:bg-[var(--surface-hover)] transition-colors duration-150 cursor-pointer"
-                  aria-expanded={openExpanded}
-                >
-                  <span className="min-w-[20px] h-[20px] rounded-[var(--radius-xs)] flex items-center justify-center text-[12px] font-bold tabular-nums bg-[var(--brand-subtle)] text-[var(--brand)]">
-                    {open}
-                  </span>
-                  <span className="text-[14px] font-semibold text-[var(--text-heading)] flex-1">
-                    Open
-                  </span>
-                  <span className="ml-auto shrink-0 text-[var(--text-heading)] h-4 w-4">
-                    {openExpanded ? (
-                      <ChevronDown className="text-[var(--text-heading)] h-4 w-4" aria-hidden />
-                    ) : (
-                      <ChevronRight className="text-[var(--text-heading)] h-4 w-4" aria-hidden />
-                    )}
-                  </span>
-                </button>
-                {openExpanded && (
-                  <div className="px-2 pt-0.5 pb-2 space-y-0 transition-opacity duration-150 ease-out">
-                    {openItems.map((item, idx) => (
-                      <TicketItem
-                        key={item.id}
-                        id={item.id}
-                        title={item.title}
-                        isResolved={false}
-                        index={idx + 1}
-                        active={item.id === selectedId}
-                        onSelect={onSelect}
-                        isNewTicket={item.id === newTicketId}
-                      />
-                    ))}
-                    {openItems.length === 0 && !showSearchEmpty && (
-                      <>
-                        {open === 0 ? (
-                          <p className="px-3 py-3 text-[12px] text-[var(--text-tertiary)]">
-                            No open tickets
-                          </p>
-                        ) : isSearchMode && searchLoading ? null : (
-                          <TicketListSectionLoading />
-                        )}
-                      </>
-                    )}
-                    {isLoadingOpen && <TicketListSectionLoading />}
-                  </div>
-                )}
-              </>
+                type="button"
+                onClick={() => {
+                  if (openExpandedControlled) onOpenExpandedChange?.();
+                  else setOpenExpandedInternal((x) => !x);
+                }}
+                className="w-full flex items-center gap-2 text-[14px] font-medium text-[var(--text-heading)] px-3 py-2 tracking-[-0.01em] border-0 bg-transparent cursor-pointer hover:bg-[var(--surface-hover)] rounded-[var(--radius-sm)] transition-colors"
+                aria-expanded={openExpanded}
+              >
+                <ChevronRight
+                  size={14}
+                  className={`text-[var(--text-tertiary)] transition-transform duration-200 ${openExpanded ? 'rotate-90' : ''}`}
+                />
+                <span>Open</span>
+                <span className="text-[var(--text-heading)] text-[14px] font-medium">{open}</span>
+              </button>
+              {openExpanded && (
+                <div className="mt-1 space-y-0.5 transition-opacity duration-150 ease-out">
+                  {openItems.map((item, idx) => (
+                    <TicketItem
+                      key={item.id}
+                      id={item.id}
+                      title={item.title}
+                      isResolved={false}
+                      index={idx + 1}
+                      active={item.id === selectedId}
+                      onSelect={onSelect}
+                      isNewTicket={item.id === newTicketId}
+                    />
+                  ))}
+                  {openItems.length === 0 && !showSearchEmpty && (
+                    <>
+                      {open === 0 ? (
+                        <p className="px-2.5 py-3 text-[12px] text-[var(--text-tertiary)]">
+                          No open tickets
+                        </p>
+                      ) : isSearchMode && searchLoading ? null : (
+                        <TicketListSectionLoading />
+                      )}
+                    </>
+                  )}
+                  {isLoadingOpen && <TicketListSectionLoading />}
+                </div>
+              )}
+            </>
           )}
         </section>
 
         {/* Resolved */}
-        <section className="pt-2">
+        <section className="mb-4">
           {!countsLoading && (
             <>
               <button
@@ -367,50 +446,43 @@ function TicketListInner({
                   if (resolvedExpandedControlled) onResolvedExpandedChange?.();
                   else setResolvedExpandedInternalOnly(!resolvedExpanded);
                 }}
-                  className="z-10 bg-transparent relative flex w-full items-center gap-2.5 px-4 py-2.5 rounded-[var(--radius-sm)] text-left border-none shadow-none hover:bg-[var(--surface-hover)] transition-colors duration-150 cursor-pointer"
-                  aria-expanded={resolvedExpanded}
-                >
-                  <span className="min-w-[20px] h-[20px] rounded-[var(--radius-xs)] flex items-center justify-center text-[12px] font-bold tabular-nums bg-[var(--color-success-bg)] text-[var(--color-success)]">
-                    {resolved}
-                  </span>
-                  <span className="text-[14px] font-semibold text-[var(--text-heading)] flex-1">
-                    Resolved
-                  </span>
-                  <span className="ml-auto shrink-0 text-[var(--text-heading)] h-4 w-4">
-                    {resolvedExpanded ? (
-                      <ChevronDown className="text-[var(--text-heading)] h-4 w-4" aria-hidden />
-                    ) : (
-                      <ChevronRight className="text-[var(--text-heading)] h-4 w-4" aria-hidden />
-                    )}
-                  </span>
-                </button>
-                {resolvedExpanded && (
-                  <div className="px-2 pt-0.5 pb-2 space-y-0 transition-opacity duration-150 ease-out">
-                    {resolvedItems.map((item, idx) => (
-                      <TicketItem
-                        key={item.id}
-                        id={item.id}
-                        title={item.title}
-                        isResolved={true}
-                        index={openItems.length + idx + 1}
-                        active={item.id === selectedId}
-                        onSelect={onSelect}
-                        isNewTicket={item.id === newTicketId}
-                      />
-                    ))}
-                    {resolvedItems.length === 0 && !showSearchEmpty && !(isSearchMode && searchLoading) && (
-                      <>
-                        {resolved === 0 ? (
-                          <p className="px-3 py-3 text-[12px] text-[var(--text-tertiary)]">
-                            No resolved tickets
-                          </p>
-                        ) : null}
-                      </>
-                    )}
-                    {showResolvedListLoading && <TicketListSectionLoading />}
-                  </div>
-                )}
-              </>
+                className="w-full flex items-center gap-2 text-[14px] font-medium text-[var(--text-heading)] px-3 py-2 tracking-[-0.01em] border-0 bg-transparent cursor-pointer hover:bg-[var(--surface-hover)] rounded-[var(--radius-sm)] transition-colors"
+                aria-expanded={resolvedExpanded}
+              >
+                <ChevronRight
+                  size={14}
+                  className={`text-[var(--text-tertiary)] transition-transform duration-200 ${resolvedExpanded ? 'rotate-90' : ''}`}
+                />
+                <span>Resolved</span>
+                <span className="text-[var(--text-heading)] text-[14px] font-medium">{resolved}</span>
+              </button>
+              {resolvedExpanded && (
+                <div className="mt-1 space-y-0.5 transition-opacity duration-150 ease-out">
+                  {resolvedItems.map((item, idx) => (
+                    <TicketItem
+                      key={item.id}
+                      id={item.id}
+                      title={item.title}
+                      isResolved={true}
+                      index={openItems.length + idx + 1}
+                      active={item.id === selectedId}
+                      onSelect={onSelect}
+                      isNewTicket={item.id === newTicketId}
+                    />
+                  ))}
+                  {resolvedItems.length === 0 && !showSearchEmpty && !(isSearchMode && searchLoading) && (
+                    <>
+                      {resolved === 0 ? (
+                        <p className="px-2.5 py-3 text-[12px] text-[var(--text-tertiary)]">
+                          No resolved tickets
+                        </p>
+                      ) : null}
+                    </>
+                  )}
+                  {showResolvedListLoading && <TicketListSectionLoading />}
+                </div>
+              )}
+            </>
           )}
         </section>
 
@@ -421,6 +493,11 @@ function TicketListInner({
           </>
         )}
       </div>
+      <InviteMemberModal
+        isOpen={inviteModalOpen}
+        onClose={() => setInviteModalOpen(false)}
+        onInviteSent={() => setInviteModalOpen(false)}
+      />
     </div>
   );
 }

@@ -3,32 +3,30 @@ import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { requireAdmin } from "@/lib/server/adminAuth";
 import { logAdminAction } from "@/lib/admin/adminLogs";
 import type { PlanDoc } from "@/lib/admin/types";
-import {
-  PLANS as CODE_PLANS,
-  type PlanId,
-  DEFAULT_PRICES,
-} from "@/lib/billing/plans";
+import { PLANS, type PlanId } from "@/lib/billing/plans";
 import { invalidatePlanCatalogCache } from "@/lib/billing/getPlanCatalog";
+
 const PLANS_COLLECTION = "plans";
 
 export type PlanWithId = PlanDoc & { id: string };
 
 function defaultPlanDoc(id: PlanId): PlanDoc {
-  const config = CODE_PLANS[id];
-  const prices = DEFAULT_PRICES[id];
+  const def = PLANS[id];
   return {
-    name: id.charAt(0).toUpperCase() + id.slice(1),
-    priceMonthly: prices.priceMonthly,
-    priceYearly: prices.priceYearly,
-    maxSessions: config?.maxSessions ?? null,
-    maxMembers: config?.maxMembers ?? null,
-    insightsEnabled: config?.insightsAccess ?? false,
+    name: def.name,
+    pricePerSeat: def.pricePerSeat,
+    annualPricePerSeat: def.annualPricePerSeat,
+    maxFeedbackPerMonth: def.maxFeedbackPerMonth,
+    maxMembers: def.maxMembers,
+    insightsEnabled: def.insightsAccess,
+    customBranding: def.customBranding,
+    prioritySupport: def.prioritySupport,
   };
 }
 
 /**
  * GET /api/admin/plans
- * Returns all plan documents from Firestore, merged with code defaults for free/starter/business/enterprise.
+ * Returns all plan documents from Firestore, merged with code defaults.
  */
 export async function GET(req: Request) {
   try {
@@ -41,18 +39,26 @@ export async function GET(req: Request) {
   snapshot.docs.forEach((d) => {
     byId.set(d.id, d.data() as PlanDoc);
   });
-  const planIds: PlanId[] = ["free", "starter", "business", "enterprise"];
+  const planIds: PlanId[] = ["starter", "business", "enterprise"];
   const plans: PlanWithId[] = planIds.map((id) => {
     const stored = byId.get(id);
     const base = defaultPlanDoc(id);
     return {
       id,
       name: stored?.name ?? base.name,
-      priceMonthly: stored?.priceMonthly ?? base.priceMonthly,
-      priceYearly: stored?.priceYearly ?? base.priceYearly,
-      maxSessions: stored?.maxSessions !== undefined ? stored.maxSessions : base.maxSessions,
+      pricePerSeat: stored?.pricePerSeat !== undefined ? stored.pricePerSeat : base.pricePerSeat,
+      annualPricePerSeat:
+        stored?.annualPricePerSeat !== undefined
+          ? stored.annualPricePerSeat
+          : base.annualPricePerSeat,
+      maxFeedbackPerMonth:
+        stored?.maxFeedbackPerMonth !== undefined
+          ? stored.maxFeedbackPerMonth
+          : base.maxFeedbackPerMonth,
       maxMembers: stored?.maxMembers !== undefined ? stored.maxMembers : base.maxMembers,
       insightsEnabled: stored?.insightsEnabled ?? base.insightsEnabled,
+      customBranding: stored?.customBranding ?? base.customBranding,
+      prioritySupport: stored?.prioritySupport ?? base.prioritySupport,
     };
   });
   return apiSuccess(plans);
@@ -84,11 +90,13 @@ export async function PATCH(req: Request) {
   const ref = adminDb.doc(`${PLANS_COLLECTION}/${id}`);
   const payload: Partial<PlanDoc> = {};
   if (typeof updates.name === "string") payload.name = updates.name;
-  if (typeof updates.priceMonthly === "number") payload.priceMonthly = updates.priceMonthly;
-  if (typeof updates.priceYearly === "number") payload.priceYearly = updates.priceYearly;
-  if (updates.maxSessions !== undefined) payload.maxSessions = updates.maxSessions;
+  if (updates.pricePerSeat !== undefined) payload.pricePerSeat = updates.pricePerSeat;
+  if (updates.annualPricePerSeat !== undefined) payload.annualPricePerSeat = updates.annualPricePerSeat;
+  if (updates.maxFeedbackPerMonth !== undefined) payload.maxFeedbackPerMonth = updates.maxFeedbackPerMonth;
   if (updates.maxMembers !== undefined) payload.maxMembers = updates.maxMembers;
   if (typeof updates.insightsEnabled === "boolean") payload.insightsEnabled = updates.insightsEnabled;
+  if (typeof updates.customBranding === "boolean") payload.customBranding = updates.customBranding;
+  if (typeof updates.prioritySupport === "boolean") payload.prioritySupport = updates.prioritySupport;
   if (Object.keys(payload).length === 0) {
     return apiError({ code: "INVALID_INPUT", message: "No fields to update", status: 400 });
   }
@@ -103,10 +111,6 @@ export async function PATCH(req: Request) {
     return apiSuccess({ id });
   } catch (err) {
     console.error("PATCH /api/admin/plans:", err);
-    return apiError({
-      code: "INTERNAL_ERROR",
-      message: "Failed to update plan",
-      status: 500,
-    });
+    return apiError({ code: "INTERNAL_ERROR", message: "Failed to update plan", status: 500 });
   }
 }

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useId, useState } from "react";
 import { Check, ChevronDown, Link, Loader2, Trash2, Users, X } from "lucide-react";
@@ -217,7 +217,7 @@ export function ShareModal({
               {/* Can view / Can resolve dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="inline-flex items-center gap-1.5 h-8 px-3 text-[14px] font-medium border border-border rounded-lg bg-transparent hover:bg-muted/30 transition-colors text-foreground whitespace-nowrap">
+                  <button className="inline-flex items-center gap-1.5 h-[38px] px-4 text-[14px] font-medium border border-border rounded-[var(--radius-btn)] bg-transparent hover:bg-muted/30 transition-colors text-foreground whitespace-nowrap">
                     {inviteAccess === "resolve" ? "Can resolve" : "Can view"}
                     <ChevronDown className="h-3.5 w-3.5 text-muted-foreground ml-0.5" />
                   </button>
@@ -235,7 +235,7 @@ export function ShareModal({
               {/* Invite button */}
               <button
                 type="button"
-                className="h-[38px] bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white text-sm font-medium rounded-lg px-4 flex-shrink-0 transition-colors inline-flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-[38px] items-center justify-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer flex-shrink-0 disabled:opacity-50 disabled:pointer-events-none"
                 onClick={onInvite}
                 disabled={!canWrite || inviting}
               >
@@ -298,7 +298,7 @@ export function ShareModal({
                             {/* Role selector */}
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <button className="inline-flex items-center gap-1.5 h-8 px-3 text-[14px] font-medium border border-border rounded-lg bg-transparent hover:bg-muted/30 transition-colors text-foreground whitespace-nowrap">
+                                <button className="inline-flex items-center gap-1.5 h-[38px] px-4 text-[14px] font-medium border border-border rounded-[var(--radius-btn)] bg-transparent hover:bg-muted/30 transition-colors text-foreground whitespace-nowrap">
                                   {getRequestAccess(req) === "resolve" ? "Can resolve" : "Can view"}
                                   <ChevronDown className="h-3.5 w-3.5 text-muted-foreground ml-0.5" />
                                 </button>
@@ -332,7 +332,7 @@ export function ShareModal({
                             </DropdownMenu>
                             <button
                               type="button"
-                              className="h-7 px-3 text-[12px] font-medium bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white rounded-lg transition-colors whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+                              className="inline-flex h-[38px] items-center justify-center gap-1.5 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all whitespace-nowrap disabled:opacity-50 disabled:pointer-events-none"
                               disabled={busy}
                               onClick={() => onApproveAccessRequest(req.id, getRequestAccess(req))}
                             >
@@ -425,7 +425,7 @@ export function ShareModal({
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button
-                              className={`inline-flex items-center gap-1.5 h-8 px-3 text-[14px] font-medium border border-border rounded-lg bg-transparent hover:bg-muted/30 transition-colors text-foreground whitespace-nowrap${disabled ? " opacity-50 cursor-not-allowed pointer-events-none" : ""}`}
+                              className={`inline-flex items-center gap-1.5 h-[38px] px-4 text-[14px] font-medium border border-border rounded-[var(--radius-btn)] bg-transparent hover:bg-muted/30 transition-colors text-foreground whitespace-nowrap${disabled ? " opacity-50 cursor-not-allowed pointer-events-none" : ""}`}
                             >
                               {busyUpdate && (
                                 <Loader2 size={12} className="animate-spin" aria-hidden />
@@ -494,7 +494,7 @@ export function ShareModal({
                       <h3 className="text-[14px] font-medium text-foreground/70">Members</h3>
                     </div>
                     <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 bg-white border border-[var(--border-strong)]">
-                      <ChevronDown className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
+                      <ChevronDown className="h-3.5 w-3.5 text-[var(--text-body)]" />
                     </div>
                   </div>
                 </section>
@@ -524,7 +524,7 @@ export function ShareModal({
                     </div>
                   </div>
                   <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 bg-white border border-[var(--border-strong)]">
-                    <ChevronDown className={`h-3.5 w-3.5 text-[var(--text-secondary)] transition-transform duration-200${membersExpanded ? " rotate-180" : ""}`} />
+                    <ChevronDown className={`h-3.5 w-3.5 text-[var(--text-body)] transition-transform duration-200${membersExpanded ? " rotate-180" : ""}`} />
                   </div>
                 </div>
 
@@ -575,7 +575,7 @@ export function ShareModal({
           {canWrite ? (
             <button
               type="button"
-              className="inline-flex items-center gap-2 text-[14px] font-medium text-[var(--brand)] bg-[var(--brand-subtle)] border border-[var(--brand-muted)] rounded-lg px-4 py-2 hover:bg-[#E0EAFF] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--brand-muted)] bg-[var(--brand-subtle)] text-[var(--brand)] text-[14px] font-medium hover:bg-[#E0EAFF] transition-colors cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
               onClick={onCopyShareLink}
               disabled={copyingLink}
             >
@@ -596,7 +596,7 @@ export function ShareModal({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="h-9 px-5 text-[14px] font-medium border border-border rounded-lg bg-transparent hover:bg-muted/40 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[14px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
               onClick={onClose}
               disabled={inviting || patchingAccessRequestId !== null}
             >
@@ -604,7 +604,7 @@ export function ShareModal({
             </button>
             <button
               type="button"
-              className="h-9 px-6 text-[14px] font-medium bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
               onClick={onClose}
               disabled={
                 inviting ||

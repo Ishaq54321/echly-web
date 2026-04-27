@@ -1,6 +1,6 @@
 import type { Timestamp } from "firebase/firestore";
 
-export type WorkspacePlan = "free" | "starter" | "business" | "enterprise";
+export type WorkspacePlan = "starter" | "business" | "enterprise";
 export type WorkspaceBillingCycle = "monthly" | "annual";
 
 /** Pre-aggregated counts for /api/insights. Updated in write-path transactions. */
@@ -67,6 +67,8 @@ export interface Workspace {
     plan: WorkspacePlan;
     billingCycle: WorkspaceBillingCycle;
     seats: number;
+    /** Monthly price per seat (0 for starter, set for business). */
+    pricePerSeat?: number;
     stripeCustomerId?: string | null;
     stripeSubscriptionId?: string | null;
     /** Set by admin; when true, workspace cannot use the app. */
@@ -75,21 +77,27 @@ export interface Workspace {
 
   /** Only explicit overrides. Plan-derived limits come from plan catalog; missing = use catalog. */
   entitlements: {
-    brandingControls: boolean;
-    integrations: boolean;
-    /** Override only; if absent, use catalog[plan].insightsEnabled */
-    insightsAccess?: boolean;
-    /** Override only; if absent, use catalog[plan].maxSessions */
-    maxSessions?: number | null;
+    /** Override only; if absent, use catalog[plan].maxFeedbackPerMonth */
+    maxFeedbackPerMonth?: number | null;
     /** Override only; if absent, use catalog[plan].maxMembers */
     maxMembers?: number | null;
-    maxFeedbackPerSession?: number | null;
+    /** Override only; if absent, use catalog[plan].insightsAccess */
+    insightsAccess?: boolean;
+    /** Override only; if absent, use catalog[plan].customBranding */
+    customBranding?: boolean;
+    /** Override only; if absent, use catalog[plan].prioritySupport */
+    prioritySupport?: boolean;
+    integrations?: boolean;
   };
 
   /** Counters for billing/limits. Incremented in transactions. */
   usage: {
     sessionsCreated: number;
     feedbackCreated: number;
+    /** Resets on the 1st of each month. Checked against maxFeedbackPerMonth. */
+    feedbackCreatedThisMonth: number;
+    /** ISO date string of last reset (YYYY-MM-DD). Used to detect month boundary. */
+    feedbackResetDate: string;
     members: number;
   };
 
@@ -108,6 +116,8 @@ export function defaultWorkspaceDoc(params: {
   name?: string | null;
   logoUrl?: string | null;
 }): WorkspaceDoc {
+  const now = new Date();
+  const resetDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
   return {
     name: (params.name ?? "My Workspace").trim() || "My Workspace",
     logoUrl: params.logoUrl ?? null,
@@ -147,24 +157,24 @@ export function defaultWorkspaceDoc(params: {
       zapier: { connected: false },
     },
     billing: {
-      plan: "free",
+      plan: "starter",
       billingCycle: "monthly",
       seats: 1,
+      pricePerSeat: 0,
       stripeCustomerId: null,
       stripeSubscriptionId: null,
     },
     entitlements: {
-      brandingControls: false,
-      integrations: false,
-      // Do not set maxSessions, maxMembers, insightsAccess — plan catalog is source of truth
+      // Do not set overrides — plan catalog is source of truth
     },
     usage: {
       sessionsCreated: 0,
       feedbackCreated: 0,
+      feedbackCreatedThisMonth: 0,
+      feedbackResetDate: resetDate,
       members: 0,
     },
     sessionCount: 0,
     archivedCount: 0,
   };
 }
-

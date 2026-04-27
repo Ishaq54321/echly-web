@@ -19,8 +19,10 @@ const sidebarShell =
   "inline-flex items-center rounded-full border px-2 py-0.5 text-[12px] font-medium";
 
 export function Tag({ name, variant = "default", inactive: _inactive = false, className = "", children, onRemove }: TagProps) {
-  const colorClass = "bg-[var(--surface-subtle)] text-[var(--text-body)] border-transparent";
-  const baseClass = variant === "default" ? TAG_CHIP_BASE_CLASS : sidebarShell;
+  const colorClass = variant === "default" ? "" : "bg-[var(--surface-subtle)] text-[var(--text-body)] border-transparent";
+  const baseClass = variant === "default"
+    ? "inline-flex items-center px-3 py-1.5 rounded-[var(--radius-sm)] border border-[var(--hair)] text-[14px] font-medium text-[var(--text-body)] hover:text-[var(--text-body)] transition-colors cursor-default"
+    : sidebarShell;
 
   return (
     <span

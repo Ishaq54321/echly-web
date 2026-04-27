@@ -147,3 +147,18 @@ export async function updateWorkspacePlanRepo(
   invalidateWorkspaceDocCache(resolvedUserId);
 }
 
+/**
+ * Increments workspace.usage.feedbackCreatedThisMonth by 1.
+ * Called after a feedback ticket is successfully created.
+ */
+export async function incrementFeedbackCreatedThisMonthRepo(
+  workspaceId: string
+): Promise<void> {
+  const trimmed = workspaceId.trim();
+  if (!trimmed) throw new Error("Missing workspaceId - incrementFeedbackCreatedThisMonthRepo");
+  await adminDb.doc(`workspaces/${trimmed}`).update({
+    "usage.feedbackCreated": FieldValue.increment(1),
+    "usage.feedbackCreatedThisMonth": FieldValue.increment(1),
+  });
+}
+

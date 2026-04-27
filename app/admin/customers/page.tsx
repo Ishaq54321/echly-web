@@ -7,9 +7,8 @@ import { useToast } from "@/components/dashboard/context/ToastContext";
 import { Modal } from "@/components/ui/Modal";
 import type { WorkspaceRow } from "@/app/api/admin/workspaces/route";
 
-const PLAN_OPTIONS = ["free", "starter", "business", "enterprise"] as const;
+const PLAN_OPTIONS = ["starter", "business", "enterprise"] as const;
 const PLAN_LABELS: Record<string, string> = {
-  free: "Free",
   starter: "Starter",
   business: "Business",
   enterprise: "Enterprise",
@@ -17,27 +16,14 @@ const PLAN_LABELS: Record<string, string> = {
 
 export default function AdminCustomersPage() {
   const searchParams = useSearchParams();
-  const planFilter = searchParams.get("plan") ?? null; // "free" | "paid" from dashboard links
+  const planFilter = searchParams.get("plan") ?? null;
   const { showToast } = useToast();
   const [rows, setRows] = useState<WorkspaceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<WorkspaceRow | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
-  const [overrideLimit, setOverrideLimit] = useState<string>("");
+  const [overrideFeedbackLimit, setOverrideFeedbackLimit] = useState<string>("");
   const [newPlan, setNewPlan] = useState<string>("");
-  /** Sync override input when selected workspace changes. Input = overrideLimit ?? planLimitSessions */
-  useEffect(() => {
-    if (!selected) return;
-    const planDefault = selected.planLimitSessions;
-    const override = selected.overrideLimit;
-    if (override === undefined) {
-      setOverrideLimit(planDefault != null ? String(planDefault) : "");
-    } else if (override === null) {
-      setOverrideLimit("");
-    } else {
-      setOverrideLimit(String(override));
-    }
-  }, [selected?.id, selected?.overrideLimit, selected?.planLimitSessions]);
   const [confirm, setConfirm] = useState<{
     title: string;
     message: string;
@@ -45,10 +31,23 @@ export default function AdminCustomersPage() {
     confirmLabel?: string;
   } | null>(null);
 
+  useEffect(() => {
+    if (!selected) return;
+    const planDefault = selected.planLimitFeedback;
+    const override = selected.overrideFeedbackLimit;
+    if (override === undefined) {
+      setOverrideFeedbackLimit(planDefault != null ? String(planDefault) : "");
+    } else if (override === null) {
+      setOverrideFeedbackLimit("");
+    } else {
+      setOverrideFeedbackLimit(String(override));
+    }
+  }, [selected?.id, selected?.overrideFeedbackLimit, selected?.planLimitFeedback]);
+
   const filteredRows = useMemo(() => {
     if (!planFilter) return rows;
-    if (planFilter === "free") return rows.filter((r) => r.plan === "free");
-    if (planFilter === "paid") return rows.filter((r) => r.plan !== "free");
+    if (planFilter === "starter") return rows.filter((r) => r.plan === "starter");
+    if (planFilter === "paid") return rows.filter((r) => r.plan !== "starter");
     return rows;
   }, [rows, planFilter]);
 
@@ -69,9 +68,7 @@ export default function AdminCustomersPage() {
     }
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
   const runAction = async (
     workspaceId: string,
@@ -86,13 +83,9 @@ export default function AdminCustomersPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ workspaceId, action, ...body }),
       });
-      if (!res) {
-        throw new Error("Action failed");
-      }
+      if (!res) throw new Error("Action failed");
       if (!res.ok) {
-        const err = (await res.json().catch(() => ({}))) as {
-          error?: { message?: string };
-        };
+        const err = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
         throw new Error(err.error?.message ?? "Action failed");
       }
       if (successToast) showToast(successToast);
@@ -106,19 +99,13 @@ export default function AdminCustomersPage() {
     }
   };
 
-  const openConfirm = (
-    title: string,
-    message: string,
-    onConfirm: () => void,
-    confirmLabel?: string
-  ) => {
+  const openConfirm = (title: string, message: string, onConfirm: () => void, confirmLabel?: string) => {
     setConfirm({ title, message, onConfirm, confirmLabel });
   };
-
   const closeConfirm = () => setConfirm(null);
 
   const handleSuspend = (row: WorkspaceRow) => {
-    openConfirm("Suspend workspace?", "Are you sure you want to suspend this workspace? Users will not be able to use the app.", () => {
+    openConfirm("Suspend workspace?", "Users will not be able to use the app.", () => {
       runAction(row.id, "suspend", {}, "Workspace suspended");
       closeConfirm();
     });
@@ -137,7 +124,7 @@ export default function AdminCustomersPage() {
       "Change Workspace Plan",
       "This will update the workspace plan and adjust limits accordingly.",
       () => {
-        runAction(row.id, "set_plan", { plan }, "Workspace plan updated successfully.");
+        runAction(row.id, "set_plan", { plan }, "Plan updated");
         closeConfirm();
       },
       "Confirm Change"
@@ -162,7 +149,7 @@ export default function AdminCustomersPage() {
         All workspaces. Click a row to open the detail panel.
         {planFilter && (
           <span className="ml-2 text-neutral-500">
-            (filtered: {planFilter === "free" ? "Free" : "Paid"})
+            (filtered: {planFilter === "starter" ? "Starter" : "Paid"})
           </span>
         )}
       </p>
@@ -173,8 +160,8 @@ export default function AdminCustomersPage() {
               <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Workspace</th>
               <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Owner</th>
               <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Plan</th>
-              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Sessions</th>
-              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Members</th>
+              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Tickets (month)</th>
+              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Seats</th>
               <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Created</th>
             </tr>
           </thead>
@@ -196,8 +183,11 @@ export default function AdminCustomersPage() {
                     {row.plan}
                   </span>
                 </td>
-                <td className="px-4 py-2.5 text-[var(--text-secondary)]">{row.sessionsUsed}</td>
-                <td className="px-4 py-2.5 text-[var(--text-secondary)]">{row.members}</td>
+                <td className="px-4 py-2.5 text-[var(--text-secondary)]">
+                  {row.usage.feedbackCreatedThisMonth}
+                  {row.planLimitFeedback != null ? ` / ${row.planLimitFeedback}` : " / ∞"}
+                </td>
+                <td className="px-4 py-2.5 text-[var(--text-secondary)]">{row.seats}</td>
                 <td className="px-4 py-2.5 text-neutral-500 text-xs">
                   {row.createdAt ? new Date(row.createdAt).toLocaleDateString() : "—"}
                 </td>
@@ -209,11 +199,7 @@ export default function AdminCustomersPage() {
 
       {selected && (
         <>
-          <div
-            className="fixed inset-0 bg-black/30 z-40"
-            onClick={() => setSelected(null)}
-            aria-hidden
-          />
+          <div className="fixed inset-0 bg-black/30 z-40" onClick={() => setSelected(null)} aria-hidden />
           <div className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-white border-l border-[var(--border)] shadow-xl z-50 overflow-auto">
             <div className="p-6 space-y-6">
               <div className="flex items-center justify-between">
@@ -228,16 +214,12 @@ export default function AdminCustomersPage() {
                 </button>
               </div>
 
-              {/* Section 1 — Workspace Info */}
+              {/* Workspace Info */}
               <section>
                 <h3 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-3">
                   Workspace Info
                 </h3>
                 <dl className="space-y-2 text-sm">
-                  <div>
-                    <dt className="text-neutral-500">Workspace name</dt>
-                    <dd className="text-[var(--text-heading)] font-medium">{selected.name}</dd>
-                  </div>
                   <div>
                     <dt className="text-neutral-500">Owner email</dt>
                     <dd className="text-[var(--text-heading)]">{selected.ownerEmail ?? selected.ownerId ?? "—"}</dd>
@@ -247,15 +229,31 @@ export default function AdminCustomersPage() {
                     <dd className="text-[var(--text-heading)]">{PLAN_LABELS[selected.plan] ?? selected.plan}</dd>
                   </div>
                   <div>
-                    <dt className="text-neutral-500">Sessions used</dt>
-                    <dd className="text-[var(--text-heading)]">{selected.sessionsUsed}</dd>
+                    <dt className="text-neutral-500">Tickets this month</dt>
+                    <dd className="text-[var(--text-heading)]">
+                      {selected.usage.feedbackCreatedThisMonth}
+                      {selected.planLimitFeedback != null
+                        ? ` / ${selected.planLimitFeedback}`
+                        : " (unlimited)"}
+                      {selected.overrideFeedbackLimit !== undefined && (
+                        <span className="ml-1 text-xs text-[var(--brand)]">(override active)</span>
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-neutral-500">Total tickets</dt>
+                    <dd className="text-[var(--text-heading)]">{selected.usage.feedbackCreated}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-neutral-500">Seats</dt>
+                    <dd className="text-[var(--text-heading)]">{selected.seats}</dd>
                   </div>
                   <div>
                     <dt className="text-neutral-500">Members</dt>
                     <dd className="text-[var(--text-heading)]">{selected.members}</dd>
                   </div>
                   <div>
-                    <dt className="text-neutral-500">Created date</dt>
+                    <dt className="text-neutral-500">Created</dt>
                     <dd className="text-[var(--text-heading)]">
                       {selected.createdAt ? new Date(selected.createdAt).toLocaleDateString() : "—"}
                     </dd>
@@ -267,19 +265,15 @@ export default function AdminCustomersPage() {
                 </dl>
               </section>
 
-              {/* Section 2 — Plan Controls */}
+              {/* Plan Controls */}
               <section>
                 <h3 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-3">
                   Plan Controls
                 </h3>
                 <p className="text-xs text-neutral-500 mb-2">
-                  Current plan:{" "}
-                  {PLAN_LABELS[(selected.billing?.plan ?? selected.plan) as string] ??
-                    (selected.billing?.plan ?? selected.plan)}
+                  Current: {PLAN_LABELS[(selected.billing?.plan ?? selected.plan) as string] ?? (selected.billing?.plan ?? selected.plan)}
                 </p>
-                <label className="block text-xs font-medium text-neutral-500 mb-1">
-                  Select new plan
-                </label>
+                <label className="block text-xs font-medium text-neutral-500 mb-1">Select new plan</label>
                 <select
                   value={newPlan || selected.plan}
                   onChange={(e) => setNewPlan(e.target.value)}
@@ -287,9 +281,7 @@ export default function AdminCustomersPage() {
                   className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm mb-2 disabled:opacity-50"
                 >
                   {PLAN_OPTIONS.map((p) => (
-                    <option key={p} value={p}>
-                      {PLAN_LABELS[p] ?? p}
-                    </option>
+                    <option key={p} value={p}>{PLAN_LABELS[p] ?? p}</option>
                   ))}
                 </select>
                 <button
@@ -299,93 +291,75 @@ export default function AdminCustomersPage() {
                     actionLoading ||
                     (newPlan || selected.plan) === (selected.billing?.plan ?? selected.plan)
                   }
-                  className="rounded-lg px-3 py-2 text-sm font-medium bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 disabled:opacity-50 w-full"
+                  className="inline-flex h-[38px] items-center justify-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none w-full"
                 >
                   {actionLoading ? "Updating…" : "Change Plan"}
                 </button>
               </section>
 
-              {/* Section 3 — Limits */}
+              {/* Ticket Limit Controls */}
               <section>
                 <h3 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-3">
-                  Limits
+                  Ticket Limit
                 </h3>
                 <p className="text-xs text-[var(--text-secondary)] mb-2">
                   Plan default:{" "}
-                  {selected.planLimitSessions != null
-                    ? `${selected.planLimitSessions} sessions`
+                  {selected.planLimitFeedback != null
+                    ? `${selected.planLimitFeedback} tickets / month`
                     : "Unlimited"}
                 </p>
                 <label className="block text-xs font-medium text-neutral-500 mb-1">
-                  Override session limit
+                  Override monthly ticket limit (empty = plan default)
                 </label>
                 <input
                   type="text"
-                  value={overrideLimit}
-                  onChange={(e) => setOverrideLimit(e.target.value)}
-                  placeholder={
-                    selected.planLimitSessions != null
-                      ? `e.g. ${selected.planLimitSessions} or empty for plan default`
-                      : "Empty = plan default (unlimited)"
-                  }
+                  value={overrideFeedbackLimit}
+                  onChange={(e) => setOverrideFeedbackLimit(e.target.value)}
+                  placeholder={selected.planLimitFeedback != null ? `e.g. ${selected.planLimitFeedback}` : "Empty = unlimited"}
                   disabled={actionLoading}
                   className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm mb-2 disabled:opacity-50"
                 />
-                {/* Status: Custom limit | Unlimited | Using plan default */}
                 <p className="text-xs text-neutral-500 mb-2">
-                  {selected.overrideLimit !== undefined ? (
-                    selected.overrideLimit === null ? (
-                      "Unlimited"
-                    ) : (
-                      "Custom limit"
-                    )
-                  ) : (
-                    "Using plan default"
-                  )}
+                  {selected.overrideFeedbackLimit !== undefined
+                    ? selected.overrideFeedbackLimit === null
+                      ? "Override: Unlimited"
+                      : `Override: ${selected.overrideFeedbackLimit} tickets / month`
+                    : "Using plan default"}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => {
-                      if (overrideLimit.trim() === "") {
-                        runAction(selected.id, "remove_session_override", {}, "Override removed");
+                      if (overrideFeedbackLimit.trim() === "") {
+                        runAction(selected.id, "remove_feedback_override", {}, "Override removed");
                       } else {
-                        const value = parseInt(overrideLimit, 10);
+                        const value = parseInt(overrideFeedbackLimit, 10);
                         if (!Number.isNaN(value) && value >= 0) {
-                          runAction(
-                            selected.id,
-                            "override_session_limit",
-                            { sessionLimit: value },
-                            "Limit updated"
-                          );
+                          runAction(selected.id, "override_feedback_limit", { feedbackLimit: value }, "Limit updated");
                         } else {
                           showToast("Enter a valid number");
                         }
                       }
                     }}
                     disabled={actionLoading}
-                    className="rounded-lg px-3 py-2 text-sm font-medium bg-[var(--surface-hover)] text-neutral-800 hover:bg-[var(--surface-hover)] disabled:opacity-50"
+                    className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[14px] font-medium hover:bg-[var(--surface-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
                   >
                     {actionLoading ? "Updating…" : "Set limit"}
                   </button>
                   <button
                     type="button"
-                    onClick={() =>
-                      runAction(selected.id, "grant_unlimited_sessions", {}, "Limit updated")
-                    }
+                    onClick={() => runAction(selected.id, "grant_unlimited_feedback", {}, "Unlimited granted")}
                     disabled={actionLoading}
-                    className="rounded-lg px-3 py-2 text-sm font-medium bg-[var(--surface-hover)] text-neutral-800 hover:bg-[var(--surface-hover)] disabled:opacity-50"
+                    className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[14px] font-medium hover:bg-[var(--surface-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
                   >
                     {actionLoading ? "Updating…" : "Grant unlimited"}
                   </button>
-                  {selected.overrideLimit !== undefined && (
+                  {selected.overrideFeedbackLimit !== undefined && (
                     <button
                       type="button"
-                      onClick={() =>
-                        runAction(selected.id, "remove_session_override", {}, "Override removed")
-                      }
+                      onClick={() => runAction(selected.id, "remove_feedback_override", {}, "Override removed")}
                       disabled={actionLoading}
-                      className="rounded-lg px-3 py-2 text-sm font-medium bg-[var(--surface-hover)] text-neutral-800 hover:bg-[var(--surface-hover)] disabled:opacity-50"
+                      className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[14px] font-medium hover:bg-[var(--surface-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
                     >
                       {actionLoading ? "Updating…" : "Remove override"}
                     </button>
@@ -393,7 +367,7 @@ export default function AdminCustomersPage() {
                 </div>
               </section>
 
-              {/* Section 4 — Danger Zone */}
+              {/* Danger Zone */}
               <section>
                 <h3 className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-3">
                   Danger Zone
@@ -404,7 +378,7 @@ export default function AdminCustomersPage() {
                       type="button"
                       onClick={() => handleResume(selected)}
                       disabled={actionLoading}
-                      className="w-full rounded-lg px-3 py-2 text-sm font-medium bg-[var(--color-success-bg)] text-[var(--color-success-solid)] border border-[var(--color-success-border)] hover:bg-[var(--color-success-bg)] disabled:opacity-50"
+                      className="inline-flex h-[38px] items-center justify-center gap-2 w-full px-4 rounded-[var(--radius-btn)] border border-[var(--color-success-border)] bg-[var(--color-success-bg)] text-[var(--color-success-solid)] text-[14px] font-medium hover:opacity-90 transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
                     >
                       {actionLoading ? "Updating…" : "Resume workspace"}
                     </button>
@@ -413,7 +387,7 @@ export default function AdminCustomersPage() {
                       type="button"
                       onClick={() => handleSuspend(selected)}
                       disabled={actionLoading}
-                      className="w-full rounded-lg px-3 py-2 text-sm font-medium bg-[var(--color-danger-bg)] text-[var(--color-danger)] border border-[var(--color-danger-border)] hover:bg-[var(--color-danger-bg)] disabled:opacity-50"
+                      className="inline-flex h-[38px] items-center justify-center gap-2 w-full px-4 rounded-[var(--radius-btn)] border border-[var(--color-danger-border)] bg-[var(--color-danger-bg)] text-[var(--color-danger)] text-[14px] font-medium hover:opacity-90 transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
                     >
                       {actionLoading ? "Suspending…" : "Suspend workspace"}
                     </button>
@@ -425,12 +399,7 @@ export default function AdminCustomersPage() {
         </>
       )}
 
-      <Modal
-        open={!!confirm}
-        onClose={closeConfirm}
-        role="alertdialog"
-        ariaLabelledBy="confirm-title"
-      >
+      <Modal open={!!confirm} onClose={closeConfirm} role="alertdialog" ariaLabelledBy="confirm-title">
         {confirm && (
           <div className="p-6">
             <h3 id="confirm-title" className="text-lg font-semibold text-[var(--text-heading)]">
@@ -441,14 +410,14 @@ export default function AdminCustomersPage() {
               <button
                 type="button"
                 onClick={closeConfirm}
-                className="rounded-lg px-3 py-2 text-sm font-medium text-neutral-700 bg-[var(--surface-hover)] hover:bg-[var(--surface-hover)]"
+                className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[14px] font-medium hover:bg-[var(--surface-hover)] transition-all cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={confirm.onConfirm}
-                className="rounded-lg px-3 py-2 text-sm font-medium bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90"
+                className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer"
               >
                 {confirm.confirmLabel ?? "Confirm"}
               </button>

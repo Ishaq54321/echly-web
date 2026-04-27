@@ -138,8 +138,8 @@ export function SignalStream({
       {selectionMode && bulkCount > 0 && (
         <div className="shrink-0 flex items-center gap-2 px-3 py-2 border-t border-[var(--layer-2-border)] bg-white/80">
           <span className="text-[12px] text-[var(--text-secondary-soft)]">{bulkCount} selected</span>
-          <button type="button" className="text-[12px] text-[var(--accent-operational)] hover:underline" onClick={() => setSelectedIds(new Set())}>Clear</button>
-          {onBulkResolve && <button type="button" className="text-[12px] text-[var(--accent-operational)] hover:underline" onClick={() => onBulkResolve()}>Resolve</button>}
+          <button type="button" className="text-[14px] text-[var(--accent-operational)] hover:underline" onClick={() => setSelectedIds(new Set())}>Clear</button>
+          {onBulkResolve && <button type="button" className="text-[14px] text-[var(--accent-operational)] hover:underline" onClick={() => onBulkResolve()}>Resolve</button>}
         </div>
       )}
 

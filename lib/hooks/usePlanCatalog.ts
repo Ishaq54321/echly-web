@@ -7,11 +7,18 @@ import type { PlanId } from "@/lib/billing/plans";
 export interface PlanCatalogItem {
   id: PlanId;
   name: string;
-  priceMonthly: number;
-  priceYearly: number;
-  maxSessions: number | null;
+  pricePerSeat: number | null;
+  annualPricePerSeat: number | null;
+  maxFeedbackPerMonth: number | null;
   maxMembers: number | null;
   insightsEnabled: boolean;
+  customBranding: boolean;
+  prioritySupport: boolean;
+  displayLimits: {
+    sessions: string;
+    members: string;
+    feedbackTickets: string;
+  };
 }
 
 export interface UsePlanCatalogResult {
@@ -26,7 +33,6 @@ let cachedPlanCatalogPromise: Promise<PlanCatalogItem[] | null> | null = null;
 
 /**
  * Fetches plan catalog from API (single source of truth). No Firestore listener.
- * Refetches on mount; same interface as before for drop-in replacement.
  */
 export function usePlanCatalog(): UsePlanCatalogResult {
   const [plans, setPlans] = useState<PlanCatalogItem[] | null>(null);
@@ -39,9 +45,7 @@ export function usePlanCatalog(): UsePlanCatalogResult {
       setPlans(cachedPlanCatalog);
       setLoading(false);
       setError(null);
-      return () => {
-        cancelled = true;
-      };
+      return () => { cancelled = true; };
     }
     setLoading(true);
     setError(null);
@@ -78,9 +82,7 @@ export function usePlanCatalog(): UsePlanCatalogResult {
         if (!cancelled) setLoading(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   return { plans, loading, error };

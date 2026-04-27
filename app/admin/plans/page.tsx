@@ -35,14 +35,10 @@ export default function AdminPlansPage() {
     }
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
   const updateField = (id: string, field: keyof PlanWithId, value: string | number | boolean | null) => {
-    setPlans((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, [field]: value } : p))
-    );
+    setPlans((prev) => prev.map((p) => (p.id === id ? { ...p, [field]: value } : p)));
   };
 
   const save = async (plan: PlanWithId) => {
@@ -56,11 +52,13 @@ export default function AdminPlansPage() {
         body: JSON.stringify({
           id: plan.id,
           name: plan.name,
-          priceMonthly: plan.priceMonthly,
-          priceYearly: plan.priceYearly,
-          maxSessions: plan.maxSessions,
+          pricePerSeat: plan.pricePerSeat,
+          annualPricePerSeat: plan.annualPricePerSeat,
+          maxFeedbackPerMonth: plan.maxFeedbackPerMonth,
           maxMembers: plan.maxMembers,
           insightsEnabled: plan.insightsEnabled,
+          customBranding: plan.customBranding,
+          prioritySupport: plan.prioritySupport,
         }),
       });
       if (!res || !res.ok) throw new Error("Failed to save");
@@ -70,10 +68,6 @@ export default function AdminPlansPage() {
     } finally {
       setSavingId(null);
     }
-  };
-
-  const handleSaveClick = (plan: PlanWithId) => {
-    setConfirmPlan(plan);
   };
 
   if (loading) {
@@ -89,23 +83,26 @@ export default function AdminPlansPage() {
     <div className="p-8">
       <h1 className="text-2xl font-semibold text-[var(--text-heading)] mb-1">Plans</h1>
       <p className="text-sm text-[var(--text-secondary)] mb-8">
-        Edit plan definitions. Changes are saved to Firestore <code className="bg-[var(--surface-hover)] px-1 rounded text-xs">plans</code>.
+        Edit plan definitions. Changes are saved to Firestore{" "}
+        <code className="bg-[var(--surface-hover)] px-1 rounded text-xs">plans</code>.
       </p>
       {error && (
         <div className="mb-4 rounded-lg bg-[var(--color-danger-bg)] border border-[var(--color-danger-border)] px-4 py-2 text-sm text-[var(--color-danger)]">
           {error}
         </div>
       )}
-      <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
-        <table className="w-full text-left text-sm">
+      <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden overflow-x-auto">
+        <table className="w-full text-left text-sm min-w-[900px]">
           <thead>
             <tr className="border-b border-[var(--border)] bg-[var(--surface-subtle)]">
               <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Name</th>
-              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Price/mo</th>
-              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Price/yr</th>
-              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Max sessions</th>
+              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">$/seat/mo</th>
+              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">$/seat/yr</th>
+              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Tickets/mo</th>
               <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Max members</th>
               <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Insights</th>
+              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Branding</th>
+              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Priority</th>
               <th className="px-4 py-3 font-semibold text-[var(--text-heading)] w-24">Actions</th>
             </tr>
           </thead>
@@ -121,43 +118,41 @@ export default function AdminPlansPage() {
                       onChange={(e) => updateField(plan.id, "name", e.target.value)}
                       placeholder={formatPlanName(plan.id, plan.id)}
                       disabled={isSaving}
-                      className="w-full max-w-[120px] rounded-md border border-[var(--border)] px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20 disabled:opacity-50 disabled:bg-[var(--surface-subtle)]"
+                      className="w-full max-w-[100px] rounded-md border border-[var(--border)] px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20 disabled:opacity-50"
                     />
                   </td>
                   <td className="px-4 py-2.5">
                     <input
                       type="number"
                       min={0}
-                      value={plan.priceMonthly}
-                      onChange={(e) => updateField(plan.id, "priceMonthly", Number(e.target.value) || 0)}
+                      value={plan.pricePerSeat ?? ""}
+                      onChange={(e) => updateField(plan.id, "pricePerSeat", e.target.value === "" ? null : Number(e.target.value))}
                       disabled={isSaving}
-                      className="w-20 rounded-md border border-[var(--border)] px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20 disabled:opacity-50 disabled:bg-[var(--surface-subtle)]"
+                      placeholder="∞"
+                      className="w-20 rounded-md border border-[var(--border)] px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20 disabled:opacity-50"
                     />
                   </td>
                   <td className="px-4 py-2.5">
                     <input
                       type="number"
                       min={0}
-                      value={plan.priceYearly}
-                      onChange={(e) => updateField(plan.id, "priceYearly", Number(e.target.value) || 0)}
+                      value={plan.annualPricePerSeat ?? ""}
+                      onChange={(e) => updateField(plan.id, "annualPricePerSeat", e.target.value === "" ? null : Number(e.target.value))}
                       disabled={isSaving}
-                      className="w-20 rounded-md border border-[var(--border)] px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20 disabled:opacity-50 disabled:bg-[var(--surface-subtle)]"
+                      placeholder="∞"
+                      className="w-20 rounded-md border border-[var(--border)] px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20 disabled:opacity-50"
                     />
                   </td>
                   <td className="px-4 py-2.5">
                     <input
                       type="text"
                       placeholder="∞"
-                      value={plan.maxSessions ?? ""}
+                      value={plan.maxFeedbackPerMonth ?? ""}
                       onChange={(e) =>
-                        updateField(
-                          plan.id,
-                          "maxSessions",
-                          e.target.value === "" ? null : Number(e.target.value) || 0
-                        )
+                        updateField(plan.id, "maxFeedbackPerMonth", e.target.value === "" ? null : Number(e.target.value) || 0)
                       }
                       disabled={isSaving}
-                      className="w-16 rounded-md border border-[var(--border)] px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20 disabled:opacity-50 disabled:bg-[var(--surface-subtle)]"
+                      className="w-16 rounded-md border border-[var(--border)] px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20 disabled:opacity-50"
                     />
                   </td>
                   <td className="px-4 py-2.5">
@@ -166,14 +161,10 @@ export default function AdminPlansPage() {
                       placeholder="∞"
                       value={plan.maxMembers ?? ""}
                       onChange={(e) =>
-                        updateField(
-                          plan.id,
-                          "maxMembers",
-                          e.target.value === "" ? null : Number(e.target.value) || 0
-                        )
+                        updateField(plan.id, "maxMembers", e.target.value === "" ? null : Number(e.target.value) || 0)
                       }
                       disabled={isSaving}
-                      className="w-16 rounded-md border border-[var(--border)] px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20 disabled:opacity-50 disabled:bg-[var(--surface-subtle)]"
+                      className="w-16 rounded-md border border-[var(--border)] px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20 disabled:opacity-50"
                     />
                   </td>
                   <td className="px-4 py-2.5">
@@ -189,11 +180,35 @@ export default function AdminPlansPage() {
                     </label>
                   </td>
                   <td className="px-4 py-2.5">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={plan.customBranding}
+                        onChange={(e) => updateField(plan.id, "customBranding", e.target.checked)}
+                        disabled={isSaving}
+                        className="rounded border-[var(--border)] text-[var(--brand)] focus:ring-[var(--brand)] disabled:opacity-50"
+                      />
+                      <span className="text-[var(--text-secondary)]">On</span>
+                    </label>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={plan.prioritySupport}
+                        onChange={(e) => updateField(plan.id, "prioritySupport", e.target.checked)}
+                        disabled={isSaving}
+                        className="rounded border-[var(--border)] text-[var(--brand)] focus:ring-[var(--brand)] disabled:opacity-50"
+                      />
+                      <span className="text-[var(--text-secondary)]">On</span>
+                    </label>
+                  </td>
+                  <td className="px-4 py-2.5">
                     <button
                       type="button"
-                      onClick={() => handleSaveClick(plan)}
+                      onClick={() => setConfirmPlan(plan)}
                       disabled={isSaving}
-                      className="rounded-lg px-3 py-1.5 text-sm font-medium bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 disabled:opacity-50"
+                      className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
                     >
                       {isSaving ? "Saving…" : "Save"}
                     </button>
@@ -205,31 +220,26 @@ export default function AdminPlansPage() {
         </table>
       </div>
 
-      <Modal
-        open={!!confirmPlan}
-        onClose={() => setConfirmPlan(null)}
-        role="alertdialog"
-        ariaLabelledBy="confirm-plan-title"
-      >
+      <Modal open={!!confirmPlan} onClose={() => setConfirmPlan(null)} role="alertdialog" ariaLabelledBy="confirm-plan-title">
         <div className="p-6">
           <h3 id="confirm-plan-title" className="text-lg font-semibold text-[var(--text-heading)]">
             Confirm plan changes?
           </h3>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            Updating plan limits affects all users on this plan.
+            Updating plan limits affects all users on this plan immediately.
           </p>
           <div className="mt-6 flex gap-3 justify-end">
             <button
               type="button"
               onClick={() => setConfirmPlan(null)}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-neutral-700 bg-[var(--surface-hover)] hover:bg-[var(--surface-hover)]"
+              className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[14px] font-medium hover:bg-[var(--surface-hover)] transition-all cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={() => confirmPlan && save(confirmPlan)}
-              className="rounded-lg px-3 py-2 text-sm font-medium bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90"
+              className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer"
             >
               Confirm Update
             </button>

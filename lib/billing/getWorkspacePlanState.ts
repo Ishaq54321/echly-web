@@ -5,29 +5,22 @@ import { getWorkspaceUsage } from "@/lib/billing/getWorkspaceUsage";
 import type { PlanId } from "@/lib/billing/plans";
 
 export type WorkspacePlanState = {
-  planId: string;
-  pricing: {
-    monthly: number;
-    yearly: number;
-  };
-  limits: {
-    maxSessions: number | null;
-    maxMembers: number | null;
-  };
-  usage: {
-    sessions: number;
-    members: number;
-  };
-  permissions: {
-    canCreateSession: boolean;
-    canInviteMember: boolean;
-  };
+  planId: PlanId;
+  pricePerSeat: number | null;
+  annualPricePerSeat: number | null;
+  seats: number;
+  feedbackTicketsUsed: number;
+  feedbackTicketsLimit: number | null;
+  canCreateFeedback: boolean;
+  canAddMember: boolean;
+  memberCount: number;
+  maxMembers: number | null;
 };
 
 /**
  * Central plan resolver: returns the current plan state of a workspace including
- * pricing, limits, usage, and permissions. Limits come from getWorkspaceEntitlements
- * (catalog + override-only), so admin plan changes apply immediately in the dashboard.
+ * pricing, ticket usage, and permissions. Limits come from getWorkspaceEntitlements
+ * (catalog + override-only), so admin plan changes apply immediately.
  */
 export async function getWorkspacePlanState(
   workspaceId: string
@@ -41,35 +34,25 @@ export async function getWorkspacePlanState(
     getWorkspaceUsage(workspaceId),
   ]);
 
-  const planId = (workspace.billing?.plan ?? "free") as PlanId;
-  if (!catalog[planId]) {
-    console.warn("Plan catalog fallback triggered");
-  }
-  const plan = catalog[planId] ?? catalog.free;
+  const planId = (workspace.billing?.plan ?? "starter") as PlanId;
+  const catalogEntry = catalog[planId] ?? catalog.starter;
 
-  const limits = {
-    maxSessions: entitlements.maxSessions ?? null,
-    maxMembers: entitlements.maxMembers ?? null,
-  };
-
-  const sessions = usageResult?.sessionCount ?? 0;
-  const members = usageResult?.memberCount ?? 0;
-
-  const permissions = {
-    canCreateSession:
-      limits.maxSessions === null || sessions < limits.maxSessions,
-    canInviteMember:
-      limits.maxMembers === null || members < limits.maxMembers,
-  };
+  const feedbackTicketsLimit = entitlements.maxFeedbackPerMonth;
+  const feedbackTicketsUsed = usageResult?.feedbackCreatedThisMonth ?? 0;
+  const memberCount = usageResult?.memberCount ?? 0;
+  const maxMembers = entitlements.maxMembers;
+  const seats = workspace.billing?.seats ?? 1;
 
   return {
-    planId: plan.id,
-    pricing: {
-      monthly: plan.priceMonthly,
-      yearly: plan.priceYearly,
-    },
-    limits,
-    usage: { sessions, members },
-    permissions,
+    planId,
+    pricePerSeat: catalogEntry.pricePerSeat,
+    annualPricePerSeat: catalogEntry.annualPricePerSeat,
+    seats,
+    feedbackTicketsUsed,
+    feedbackTicketsLimit,
+    canCreateFeedback: feedbackTicketsLimit === null || feedbackTicketsUsed < feedbackTicketsLimit,
+    canAddMember: maxMembers === null || memberCount < maxMembers,
+    memberCount,
+    maxMembers,
   };
 }

@@ -59,14 +59,14 @@ function OverviewSessionHeader({
           type="button"
           onClick={onCopy}
           disabled={copyBusy}
-          className="h-9 inline-flex items-center gap-2 text-sm px-3 rounded-lg border border-[var(--layer-2-border)] bg-white hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-150 text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          className="h-[38px] inline-flex items-center gap-2 text-[14px] px-4 rounded-[var(--radius-btn)] border border-[var(--layer-2-border)] bg-white hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-150 text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {copyBusy ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Share2 size={14} />}
           {copyBusy ? "" : copied ? "Copied" : "Share"}
         </button>
         <Link
           href={`/session/${sessionId}`}
-          className="h-9 inline-flex items-center gap-2 text-sm px-3 rounded-lg bg-brand-primary text-white hover:opacity-90 transition-colors duration-200 ease-out font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 cursor-pointer"
+          className="h-[38px] inline-flex items-center gap-2 text-[14px] px-4 rounded-[var(--radius-btn)] bg-brand-primary text-white hover:opacity-90 transition-colors duration-200 ease-out font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 cursor-pointer"
         >
           <LayoutPanelLeft size={14} />
           Open Feedback Board
@@ -74,7 +74,7 @@ function OverviewSessionHeader({
         <button
           type="button"
           aria-label="Settings"
-          className="h-10 w-10 inline-flex items-center justify-center rounded-lg border border-[var(--layer-2-border)] bg-white hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-150 text-[var(--text-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 cursor-pointer"
+          className="h-[38px] w-[38px] inline-flex items-center justify-center rounded-[var(--radius-btn)] border border-[var(--layer-2-border)] bg-white hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-150 text-[var(--text-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40 cursor-pointer"
         >
           <Settings size={14} />
         </button>

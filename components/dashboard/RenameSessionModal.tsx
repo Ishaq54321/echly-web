@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
@@ -98,7 +98,7 @@ export function RenameSessionModal({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="px-4 py-2.5 text-[14px] font-medium rounded-xl bg-[var(--layer-2-bg)] text-[var(--text-primary-strong)] hover:bg-[var(--layer-2-hover-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-colors duration-[var(--motion-duration)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[14px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
           >
             Cancel
           </button>
@@ -106,7 +106,7 @@ export function RenameSessionModal({
             type="button"
             onClick={handleSave}
             disabled={saving || value.trim() === ""}
-            className="px-4 py-2.5 text-[14px] font-semibold rounded-xl bg-[var(--color-primary)] text-white shadow-[0_2px_8px_rgba(26,86,219,0.3)] hover:bg-[var(--color-primary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-[var(--motion-duration)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--text-heading)] text-white text-[14px] font-medium hover:opacity-85 transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
           >
             {saving ? "Saving…" : "Save"}
           </button>

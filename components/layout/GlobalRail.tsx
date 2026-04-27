@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import Image from "next/image";
@@ -38,7 +38,7 @@ type MainNavItem = {
 const NAV_ITEMS: MainNavItem[] = [
   { href: "/dashboard", icon: Home, label: "Dashboard" },
   { href: "/discussion", icon: MessageSquare, label: "Discussion" },
-  { href: "/activity", icon: SquareChartGantt, label: "Activity", iconStroke: 1.9 },
+  { href: "/activity", icon: SquareChartGantt, label: "Activity", iconStroke: 2.2 },
   { href: "/shared", icon: Inbox, label: "Shared" },
   { href: "/settings", icon: Settings, label: "Settings" },
 ];
@@ -68,7 +68,7 @@ export default function GlobalRail() {
   const router = useRouter();
   useAuthGuard({ router });
   // WORKSPACE-MEMBER: replaced hardcoded string with live data
-  const { workspaceName, workspaceLogoUrl, isWorkspaceOwner, allWorkspaces, activeWorkspaceId, switchWorkspace, isLoadingWorkspaces, workspaceId, workspaceDocLoading, hintWorkspaceName, hintWorkspaceLogoUrl } = useWorkspace();
+  const { workspaceName, workspaceLogoUrl, isWorkspaceOwner, allWorkspaces, activeWorkspaceId, switchWorkspace, isLoadingWorkspaces, workspaceId, workspaceDocLoading, hintWorkspaceName, hintWorkspaceLogoUrl, memberCount } = useWorkspace();
   const effectiveLogoUrl = workspaceDocLoading ? hintWorkspaceLogoUrl : workspaceLogoUrl;
   const effectiveName = workspaceDocLoading ? (hintWorkspaceName ?? workspaceName) : workspaceName;
   const displayName = effectiveName ?? "Workspace";
@@ -126,32 +126,12 @@ export default function GlobalRail() {
     >
       <aside
         className={cn(
-          "relative flex flex-col bg-white h-screen shrink-0 min-h-0 overflow-visible py-4",
+          "relative flex flex-col bg-[var(--surface-subtle)] h-screen shrink-0 min-h-0 overflow-visible py-4",
           mounted && "transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
-          isCollapsed ? "w-[64px] items-center" : "w-[220px] items-stretch"
+          isCollapsed ? "w-[64px] items-center group/rail" : "w-[270px] items-stretch"
         )}
         aria-label="Global navigation"
       >
-        <div className={cn("absolute -right-3 top-6 z-40", isCollapsed ? "hidden" : "block")}>
-          <button
-            type="button"
-            onClick={() => setIsCollapsed((prev) => !prev)}
-            aria-label="Toggle sidebar"
-            className={cn(
-              "h-7 w-7 rounded-md border border-[var(--border)] bg-white shadow-sm",
-              "flex items-center justify-center text-neutral-800 hover:text-[var(--text-heading)]",
-              "transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
-              "hover:scale-105",
-              "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0] focus-visible:ring-offset-2"
-            )}
-          >
-            <PanelLeftClose
-              className={RAIL_ICON_CLASS}
-              strokeWidth={RAIL_ICON_STROKE}
-              aria-hidden
-            />
-          </button>
-        </div>
 
         <div className="flex flex-col flex-1 min-h-0 overflow-x-hidden">
         {/* Logo */}
@@ -168,7 +148,7 @@ export default function GlobalRail() {
               <div
                 className={cn(
                   "transition-opacity duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
-                  "opacity-100 group-hover/logo:opacity-0"
+                  "opacity-100 group-hover/rail:opacity-0"
                 )}
               >
                 <Link
@@ -191,8 +171,8 @@ export default function GlobalRail() {
                 className={cn(
                   "absolute inset-0 flex items-center justify-center rounded-md",
                   "transition-opacity duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
-                  "opacity-0 pointer-events-none group-hover/logo:pointer-events-auto group-hover/logo:opacity-100",
-                  "text-neutral-800 hover:text-[var(--text-heading)]",
+                  "opacity-0 pointer-events-none group-hover/rail:pointer-events-auto group-hover/rail:opacity-100",
+                  "text-[var(--text-heading)]",
                   "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0] focus-visible:ring-offset-2"
                 )}
                 aria-label="Expand sidebar"
@@ -205,19 +185,28 @@ export default function GlobalRail() {
               </button>
             </div>
           ) : (
-            <Link
-              href="/dashboard"
-              className="relative w-10 h-10 bg-[var(--brand)] rounded-md flex items-center justify-center overflow-hidden shrink-0"
-              aria-label="Echly home"
-            >
-              <Image
-                src="/Echly_logo.svg"
-                alt=""
-                fill
-                sizes="40px"
-                className="object-cover"
-              />
-            </Link>
+            <div className="flex items-center justify-between w-full px-3 py-2">
+              <Link href="/dashboard" className="flex items-center gap-2.5" aria-label="Echly home">
+                <div className="relative w-10 h-10 rounded-[var(--radius-sm)] bg-[var(--brand)] flex items-center justify-center overflow-hidden shrink-0">
+                  <Image
+                    src="/Echly_logo.svg"
+                    alt=""
+                    fill
+                    sizes="40px"
+                    className="object-cover"
+                  />
+                </div>
+                <span className="text-[17px] font-semibold text-[var(--text-heading)] tracking-[-0.01em]">Echly</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => setIsCollapsed(true)}
+                aria-label="Collapse sidebar"
+                className="w-9 h-9 flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-heading)] hover:bg-[var(--surface-hover)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0] focus-visible:ring-offset-2"
+              >
+                <PanelLeftClose size={20} strokeWidth={2.2} />
+              </button>
+            </div>
           )}
         </div>
 
@@ -235,7 +224,7 @@ export default function GlobalRail() {
                 flexDirection: "column",
                 alignItems: "center",
                 gap: 6,
-                margin: "16px auto 0",
+                margin: "20px auto 0",
                 flexShrink: 0,
               }}
             >
@@ -260,9 +249,9 @@ export default function GlobalRail() {
                 }}
               >
                 <UserPlus
-                  className="h-[22px] w-[22px] shrink-0 transition-colors duration-[160ms] group-hover:text-[var(--text-heading)]"
+                  className="h-[22px] w-[22px] shrink-0"
                   strokeWidth={2.2}
-                  style={{ color: "var(--text-body)" }}
+                  style={{ color: "var(--text-heading)" }}
                   aria-hidden
                 />
               </button>
@@ -312,71 +301,41 @@ export default function GlobalRail() {
               </button>
             </div>
             <div
-              style={{ height: 1, background: "var(--border)", width: "100%", margin: "16px 0 16px" }}
+              style={{ height: 1, background: "var(--border)", width: "100%", margin: "20px 0 20px" }}
               aria-hidden
             />
           </>
         )}
 
         {!isCollapsed && (
-          <div className="flex w-full px-3">
-            <div className="w-full">
-              <button
-                type="button"
-                onClick={() => setWorkspacePopoverOpen((v) => !v)}
-                className={cn(
-                  "flex items-center rounded-md transition-colors duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0] focus-visible:ring-offset-2",
-                  "text-[var(--text-body)] hover:text-[var(--text-heading)] hover:bg-[var(--surface-hover)]",
-                  "justify-start gap-2 px-3 py-2 w-full"
-                )}
-                aria-label="Workspace menu"
-                aria-expanded={workspacePopoverOpen}
-              >
-                {effectiveLogoUrl && !logoError ? (
-                  <span className="inline-flex h-7 w-7 shrink-0 overflow-hidden rounded-full">
-                    {
-                      // eslint-disable-next-line @next/next/no-img-element -- remote workspace logo
-                      <img
-                        src={effectiveLogoUrl}
-                        alt={displayName}
-                        className="h-full w-full object-cover"
-                        onError={() => setLogoError(true)}
-                      />
-                    }
-                  </span>
-                ) : workspaceDocLoading && !effectiveName ? (
-                  <div className="h-7 w-7 rounded-full bg-muted animate-pulse shrink-0" />
-                ) : (
-                  <WorkspaceInitialsAvatar name={displayName} />
-                )}
-                <span
-                  className="flex-1 min-w-0 text-sm font-medium text-current truncate opacity-100 translate-x-0 transition-[opacity,transform] duration-200 ease-out"
-                  style={{ maxWidth: "120px" }}
-                >
+          <div className="mx-3 mt-4 rounded-[var(--radius-md)] border border-[var(--border)] overflow-hidden shadow-[0_1px_0_rgba(28,25,23,0.02)]">
+            <div className="px-3 py-2.5 flex items-center gap-2.5 cursor-pointer hover:bg-[var(--surface-hover)] hover:rounded-t-[var(--radius-md)] transition-colors">
+              <div className="flex flex-col flex-1 min-w-0">
+                <div className="text-[14px] font-semibold text-[var(--text-heading)] truncate">
                   {displayName}
-                </span>
-                <ChevronDown
-                  className={cn(
-                    "h-4 w-4 shrink-0 text-neutral-500 transition-transform duration-200",
-                    workspacePopoverOpen ? "rotate-180" : ""
-                  )}
-                  aria-hidden
-                />
-              </button>
+                </div>
+                <div className="text-[13px] text-[var(--text-heading)] mt-0.5">
+                  {memberCount} {memberCount === 1 ? "member" : "members"}
+                </div>
+              </div>
+              <ChevronDown size={14} strokeWidth={2} className="text-[var(--text-heading)] shrink-0 ml-auto" />
             </div>
+            <div className="h-px bg-[var(--border)]" />
+            <button
+              type="button"
+              onClick={() => setInviteModalOpen(true)}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[15px] font-medium text-[var(--text-heading)] hover:bg-[var(--surface-hover)] transition-all duration-200 group/invite cursor-pointer border-0 bg-transparent"
+            >
+              <UserPlus size={18} strokeWidth={2} className="text-[var(--text-heading)]" />
+              Invite teammates
+            </button>
           </div>
         )}
 
-        {!isCollapsed && (
-          <div
-            className="h-px bg-[var(--border)] my-1 shrink-0 mx-3"
-            aria-hidden
-          />
-        )}
 
         <nav
           className={cn(
-            "flex flex-col gap-3 min-h-0",
+            "flex flex-col gap-1 min-h-0",
             isCollapsed
               ? "mt-0 items-stretch overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
               : "mt-4 items-stretch px-2 overflow-y-auto flex-1"
@@ -393,11 +352,11 @@ export default function GlobalRail() {
                 <Link
                   href={href}
                   className={cn(
-                    "w-full flex items-center px-3 py-2 rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0] focus-visible:ring-offset-2",
-                    isCollapsed ? "justify-center gap-0" : "gap-3",
+                    "w-full flex items-center transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0] focus-visible:ring-offset-2",
+                    isCollapsed ? "justify-center p-3 rounded-[var(--radius-sm)]" : "gap-3 px-3 py-3 rounded-[var(--radius-sm)]",
                     active
-                      ? "bg-[var(--brand-subtle)] text-[var(--brand-text)]"
-                      : "text-[var(--text-body)] hover:text-[var(--text-heading)] hover:bg-[var(--surface-hover)]"
+                      ? "bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold"
+                      : "text-[var(--text-heading)] hover:bg-[var(--surface-hover)]"
                   )}
                   aria-label={label}
                   aria-current={active ? "page" : undefined}
@@ -409,10 +368,10 @@ export default function GlobalRail() {
                   <span
                     className={cn(
                       "text-[15px] font-semibold text-current whitespace-nowrap",
-                      "transition-[opacity,transform] duration-200 ease-out",
+                      "transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
                       isCollapsed
-                        ? "opacity-0 translate-x-[-6px] w-0 overflow-hidden pointer-events-none"
-                        : "opacity-100 translate-x-0"
+                        ? "opacity-0 translate-x-[-6px] w-0 overflow-hidden pointer-events-none delay-0"
+                        : "opacity-100 translate-x-0 delay-150"
                     )}
                   >
                     {label}
@@ -420,7 +379,7 @@ export default function GlobalRail() {
                 </Link>
                 {isCollapsed ? (
                   <span
-                    className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2 py-1 text-xs text-[var(--text-body)] rounded-md bg-white border border-[var(--border)] shadow-[var(--shadow-sm)] opacity-0 pointer-events-none z-10 transition-opacity duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:opacity-100 group-focus-within:opacity-100"
+                    className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2 py-1 text-xs text-[var(--text-heading)] rounded-md bg-white border border-[var(--border)] shadow-[var(--shadow-sm)] opacity-0 pointer-events-none z-10 transition-opacity duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:opacity-100 group-focus-within:opacity-100"
                     role="tooltip"
                   >
                     {label}
@@ -439,7 +398,7 @@ export default function GlobalRail() {
         <div
           className={cn(
             "absolute top-[5.5rem] w-64 rounded-xl border bg-white shadow-lg p-4 z-50",
-            isCollapsed ? "left-[64px]" : "left-[220px]"
+            isCollapsed ? "left-[64px]" : "left-[270px]"
           )}
           role="dialog"
           aria-label="Workspace"
@@ -653,7 +612,7 @@ export default function GlobalRail() {
                     setInviteSubmitting(false);
                   }
                 }}
-                className="px-4 py-2.5 text-sm font-medium rounded-xl bg-[var(--brand)] text-white hover:bg-[var(--brand-hover)] transition disabled:opacity-50"
+                className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
               >
                 {inviteSubmitting ? "Sending…" : "Send Invite"}
               </button>

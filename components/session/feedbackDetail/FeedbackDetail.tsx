@@ -54,7 +54,7 @@ function FeedbackDetailInner({
   }
 
   return (
-    <div className="flex flex-col min-h-0 font-sans px-6 pt-4">
+    <div className="flex flex-col min-h-0 font-sans px-4 pt-4">
       <FeedbackHeader
         item={selectedItem}
         isActivityOpen={isCommentsOpen}

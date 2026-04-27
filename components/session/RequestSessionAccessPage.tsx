@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle, Clock, Lock, Loader2, XCircle } from "lucide-react";
+import { Check, Clock, Lock, Loader2, XCircle } from "lucide-react";
 import PublicSessionNav, { PUBLIC_NAV_HEIGHT } from "@/components/layout/PublicSessionNav";
 
 export interface RequestSessionAccessPageProps {
@@ -42,7 +42,7 @@ export function RequestSessionAccessPage({
 
   const IconComponent =
     requestStatus === "submitted"
-      ? CheckCircle
+      ? Check
       : requestStatus === "already_requested"
         ? Clock
         : requestStatus === "rejected"

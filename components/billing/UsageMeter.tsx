@@ -8,13 +8,11 @@ import { useBillingStore } from "@/lib/store/billingStore";
 export type { BillingUsageData as BillingUsage } from "@/lib/hooks/useBillingUsage";
 
 const PLAN_LABEL: Record<string, string> = {
-  free: "Free",
   starter: "Starter",
   business: "Business",
   enterprise: "Enterprise",
 };
 
-/** Threshold (0–1) above which we show a warning. */
 const WARNING_THRESHOLD = 0.85;
 
 function MeterRow({
@@ -30,15 +28,16 @@ function MeterRow({
 }) {
   const atLimit = limit != null && used >= limit;
   const nearLimit = limit != null && limit > 0 && used >= limit * WARNING_THRESHOLD && !atLimit;
-  const displayLimit = limit == null ? unlimitedLabel : limit;
   const showWarning = atLimit || nearLimit;
 
   return (
     <div className="flex flex-col gap-0.5">
       <div className="flex items-baseline justify-between text-sm">
         <span className="text-[var(--text-secondary)]">{label}</span>
-        <span className={`tabular-nums font-medium ${showWarning ? "text-amber-600" : "text-[var(--text-heading)]"}`}>
-          {limit == null ? `${used}` : `${used} / ${limit}`}
+        <span
+          className={`tabular-nums font-medium ${showWarning ? "text-amber-600" : "text-[var(--text-heading)]"}`}
+        >
+          {limit == null ? `${used} used` : `${used} / ${limit}`}
         </span>
       </div>
       {limit != null && limit > 0 && (
@@ -52,6 +51,9 @@ function MeterRow({
           />
         </div>
       )}
+      {limit == null && (
+        <p className="text-xs text-[var(--text-secondary)]">{unlimitedLabel}</p>
+      )}
     </div>
   );
 }
@@ -59,14 +61,10 @@ function MeterRow({
 export function UsageMeter() {
   const { isIdentityReady, workspaceId } = useWorkspace();
   const workspaceGateReady =
-    isIdentityReady &&
-    workspaceId != null &&
-    workspaceId.trim() !== "";
+    isIdentityReady && workspaceId != null && workspaceId.trim() !== "";
   const { data: realtimeUsage, loading: realtimeLoading, error: realtimeError } =
-    useWorkspaceUsageRealtime({
-      enabled: workspaceGateReady,
-    });
-  const { maxSessions, plan: cachedPlan, isLoaded: isBillingLoaded } = useBillingStore();
+    useWorkspaceUsageRealtime({ enabled: workspaceGateReady });
+  const { feedbackTicketsLimit, plan: cachedPlan, isLoaded: isBillingLoaded } = useBillingStore();
 
   if (!workspaceGateReady || realtimeLoading || !isBillingLoaded) {
     return (
@@ -90,18 +88,22 @@ export function UsageMeter() {
 
   const plan = cachedPlan ?? realtimeUsage.plan;
   const planLabel = PLAN_LABEL[plan] ?? plan;
+  const ticketsUsed = realtimeUsage.feedbackCreatedThisMonth;
 
   return (
     <div className="rounded-xl border border-[var(--border)] bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm font-semibold text-[var(--text-heading)]">Usage</span>
-        <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide">{planLabel}</span>
+        <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
+          {planLabel}
+        </span>
       </div>
       <div className="space-y-3">
         <MeterRow
-          label="Sessions used"
-          used={realtimeUsage.sessionUsed}
-          limit={maxSessions}
+          label="Feedback tickets this month"
+          used={ticketsUsed}
+          limit={feedbackTicketsLimit}
+          unlimitedLabel="No monthly limit"
         />
       </div>
     </div>

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useRef, useEffect } from "react";
 import { Pencil, Check } from "lucide-react";
@@ -84,7 +84,7 @@ export function DescriptionSection({
               <button
                 type="button"
                 onClick={onCancel}
-                className="text-[14px] font-medium px-3 py-2 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[var(--text-secondary-soft)] hover:bg-[var(--layer-2-hover-bg)] transition-colors duration-[var(--motion-duration)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] cursor-pointer"
+                className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[14px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all cursor-pointer"
               >
                 Cancel
               </button>
@@ -92,7 +92,7 @@ export function DescriptionSection({
                 type="button"
                 onClick={triggerSave}
                 disabled={isSaving || draft === description}
-                className="text-[14px] font-semibold px-4 py-2 rounded-xl bg-[var(--color-primary)] text-white shadow-[0_2px_8px_rgba(26,86,219,0.3)] hover:bg-[var(--color-primary-hover)] disabled:opacity-50 disabled:pointer-events-none transition-all duration-[var(--motion-duration)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] cursor-pointer"
+                className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--text-heading)] text-white text-[14px] font-medium hover:opacity-85 transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
               >
                 {isSaving ? "Saving..." : "Save"}
               </button>

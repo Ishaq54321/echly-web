@@ -1,21 +1,21 @@
-"use client";
+﻿"use client";
 
 import { forwardRef } from "react";
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
 const baseClass =
-  "cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] focus-visible:ring-offset-2 transition-[transform,box-shadow,background-color,border-color,color] duration-[var(--motion-standard)] [transition-timing-function:var(--ease-premium)] rounded-xl font-medium";
+  "inline-flex items-center justify-center gap-2 font-medium cursor-pointer transition-all disabled:opacity-50 disabled:pointer-events-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]/20 focus-visible:outline-none";
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    "btn-primary-glow bg-[var(--color-primary)] text-white shadow-[0_2px_8px_rgba(26,86,219,0.28)] hover:bg-[var(--color-primary-hover)] active:scale-[0.98]",
+    "h-[38px] px-4 rounded-[var(--radius-btn)] border-none bg-[var(--text-heading)] text-white text-[14px] hover:opacity-85",
   secondary:
-    "bg-[var(--layer-1-bg)] border border-[var(--layer-2-border)] text-[var(--text-primary-strong)] shadow-[0_1px_0_rgba(255,255,255,0.5)_inset] hover:bg-[var(--layer-2-hover-bg)] hover:border-[var(--layer-2-border)] hover:-translate-y-px active:translate-y-0",
+    "h-[38px] px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[14px] hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)]",
   ghost:
-    "bg-transparent text-[var(--text-secondary-soft)] hover:bg-[var(--layer-2-hover-bg)] hover:text-[var(--text-primary-strong)]",
+    "h-[38px] px-4 rounded-[var(--radius-btn)] bg-transparent text-[var(--text-secondary)] text-[14px] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)]",
   danger:
-    "bg-[var(--color-danger)] text-white shadow-[0_2px_8px_rgba(229,72,77,0.25)] hover:opacity-95 active:scale-[0.998]",
+    "h-[38px] px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[14px] hover:text-[var(--color-danger)] hover:border-[var(--color-danger)]/30 hover:bg-[var(--color-danger-bg)]",
 };
 
 export interface ButtonProps
@@ -24,61 +24,11 @@ export interface ButtonProps
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  (
-    {
-      variant = "primary",
-      className = "",
-      disabled,
-      onMouseDown: onMouseDownProp,
-      onMouseUp: onMouseUpProp,
-      onMouseLeave: onMouseLeaveProp,
-      ...props
-    },
-    ref
-  ) => {
-    const isPrimary = variant === "primary";
-
-    const handlePressDown = (e: React.MouseEvent<HTMLButtonElement>) => {
-      onMouseDownProp?.(e);
-      if (!isPrimary || disabled) return;
-
-      const el = e.currentTarget;
-      // Instant tactile press feedback (80ms transform only).
-      el.style.transition = "transform 80ms ease";
-      el.style.transform = "scale(0.97)";
-    };
-
-    const handlePressUp = (e: React.MouseEvent<HTMLButtonElement>) => {
-      onMouseUpProp?.(e);
-      if (!isPrimary || disabled) return;
-
-      const el = e.currentTarget;
-      el.style.transition = "transform 80ms ease";
-      el.style.transform = "scale(1)";
-
-      // Restore class-driven transforms on the next frame.
-      requestAnimationFrame(() => {
-        el.style.transition = "";
-        el.style.transform = "";
-      });
-    };
-
-    const handlePressCancel = (e: React.MouseEvent<HTMLButtonElement>) => {
-      onMouseLeaveProp?.(e);
-      if (!isPrimary || disabled) return;
-
-      const el = e.currentTarget;
-      el.style.transition = "";
-      el.style.transform = "";
-    };
-
+  ({ variant = "primary", className = "", disabled, ...props }, ref) => {
     return (
       <button
         ref={ref}
         className={`${baseClass} ${variantClasses[variant]} ${className}`.trim()}
-        onMouseDown={handlePressDown}
-        onMouseUp={handlePressUp}
-        onMouseLeave={handlePressCancel}
         {...props}
         disabled={disabled}
       />

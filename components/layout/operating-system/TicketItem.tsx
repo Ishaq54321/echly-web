@@ -1,6 +1,7 @@
 "use client";
 
 import React, { memo } from "react";
+import { getTicketIcon } from "@/lib/utils/getTicketIcon";
 
 interface TicketItemProps {
   id: string;
@@ -17,11 +18,14 @@ interface TicketItemProps {
 function TicketItemInner({
   id,
   title,
+  isResolved,
   impactLabel,
   active,
   onSelect,
   isNewTicket = false,
 }: TicketItemProps) {
+  const IconComponent = getTicketIcon(title);
+
   const handleClick = () => {
     onSelect(id);
   };
@@ -31,24 +35,27 @@ function TicketItemInner({
       type="button"
       onClick={handleClick}
       data-ticket-id={id}
-      className={`sidebar-item sidebar-row-interactive group relative flex w-full items-center gap-2 text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]/40 transition-colors duration-[var(--motion-duration-fast)] hover:bg-[var(--surface-hover)] ${isNewTicket ? "echly-new-ticket-highlight" : ""}`}
+      className={`group relative flex w-full items-center gap-2.5 text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]/40 px-3 py-2.5 rounded-[7px] text-[14px] tracking-[-0.005em] transition-colors ${
+        active
+          ? 'bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold'
+          : isResolved
+          ? 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]'
+          : 'text-[var(--text-heading)] hover:bg-[var(--surface-hover)]'
+      } ${isNewTicket ? "echly-new-ticket-highlight" : ""}`}
       aria-current={active ? "true" : undefined}
     >
-      <span className="relative min-w-0 flex-1 truncate text-[14px] leading-[1.4] py-0.5">
-        {title?.trim() ? (
-          <span
-            className={`truncate block ${
-              active
-                ? "text-[var(--text-heading)] font-[550]"
-                : "text-[var(--text-body)] font-[450]"
-            }`}
-          >
-            {title}
-          </span>
-        ) : null}
+      <span className={`w-[30px] h-[30px] rounded-[var(--radius-sm)] grid place-items-center shrink-0 ${active ? 'bg-[var(--brand)] text-white' : isResolved ? 'bg-[var(--color-success-bg)] text-[var(--color-success)]' : 'bg-[var(--surface-hover)] text-[var(--text-secondary)]'}`}>
+        {isResolved ? (
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5l3 3 6-6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        ) : (
+          <IconComponent size={14} strokeWidth={2} />
+        )}
+      </span>
+      <span className="relative min-w-0 flex-1 truncate text-[14px] leading-[1.4]">
+        {title?.trim() ? title : null}
       </span>
       {impactLabel && (
-        <span className="shrink-0 rounded-full border border-[var(--layer-2-border)] px-2 py-0.5 text-[12px] font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)] bg-[var(--layer-1-bg)]">
+        <span className="shrink-0 text-[11px] font-medium text-[var(--text-tertiary)] tabular-nums">
           {impactLabel}
         </span>
       )}

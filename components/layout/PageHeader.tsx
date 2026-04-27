@@ -26,7 +26,7 @@ export function PageHeader({ title, breadcrumb, actions, className = "" }: PageH
         <button
           type="button"
           onClick={openMobileMenu}
-          className="md:hidden w-8 h-8 flex items-center justify-center rounded-md hover:bg-[var(--gray-100)] transition-colors shrink-0"
+          className="md:hidden w-[38px] h-[38px] flex items-center justify-center rounded-[var(--radius-btn)] hover:bg-[var(--gray-100)] transition-colors shrink-0"
           aria-label="Open navigation"
         >
           <Menu style={{ width: 16, height: 16, color: "var(--text-secondary)" }} aria-hidden />

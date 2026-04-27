@@ -111,7 +111,7 @@ export default function DashboardCaptureHost({ open, onClose }: DashboardCapture
       <button
         type="button"
         onClick={handleClose}
-        className="w-full mt-3 h-10 rounded-[var(--radius-sm)] text-sm font-medium text-[var(--text-secondary)] dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-[var(--surface-hover)] dark:hover:bg-neutral-800 active:scale-[0.98] transition-all duration-150"
+        className="w-full mt-3 h-[38px] rounded-[var(--radius-btn)] text-[14px] font-medium text-[var(--text-secondary)] dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-[var(--surface-hover)] dark:hover:bg-neutral-800 active:scale-[0.98] transition-all duration-150"
       >
         Maybe later
       </button>

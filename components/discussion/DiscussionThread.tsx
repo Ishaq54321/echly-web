@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
@@ -549,7 +549,7 @@ export function DiscussionThread({
                   type="button"
                   onClick={handleSendComment}
                   disabled={sending || !commentDraft.trim()}
-                  className="h-[38px] w-[38px] rounded-xl bg-[var(--brand)] text-white flex items-center justify-center shadow-level-1 hover:bg-[var(--brand-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition shrink-0"
+                  className="h-[34px] w-[34px] rounded-[var(--radius-btn)] bg-[var(--brand)] text-white flex items-center justify-center hover:bg-[var(--brand-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition shrink-0"
                   aria-label="Send reply"
                 >
                   <Send className="h-3.5 w-3.5" strokeWidth={1.5} />

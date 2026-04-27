@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useRef, useCallback, memo, useMemo, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
-import { X, CheckCircle2, RotateCcw, RefreshCw, Paperclip, Smile, MessageSquare, AtSign } from "lucide-react";
+import { X, Check, RotateCcw, RefreshCw, Paperclip, Smile, MessageSquare, AtSign } from "lucide-react";
 import EmojiPicker from "emoji-picker-react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -541,7 +541,7 @@ const ThreadBlock = memo(function ThreadBlock({
                   e.stopPropagation();
                   onReplyToggle(true);
                 }}
-                className="text-[12px] font-semibold text-[var(--text-body)] hover:text-[var(--text-heading)] hover:underline cursor-pointer"
+                className="text-[13px] font-semibold text-[var(--text-body)] hover:text-[var(--text-heading)] hover:underline cursor-pointer"
               >
                 Reply
               </button>
@@ -553,7 +553,7 @@ const ThreadBlock = memo(function ThreadBlock({
               onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.stopPropagation()}
             >
-              <div className="rounded-[var(--radius-md)] bg-[var(--surface-card)] shadow-[var(--shadow-sm)] overflow-hidden focus-within:ring-2 focus-within:ring-[var(--brand)]/20 transition-all">
+              <div className="rounded-[var(--radius-md)] bg-[var(--surface-card)] border border-[var(--border)] overflow-hidden focus-within:border-[var(--brand)] focus-within:ring-0 transition-all">
 
                 {/* Row 1: Avatar + Tiptap Editor */}
                 <div className="flex items-start gap-3 px-4 pt-4">
@@ -784,7 +784,7 @@ const ThreadBlock = memo(function ThreadBlock({
                         }
                       }}
                       disabled={(!replyHasContent && replyPendingAttachments.length === 0) || replyPendingAttachments.some(att => (att as any)._loading)}
-                      className="text-[14px] font-semibold text-white bg-[var(--brand)] hover:bg-[var(--brand-hover)] px-4 py-1.5 rounded-full disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer"
+                      className="inline-flex h-[34px] items-center gap-1.5 px-3 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[13px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
                     >
                       Reply
                     </button>
@@ -961,7 +961,7 @@ const CommentThreadList = memo(function CommentThreadList({
             onClick={() => setResolvedCollapsed((c) => !c)}
             className="flex items-center gap-2 text-[14px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-heading)] cursor-pointer"
           >
-            <CheckCircle2 className="h-[18px] w-[18px] text-[var(--color-success)]" />
+            <Check className="h-[18px] w-[18px] text-[var(--color-success)]" />
             Resolved ({resolvedRoots.length})
           </button>
           {!resolvedCollapsed && (
@@ -1125,64 +1125,40 @@ export function CommentPanel({
   const displayThreadCounts = threadCountsProp ?? fallbackCounts;
   void displayThreadCounts;
 
+  const commentRootCount = comments.filter((c) => !c.threadId).length;
+
   const panelContent = (
     <>
-      {/* Header */}
-      <div className="shrink-0 flex items-center justify-between px-4 py-3">
-        <h2 className="text-[14px] font-semibold text-[var(--text-heading)] tracking-[-0.01em]">
-          Comments ({comments.length})
-        </h2>
-        <div className="flex items-center gap-0.5">
-          {onRefreshComments ? (
-            <button
-              type="button"
-              onClick={onRefreshComments}
-              className="p-2 rounded-xl text-[var(--text-tertiary)] hover:bg-[var(--layer-2-hover-bg)] hover:text-[var(--text-primary-strong)] transition-colors duration-[var(--motion-duration)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] cursor-pointer"
-              aria-label="Refresh comments"
-            >
-              <RefreshCw className="h-4 w-4" strokeWidth={1.5} />
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-xl text-[var(--text-tertiary)] hover:bg-[var(--layer-2-hover-bg)] hover:text-[var(--text-primary-strong)] transition-colors duration-[var(--motion-duration)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)] cursor-pointer"
-            aria-label="Close comment panel"
-          >
-            <X className="h-4 w-4" strokeWidth={1.5} />
-          </button>
-        </div>
-      </div>
-
-      {/* Top-level compose */}
+      {/* Composer at top — pill-shaped */}
       {!composeExpanded ? (
-        <div className="shrink-0 px-4 py-4">
+        <div className="shrink-0 px-5 pt-4 pb-3.5">
           <div
-            className="flex items-center gap-3 rounded-[var(--radius-md)] bg-[var(--surface-card)] shadow-[var(--shadow-sm)] px-4 py-3 cursor-text"
+            className="grid items-center gap-2.5 border border-[var(--hair-strong)] rounded-full px-2.5 py-1.5 bg-white transition-all cursor-text hover:border-[var(--hair)] focus-within:border-[var(--brand)] focus-within:shadow-[0_0_0_3px_var(--brand-subtle)]"
+            style={{ gridTemplateColumns: '26px 1fr auto' }}
             onClick={() => setComposeExpanded(true)}
           >
-            <div className="w-[28px] h-[28px] rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold text-[14px] flex items-center justify-center shrink-0 overflow-hidden">
+            <div className="w-[26px] h-[26px] rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold text-[10.5px] flex items-center justify-center shrink-0 overflow-hidden">
               {currentUserAvatarUrl ? (
                 <img src={currentUserAvatarUrl} alt="" className="w-full h-full object-cover" />
               ) : (
                 currentUserInitial || "?"
               )}
             </div>
-            <span className="text-[14px] text-[var(--text-secondary)] flex-1">Leave a comment...</span>
-            <div className="flex items-center gap-2.5">
-              <AtSign className="h-[18px] w-[18px] text-[var(--text-body)]" strokeWidth={1.5} />
-              <Smile className="h-[18px] w-[18px] text-[var(--text-body)]" strokeWidth={1.5} />
-              <Paperclip className="h-[18px] w-[18px] text-[var(--text-body)]" strokeWidth={1.5} />
-            </div>
+            <span className="text-[13.5px] text-[var(--text-tertiary)] min-w-0 truncate">Leave a comment…</span>
+            <span className="flex items-center gap-[2px]">
+              <button type="button" onClick={(e) => e.stopPropagation()} className="w-[26px] h-[26px] rounded-lg grid place-items-center text-[var(--text-secondary)] border-0 bg-transparent cursor-pointer hover:bg-black/[0.04]">
+                <Smile className="h-3.5 w-3.5" strokeWidth={1.4} />
+              </button>
+            </span>
           </div>
         </div>
       ) : (
-        <div className="shrink-0 px-4 py-4">
-          <div className="rounded-[var(--radius-md)] bg-[var(--surface-card)] shadow-[var(--shadow-sm)] overflow-hidden focus-within:ring-2 focus-within:ring-[var(--brand)]/20 transition-all">
+        <div className="shrink-0 px-5 pt-4 pb-3.5">
+          <div className="rounded-[var(--radius-md)] bg-white border border-[var(--hair-strong)] overflow-hidden focus-within:border-[var(--brand)] focus-within:shadow-[0_0_0_3px_var(--brand-subtle)] transition-all">
 
             {/* Row 1: Avatar + Tiptap editor */}
             <div className="flex items-start gap-3 px-4 pt-4">
-              <div className="w-[28px] h-[28px] rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold text-[14px] flex items-center justify-center shrink-0 overflow-hidden mt-0.5">
+              <div className="w-[26px] h-[26px] rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold text-[10.5px] flex items-center justify-center shrink-0 overflow-hidden mt-0.5">
                 {currentUserAvatarUrl ? (
                   <img src={currentUserAvatarUrl} alt="" className="w-full h-full object-cover" />
                 ) : (
@@ -1408,7 +1384,7 @@ export function CommentPanel({
                     }
                   }}
                   disabled={(!composeHasContent && composePendingAttachments.length === 0) || composePendingAttachments.some(att => (att as any)._loading)}
-                  className="text-[14px] font-semibold text-white bg-[var(--brand)] hover:bg-[var(--brand-hover)] px-4 py-1.5 rounded-full disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer max-w-[280px] truncate"
+                  className="inline-flex h-[34px] items-center gap-1.5 px-3 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[13px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none max-w-[280px] truncate"
                 >
                   Comment
                 </button>
@@ -1446,12 +1422,38 @@ export function CommentPanel({
         </div>
       )}
 
+      {/* Divider + comment count */}
+      <div className="h-px bg-[var(--hair)] mx-5 shrink-0" />
+      <div className="shrink-0 px-5 pt-4 pb-2.5 text-[var(--text-secondary)] text-[13px] font-medium">
+        <b className="text-[var(--text-heading)] font-semibold">{commentRootCount} Comment{commentRootCount !== 1 ? 's' : ''}</b>
+        <div className="float-right flex items-center gap-0.5">
+          {onRefreshComments ? (
+            <button
+              type="button"
+              onClick={onRefreshComments}
+              className="p-1.5 rounded-lg text-[var(--text-tertiary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors cursor-pointer border-0 bg-transparent"
+              aria-label="Refresh comments"
+            >
+              <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.5} />
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-[var(--text-tertiary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors cursor-pointer border-0 bg-transparent"
+            aria-label="Close comment panel"
+          >
+            <X className="h-3.5 w-3.5" strokeWidth={1.5} />
+          </button>
+        </div>
+      </div>
+
       {/* Scrollable comment list */}
       <div
         ref={scrollContainerRef}
         className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden box-border"
       >
-        <div className="px-4 py-4 min-w-0 box-border">
+        <div className="px-3 pb-5 min-w-0 box-border">
           <CommentThreadList
             comments={comments}
             loading={loading}
@@ -1485,7 +1487,7 @@ export function CommentPanel({
       <aside
         role="complementary"
         aria-label="Comments"
-        className="h-full min-w-0 flex flex-col bg-transparent box-border overflow-x-hidden"
+        className="h-full min-w-0 flex flex-col bg-transparent box-border overflow-hidden"
       >
         {panelContent}
       </aside>

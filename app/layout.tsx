@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import { DM_Sans } from "next/font/google";
 import "./globals.css";
 
-const plusJakartaSans = Plus_Jakarta_Sans({
+const dmSans = DM_Sans({
   subsets: ["latin"],
   display: "swap",
 });
@@ -20,7 +20,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full" suppressHydrationWarning>
       <body
-        className={`${plusJakartaSans.className} font-sans antialiased h-full overflow-y-auto`}
+        className={`${dmSans.className} font-sans antialiased h-full overflow-y-auto`}
         suppressHydrationWarning
       >
         <div className="env-canvas h-full flex flex-col">{children}</div>

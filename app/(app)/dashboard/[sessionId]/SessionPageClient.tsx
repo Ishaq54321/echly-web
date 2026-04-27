@@ -1973,6 +1973,31 @@ export default function SessionPageClient({
     }
   }, [sessionId, sessionTitleDraft, isIdentityResolved, showToast]);
 
+  const handleSidebarRenameTitle = useCallback(async (newTitle: string) => {
+    const safeTitle = newTitle.trim();
+    if (!safeTitle || safeTitle === session?.title) return;
+    const previousTitle = session?.title ?? '';
+    setSession((prev: Session | null) => prev ? ({ ...prev, title: safeTitle } as Session) : prev);
+    try {
+      const res = await authFetch(`/api/sessions/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: safeTitle }),
+      });
+      if (!res || !res.ok) {
+        setSession((prev: Session | null) => prev ? ({ ...prev, title: previousTitle } as Session) : prev);
+        showToast('Could not save session name');
+        return;
+      }
+      const raw = await res.json();
+      const apiTitle = (raw?.data?.session?.title ?? raw?.session?.title ?? safeTitle) as string;
+      setSession((prev: Session | null) => prev ? ({ ...prev, title: apiTitle } as Session) : prev);
+    } catch {
+      setSession((prev: Session | null) => prev ? ({ ...prev, title: previousTitle } as Session) : prev);
+      showToast('Could not save session name');
+    }
+  }, [sessionId, session?.title, showToast]);
+
   const handleMarkAllResolved = useCallback(() => {
     safeResolveAction({
       canResolve: sessionAccessRef.current?.canResolve === true,
@@ -2372,7 +2397,7 @@ export default function SessionPageClient({
         onDismiss={() => setActionToastState("hidden")}
         errorText="Failed to save"
       />
-      <div className="flex flex-col h-full min-h-0 overflow-hidden relative">
+      <div className="flex flex-col h-full min-h-0 overflow-hidden relative bg-[var(--surface-subtle)]">
         {!isIdentityResolved && !isAnonymousViewer && (
           <div
             aria-hidden
@@ -2415,9 +2440,17 @@ export default function SessionPageClient({
             onToggleNavPanel={() => setNavPanelOpen(true)}
           />
         )}
-        <div className="flex flex-1 min-h-0 overflow-hidden bg-[var(--surface-subtle)]">
-        <aside className="hidden lg:flex w-[336px] shrink-0 min-h-0 flex-col p-4 pr-2">
-          <div className="flex-1 min-h-0 flex flex-col bg-[var(--surface-card)] rounded-[var(--radius-md)] border border-[var(--border)] shadow-[var(--shadow-sm)] overflow-hidden">
+        <div
+          className="grid flex-1 min-h-0 overflow-hidden bg-[var(--surface-subtle)]"
+          style={{
+            gridTemplateColumns: (isCommentPanelOpen || activeThreadId != null) ? '346px 1fr 360px' : '346px 1fr',
+            gap: '14px',
+            padding: '14px 14px 14px',
+            transition: 'grid-template-columns 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        >
+          {/* Left card: Ticket list */}
+          <aside className="hidden lg:flex flex-col bg-[var(--surface-card)] rounded-[14px] min-h-0 overflow-hidden" style={{ boxShadow: 'var(--shadow-card)' }}>
           <TicketList
             counts={{
               total: isCountsSynced ? feedbackTotal : Math.max(0, sessionRestTotal),
@@ -2454,77 +2487,77 @@ export default function SessionPageClient({
             workspaceName={workspaceName || "Workspace"}
             updatedAt={session?.updatedAt}
             viewCount={session?.viewCount ?? 0}
+            canRenameTitle={isWorkspaceMember}
+            onRenameTitle={handleSidebarRenameTitle}
           />
-          </div>
-        </aside>
+          </aside>
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {/* Center card: Main content */}
+          <section className="flex flex-col bg-[var(--surface-card)] rounded-[14px] min-h-0 overflow-hidden" style={{ boxShadow: 'var(--shadow-card)' }}>
           {pendingResolveRequest && sessionAccess?.canResolve === false ? (
             <PendingAccessBanner />
           ) : null}
-          <div className="flex flex-1 min-h-0 min-w-0">
-            <main className="flex-1 min-h-0 overflow-y-auto flex flex-col min-w-0 bg-[var(--surface-subtle)]">
-              <div className="h-full flex flex-col min-w-0">
-                <div className="z-20 shrink-0 flex items-center gap-2 px-4 py-3 lg:hidden bg-[var(--layer-1-bg)]">
-                  <button
-                    type="button"
-                    onClick={() => setIsTicketNavigatorOpen(true)}
-                    className="h-9 inline-flex items-center px-4 rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[14px] font-medium text-[var(--text-secondary-soft)] hover:bg-[var(--layer-2-hover-bg)] hover:text-[var(--text-primary-strong)] transition-colors duration-200"
-                  >
-                    Tickets
-                  </button>
-                </div>
-                <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
-                  <div className="max-w-[760px] mx-auto w-full px-8 pt-10 pb-16 flex-1 min-h-0 flex flex-col">
-                    {renderExecutionContent()}
-                  </div>
+          <main className="flex-1 min-h-0 overflow-y-auto flex flex-col min-w-0">
+            <div className="h-full flex flex-col min-w-0">
+              <div className="z-20 shrink-0 flex items-center gap-2 px-4 py-3 lg:hidden bg-[var(--layer-1-bg)]">
+                <button
+                  type="button"
+                  onClick={() => setIsTicketNavigatorOpen(true)}
+                  className="h-[38px] inline-flex items-center px-4 rounded-[var(--radius-btn)] border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] text-[14px] font-medium text-[var(--text-secondary-soft)] hover:bg-[var(--layer-2-hover-bg)] hover:text-[var(--text-primary-strong)] transition-colors duration-200"
+                >
+                  Tickets
+                </button>
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
+                <div className="max-w-[900px] mx-auto w-full px-8 pt-11 pb-20 flex-1 min-h-0 flex flex-col">
+                  {renderExecutionContent()}
                 </div>
               </div>
-            </main>
-
-            {/* Comment panel: opens when comment mode is active or a thread is selected. */}
-            <div
-              className="shrink-0 flex flex-col min-h-0 transition-[width] duration-[250ms] ease-out overflow-visible p-4 pl-2"
-              style={{ width: (isCommentPanelOpen || activeThreadId != null) ? 404 : 0 }}
-            >
-              {(isCommentPanelOpen || activeThreadId != null) && (
-                <div className="flex-1 min-h-0 bg-[var(--surface-card)] rounded-[var(--radius-md)] border border-[var(--border)] shadow-[var(--shadow-sm)] overflow-hidden flex flex-col">
-                  <CommentPanel
-                    variant="sidebar"
-                    isOpen
-                    onClose={() => {
-                      setActiveThreadId(null);
-                      setIsCommentPanelOpen(false);
-                      setIsCommentMode(false);
-                    }}
-                    comments={comments}
-                    loading={loadingComments}
-                    threadCounts={displayCommentThreadCounts}
-                    onRefreshComments={() => void refetchComments()}
-                    sendReply={sendReply}
-                    sendComment={sendComment}
-                    activeThreadId={activeThreadId}
-                    onSelectThread={setActiveThreadId}
-                    currentUserId={authUid}
-                    currentUserInitial={authDisplayName ? authDisplayName.charAt(0).toUpperCase() : "?"}
-                    currentUserName={authDisplayName || undefined}
-                    currentUserAvatarUrl={authPhotoUrl || undefined}
-                    updateComment={updateComment}
-                    deleteComment={deleteComment}
-                    onReactionsChanged={handleReactionsChanged}
-                    participants={participants}
-                    showToast={showToast}
-                    ticketTitleMap={ticketTitleMap}
-                    selectedTicketTitle={selectedTicketTitle}
-                    onNavigateToTicket={(fid: string) => setSelectedId(fid)}
-                    onAnimatePin={triggerPinAnimation}
-                    animatingCommentId={animatingCommentId}
-                  />
-                </div>
-              )}
             </div>
-          </div>
-        </div>
+          </main>
+          </section>
+
+          {/* Right card: Comment panel */}
+          {(isCommentPanelOpen || activeThreadId != null) && (
+            <aside
+              className="flex flex-col min-h-0 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300"
+              style={{ animationTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)' }}
+            >
+              <div className="flex flex-col flex-1 min-h-0 bg-[var(--surface-card)] rounded-[14px] overflow-hidden" style={{ boxShadow: 'var(--shadow-card)' }}>
+                <CommentPanel
+                  variant="sidebar"
+                  isOpen
+                  onClose={() => {
+                    setActiveThreadId(null);
+                    setIsCommentPanelOpen(false);
+                    setIsCommentMode(false);
+                  }}
+                  comments={comments}
+                  loading={loadingComments}
+                  threadCounts={displayCommentThreadCounts}
+                  onRefreshComments={() => void refetchComments()}
+                  sendReply={sendReply}
+                  sendComment={sendComment}
+                  activeThreadId={activeThreadId}
+                  onSelectThread={setActiveThreadId}
+                  currentUserId={authUid}
+                  currentUserInitial={authDisplayName ? authDisplayName.charAt(0).toUpperCase() : "?"}
+                  currentUserName={authDisplayName || undefined}
+                  currentUserAvatarUrl={authPhotoUrl || undefined}
+                  updateComment={updateComment}
+                  deleteComment={deleteComment}
+                  onReactionsChanged={handleReactionsChanged}
+                  participants={participants}
+                  showToast={showToast}
+                  ticketTitleMap={ticketTitleMap}
+                  selectedTicketTitle={selectedTicketTitle}
+                  onNavigateToTicket={(fid: string) => setSelectedId(fid)}
+                  onAnimatePin={triggerPinAnimation}
+                  animatingCommentId={animatingCommentId}
+                />
+              </div>
+            </aside>
+          )}
         </div>
       </div>
 
@@ -2572,6 +2605,9 @@ export default function SessionPageClient({
               isSearchMode={isSearchMode}
               searchResults={searchResults}
               searchLoading={searchLoading}
+              sessionTitle={session?.title || "Untitled"}
+              canRenameTitle={isWorkspaceMember}
+              onRenameTitle={handleSidebarRenameTitle}
               />
           </div>
         </div>
@@ -2626,7 +2662,7 @@ export default function SessionPageClient({
               <button
                 type="button"
                 onClick={() => setNavPanelOpen(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors cursor-pointer"
+                className="inline-flex h-[38px] w-[38px] items-center justify-center rounded-[var(--radius-btn)] text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors cursor-pointer"
                 title="Close navigation"
               >
                 <PanelLeftClose size={18} strokeWidth={1.5} />

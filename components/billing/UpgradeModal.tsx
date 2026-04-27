@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check } from "lucide-react";
 import { useWorkspace } from "@/lib/client/workspaceContext";
@@ -14,65 +14,36 @@ export interface UpgradeModalProps {
   upgradePlan: string | null;
 }
 
-const PLAN_LABEL: Record<string, string> = {
-  free: "Free",
-  starter: "Starter",
-  business: "Business",
-  enterprise: "Enterprise",
-};
-
-function currentPlanFromUpgrade(upgradePlan: string | null): string {
-  if (upgradePlan === "starter") return "free";
-  if (upgradePlan === "business") return "starter";
-  if (upgradePlan === "enterprise") return "business";
-  return "free";
-}
-
 const VALUE_BULLETS = [
+  "Unlimited feedback tickets",
   "Unlimited sessions",
-  "Advanced insights dashboard",
-  "Team collaboration",
-  "Faster feedback cycles",
+  "Unlimited members",
+  "Custom branding (your logo)",
+  "Insights & analytics",
 ];
 
-export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeModalProps) {
-  const router = useRouter();
+export function UpgradeModal({ open, onClose, message }: UpgradeModalProps) {
   const { isIdentityReady, workspaceId } = useWorkspace();
-  const currentPlan = currentPlanFromUpgrade(upgradePlan);
-  const currentPlanLabel = PLAN_LABEL[currentPlan] ?? currentPlan;
   const { data: workspaceUsage } = useWorkspaceUsageRealtime({
-    enabled:
-      open &&
-      isIdentityReady &&
-      workspaceId != null &&
-      workspaceId.trim() !== "",
+    enabled: open && isIdentityReady && workspaceId != null && workspaceId.trim() !== "",
   });
-  const { maxSessions } = useBillingStore();
+  const { feedbackTicketsLimit, plan: cachedPlan } = useBillingStore();
 
-  const ctaLabel =
-    currentPlan === "starter"
-      ? "Upgrade to Business"
-      : currentPlan === "business"
-      ? "Upgrade to Enterprise"
-      : "View Plans";
+  const currentPlan = cachedPlan ?? workspaceUsage?.plan ?? "starter";
+  const planLabel =
+    currentPlan === "business"
+      ? "Business"
+      : currentPlan === "enterprise"
+      ? "Enterprise"
+      : "Starter";
 
-  const handlePrimary = () => {
-    onClose();
-    router.push("/settings?tab=billing");
-  };
-
-  const sessionsUsed = workspaceUsage?.sessionUsed ?? 0;
-  const sessionsMax = maxSessions;
-
+  const ticketsUsed = workspaceUsage?.feedbackCreatedThisMonth ?? 0;
+  const ticketsLimit = feedbackTicketsLimit;
   const progressPct =
-    sessionsMax != null && sessionsMax > 0
-      ? Math.min(100, (sessionsUsed / sessionsMax) * 100)
+    ticketsLimit != null && ticketsLimit > 0
+      ? Math.min(100, (ticketsUsed / ticketsLimit) * 100)
       : 0;
-
-  const isFull =
-    sessionsMax != null && sessionsMax > 0 && sessionsUsed >= sessionsMax;
-  const isOverLimit =
-    sessionsMax != null && sessionsMax > 0 && sessionsUsed > sessionsMax;
+  const isFull = ticketsLimit != null && ticketsLimit > 0 && ticketsUsed >= ticketsLimit;
 
   return (
     <AnimatePresence>
@@ -115,7 +86,7 @@ export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeMod
             {/* Plan badge */}
             <div>
               <span className="inline-flex items-center rounded-full bg-[var(--surface-hover)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)]">
-                Current Plan: {currentPlanLabel}
+                Current Plan: {planLabel}
               </span>
             </div>
 
@@ -124,44 +95,36 @@ export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeMod
               id="upgrade-modal-title"
               className="mt-4 text-xl font-semibold tracking-tight text-[var(--text-heading)] sm:text-2xl"
             >
-              {isOverLimit
-                ? "You have exceeded your plan limit."
-                : `You've reached the ${currentPlanLabel.toLowerCase()} workspace limit`}
+              {isFull
+                ? "You've used all your feedback tickets this month."
+                : message ?? "Upgrade to Business for unlimited feedback tickets."}
             </h2>
 
             {/* Description */}
             <p className="mt-2 text-[15px] leading-relaxed text-neutral-700">
-              {isOverLimit
-                ? "Existing sessions remain available. Delete sessions or upgrade to create new ones."
-                : "Create unlimited feedback sessions, collaborate with your team, and unlock deeper insights by upgrading your workspace."}
+              {isFull
+                ? "Your workspace has reached its monthly ticket limit. Upgrade to Business for unlimited feedback collection."
+                : "Collect unlimited feedback, collaborate with your full team, and unlock deeper insights by upgrading your workspace."}
             </p>
 
-            {/* Usage */}
-            {workspaceUsage != null && sessionsMax != null && sessionsMax > 0 && (
+            {/* Ticket usage */}
+            {workspaceUsage != null && ticketsLimit != null && ticketsLimit > 0 && (
               <div className="mt-5">
-
                 <div className="flex items-baseline justify-between text-sm">
-                  <span className="text-[var(--text-secondary)]">Sessions used</span>
-
+                  <span className="text-[var(--text-secondary)]">Feedback tickets used this month</span>
                   <span className="tabular-nums font-medium text-[var(--text-heading)]">
-                    {sessionsUsed} / {sessionsMax} sessions
+                    {ticketsUsed} / {ticketsLimit}
                   </span>
                 </div>
-
                 <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-hover)]">
                   <motion.div
                     className="h-full rounded-full"
-                    style={{
-                      background: isFull
-                        ? "#1775E0"
-                        : "rgba(21, 93, 252, 0.5)",
-                    }}
+                    style={{ background: isFull ? "#1775E0" : "rgba(21, 93, 252, 0.5)" }}
                     initial={{ width: 0 }}
                     animate={{ width: `${progressPct}%` }}
                     transition={{ duration: 0.3, ease: "easeOut" }}
                   />
                 </div>
-
               </div>
             )}
 
@@ -169,18 +132,10 @@ export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeMod
             <div className="mt-5 rounded-xl bg-[var(--surface-subtle)]/80 p-4">
               <ul className="space-y-2.5" role="list">
                 {VALUE_BULLETS.map((bullet) => (
-                  <li
-                    key={bullet}
-                    className="flex items-center gap-2.5 text-sm text-neutral-700"
-                  >
+                  <li key={bullet} className="flex items-center gap-2.5 text-sm text-neutral-700">
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--brand)]/10 text-[var(--brand)]">
-                      <Check
-                        className="h-3 w-3"
-                        strokeWidth={2.5}
-                        aria-hidden
-                      />
+                      <Check className="h-3 w-3" strokeWidth={2.5} aria-hidden />
                     </span>
-
                     {bullet}
                   </li>
                 ))}
@@ -189,23 +144,21 @@ export function UpgradeModal({ open, onClose, message, upgradePlan }: UpgradeMod
 
             {/* Buttons */}
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-xl border border-[var(--border)] px-5 py-2.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition"
+                className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-secondary)] text-[14px] font-medium hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-all cursor-pointer"
               >
                 Maybe Later
               </button>
-
-              <button
-                type="button"
-                onClick={handlePrimary}
-                className="rounded-xl bg-[var(--brand)] px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[var(--brand-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:ring-offset-2 transition"
-              >
-                {ctaLabel}
-              </button>
-
+              <Link href="/settings?tab=billing" onClick={onClose}>
+                <button
+                  type="button"
+                  className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer"
+                >
+                  Upgrade to Business — $39/seat/mo
+                </button>
+              </Link>
             </div>
 
           </motion.div>

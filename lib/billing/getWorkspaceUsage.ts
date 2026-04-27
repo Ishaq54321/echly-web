@@ -1,9 +1,8 @@
 import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
-import { getWorkspaceSessionCountRepo } from "@/lib/repositories/sessionsRepository.server";
 
 export interface WorkspaceUsage {
-  sessionCount: number;
   memberCount: number;
+  feedbackCreatedThisMonth: number;
 }
 
 /**
@@ -13,11 +12,11 @@ export async function getWorkspaceUsage(workspaceId: string): Promise<WorkspaceU
   const workspace = await getWorkspace(workspaceId);
   if (!workspace) return null;
 
-  const sessionCount = await getWorkspaceSessionCountRepo(workspaceId, workspace);
   const memberCount = workspace.usage?.members ?? 0;
+  const feedbackCreatedThisMonth = workspace.usage?.feedbackCreatedThisMonth ?? 0;
 
   return {
-    sessionCount,
     memberCount,
+    feedbackCreatedThisMonth,
   };
 }

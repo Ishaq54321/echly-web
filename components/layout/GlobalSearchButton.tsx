@@ -22,7 +22,7 @@ export function GlobalSearchButton({ onBeforeOpen }: GlobalSearchButtonProps = {
       aria-label="Search"
       onClick={openSearch}
     >
-      <Search size={20} strokeWidth={2} />
+      <Search size={20} strokeWidth={2} className="text-[var(--text-body)]" />
     </button>
   );
 }

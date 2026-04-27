@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useRef, useLayoutEffect } from "react";
 import { PenTool, Code2, LayoutDashboard, Megaphone, Crown } from "lucide-react";
@@ -139,7 +139,7 @@ export function WorkspaceForm({
               onClick={() => setRole(id)}
               className={ROLE_GRID_CLASS}
             >
-              <Icon className={`w-6 h-6 shrink-0 ${role === id ? "text-[var(--brand)]" : "text-[var(--text-secondary)]"}`} />
+              <Icon className={`w-6 h-6 shrink-0 ${role === id ? "text-[var(--brand)]" : "text-[var(--text-body)]"}`} />
               <span className={`text-sm font-medium ${role === id ? "text-[#1462C4]" : "text-[var(--text-body)]"}`}>{id}</span>
             </button>
           ))}

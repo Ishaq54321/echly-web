@@ -12,7 +12,7 @@ export interface SystemOverviewBlockProps {
 function MomentumIndicator({ direction }: { direction: MomentumDirection }) {
   const config = {
     improving: { icon: TrendingUp, label: "Improving", className: "text-[var(--color-success)]" },
-    stable: { icon: Minus, label: "Stable", className: "text-[var(--text-tertiary)]" },
+    stable: { icon: Minus, label: "Stable", className: "text-[var(--text-secondary)]" },
     slowing: { icon: TrendingDown, label: "Slowing", className: "text-[var(--color-warning)]" },
   };
   const { icon: Icon, label, className } = config[direction];

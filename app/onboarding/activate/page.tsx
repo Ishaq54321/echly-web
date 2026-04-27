@@ -992,7 +992,7 @@ function WriteFeedbackPopup({ onSubmit }: { onSubmit?: (text?: string) => void }
           type="button"
           data-demo-target="submit-feedback"
           onClick={() => onSubmit?.(value)}
-          className="mt-4 h-10 w-full rounded-xl bg-gray-900 hover:bg-black text-white text-[12px] font-semibold"
+          className="mt-4 h-[38px] w-full rounded-[var(--radius-btn)] bg-gray-900 hover:bg-black text-white text-[14px] font-semibold"
         >
           Submit
         </button>
@@ -1105,7 +1105,7 @@ function VoiceFeedbackPopup({
           type="button"
           data-demo-target="finish"
           onClick={onFinish}
-          className="mt-4 h-10 w-full rounded-xl bg-gray-900 hover:bg-black text-white text-[12px] font-semibold"
+          className="mt-4 h-[38px] w-full rounded-[var(--radius-btn)] bg-gray-900 hover:bg-black text-white text-[14px] font-semibold"
         >
           Finish
         </button>

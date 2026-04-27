@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
@@ -339,7 +339,7 @@ export function DiscussionPanel({
                 type="button"
                 onClick={handleSendComment}
                 disabled={sending || !commentDraft.trim()}
-                className="px-4 py-2.5 rounded-xl bg-[var(--brand)] text-white text-sm font-medium hover:bg-[var(--brand-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition"
+                className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
               >
                 {sending ? "Sending…" : "Send"}
               </button>

@@ -55,7 +55,7 @@ export function SessionFeedbackPopup({
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
-        fontFamily: '"Plus Jakarta Sans", "SF Pro Display", Inter, system-ui, sans-serif',
+        fontFamily: '"DM Sans", "SF Pro Display", Inter, system-ui, sans-serif',
       }}
     >
       <div style={{ padding: 20, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>

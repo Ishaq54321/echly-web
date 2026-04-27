@@ -87,6 +87,8 @@ export type WorkspaceContextValue = {
   hintWorkspaceName: string | null;
   /** Workspace logo URL from local hint (available before Firestore fires). */
   hintWorkspaceLogoUrl: string | null;
+  /** Total member count for the active workspace. */
+  memberCount: number;
 };
 
 /** Throws if identity is not ready; use before destructive or workspace-scoped API calls. */
@@ -129,6 +131,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [workspaceDocLoading, setWorkspaceDocLoading] = useState(true);
   const [hintWorkspaceName, setHintWorkspaceName] = useState<string | null>(null);
   const [hintWorkspaceLogoUrl, setHintWorkspaceLogoUrl] = useState<string | null>(null);
+  const [memberCount, setMemberCount] = useState<number>(0);
 
   useEffect(() => {
     const hint = getUidHint();
@@ -327,6 +330,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, [claimsReady, authUid]);
 
+  // Fetch member count once when active workspace changes
+  useEffect(() => {
+    if (!activeWorkspaceId) return;
+    fetch("/api/workspace/members/all")
+      .then((res) => res.json())
+      .then((data: { totalMembers?: number }) => setMemberCount(data.totalMembers || 0))
+      .catch(() => setMemberCount(0));
+  }, [activeWorkspaceId]);
+
   // Subscribe to the workspace document for live name/logo/owner data
   useEffect(() => {
     setWorkspaceDocLoading(true);
@@ -469,6 +481,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       workspaceDocLoading,
       hintWorkspaceName,
       hintWorkspaceLogoUrl,
+      memberCount,
     }),
     [
       workspaceId,
@@ -492,6 +505,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       workspaceDocLoading,
       hintWorkspaceName,
       hintWorkspaceLogoUrl,
+      memberCount,
     ]
   );
 

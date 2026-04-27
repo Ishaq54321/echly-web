@@ -58,7 +58,7 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["Plus Jakarta Sans", "sans-serif"],
+        sans: ["DM Sans", "sans-serif"],
       },
       fontSize: {
         xs:   ["12px", { lineHeight: "1.4" }],

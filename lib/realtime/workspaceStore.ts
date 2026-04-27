@@ -8,6 +8,7 @@ import type { Workspace } from "@/lib/domain/workspace";
 export interface WorkspaceUsageRealtimeData {
   plan: string;
   sessionUsed: number;
+  feedbackCreatedThisMonth: number;
 }
 
 type WorkspaceStoreSnapshot = {
@@ -73,9 +74,16 @@ function resolveSessionUsed(data: DocumentData): number {
 }
 
 function mapWorkspaceUsage(data: DocumentData): WorkspaceUsageRealtimeData {
+  const rawThisMonth = data?.usage?.feedbackCreatedThisMonth;
+  const feedbackCreatedThisMonth =
+    typeof rawThisMonth === "number" && !Number.isNaN(rawThisMonth)
+      ? Math.max(0, rawThisMonth)
+      : 0;
+
   return {
     plan: resolvePlan(data),
     sessionUsed: resolveSessionUsed(data),
+    feedbackCreatedThisMonth,
   };
 }
 

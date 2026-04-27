@@ -4,18 +4,12 @@ import {
   requireAuth,
   toAuthorizationResponse,
 } from "@/lib/server/auth/authorize";
-import {
-  createSessionRepo,
-  getWorkspaceSessionCountRepo,
-} from "@/lib/repositories/sessionsRepository.server";
+import { createSessionRepo } from "@/lib/repositories/sessionsRepository.server";
 import {
   createActivityEvent,
   resolveActorForActivityEvent,
 } from "@/lib/repositories/activityEventsRepository.server";
-import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 import { WORKSPACE_SUSPENDED_MESSAGE } from "@/lib/server/assertWorkspaceActive";
-import { checkPlanLimit, type PlanLimitError } from "@/lib/billing/checkPlanLimit";
-import { planLimitReachedApiError } from "@/lib/billing/planLimitResponse";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { corsHeaders } from "@/lib/server/cors";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
@@ -197,25 +191,6 @@ export async function POST(req: NextRequest) {
 
   try {
     const workspaceId = await getUserWorkspaceIdRepo(user.uid);
-    const workspace = await getWorkspace(workspaceId);
-
-    if (workspace) {
-      const currentSessionCount = await getWorkspaceSessionCountRepo(workspaceId, workspace);
-      try {
-        await checkPlanLimit({
-          workspace,
-          metric: "maxSessions",
-          currentUsage: currentSessionCount,
-        });
-      } catch (limitErr) {
-        const planErr = limitErr as PlanLimitError;
-        if (planErr.code === "PLAN_LIMIT_REACHED") {
-          const errParams = planLimitReachedApiError(planErr);
-          return apiError({ ...errParams, init: { headers: corsHeaders(req) } });
-        }
-        throw limitErr;
-      }
-    }
 
     const id = await createSessionRepo(workspaceId, user.uid);
 

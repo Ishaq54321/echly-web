@@ -3,12 +3,19 @@
 import { useSyncExternalStore } from "react";
 
 export type BillingState = {
-  maxSessions: number | null;
   plan: string | null;
+  feedbackTicketsUsed: number;
+  feedbackTicketsLimit: number | null;
+  seats: number;
   isLoaded: boolean;
   isLoading: boolean;
   error: string | null;
-  setBilling: (data: { maxSessions: number | null; plan: string | null }) => void;
+  setBilling: (data: {
+    plan: string | null;
+    feedbackTicketsUsed: number;
+    feedbackTicketsLimit: number | null;
+    seats: number;
+  }) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: unknown) => void;
 };
@@ -16,8 +23,10 @@ export type BillingState = {
 type BillingStoreSnapshot = Omit<BillingState, "setBilling" | "setLoading" | "setError">;
 
 let snapshot: BillingStoreSnapshot = {
-  maxSessions: null,
   plan: null,
+  feedbackTicketsUsed: 0,
+  feedbackTicketsLimit: null,
+  seats: 1,
   isLoaded: false,
   isLoading: false,
   error: null,
@@ -43,10 +52,17 @@ function getSnapshot(): BillingStoreSnapshot {
   return snapshot;
 }
 
-function setBilling(data: { maxSessions: number | null; plan: string | null }) {
+function setBilling(data: {
+  plan: string | null;
+  feedbackTicketsUsed: number;
+  feedbackTicketsLimit: number | null;
+  seats: number;
+}) {
   setSnapshot({
-    maxSessions: data.maxSessions,
     plan: data.plan,
+    feedbackTicketsUsed: data.feedbackTicketsUsed,
+    feedbackTicketsLimit: data.feedbackTicketsLimit,
+    seats: data.seats,
     isLoaded: true,
     error: null,
   });
@@ -62,21 +78,13 @@ function setError(error: unknown) {
 }
 
 export const billingStore: BillingState = {
-  get maxSessions() {
-    return snapshot.maxSessions;
-  },
-  get plan() {
-    return snapshot.plan;
-  },
-  get isLoaded() {
-    return snapshot.isLoaded;
-  },
-  get isLoading() {
-    return snapshot.isLoading;
-  },
-  get error() {
-    return snapshot.error;
-  },
+  get plan() { return snapshot.plan; },
+  get feedbackTicketsUsed() { return snapshot.feedbackTicketsUsed; },
+  get feedbackTicketsLimit() { return snapshot.feedbackTicketsLimit; },
+  get seats() { return snapshot.seats; },
+  get isLoaded() { return snapshot.isLoaded; },
+  get isLoading() { return snapshot.isLoading; },
+  get error() { return snapshot.error; },
   setBilling,
   setLoading,
   setError,

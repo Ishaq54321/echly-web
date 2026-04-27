@@ -10,8 +10,8 @@ export interface MomentumBlockProps {
 
 const config = {
   up: { icon: TrendingUp, label: "Resolution velocity ↑", className: "text-[var(--text-secondary-soft)]" },
-  flat: { icon: Minus, label: "Resolution velocity →", className: "text-[var(--text-tertiary)]" },
-  down: { icon: TrendingDown, label: "Resolution velocity ↓", className: "text-[var(--text-tertiary)]" },
+  flat: { icon: Minus, label: "Resolution velocity →", className: "text-[var(--text-secondary)]" },
+  down: { icon: TrendingDown, label: "Resolution velocity ↓", className: "text-[var(--text-secondary)]" },
 };
 
 export function MomentumBlock({ resolutionVelocity }: MomentumBlockProps) {

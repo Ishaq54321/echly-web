@@ -19,6 +19,10 @@ import {
   toAuthorizationResponse,
 } from "@/lib/server/auth/authorize";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
+import { checkFeedbackTicketLimit } from "@/lib/billing/checkPlanLimit";
+import type { PlanLimitError } from "@/lib/billing/checkPlanLimit";
+import { getWorkspace, incrementFeedbackCreatedThisMonthRepo } from "@/lib/repositories/workspacesRepository.server";
+import { planLimitReachedApiError } from "@/lib/billing/planLimitResponse";
 
 /** POST /api/feedback — create feedback (ticket) for a session. Returns same shape as GET /api/tickets/:id. */
 export async function POST(req: NextRequest) {
@@ -253,6 +257,23 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  // Check monthly feedback ticket limit before creating
+  if (sessionWorkspaceId) {
+    const workspace = await getWorkspace(sessionWorkspaceId);
+    if (workspace) {
+      try {
+        await checkFeedbackTicketLimit(workspace);
+      } catch (limitErr) {
+        const planErr = limitErr as PlanLimitError;
+        if (planErr.code === "PLAN_LIMIT_REACHED") {
+          const errParams = planLimitReachedApiError(planErr);
+          return apiError({ ...errParams, init: { headers: corsHeaders(req) } });
+        }
+        throw limitErr;
+      }
+    }
+  }
+
   const structuredData = {
     title,
     instruction:
@@ -298,6 +319,12 @@ export async function POST(req: NextRequest) {
         data: structuredData,
         createdAt: result.createdAt!,
       });
+      // Increment monthly ticket counter (best-effort; does not fail the request)
+      if (sessionWorkspaceId) {
+        incrementFeedbackCreatedThisMonthRepo(sessionWorkspaceId).catch((e) =>
+          console.error("Failed to increment feedbackCreatedThisMonth:", e)
+        );
+      }
     } else {
       const existing = result.existingFeedback;
       if (!existing) {

@@ -38,7 +38,7 @@ export function CommandCenterHeader({
             role="tab"
             aria-selected={viewMode === "all"}
             onClick={() => onViewModeChange("all")}
-            className={`h-8 px-3.5 rounded-md text-[14px] font-medium transition-colors duration-150 ease-out ${
+            className={`h-[38px] px-4 rounded-[var(--radius-btn)] text-[14px] font-medium transition-colors duration-150 ease-out ${
               viewMode === "all"
                 ? "bg-[var(--layer-2-hover-bg)] text-[var(--text-primary-strong)]"
                 : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary-soft)]"
@@ -51,7 +51,7 @@ export function CommandCenterHeader({
             role="tab"
             aria-selected={viewMode === "archived"}
             onClick={() => onViewModeChange("archived")}
-            className={`h-8 px-3.5 rounded-md text-[14px] font-medium transition-colors duration-150 ease-out ${
+            className={`h-[38px] px-4 rounded-[var(--radius-btn)] text-[14px] font-medium transition-colors duration-150 ease-out ${
               viewMode === "archived"
                 ? "bg-[var(--layer-2-hover-bg)] text-[var(--text-primary-strong)]"
                 : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary-soft)]"
@@ -64,7 +64,7 @@ export function CommandCenterHeader({
           variant="primary"
           type="button"
           onClick={onNewSession}
-          className="h-9 rounded-lg text-[14px] px-4 font-semibold"
+          className="h-[38px] rounded-[var(--radius-btn)] text-[14px] px-4 font-semibold"
         >
           New Session
         </Button>

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, Fragment } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -21,7 +21,6 @@ import {
   Info,
   Eye,
   EyeOff,
-  CheckCircle,
   Gem,
 } from "lucide-react";
 import { ImageCropModal } from "@/components/ui/ImageCropModal";
@@ -54,8 +53,8 @@ const SECTION_TITLE = "text-lg font-semibold text-[var(--text-heading)]"; /* H2:
 const SECTION_SUBTITLE = "text-[16px] font-semibold text-[var(--text-heading)]"; /* H3 setting labels: 600 for hierarchy */
 const SECTION_DESC = "text-[14px] text-[var(--text-secondary)] mt-1"; /* body, darker grey */
 const SETTING_DESC = "text-[14px] text-[var(--text-secondary)] mt-0.5";
-const BTN_PRIMARY = "rounded-[var(--radius-sm)] px-4 py-2.5 text-sm font-semibold bg-[var(--brand)] text-white hover:bg-[var(--brand-hover)] hover:shadow-[0_2px_8px_rgba(23,117,224,0.35)] transition-all duration-200";
-const BTN_SECONDARY = "rounded-[var(--radius-sm)] px-4 py-2.5 text-sm font-semibold bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--text-heading)] hover:bg-[var(--surface-hover)] hover:shadow-[0_1px_4px_rgba(0,0,0,0.06)] transition-all duration-200";
+const BTN_PRIMARY = "inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--text-heading)] text-white text-[14px] font-medium hover:opacity-85 transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
+const BTN_SECONDARY = "inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[14px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
 
 function SectionHeader({
   title,
@@ -167,7 +166,7 @@ function SettingsPageInner() {
                 onClick={() => setActiveTab(id)}
                 className={`
                   relative pb-3 text-sm transition-colors duration-200
-                  ${isActive ? "text-[var(--brand)] font-bold" : "font-medium text-[var(--text-meta)] hover:text-neutral-700"}
+                  ${isActive ? "text-[var(--text-heading)] font-semibold" : "font-medium text-[var(--text-secondary)] hover:text-[var(--text-heading)]"}
                 `}
                 aria-current={isActive ? "true" : undefined}
               >
@@ -748,7 +747,7 @@ function ChangeEmailModal({ onClose }: { onClose: () => void }) {
         <div style={{ padding: "24px 28px" }}>
           {success ? (
             <div style={{ textAlign: "center", padding: "12px 0 8px" }}>
-              <CheckCircle size={32} color="var(--color-success-solid)" style={{ margin: "0 auto 12px" }} />
+              <Check size={32} color="var(--color-success-solid)" style={{ margin: "0 auto 12px" }} />
               <p style={{ fontSize: 17, fontWeight: 600, color: "#111", margin: "0 0 8px" }}>Confirmation email sent!</p>
               <p style={{ fontSize: 14, color: "#777", margin: 0 }}>Check {newEmail} for a confirmation link.</p>
             </div>
@@ -2237,7 +2236,7 @@ function SecurityTab() {
             title="Active Sessions"
             description="Devices where you're currently signed in."
           />
-          <Button variant="ghost" className="text-sm font-semibold text-[var(--brand)] hover:underline shrink-0 rounded-lg px-4 py-2.5">
+          <Button variant="ghost" className="text-[14px] font-medium text-[var(--brand)] hover:underline shrink-0">
             Log out of all other sessions
           </Button>
         </div>
@@ -2290,7 +2289,7 @@ function SecurityTab() {
                 <button
                   type="button"
                   onClick={openTransferModal}
-                  className="rounded-[var(--radius-sm)] px-4 py-2.5 text-sm font-semibold shrink-0 bg-[var(--color-warning-bg)] text-[var(--color-warning-text)] border border-[var(--color-warning-border)] hover:bg-[var(--color-warning-bg)] transition-all duration-200"
+                  className="rounded-[var(--radius-btn)] px-4 py-2.5 text-sm font-semibold shrink-0 bg-[var(--color-warning-bg)] text-[var(--color-warning-text)] border border-[var(--color-warning-border)] hover:bg-[var(--color-warning-bg)] transition-all duration-200"
                 >
                   Transfer
                 </button>
@@ -2304,7 +2303,7 @@ function SecurityTab() {
                 </div>
                 <button
                   type="button"
-                  className="rounded-[var(--radius-sm)] px-4 py-2.5 text-sm font-semibold shrink-0 bg-[var(--color-danger)] text-white hover:opacity-95 hover:shadow-[0_2px_8px_rgba(229,72,77,0.35)] transition-all duration-200"
+                  className="rounded-[var(--radius-btn)] px-4 py-2.5 text-sm font-semibold shrink-0 bg-[var(--color-danger)] text-white hover:opacity-95 hover:shadow-[0_2px_8px_rgba(229,72,77,0.35)] transition-all duration-200"
                   onClick={() => { setDeleteConfirmName(""); setDeleteError(null); setDeleteModalOpen(true); }}
                 >
                   Delete Workspace
@@ -2383,14 +2382,14 @@ function SecurityTab() {
                 <button
                   type="button"
                   onClick={() => setTransferModalOpen(false)}
-                  className="px-4 py-2.5 text-sm font-medium rounded-xl text-neutral-700 hover:bg-[var(--surface-hover)] transition"
+                  className={BTN_SECONDARY}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={transferSubmitting || transferMembers.length === 0}
-                  className="px-4 py-2.5 text-sm font-semibold rounded-xl bg-[var(--brand)] text-white hover:bg-[var(--brand-hover)] transition disabled:opacity-50"
+                  className={BTN_PRIMARY}
                 >
                   {transferSubmitting ? "Transferring…" : "Transfer Ownership"}
                 </button>
@@ -2442,14 +2441,14 @@ function SecurityTab() {
                 <button
                   type="button"
                   onClick={() => setDeleteModalOpen(false)}
-                  className="px-4 py-2.5 text-sm font-medium rounded-xl text-neutral-700 hover:bg-[var(--surface-hover)] transition"
+                  className={BTN_SECONDARY}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={deleteSubmitting || deleteConfirmName !== workspaceName}
-                  className={`px-4 py-2.5 text-sm font-semibold rounded-xl transition disabled:cursor-not-allowed ${
+                  className={`inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none text-[14px] font-medium transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none ${
                     deleteConfirmName === workspaceName
                       ? "bg-[var(--color-danger)] text-white hover:opacity-95"
                       : "bg-[var(--surface-hover)] text-neutral-400 disabled:opacity-100"
@@ -2521,60 +2520,54 @@ function IntegrationsTab({ onNavigateToBilling }: { onNavigateToBilling: () => v
   );
 }
 
-/* ——— Billing tab: full SaaS pricing, backed by /api/plans/catalog ——— */
+/* ——— Billing tab: SaaS pricing, backed by /api/plans/catalog ——— */
 const BILLING_CONTAINER = "w-full";
 const BRAND_BLUE = "#1775E0";
 
 type CatalogPlan = {
-  id: "free" | "starter" | "business" | "enterprise";
+  id: "starter" | "business" | "enterprise";
   name: string;
-  priceMonthly: number;
-  priceYearly: number;
-  maxSessions: number | null;
+  pricePerSeat: number | null;
+  annualPricePerSeat: number | null;
+  maxFeedbackPerMonth: number | null;
   maxMembers: number | null;
   insightsEnabled: boolean;
+  customBranding: boolean;
+  prioritySupport: boolean;
+  displayLimits: { sessions: string; members: string; feedbackTickets: string };
 };
 
 type DisplayPlan = {
   id: CatalogPlan["id"];
   title: string;
-  monthlyPrice: number | null;
+  pricePerSeat: number | null;
   features: string[];
   cta: string;
   highlight: boolean;
   badge: string | null;
 };
 
-const PLAN_DISPLAY_META: Record<CatalogPlan["id"], Omit<DisplayPlan, "id" | "monthlyPrice">> = {
-  free: {
-    title: "Free",
-    features: [
-      "Basic collaboration",
-      "Manual action steps",
-      "Limited AI summaries",
-    ],
-    cta: "Start Free",
-    highlight: false,
-    badge: null,
-  },
+const PLAN_DISPLAY_META: Record<CatalogPlan["id"], Omit<DisplayPlan, "id" | "pricePerSeat">> = {
   starter: {
     title: "Starter",
     features: [
+      "50 feedback tickets / month",
       "AI action steps",
-      "Team collaboration",
-      "Basic integrations",
+      "Basic collaboration",
     ],
-    cta: "Upgrade",
+    cta: "Current Plan",
     highlight: false,
     badge: null,
   },
   business: {
     title: "Business",
     features: [
+      "Unlimited feedback tickets",
+      "Unlimited sessions",
+      "Unlimited members",
+      "Custom branding",
       "Advanced AI insights",
       "Full integrations",
-      "Team workspace",
-      "Priority support",
     ],
     cta: "Upgrade to Business",
     highlight: true,
@@ -2583,9 +2576,10 @@ const PLAN_DISPLAY_META: Record<CatalogPlan["id"], Omit<DisplayPlan, "id" | "mon
   enterprise: {
     title: "Enterprise",
     features: [
+      "Everything in Business",
+      "Priority support",
       "SSO",
       "Audit logs",
-      "Advanced security",
       "Custom integrations",
     ],
     cta: "Contact Sales",
@@ -2598,7 +2592,6 @@ const COMPARISON_SECTIONS: {
   section: string;
   rows: {
     feature: string;
-    free: boolean | string;
     starter: boolean | string;
     business: boolean | string;
     enterprise: boolean | string;
@@ -2607,48 +2600,41 @@ const COMPARISON_SECTIONS: {
   {
     section: "FEEDBACK CAPTURE",
     rows: [
-      { feature: "Feedback sessions", free: "", starter: "", business: "", enterprise: "" },
-      { feature: "Feedback widget", free: true, starter: true, business: true, enterprise: true },
-      { feature: "Session management", free: true, starter: true, business: true, enterprise: true },
+      { feature: "Feedback tickets / month", starter: "50 / month", business: "Unlimited", enterprise: "Unlimited" },
+      { feature: "Feedback sessions", starter: "Unlimited", business: "Unlimited", enterprise: "Unlimited" },
+      { feature: "Feedback widget", starter: true, business: true, enterprise: true },
     ],
   },
   {
     section: "AI ASSISTANCE",
     rows: [
-      { feature: "AI summaries", free: "Limited", starter: true, business: true, enterprise: true },
-      { feature: "AI action steps", free: false, starter: true, business: true, enterprise: true },
-      { feature: "Advanced AI insights", free: false, starter: false, business: true, enterprise: true },
+      { feature: "AI summaries", starter: true, business: true, enterprise: true },
+      { feature: "AI action steps", starter: true, business: true, enterprise: true },
+      { feature: "Advanced AI insights", starter: false, business: true, enterprise: true },
     ],
   },
   {
-    section: "COLLABORATION",
+    section: "TEAM & WORKSPACE",
     rows: [
-      { feature: "Basic collaboration", free: true, starter: true, business: true, enterprise: true },
-      { feature: "Team collaboration", free: false, starter: true, business: true, enterprise: true },
-      { feature: "Team workspace", free: false, starter: false, business: true, enterprise: true },
+      { feature: "Members", starter: "Limited (5)", business: "Unlimited", enterprise: "Unlimited" },
+      { feature: "Custom branding", starter: false, business: true, enterprise: true },
+      { feature: "Full integrations", starter: false, business: true, enterprise: true },
     ],
   },
   {
-    section: "INTEGRATIONS",
+    section: "SUPPORT & SECURITY",
     rows: [
-      { feature: "Basic integrations", free: false, starter: true, business: true, enterprise: true },
-      { feature: "Full integrations", free: false, starter: false, business: true, enterprise: true },
-      { feature: "Custom integrations", free: false, starter: false, business: false, enterprise: true },
-    ],
-  },
-  {
-    section: "SECURITY",
-    rows: [
-      { feature: "SSO", free: false, starter: false, business: false, enterprise: true },
-      { feature: "Audit logs", free: false, starter: false, business: false, enterprise: true },
-      { feature: "Advanced security", free: false, starter: false, business: false, enterprise: true },
+      { feature: "Priority support", starter: false, business: false, enterprise: true },
+      { feature: "SSO", starter: false, business: false, enterprise: true },
+      { feature: "Audit logs", starter: false, business: false, enterprise: true },
     ],
   },
 ];
 
 const FAQ_ITEMS: { q: string; a: string }[] = [
   { q: "Can I cancel anytime?", a: "Yes. You can upgrade or cancel your plan at any time." },
-  { q: "What counts as a feedback session?", a: "A feedback session is created whenever someone submits feedback using the widget." },
+  { q: "What counts as a feedback ticket?", a: "A feedback ticket is an individual piece of feedback submitted through the widget. Each submission counts as one ticket." },
+  { q: "When do my tickets reset?", a: "Ticket counts reset on the 1st of every calendar month." },
   { q: "Do you offer agency discounts?", a: "Yes. Contact sales for agency pricing." },
 ];
 
@@ -2679,64 +2665,62 @@ function BillingTab() {
 
   const displayPlans = useMemo(() => {
     if (!plans || plans.length === 0) return [];
-    const byId = plans.reduce<Record<CatalogPlan["id"], CatalogPlan>>((acc, p) => {
-      acc[p.id] = p;
-      return acc;
-    }, {} as Record<CatalogPlan["id"], CatalogPlan>);
     const result: (DisplayPlan & {
       priceAmount: string;
       priceSuffix: string;
       priceSubLabel: string | null;
     })[] = [];
     for (const plan of plans) {
-      const meta = PLAN_DISPLAY_META[plan.id];
-      const isEnterprise = plan.id === "enterprise";
-      const monthlyPrice = isEnterprise ? null : plan.priceMonthly;
-      const yearlyPrice = isEnterprise ? null : plan.priceYearly;
+      const meta = PLAN_DISPLAY_META[plan.id as CatalogPlan["id"]];
+      if (!meta) continue;
+      const isAnnual = billingPeriod === "annual";
+      const perSeat = isAnnual ? (plan.annualPricePerSeat ?? plan.pricePerSeat) : plan.pricePerSeat;
 
-      const limitFeatures: string[] = [];
-      const sessionsLabel =
-        plan.maxSessions == null
-          ? "Unlimited feedback sessions"
-          : `${plan.maxSessions} feedback sessions`;
-      limitFeatures.push(sessionsLabel);
-
-      const features = [...limitFeatures, ...meta.features];
-
-      if (monthlyPrice == null) {
+      if (plan.id === "enterprise" || perSeat === null) {
         result.push({
-          id: plan.id,
+          id: plan.id as CatalogPlan["id"],
           title: plan.name || meta.title,
-          monthlyPrice: null,
-          features,
+          pricePerSeat: null,
+          features: meta.features,
           cta: meta.cta,
           highlight: meta.highlight,
           badge: meta.badge,
           priceAmount: "Custom",
+          priceSuffix: "",
+          priceSubLabel: "Contact us for pricing",
+        });
+        continue;
+      }
+
+      if (perSeat === 0) {
+        result.push({
+          id: plan.id as CatalogPlan["id"],
+          title: plan.name || meta.title,
+          pricePerSeat: 0,
+          features: meta.features,
+          cta: meta.cta,
+          highlight: meta.highlight,
+          badge: meta.badge,
+          priceAmount: "Free",
           priceSuffix: "",
           priceSubLabel: null,
         });
         continue;
       }
 
-      const isAnnual = billingPeriod === "annual";
-      // Annual pricing from Firestore only: use plan.priceYearly. No derivation from monthly.
-      const amount =
-        isAnnual && yearlyPrice != null
-          ? plan.priceYearly * teamSizeNumber
-          : plan.priceMonthly * teamSizeNumber;
-      const suffix = isAnnual && yearlyPrice != null ? "/ year" : "/ month";
-      const subLabel = isAnnual && yearlyPrice != null ? "Billed annually" : null;
+      const total = perSeat * teamSizeNumber;
+      const suffix = isAnnual ? "/ seat / year" : "/ seat / month";
+      const subLabel = isAnnual ? `$${(perSeat * 12).toFixed(0)}/seat/yr billed annually` : null;
 
       result.push({
-        id: plan.id,
+        id: plan.id as CatalogPlan["id"],
         title: plan.name || meta.title,
-        monthlyPrice: plan.priceMonthly,
-        features,
+        pricePerSeat: perSeat,
+        features: meta.features,
         cta: meta.cta,
         highlight: meta.highlight,
         badge: meta.badge,
-        priceAmount: `$${amount.toFixed(0)}`,
+        priceAmount: `$${perSeat % 1 === 0 ? perSeat.toFixed(0) : perSeat.toFixed(2)}`,
         priceSuffix: suffix,
         priceSubLabel: subLabel,
       });
@@ -2780,7 +2764,7 @@ function BillingTab() {
       <div className="billing-container flex flex-wrap items-center justify-center gap-8" style={{ marginBottom: 32 }}>
         <div className="flex items-center gap-2">
           <label htmlFor="team-size" className="text-[15px] font-medium text-neutral-700">
-            Team size:
+            Seats:
           </label>
           <input
             id="team-size"
@@ -2791,7 +2775,7 @@ function BillingTab() {
           />
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-[15px] font-medium text-neutral-700">Bill me:</span>
+          <span className="text-[15px] font-medium text-neutral-700">Billing:</span>
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -2811,13 +2795,15 @@ function BillingTab() {
                 onChange={() => setBillingPeriod("annual")}
                 className="w-4 h-4 text-[var(--brand)] focus:ring-[var(--brand)]"
               />
-              <span className="text-[15px] font-medium text-[var(--text-heading)]">Annually</span>
+              <span className="text-[15px] font-medium text-[var(--text-heading)]">
+                Annually <span className="text-xs text-[var(--brand)] font-semibold">Save 20%</span>
+              </span>
             </label>
           </div>
         </div>
       </div>
 
-      {/* Pricing cards — equal width, 24px gap */}
+      {/* Pricing cards */}
       <div className="billing-container">
         <section className="billing-pricing-grid mb-[72px] items-stretch">
           {displayPlans.map((plan) => (
@@ -2857,16 +2843,16 @@ function BillingTab() {
                   variant={plan.highlight ? "primary" : "secondary"}
                   className={
                     plan.highlight
-                      ? "w-full rounded-[var(--radius-sm)] px-4 py-2.5 text-sm font-semibold bg-[var(--brand)] text-white hover:brightness-110 border border-transparent"
+                      ? "w-full rounded-[var(--radius-btn)] px-4 py-2.5 text-sm font-semibold bg-[var(--brand)] text-white hover:brightness-110 border border-transparent"
                       : "secondary-cta w-full text-sm"
                   }
                   onClick={() => {
-                    const cycle = billingPeriod === "annual" ? "annual" : "monthly";
                     if (plan.id === "enterprise") {
-                      router.push(`/settings?tab=billing&plan=enterprise&cycle=${cycle}`);
+                      router.push(`/settings?tab=billing&plan=enterprise`);
                       return;
                     }
-                    router.push(`/settings?tab=billing&plan=${plan.id}&cycle=${cycle}`);
+                    if (plan.id === "starter") return; // already on starter
+                    router.push(`/settings?tab=billing&plan=${plan.id}&cycle=${billingPeriod}`);
                   }}
                 >
                   {plan.cta}
@@ -2878,22 +2864,21 @@ function BillingTab() {
 
         {/* Feature comparison table */}
         <section className="mb-[72px] overflow-x-auto">
-          <div className="rounded-[var(--radius-lg)] border overflow-hidden min-w-[640px]" style={{ borderColor: "rgba(0,0,0,0.08)" }}>
+          <div className="rounded-[var(--radius-lg)] border overflow-hidden min-w-[560px]" style={{ borderColor: "rgba(0,0,0,0.08)" }}>
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b bg-[var(--surface-subtle)]/80" style={{ borderColor: "rgba(0,0,0,0.05)" }}>
                   <th className="py-3 px-4 text-[15px] font-semibold text-[var(--text-heading)]">Feature</th>
-                  <th className="py-3 px-4 text-[15px] font-semibold text-[var(--text-heading)]">Free</th>
-                  <th className="py-3 px-4 text-[15px] font-semibold text-[var(--text-heading)]">Starter</th>
-                  <th className="py-3 px-4 text-[15px] font-semibold text-[var(--text-heading)]">Business</th>
-                  <th className="py-3 px-4 text-[15px] font-semibold text-[var(--text-heading)]">Enterprise</th>
+                  <th className="py-3 px-4 text-[15px] font-semibold text-[var(--text-heading)]">Starter (Free)</th>
+                  <th className="py-3 px-4 text-[15px] font-semibold text-[var(--text-heading)]">Business ($39/seat/mo)</th>
+                  <th className="py-3 px-4 text-[15px] font-semibold text-[var(--text-heading)]">Enterprise (Custom)</th>
                 </tr>
               </thead>
               <tbody>
                 {COMPARISON_SECTIONS.map(({ section, rows }) => (
                   <Fragment key={section}>
                     <tr className="bg-[#F8FAFC]">
-                      <td colSpan={5} className="py-2.5 px-4 text-[14px] font-semibold tracking-[0.04em] text-neutral-700">
+                      <td colSpan={4} className="py-2.5 px-4 text-[14px] font-semibold tracking-[0.04em] text-neutral-700">
                         {section}
                       </td>
                     </tr>
@@ -2903,47 +2888,24 @@ function BillingTab() {
                         className={rowIdx % 2 === 1 ? "bg-[#FBFBFB]" : ""}
                         style={{ borderBottom: "1px solid rgba(0,0,0,0.05)" }}
                       >
-                        <td className="py-3 px-4 text-[15px] text-neutral-700">
-                          {row.feature}
-                        </td>
-                        {(["free", "starter", "business", "enterprise"] as const).map(
-                          (col) => {
-                            let v = row[col];
-                            const plan = plans?.find((p) => p.id === col) ?? null;
-
-                            if (row.feature === "Feedback sessions" && plan) {
-                              v =
-                                plan.maxSessions == null
-                                  ? "Unlimited"
-                                  : String(plan.maxSessions);
-                            }
-
-                            if (row.feature === "Advanced AI insights" && plan) {
-                              v = !!plan.insightsEnabled;
-                            }
-
-                            return (
-                              <td
-                                key={col}
-                                className="py-3 px-4 text-[15px] text-[var(--text-secondary)] align-middle"
-                              >
-                                {v === true ? (
-                                  <span className="inline-flex items-center">
-                                    <CheckMarkIcon />
-                                  </span>
-                                ) : v === false ? (
-                                  <Minus
-                                    className="w-5 h-5 text-neutral-300 inline"
-                                    strokeWidth={2}
-                                    aria-hidden
-                                  />
-                                ) : (
-                                  <span>{v}</span>
-                                )}
-                              </td>
-                            );
-                          }
-                        )}
+                        <td className="py-3 px-4 text-[15px] text-neutral-700">{row.feature}</td>
+                        {(["starter", "business", "enterprise"] as const).map((col) => {
+                          const v = row[col];
+                          return (
+                            <td
+                              key={col}
+                              className="py-3 px-4 text-[15px] text-[var(--text-secondary)] align-middle"
+                            >
+                              {v === true ? (
+                                <span className="inline-flex items-center"><CheckMarkIcon /></span>
+                              ) : v === false ? (
+                                <Minus className="w-5 h-5 text-neutral-300 inline" strokeWidth={2} aria-hidden />
+                              ) : (
+                                <span>{v}</span>
+                              )}
+                            </td>
+                          );
+                        })}
                       </tr>
                     ))}
                   </Fragment>
@@ -2962,10 +2924,7 @@ function BillingTab() {
             {FAQ_ITEMS.map(({ q, a }, index) => {
               const isOpen = faqOpenIndex === index;
               return (
-                <div
-                  key={q}
-                  className="bg-[var(--brand-subtle)] rounded-[var(--radius-lg)] p-5 mb-4"
-                >
+                <div key={q} className="bg-[var(--brand-subtle)] rounded-[var(--radius-lg)] p-5 mb-4">
                   <button
                     type="button"
                     onClick={() => setFaqOpenIndex(isOpen ? null : index)}
@@ -2980,15 +2939,9 @@ function BillingTab() {
                   </button>
                   <div
                     className="overflow-hidden transition-all duration-200 ease"
-                    style={{
-                      maxHeight: isOpen ? 300 : 0,
-                      opacity: isOpen ? 1 : 0,
-                      marginTop: isOpen ? 12 : 0,
-                    }}
+                    style={{ maxHeight: isOpen ? 300 : 0, opacity: isOpen ? 1 : 0, marginTop: isOpen ? 12 : 0 }}
                   >
-                    <p className="text-[16px] text-[var(--text-body)]" style={{ lineHeight: 1.6 }}>
-                      {a}
-                    </p>
+                    <p className="text-[16px] text-[var(--text-body)]" style={{ lineHeight: 1.6 }}>{a}</p>
                   </div>
                 </div>
               );

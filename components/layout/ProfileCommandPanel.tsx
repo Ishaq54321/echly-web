@@ -74,7 +74,7 @@ export function ProfileCommandPanel({
       workspaceId != null &&
       workspaceId.trim() !== "",
   });
-  const { maxSessions, plan: cachedPlan, isLoaded: isBillingLoaded } = useBillingStore();
+  const { feedbackTicketsUsed, feedbackTicketsLimit, plan: cachedPlan, isLoaded: isBillingLoaded } = useBillingStore();
 
   useEffect(() => {
     if (!open || !anchorRef?.current) {
@@ -154,11 +154,10 @@ export function ProfileCommandPanel({
     user?.displayName?.trim() || user?.email?.split("@")[0] || "User";
   const workspaceName = "Workspace";
   const metaText = `Admin • ${workspaceName}`;
-  const sessionUsed = workspaceUsage?.sessionUsed ?? 0;
-  const displayPlan = cachedPlan ?? workspaceUsage?.plan ?? "free";
-  const sessionsText = !isBillingLoaded
-    ? "— / — sessions used"
-    : `${sessionUsed} / ${maxSessions === null ? "Unlimited" : maxSessions} sessions used`;
+  const displayPlan = cachedPlan ?? workspaceUsage?.plan ?? "starter";
+  const ticketsText = !isBillingLoaded
+    ? "— / — tickets used"
+    : `${feedbackTicketsUsed} / ${feedbackTicketsLimit === null ? "Unlimited" : feedbackTicketsLimit} tickets this month`;
 
   const lifetimeIssuesCaptured = Math.max(
     0,
@@ -445,7 +444,7 @@ export function ProfileCommandPanel({
                   {displayPlan.charAt(0).toUpperCase() + displayPlan.slice(1)}
                 </p>
                 <p className="font-semibold text-[14px] text-neutral-700 mt-0 mb-0.5">
-                  {sessionsText}
+                  {ticketsText}
                 </p>
                 <Link
                   href="/settings?tab=billing"

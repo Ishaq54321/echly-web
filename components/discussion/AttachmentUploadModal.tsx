@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { X, Upload, FileIcon } from "lucide-react";
@@ -329,7 +329,7 @@ export function AttachmentUploadModal({
               <button
                 type="button"
                 onClick={handleClose}
-                className="px-4 py-2.5 rounded-lg text-sm font-medium text-neutral-700 bg-[var(--surface-hover)] hover:bg-[var(--surface-hover)] transition-colors"
+                className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[14px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all cursor-pointer"
               >
                 Cancel
               </button>
@@ -337,7 +337,7 @@ export function AttachmentUploadModal({
                 type="button"
                 onClick={handleSend}
                 disabled={uploading || !uploadedAttachment}
-                className="px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
               >
                 Attach
               </button>

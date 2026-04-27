@@ -11,7 +11,7 @@ export interface ExecutionMomentumBlockProps {
 function Trend({ direction }: { direction: "up" | "flat" | "down" }) {
   const config = {
     up: { icon: TrendingUp, label: "Up", className: "text-[var(--color-success)]" },
-    flat: { icon: Minus, label: "Flat", className: "text-[var(--text-tertiary)]" },
+    flat: { icon: Minus, label: "Flat", className: "text-[var(--text-secondary)]" },
     down: { icon: TrendingDown, label: "Down", className: "text-[var(--color-warning)]" },
   };
   const { icon: Icon, label, className } = config[direction];
