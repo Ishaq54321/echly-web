@@ -77,11 +77,11 @@ function ErrorState() {
           height: "38px",
           padding: "0 20px",
           background: "#FFFFFF",
-          border: "1.5px solid #E0E0E0",
+          border: "1.5px solid var(--border)",
           borderRadius: "10px",
           fontSize: "14px",
           fontWeight: "500",
-          color: "#333333",
+          color: "var(--text-body)",
           cursor: "pointer",
           display: "inline-flex",
           alignItems: "center",
@@ -90,12 +90,12 @@ function ErrorState() {
           transition: "all 140ms ease",
         }}
         onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.borderColor = "#BBBBBB";
+          (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--text-placeholder)";
           (e.currentTarget as HTMLButtonElement).style.boxShadow =
             "0 2px 8px rgba(0,0,0,0.10)";
         }}
         onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.borderColor = "#E0E0E0";
+          (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)";
           (e.currentTarget as HTMLButtonElement).style.boxShadow =
             "0 1px 3px rgba(0,0,0,0.06)";
         }}
@@ -133,7 +133,7 @@ function EmptyState() {
           marginBottom: "20px",
         }}
       >
-        <Inbox size={28} color="#AAAAAA" />
+        <Inbox size={28} color="var(--text-tertiary)" />
       </div>
 
       <h2
@@ -269,7 +269,7 @@ function SessionRow({
                 width: "3px",
                 height: "3px",
                 borderRadius: "50%",
-                background: "#D1D5DB",
+                background: "var(--border-strong)",
                 flexShrink: 0,
               }}
             />
@@ -289,7 +289,7 @@ function SessionRow({
                 whiteSpace: "nowrap",
               }}
             >
-              <Building2 size={15} color="#444444" />
+              <Building2 size={15} color="var(--text-body)" />
               {workspaceLabel}
             </span>
           </div>
@@ -387,7 +387,7 @@ export default function SharedPage() {
         }
         .skeleton-pulse {
           animation: shimmer 1.6s ease-in-out infinite;
-          background: #F0F0F0;
+          background: var(--surface-hover);
           border-radius: 6px;
         }
       `}</style>

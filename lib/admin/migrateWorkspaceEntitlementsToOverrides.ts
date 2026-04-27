@@ -56,7 +56,7 @@ export async function migrateWorkspaceEntitlementsToOverrides(dryRun: boolean): 
     }
     if (
       entitlements?.insightsAccess !== undefined &&
-      entitlements.insightsAccess === entry.insightsEnabled
+      entitlements.insightsAccess === entry.insightsAccess
     ) {
       toRemove.push("insightsAccess");
     }

@@ -55,7 +55,7 @@ export function SessionsTimeRangeFilter({
                 className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--surface-hover)] ${
                   value === id
                     ? "font-semibold text-[var(--text-heading)]"
-                    : "font-medium text-neutral-700"
+                    : "font-medium text-[var(--text-body)]"
                 }`}
                 onClick={() => {
                   onChange(id);

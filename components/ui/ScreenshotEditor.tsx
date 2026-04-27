@@ -158,10 +158,10 @@ export function ScreenshotEditor({
       ? rawStoredTool as Tool
       : "pen"
   );
-  const [color, setColor] = useState(savedPrefs.color ?? "#EF4444");
+  const [color, setColor] = useState(savedPrefs.color ?? "var(--color-danger)");
   const [strokeWidth, setStrokeWidth] = useState(savedPrefs.strokeWidth ?? 3);
   const [fillColor, setFillColor] = useState(savedPrefs.fillColor ?? "transparent");
-  const [outlineColor, setOutlineColor] = useState(savedPrefs.outlineColor ?? "#EF4444");
+  const [outlineColor, setOutlineColor] = useState(savedPrefs.outlineColor ?? "var(--color-danger)");
   const [fillOpacity, setFillOpacity] = useState<number>(savedPrefs.fillOpacity ?? 1);
   const [outlineWidth, setOutlineWidth] = useState<number>(savedPrefs.outlineWidth ?? 2);
 

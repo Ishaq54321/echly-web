@@ -73,7 +73,7 @@ export function RequestSessionAccessPage({
     <div
       style={{
         minHeight: "100dvh",
-        background: "#F7F8FA",
+        background: "var(--surface-subtle)",
       }}
     >
       {isPublicRoute !== false && <PublicSessionNav />}
@@ -92,7 +92,7 @@ export function RequestSessionAccessPage({
         <div
           style={{
             background: "#FFFFFF",
-            border: "1px solid #E5E5E5",
+            border: "1px solid var(--border)",
             borderRadius: 24,
             boxShadow:
               "0 8px 40px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04)",
@@ -137,7 +137,7 @@ export function RequestSessionAccessPage({
             style={{
               fontSize: 22,
               fontWeight: 700,
-              color: "#111111",
+              color: "var(--text-heading)",
               letterSpacing: "-0.3px",
               marginBottom: 8,
               marginTop: 0,
@@ -150,7 +150,7 @@ export function RequestSessionAccessPage({
           <p
             style={{
               fontSize: 15,
-              color: "#777777",
+              color: "var(--text-secondary)",
               lineHeight: 1.6,
               maxWidth: 320,
               margin: "0 auto 24px",
@@ -218,7 +218,7 @@ export function RequestSessionAccessPage({
                 width: "100%",
                 height: 44,
                 background: "transparent",
-                color: "#555555",
+                color: "var(--text-secondary)",
                 borderRadius: 10,
                 fontSize: 14,
                 fontWeight: 500,

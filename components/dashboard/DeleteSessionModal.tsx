@@ -63,10 +63,10 @@ export function DeleteSessionModal({
               <ShieldAlert className="h-10 w-10 text-[var(--color-warning)]" />
             </div>
             <div className="flex flex-col gap-1.5">
-              <h3 className="text-[17px] font-semibold text-foreground">
+              <h3 className="text-[17px] font-semibold text-[var(--text-heading)]">
                 Permission required
               </h3>
-              <p className="text-[14px] text-muted-foreground leading-relaxed max-w-[300px]">
+              <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed max-w-[300px]">
                 Only the session creator or workspace owner can delete a session. Contact your workspace owner to remove it.
               </p>
             </div>

@@ -74,7 +74,7 @@ export default function AdminPlansPage() {
     return (
       <div className="p-8">
         <h1 className="text-2xl font-semibold text-[var(--text-heading)] mb-8">Plans</h1>
-        <p className="text-sm text-neutral-500">Loading…</p>
+        <p className="text-sm text-[var(--text-secondary)]">Loading…</p>
       </div>
     );
   }

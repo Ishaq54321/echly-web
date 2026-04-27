@@ -7,13 +7,13 @@ export function AuthLayout({ children }: { children: ReactNode }) {
     <div
       className="h-full w-full flex items-center justify-center relative overflow-hidden"
       style={{
-        background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+        background: "linear-gradient(180deg, var(--surface-card) 0%, var(--surface-subtle) 100%)",
       }}
     >
       <div
         className="absolute inset-0 pointer-events-none z-0"
         style={{
-          background: "radial-gradient(circle at 50% 0%, rgba(70,110,255,0.08), transparent 60%)",
+          background: "radial-gradient(circle at 50% 0%, rgba(23,117,224,0.08), transparent 60%)",
         }}
       />
       <div

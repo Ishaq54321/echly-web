@@ -38,7 +38,7 @@ export function ConfirmationCard({ ticket, onConfirm, onEdit }: ConfirmationCard
           {ticket.title}
         </li>
         {ticket.actionSteps?.length ? (
-          <li className="echly-confirmation-card-desc" style={{ fontSize: 13, fontWeight: 500, color: "#A1A1AA", marginTop: 6, lineHeight: 1.4 }}>
+          <li className="echly-confirmation-card-desc" style={{ fontSize: 13, fontWeight: 500, color: "var(--text-tertiary)", marginTop: 6, lineHeight: 1.4 }}>
             {ticket.actionSteps.join("\n\n")}
           </li>
         ) : null}

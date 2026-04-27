@@ -10,18 +10,18 @@ import { WorkspaceProvider, useWorkspace } from "@/lib/client/workspaceContext";
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuthGuard({ router, useReplace: true });
-  const { authUid } = useWorkspace();
+  const { authUid, isIdentityResolved } = useWorkspace();
   const [adminChecked, setAdminChecked] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    if (!authUid) return;
+    if (!authUid || !isIdentityResolved) return;
     let cancelled = false;
     setError(null);
     authFetch("/api/admin/me")
       .then((res) => {
-        if (!res) return { isAdmin: false };
+        if (!res || !res.ok) return { data: { isAdmin: false } };
         return res.json();
       })
       .then((envelope: { data?: { isAdmin?: boolean } | null }) => {
@@ -39,7 +39,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [authUid]);
+  }, [authUid, isIdentityResolved]);
 
   useEffect(() => {
     if (authLoading || !adminChecked || !user || error) return;
@@ -51,7 +51,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   if (authLoading || !user) {
     return (
       <div className="flex h-full items-center justify-center bg-[var(--surface-subtle)]">
-        <div className="text-sm text-neutral-500">Loading…</div>
+        <div className="text-sm text-[var(--text-secondary)]">Loading…</div>
       </div>
     );
   }
@@ -59,7 +59,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   if (!adminChecked) {
     return (
       <div className="flex h-full items-center justify-center bg-[var(--surface-subtle)]">
-        <div className="text-sm text-neutral-500">Loading…</div>
+        <div className="text-sm text-[var(--text-secondary)]">Loading…</div>
       </div>
     );
   }
@@ -75,8 +75,8 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
 
   if (!isAdmin) {
     return (
-      <div className="flex h-full items-center justify-center bg-[var(--surface-subtle)]">
-        <div className="text-sm text-neutral-500">Loading…</div>
+      <div className="flex items-center justify-center h-screen text-[var(--text-secondary)] text-[14px]">
+        Verifying admin access...
       </div>
     );
   }

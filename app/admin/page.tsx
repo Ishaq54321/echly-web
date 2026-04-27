@@ -37,7 +37,7 @@ export default function AdminPage() {
     return (
       <div className="p-8">
         <h1 className="text-2xl font-semibold text-[var(--text-heading)] mb-8">Dashboard</h1>
-        <p className="text-sm text-neutral-500">Loading…</p>
+        <p className="text-sm text-[var(--text-secondary)]">Loading…</p>
       </div>
     );
   }
@@ -84,7 +84,7 @@ export default function AdminPage() {
         {cards.map((card) => {
           const content = (
             <>
-              <p className="text-sm font-medium text-neutral-500">{card.label}</p>
+              <p className="text-sm font-medium text-[var(--text-secondary)]">{card.label}</p>
               <p className="text-2xl font-semibold text-[var(--text-heading)] mt-1">{card.value}</p>
             </>
           );

@@ -101,7 +101,7 @@ function TicketGroup({
         <motion.span
           animate={{ rotate: expanded ? 180 : 0 }}
           transition={{ duration: 0.2 }}
-          className="text-gray-400"
+          className="text-[var(--text-tertiary)]"
         >
           <ChevronDown className="h-3.5 w-3.5" />
         </motion.span>
@@ -115,7 +115,7 @@ function TicketGroup({
               onClick={() => onSelect(ticket.id)}
               className={`w-full text-left px-3 py-2.5 rounded-xl transition-colors ${
                 selectedId === ticket.id
-                  ? "bg-[var(--brand)]/10 border border-[#466EFF]/30 text-[var(--text-heading)]"
+                  ? "bg-[var(--brand)]/10 border border-[var(--brand)]/30 text-[var(--text-heading)]"
                   : "hover:bg-[var(--surface-hover)] text-[var(--text-body)] border border-transparent"
               }`}
             >
@@ -151,7 +151,7 @@ export default function DemoFeedbackDashboard() {
           <div className="w-3 h-3 bg-yellow-400 rounded-full" />
           <div className="w-3 h-3 bg-green-400 rounded-full" />
         </div>
-        <div className="ml-4 text-xs text-gray-400 select-none">Echly · Feedback</div>
+        <div className="ml-4 text-xs text-[var(--text-tertiary)] select-none">Echly · Feedback</div>
       </div>
 
       <div className="flex h-[440px]">
@@ -223,7 +223,7 @@ export default function DemoFeedbackDashboard() {
               </div>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
+            <div className="flex-1 flex items-center justify-center text-[var(--text-tertiary)] text-sm">
               Select a ticket
             </div>
           )}

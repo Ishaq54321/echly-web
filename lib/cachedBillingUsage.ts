@@ -20,10 +20,11 @@ export async function getBillingUsageCached(
 
   const res = await fetchFn("/api/billing/usage");
   if (!res || !res.ok) return null;
-  const json = (await res.json()) as BillingUsageData;
-  cachedUsage = json;
+  const envelope = (await res.json()) as { data?: BillingUsageData };
+  // TODO: BillingUsageProvider and useBillingUsageContext may be wired up later
+  cachedUsage = (envelope?.data ?? {}) as BillingUsageData;
   cachedAtMs = now;
-  return json;
+  return cachedUsage;
 }
 
 export function invalidateBillingUsageCache(): void {

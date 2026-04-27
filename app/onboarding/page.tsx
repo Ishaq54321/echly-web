@@ -103,7 +103,7 @@ export default function OnboardingPage() {
 
   if (loading || !authReady) {
     return (
-      <div className="w-8 h-8 border-2 border-[var(--border)] border-t-[#466EFF] rounded-full animate-spin" />
+      <div className="w-8 h-8 border-2 border-[var(--border)] border-t-[var(--brand)] rounded-full animate-spin" />
     );
   }
 
@@ -134,7 +134,7 @@ export default function OnboardingPage() {
                   placeholder="e.g. Alex Kim"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  className="w-full h-11 rounded-[var(--radius-sm)] border border-[var(--border)] bg-white text-[var(--text-heading)] text-base pl-3 placeholder:text-gray-400 focus:outline-none focus:border-[#466EFF] focus:ring-[3px] focus:ring-[rgba(70,110,255,0.15)]"
+                  className="w-full h-11 rounded-[var(--radius-sm)] border border-[var(--border)] bg-white text-[var(--text-heading)] text-base pl-3 placeholder:text-[var(--text-placeholder)] focus:outline-none focus:border-[var(--brand)] focus:ring-[3px] focus:ring-[rgba(23,117,224,0.15)]"
                   required
                 />
                 {displayNameError && <p className="mt-1 text-sm text-[var(--color-danger)]">{displayNameError}</p>}
@@ -143,7 +143,7 @@ export default function OnboardingPage() {
                 type="submit"
                 disabled={submitting}
                 className="w-full h-12 rounded-[var(--radius-sm)] text-white font-medium text-lg disabled:opacity-50 flex items-center justify-center"
-                style={{ background: "linear-gradient(135deg, #466EFF, #5F7DFF)" }}
+                style={{ background: "var(--brand)" }}
               >
                 {submitting ? "Saving…" : "Get started"}
               </button>

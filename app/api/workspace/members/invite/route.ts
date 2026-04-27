@@ -15,6 +15,9 @@ import {
 import { sendWorkspaceInviteEmail } from "@/lib/email/workspaceEmails";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import type { WorkspaceMemberRole } from "@/lib/domain/workspaceMember";
+import { checkPlanLimit } from "@/lib/billing/checkPlanLimit";
+import type { PlanLimitError } from "@/lib/billing/checkPlanLimit";
+import { planLimitReachedApiError } from "@/lib/billing/planLimitResponse";
 
 export const dynamic = "force-dynamic";
 
@@ -40,8 +43,7 @@ export async function POST(req: NextRequest) {
   }
 
   const email = body.email.toLowerCase().trim();
-  const role: WorkspaceMemberRole =
-    body.role === "OWNER" ? "OWNER" : "MEMBER";
+  const role: WorkspaceMemberRole = "MEMBER";
 
   try {
     const workspaceId = await getUserWorkspaceIdRepo(user.uid);
@@ -110,6 +112,17 @@ export async function POST(req: NextRequest) {
     const existingInvite = await getWorkspaceInvitationByEmailRepo(workspaceId, email);
     if (existingInvite) {
       return apiError({ code: "INVALID_INPUT", message: "INVITE_ALREADY_SENT", status: 409 });
+    }
+
+    // Check member limit before creating the invitation
+    const currentMembers = workspace.usage?.members ?? 0;
+    try {
+      await checkPlanLimit({ workspace, metric: "maxMembers", currentUsage: currentMembers });
+    } catch (err) {
+      if ((err as PlanLimitError).code === "PLAN_LIMIT_REACHED") {
+        return apiError(planLimitReachedApiError(err as PlanLimitError));
+      }
+      throw err;
     }
 
     const token = nanoid(32);

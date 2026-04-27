@@ -69,7 +69,7 @@ export function UserAvatar({
         <span
           className={
             initialsClassName ??
-            "flex h-full w-full items-center justify-center rounded-full bg-[var(--surface-hover)] text-sm font-semibold text-neutral-700"
+            "flex h-full w-full items-center justify-center rounded-full bg-[var(--surface-hover)] text-sm font-semibold text-[var(--text-body)]"
           }
           aria-hidden
         >

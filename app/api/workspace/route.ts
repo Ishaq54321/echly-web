@@ -10,6 +10,7 @@ import {
 } from "@/lib/repositories/workspaceMembersRepository.server";
 import { sendWorkspaceDeletionConfirmationEmail } from "@/lib/email/workspaceEmails";
 import { adminDb } from "@/lib/server/firebaseAdmin";
+import { getPaymentProvider } from "@/lib/billing/payments";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,14 @@ export async function DELETE(req: NextRequest) {
 
     if (typeof body.confirmName !== "string" || body.confirmName !== workspace.name) {
       return apiError({ code: "INVALID_INPUT", message: "Workspace name confirmation does not match", status: 400 });
+    }
+
+    if (workspace.billing?.stripeSubscriptionId) {
+      try {
+        await getPaymentProvider().cancelSubscription(workspace.billing.stripeSubscriptionId, false);
+      } catch (err) {
+        console.error("Failed to cancel Stripe subscription on workspace delete:", err);
+      }
     }
 
     await softDeleteWorkspaceRepo(workspaceId, user.uid);

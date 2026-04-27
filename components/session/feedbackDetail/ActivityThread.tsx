@@ -21,7 +21,7 @@ export function ActivityThread({
 }: ActivityThreadProps) {
   if (loading) {
     return (
-      <div className="text-sm text-slate-400 py-6">Loading…</div>
+      <div className="text-sm text-[var(--text-tertiary)] py-6">Loading…</div>
     );
   }
 

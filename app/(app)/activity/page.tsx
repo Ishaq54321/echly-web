@@ -298,8 +298,8 @@ function writeActivityCache(
 
 /** Semantic active state per category — inline styles to guarantee colors render (sourced from eventIconMap badgeClass). */
 const ACTIVITY_TYPE_PILL_ACTIVE_STYLES: Record<ActivityFilterCategoryId, React.CSSProperties> = {
-  comments: { background: '#1775E0', borderColor: '#1775E0', color: '#FFFFFF' },
-  created:  { background: '#A855F7', borderColor: '#A855F7', color: '#FFFFFF' },
+  comments: { background: 'var(--brand)', borderColor: 'var(--brand)', color: '#FFFFFF' },
+  created:  { background: 'var(--color-insight)', borderColor: 'var(--color-insight)', color: '#FFFFFF' },
   resolved: { background: 'var(--color-success)', borderColor: 'var(--color-success)', color: '#FFFFFF' },
 };
 
@@ -760,10 +760,10 @@ function ActivityFeed() {
       <div className="w-full px-6 py-8">
         <div className="mx-auto w-full max-w-[1280px]">
         <div className="flex items-center gap-2.5 mb-7">
-          <Clock className="h-4 w-4 text-muted-foreground" aria-hidden />
-          <h1 className="text-[16px] font-medium text-foreground">Activity</h1>
+          <Clock className="h-4 w-4 text-[var(--text-secondary)]" aria-hidden />
+          <h1 className="text-[16px] font-medium text-[var(--text-heading)]">Activity</h1>
         </div>
-        <p className="text-sm text-muted-foreground">Please sign in to view activity.</p>
+        <p className="text-sm text-[var(--text-secondary)]">Please sign in to view activity.</p>
         </div>
       </div>
     );
@@ -922,7 +922,7 @@ function ActivityFeed() {
                         setMemberFilterTouched(false);
                         setMemberDropdownOpen(false);
                       }}
-                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/40${selectedMemberId === null ? " font-medium text-foreground" : ""}`}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-[var(--surface-hover)]${selectedMemberId === null ? " font-medium text-[var(--text-heading)]" : ""}`}
                     >
                       <span className="flex-1 text-left">All</span>
                       {selectedMemberId === null && (
@@ -931,7 +931,7 @@ function ActivityFeed() {
                     </button>
 
                     {loadingMembers ? (
-                      <div className="px-3 py-2 text-sm text-muted-foreground">
+                      <div className="px-3 py-2 text-sm text-[var(--text-secondary)]">
                         Loading…
                       </div>
                     ) : (
@@ -949,9 +949,9 @@ function ActivityFeed() {
                               setMemberDropdownOpen(false);
                             }
                           }}
-                          className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/40 text-left${selectedMemberId === member.uid ? " font-medium text-foreground" : ""}`}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-[var(--surface-hover)] text-left${selectedMemberId === member.uid ? " font-medium text-[var(--text-heading)]" : ""}`}
                         >
-                          <div className="w-5 h-5 rounded-full bg-muted flex-shrink-0 overflow-hidden flex items-center justify-center text-[12px] font-medium text-muted-foreground">
+                          <div className="w-5 h-5 rounded-full bg-[var(--surface-hover)] flex-shrink-0 overflow-hidden flex items-center justify-center text-[12px] font-medium text-[var(--text-secondary)]">
                             {member.avatarUrl ? (
                               <img
                                 src={member.avatarUrl}
@@ -1018,14 +1018,14 @@ function ActivityFeed() {
           <div className="flex flex-col items-center py-16 text-center px-6">
             <div className="relative mb-6" aria-hidden>
               <div className="absolute inset-0 rounded-full bg-primary/5 blur-2xl scale-150" />
-              <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-border/60 bg-gradient-to-b from-muted/80 to-muted/40 shadow-sm">
-                <Clock className="h-7 w-7 text-muted-foreground/55" strokeWidth={1.25} />
+              <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--border)]/60 bg-gradient-to-b from-muted/80 to-muted/40 shadow-sm">
+                <Clock className="h-7 w-7 text-[var(--text-secondary)]/55" strokeWidth={1.25} />
               </div>
             </div>
-            <p className="text-[15px] font-medium text-foreground/90 tracking-tight">
+            <p className="text-[15px] font-medium text-[var(--text-heading)]/90 tracking-tight">
               Nothing here yet
             </p>
-            <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
+            <p className="mt-2 max-w-sm text-sm leading-relaxed text-[var(--text-secondary)]">
               When your team comments, creates feedback, or resolves tickets, it will appear in this
               timeline.
             </p>
@@ -1042,7 +1042,7 @@ function ActivityFeed() {
                   {/* Day section rule */}
                   <div className="flex items-center gap-4">
                     <div className="flex-1 h-px bg-border" aria-hidden />
-                    <span className="text-sm font-semibold text-foreground/60 whitespace-nowrap tracking-wide">
+                    <span className="text-sm font-semibold text-[var(--text-heading)]/60 whitespace-nowrap tracking-wide">
                       {section.label}
                     </span>
                     <div className="flex-1 h-px bg-border" aria-hidden />
@@ -1071,23 +1071,23 @@ function ActivityFeed() {
                             <button
                               type="button"
                               onClick={() => toggleSystemGroup(row.key)}
-                              className="flex w-full cursor-pointer items-center gap-3 border-0 bg-transparent py-3 text-left transition-colors hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              className="flex w-full cursor-pointer items-center gap-3 border-0 bg-transparent py-3 text-left transition-colors hover:bg-[var(--surface-hover)]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             >
                               <div className="relative z-10 flex w-[52px] shrink-0 justify-center">
                                 <div
-                                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/50 text-muted-foreground"
+                                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--surface-hover)]/50 text-[var(--text-secondary)]"
                                   aria-hidden
                                 >
                                   <Settings className="h-5 w-5" />
                                 </div>
                               </div>
                               <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                                <span className="min-w-0 text-[15px] font-normal leading-snug text-muted-foreground">
+                                <span className="min-w-0 text-[15px] font-normal leading-snug text-[var(--text-secondary)]">
                                   {row.items.length} system{" "}
                                   {row.items.length === 1 ? "event" : "events"}
                                 </span>
                                 <ChevronDown
-                                  className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-150 ${isExpanded ? "rotate-180" : ""}`}
+                                  className={`h-4 w-4 shrink-0 text-[var(--text-secondary)] transition-transform duration-150 ${isExpanded ? "rotate-180" : ""}`}
                                   aria-hidden
                                 />
                               </div>

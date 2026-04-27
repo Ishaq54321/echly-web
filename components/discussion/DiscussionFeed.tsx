@@ -126,7 +126,7 @@ export function DiscussionFeed({
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <MessageSquare className="w-12 h-12 text-neutral-300 mb-4" />
+        <MessageSquare className="w-12 h-12 text-[var(--text-placeholder)] mb-4" />
         <h2 className="text-lg font-semibold text-[var(--text-heading)]">
           No discussions yet
         </h2>

@@ -13,7 +13,7 @@ export interface PlansCatalogResponseItem {
   annualPricePerSeat: number | null;
   maxFeedbackPerMonth: number | null;
   maxMembers: number | null;
-  insightsEnabled: boolean;
+  insightsAccess: boolean;
   customBranding: boolean;
   prioritySupport: boolean;
   displayLimits: {
@@ -36,7 +36,7 @@ export async function GET() {
         annualPricePerSeat: entry.annualPricePerSeat,
         maxFeedbackPerMonth: entry.maxFeedbackPerMonth,
         maxMembers: entry.maxMembers,
-        insightsEnabled: entry.insightsEnabled,
+        insightsAccess: entry.insightsAccess,
         customBranding: entry.customBranding,
         prioritySupport: entry.prioritySupport,
         displayLimits: entry.displayLimits,

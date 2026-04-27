@@ -524,7 +524,7 @@ export function EditorToolbar({
               <Crop {...iconProps} />
             </button>
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block pointer-events-none whitespace-nowrap">
-              <div className="bg-[#3A3A3C] text-white text-[12px] px-2.5 py-1.5 rounded-lg">
+              <div className="bg-[var(--text-heading)] text-white text-[12px] px-2.5 py-1.5 rounded-lg">
                 Crop unavailable — screenshot has feedback pins
               </div>
             </div>

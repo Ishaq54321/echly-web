@@ -126,9 +126,9 @@ export function ExternalShareModal({
                 Share link
               </span>
               <div className="relative group">
-                <Info className="h-4 w-4 text-muted-foreground cursor-default mt-px" />
+                <Info className="h-4 w-4 text-[var(--text-secondary)] cursor-default mt-px" />
                 <div className="absolute top-full left-0 mt-1.5 hidden group-hover:block z-50 pointer-events-none w-48">
-                  <div className="bg-background text-foreground border border-border rounded-lg px-2.5 py-1.5 text-[12px] leading-snug shadow-md">
+                  <div className="bg-[var(--surface-page)] text-[var(--text-heading)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 text-[12px] leading-snug shadow-md">
                     This link is view-only if the session owner has enabled public viewing.
                   </div>
                 </div>

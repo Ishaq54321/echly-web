@@ -76,7 +76,7 @@ export function SessionFeedbackPopup({
             style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
           />
         </div>
-        <p style={{ margin: "12px 0 0", fontSize: 13, fontWeight: 500, color: "#A1A1AA" }}>
+        <p style={{ margin: "12px 0 0", fontSize: 13, fontWeight: 500, color: "var(--text-tertiary)" }}>
           Speak or type feedback
         </p>
       </div>
@@ -188,7 +188,7 @@ export function SessionFeedbackPopup({
               padding: "8px 12px",
               border: "none",
               background: "transparent",
-              color: "#A1A1AA",
+              color: "var(--text-tertiary)",
               fontSize: 13,
               fontWeight: 500,
               cursor: "pointer",

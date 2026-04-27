@@ -73,10 +73,10 @@ function TicketListSectionLoading() {
       {Array.from({ length: 5 }).map((_, i) => (
         <div key={i} className="flex flex-col gap-0.5 px-6 py-2.5">
           <div
-            className="h-3.5 rounded-md bg-muted-foreground/15 animate-pulse"
+            className="h-3.5 rounded-md bg-[var(--surface-hover)]-foreground/15 animate-pulse"
             style={{ width: `${55 + (i % 4) * 10}%` }}
           />
-          <div className="h-3 w-20 rounded-md bg-muted-foreground/10 animate-pulse" />
+          <div className="h-3 w-20 rounded-md bg-[var(--surface-hover)]-foreground/10 animate-pulse" />
         </div>
       ))}
     </div>
@@ -319,7 +319,7 @@ function TicketListInner({
         <div
           className="mb-4 p-4 pb-3.5 rounded-[12px] relative overflow-hidden shrink-0"
           style={{
-            background: 'radial-gradient(120% 110% at 100% 0%, rgba(23,117,224,0.10) 0%, rgba(23,117,224,0) 55%), linear-gradient(180deg, #F5F9FE 0%, #FFFFFF 100%)',
+            background: 'radial-gradient(120% 110% at 100% 0%, rgba(23,117,224,0.10) 0%, rgba(23,117,224,0) 55%), linear-gradient(180deg, var(--brand-subtle) 0%, var(--surface-card) 100%)',
             border: '1px solid rgba(23,117,224,0.10)',
           }}
         >

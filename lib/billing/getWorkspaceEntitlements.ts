@@ -38,12 +38,12 @@ export async function getWorkspaceEntitlements(
     maxMembers:
       overrides.maxMembers !== undefined ? overrides.maxMembers : entry.maxMembers,
     insightsAccess:
-      overrides.insightsAccess !== undefined ? overrides.insightsAccess : entry.insightsEnabled,
+      overrides.insightsAccess !== undefined ? overrides.insightsAccess : entry.insightsAccess,
     customBranding:
       overrides.customBranding !== undefined ? overrides.customBranding : entry.customBranding,
     prioritySupport:
       overrides.prioritySupport !== undefined ? overrides.prioritySupport : entry.prioritySupport,
     integrations:
-      overrides.integrations !== undefined ? overrides.integrations : false,
+      overrides.integrations !== undefined ? overrides.integrations : (entry?.integrations ?? false),
   };
 }

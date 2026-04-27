@@ -19,7 +19,7 @@ export function ProgressRing({ value }: { value: number }) {
         viewBox={`0 0 ${size} ${size}`}
       >
         <circle
-          className="text-neutral-200"
+          className="text-[var(--border)]"
           stroke="currentColor"
           fill="none"
           strokeWidth={stroke}

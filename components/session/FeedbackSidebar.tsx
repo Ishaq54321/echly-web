@@ -128,7 +128,7 @@ function FeedbackSidebarInner({
                   <button
                     type="button"
                     role="menuitem"
-                    className="w-full text-left px-4 py-2 text-[14px] text-neutral-700 cursor-pointer hover:bg-[var(--surface-hover)] transition-colors duration-120"
+                    className="w-full text-left px-4 py-2 text-[14px] text-[var(--text-body)] cursor-pointer hover:bg-[var(--surface-hover)] transition-colors duration-120"
                     onClick={() => {
                       setFilter("all");
                       setMenuOpen(false);
@@ -139,7 +139,7 @@ function FeedbackSidebarInner({
                   <button
                     type="button"
                     role="menuitem"
-                    className="w-full text-left px-4 py-2 text-[14px] text-neutral-700 cursor-pointer hover:bg-[var(--surface-hover)] transition-colors duration-120"
+                    className="w-full text-left px-4 py-2 text-[14px] text-[var(--text-body)] cursor-pointer hover:bg-[var(--surface-hover)] transition-colors duration-120"
                     onClick={() => {
                       setFilter("active");
                       setMenuOpen(false);
@@ -150,7 +150,7 @@ function FeedbackSidebarInner({
                   <button
                     type="button"
                     role="menuitem"
-                    className="w-full text-left px-4 py-2 text-[14px] text-neutral-700 cursor-pointer hover:bg-[var(--surface-hover)] transition-colors duration-120"
+                    className="w-full text-left px-4 py-2 text-[14px] text-[var(--text-body)] cursor-pointer hover:bg-[var(--surface-hover)] transition-colors duration-120"
                     onClick={() => {
                       setFilter("resolved");
                       setMenuOpen(false);
@@ -161,7 +161,7 @@ function FeedbackSidebarInner({
                   <button
                     type="button"
                     role="menuitem"
-                    className="w-full text-left px-4 py-2 text-[14px] text-neutral-700 cursor-pointer hover:bg-[var(--surface-hover)] transition-colors duration-120"
+                    className="w-full text-left px-4 py-2 text-[14px] text-[var(--text-body)] cursor-pointer hover:bg-[var(--surface-hover)] transition-colors duration-120"
                     onClick={async () => {
                       setMenuOpen(false);
                       await onMarkAllResolved?.();

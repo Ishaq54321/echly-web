@@ -1228,8 +1228,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           minWidth: 200,
           padding: "8px 12px",
           borderRadius: 10,
-          border: "1px solid #E6F0FF",
-          background: "#F8FBFF",
+          border: "1px solid #EBF4FF",
+          background: "#F8F8F8",
           color: "var(--text-body)",
           fontSize: 13,
           boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
@@ -1256,22 +1256,22 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           minWidth: 280,
           padding: "16px",
           borderRadius: 12,
-          border: "1px solid #E6F0FF",
-          background: "#F8FBFF",
+          border: "1px solid #EBF4FF",
+          background: "#F8F8F8",
           boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
         }}
       >
         <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-heading)", marginBottom: 8 }}>
           Sign in to use Echly
         </div>
-        <div style={{ fontSize: 13, color: "#4B5563", marginBottom: 12 }}>
+        <div style={{ fontSize: 13, color: "#78716C", marginBottom: 12 }}>
           You are not signed in on the dashboard.
         </div>
         <button
           type="button"
           onClick={onTriggerLogin}
           style={{
-            background: "#3B82F6",
+            background: "#1775E0",
             color: "#FFFFFF",
             border: "none",
             borderRadius: 8,
@@ -1329,7 +1329,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             left: 0,
             right: 0,
             height: 2,
-            background: "linear-gradient(90deg, #93c5fd, #3b82f6)",
+            background: "linear-gradient(90deg, #C3DFFE, #1775E0)",
             opacity: 0.9,
             pointerEvents: "none",
             zIndex: 5,

@@ -105,7 +105,7 @@ export default function DemoGuide({
         className="relative rounded-[var(--radius-sm)] px-[14px] py-[10px] text-[14px] font-medium max-w-[240px]"
         style={{
           background: "white",
-          color: "#1a1a1a",
+          color: "var(--text-heading)",
           boxShadow: "0 24px 48px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.08)",
           border: "1px solid var(--border)",
         }}
@@ -225,7 +225,7 @@ export function GuideArrow({
           height={ARROW_SIZE}
           viewBox="0 0 24 24"
           fill="none"
-          className="text-[#4F7EFF]"
+          className="text-[var(--brand)]"
           style={{
             filter: "drop-shadow(0 2px 8px rgba(79,126,255,0.4))",
           }}
@@ -307,7 +307,7 @@ export function CursorAnnotation({
           whiteSpace: "normal",
           lineHeight: 1.4,
           background: "white",
-          color: "#1a1a1a",
+          color: "var(--text-heading)",
           boxShadow: "0 24px 48px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.08)",
           border: "1px solid var(--border)",
         }}

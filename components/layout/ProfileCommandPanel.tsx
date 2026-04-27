@@ -185,8 +185,8 @@ export function ProfileCommandPanel({
       key: "issuesCaptured" as const,
       label: "Issues captured",
       context: "lifetime",
-      bg: "#EFF6FF",
-      textColor: "#1E3A8A",
+      bg: "var(--brand-subtle)",
+      textColor: "var(--brand-text)",
       Icon: Info,
     },
     {
@@ -222,7 +222,7 @@ export function ProfileCommandPanel({
             left: position.left,
             background: "#FFFFFF",
             borderRadius: 14,
-            border: "1px solid #EAEAEA",
+            border: "1px solid var(--border)",
             boxShadow: "0 12px 32px rgba(0,0,0,0.08)",
             padding: 16,
             opacity: mounted ? 1 : 0,
@@ -365,7 +365,7 @@ export function ProfileCommandPanel({
               <div
                 className="transition-[transform,box-shadow] duration-[120ms] ease-out hover:translate-y-[-1px] hover:shadow-[var(--shadow-md)]"
                 style={{
-                  background: "#EFF6FF",
+                  background: "var(--brand-subtle)",
                   border: "1px solid #EBF4FF",
                   borderRadius: 10,
                   padding: 10,
@@ -373,11 +373,11 @@ export function ProfileCommandPanel({
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <Sparkles size={20} style={{ color: "#1775E0", flexShrink: 0 }} aria-hidden />
-                  <p style={{ fontSize: 13, fontWeight: 500, color: "#1E3A8A", margin: 0 }}>
+                  <p style={{ fontSize: 13, fontWeight: 500, color: "var(--brand-text)", margin: 0 }}>
                     Unlock advanced feedback tools
                   </p>
                 </div>
-                <p style={{ fontSize: 12, color: "#475569", marginTop: 2 }}>
+                <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
                   Collaborate with your team, remove Echly branding, and access AI insights.
                 </p>
                 <button
@@ -418,10 +418,10 @@ export function ProfileCommandPanel({
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p style={{ fontSize: 15, fontWeight: 500, color: "#111111" }}>
+                  <p style={{ fontSize: 15, fontWeight: 500, color: "var(--text-heading)" }}>
                     {displayName}
                   </p>
-                  <p style={{ fontSize: 12, color: "#6B6B6B", marginTop: 2 }}>
+                  <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
                     {metaText}
                   </p>
                   <button
@@ -435,15 +435,15 @@ export function ProfileCommandPanel({
               </div>
 
               {/* Upgrade plan — usage and CTA */}
-              <div className="mb-4 pb-4 border-b border-[#EAEAEA] font-medium">
+              <div className="mb-4 pb-4 border-b border-[var(--border)] font-medium">
                 <span className="text-[var(--brand)] font-semibold text-[15px] block mb-1.5">
                   Upgrade plan
                 </span>
-                <p className="font-semibold text-[14px] text-neutral-700 mt-0 mb-0.5">
+                <p className="font-semibold text-[14px] text-[var(--text-body)] mt-0 mb-0.5">
                   Current plan:{" "}
                   {displayPlan.charAt(0).toUpperCase() + displayPlan.slice(1)}
                 </p>
-                <p className="font-semibold text-[14px] text-neutral-700 mt-0 mb-0.5">
+                <p className="font-semibold text-[14px] text-[var(--text-body)] mt-0 mb-0.5">
                   {ticketsText}
                 </p>
                 <Link
@@ -475,7 +475,7 @@ export function ProfileCommandPanel({
                         key={label}
                         href={href}
                         style={{ fontSize: 14, fontWeight: 500, padding: "4px 10px" }}
-                        className="block text-[#111111] transition hover:bg-[#F5F7F6]"
+                        className="block text-[var(--text-heading)] transition hover:bg-[var(--surface-hover)]"
                       >
                         {label}
                       </a>

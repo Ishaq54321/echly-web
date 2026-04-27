@@ -75,7 +75,7 @@ export async function POST(req: Request) {
       plan: newPlan,
       feedbackTicketsLimit: entry.maxFeedbackPerMonth,
       maxMembers: entry.maxMembers,
-      insightsAccess: entry.insightsEnabled,
+      insightsAccess: entry.insightsAccess,
     });
   } catch (err) {
     console.error("POST /api/admin/update-plan:", err);

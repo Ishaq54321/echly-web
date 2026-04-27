@@ -389,7 +389,7 @@ export function CommentItem({
                       {formatCommentDate(comment.createdAt)}
                     </span>
                   </div>
-                  <p className="mt-1 text-sm text-neutral-700 line-clamp-2 break-words">
+                  <p className="mt-1 text-sm text-[var(--text-body)] line-clamp-2 break-words">
                     {comment.message}
                   </p>
                 </div>

@@ -31,7 +31,7 @@ export default function AdminUsagePage() {
     return (
       <div className="p-8">
         <h1 className="text-2xl font-semibold text-[var(--text-heading)] mb-8">Usage</h1>
-        <p className="text-sm text-neutral-500">Loading…</p>
+        <p className="text-sm text-[var(--text-secondary)]">Loading…</p>
       </div>
     );
   }
@@ -66,7 +66,7 @@ export default function AdminUsagePage() {
             key={label}
             className="rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm"
           >
-            <p className="text-sm font-medium text-neutral-500">{label}</p>
+            <p className="text-sm font-medium text-[var(--text-secondary)]">{label}</p>
             <p className="mt-1 text-2xl font-semibold text-[var(--text-heading)]">{value}</p>
           </div>
         ))}

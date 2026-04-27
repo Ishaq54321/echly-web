@@ -114,7 +114,7 @@ export function DropdownMenuContent({
   return createPortal(
     <div
       ref={menuRef}
-      className={`fixed rounded-lg border border-border bg-background shadow-md py-1 ${className}`}
+      className={`fixed rounded-lg border border-[var(--border)] bg-[var(--surface-page)] shadow-md py-1 ${className}`}
       style={{
         zIndex: PORTAL_DROPDOWN_Z_INDEX,
         top: rect.top,
@@ -143,7 +143,7 @@ export function DropdownMenuItem({
   const { setOpen } = useCtx();
   return (
     <div
-      className={`px-3 py-1.5 text-[14px] cursor-pointer hover:bg-muted/50 transition-colors text-foreground ${className}`}
+      className={`px-3 py-1.5 text-[14px] cursor-pointer hover:bg-[var(--surface-hover)]/50 transition-colors text-[var(--text-heading)] ${className}`}
       onMouseDown={(e) => e.preventDefault()}
       onClick={() => {
         onClick?.();

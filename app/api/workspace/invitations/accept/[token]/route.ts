@@ -18,6 +18,10 @@ import {
 import { addWorkspaceMembershipRepo } from "@/lib/repositories/usersRepository.server";
 import { setWorkspaceClaim } from "@/lib/server/setWorkspaceClaim";
 import { adminDb } from "@/lib/server/firebaseAdmin";
+import { getPaymentProvider } from "@/lib/billing/payments";
+import { checkPlanLimit } from "@/lib/billing/checkPlanLimit";
+import type { PlanLimitError } from "@/lib/billing/checkPlanLimit";
+import { planLimitReachedApiError } from "@/lib/billing/planLimitResponse";
 
 export const dynamic = "force-dynamic";
 
@@ -120,6 +124,17 @@ export async function POST(
       });
     }
 
+    // Check member limit before adding new member
+    const currentMembers = workspace!.usage?.members ?? 0;
+    try {
+      await checkPlanLimit({ workspace: workspace!, metric: "maxMembers", currentUsage: currentMembers });
+    } catch (err) {
+      if ((err as PlanLimitError).code === "PLAN_LIMIT_REACHED") {
+        return apiError(planLimitReachedApiError(err as PlanLimitError));
+      }
+      throw err;
+    }
+
     // Fetch caller profile for member doc
     const profileSnap = await adminDb.doc(`users/${user.uid}`).get();
     const profile = (profileSnap.data() ?? {}) as Record<string, unknown>;
@@ -147,6 +162,28 @@ export async function POST(
     // WS-005 FIX: always add to workspaceMemberships
     // Only update active workspaceId if they have none yet
     await addWorkspaceMembershipRepo(user.uid, invitation.workspaceId);
+
+    // Re-read workspace after atomic member increment to get accurate count for Stripe
+    const updatedWorkspace = await getWorkspace(invitation.workspaceId);
+    const actualMemberCount = updatedWorkspace?.usage?.members ?? 1;
+
+    if (
+      updatedWorkspace?.billing?.plan === "business" &&
+      updatedWorkspace.billing.stripeSubscriptionId
+    ) {
+      try {
+        const newSeatCount = Math.max(actualMemberCount, 1);
+        await getPaymentProvider().updateSubscriptionSeats(
+          updatedWorkspace.billing.stripeSubscriptionId,
+          newSeatCount
+        );
+        await adminDb.doc(`workspaces/${invitation.workspaceId}`).update({
+          "billing.seats": newSeatCount,
+        });
+      } catch (stripeErr) {
+        console.error("[invite accept] failed to sync Stripe seats:", stripeErr);
+      }
+    }
 
     const userRef = adminDb.doc(`users/${user.uid}`);
 

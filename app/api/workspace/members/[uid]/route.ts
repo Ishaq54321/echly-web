@@ -8,6 +8,8 @@ import {
   getWorkspaceMemberRepo,
   removeWorkspaceMemberRepo,
 } from "@/lib/repositories/workspaceMembersRepository.server";
+import { adminDb } from "@/lib/server/firebaseAdmin";
+import { getPaymentProvider } from "@/lib/billing/payments";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +49,28 @@ export async function DELETE(
     }
 
     await removeWorkspaceMemberRepo(workspaceId, targetUid);
+
+    // Re-read workspace after atomic member decrement to get accurate count for Stripe
+    const updatedWorkspace = await getWorkspace(workspaceId);
+    const actualMemberCount = updatedWorkspace?.usage?.members ?? 1;
+
+    if (
+      updatedWorkspace?.billing?.plan === "business" &&
+      updatedWorkspace.billing.stripeSubscriptionId
+    ) {
+      try {
+        const newSeatCount = Math.max(actualMemberCount, 1);
+        await getPaymentProvider().updateSubscriptionSeats(
+          updatedWorkspace.billing.stripeSubscriptionId,
+          newSeatCount
+        );
+        await adminDb.doc(`workspaces/${workspaceId}`).update({
+          "billing.seats": newSeatCount,
+        });
+      } catch (stripeErr) {
+        console.error("[member remove] failed to sync Stripe seats:", stripeErr);
+      }
+    }
 
     return apiSuccess({ success: true });
   } catch (err) {

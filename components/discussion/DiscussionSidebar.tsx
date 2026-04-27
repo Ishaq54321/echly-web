@@ -51,7 +51,7 @@ export function DiscussionSidebar({
       >
         <span
           className={`w-[6px] h-[6px] rounded-full shrink-0 ${
-            selectedProjectId === null ? "bg-[var(--brand)]" : "bg-neutral-300"
+            selectedProjectId === null ? "bg-[var(--brand)]" : "bg-[var(--text-tertiary)]"
           }`}
         />
         <span className="flex-1 truncate">All projects</span>
@@ -88,7 +88,7 @@ export function DiscussionSidebar({
                 >
                   <span
                     className={`w-[6px] h-[6px] rounded-full shrink-0 ${
-                      isActive ? "bg-[var(--brand)]" : "bg-neutral-300"
+                      isActive ? "bg-[var(--brand)]" : "bg-[var(--text-tertiary)]"
                     }`}
                   />
                   <span className="flex-1 truncate">{proj.name || "Untitled"}</span>

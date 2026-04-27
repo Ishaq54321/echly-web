@@ -35,7 +35,7 @@ export function MinimalLoader({
         aria-hidden
       />
       {showLabel ? (
-        <span className="text-sm text-neutral-500">{label}</span>
+        <span className="text-sm text-[var(--text-secondary)]">{label}</span>
       ) : null}
     </div>
   );

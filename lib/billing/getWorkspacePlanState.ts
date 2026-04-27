@@ -31,7 +31,7 @@ export async function getWorkspacePlanState(
   const [catalog, entitlements, usageResult] = await Promise.all([
     getPlanCatalog(),
     getWorkspaceEntitlements(workspace),
-    getWorkspaceUsage(workspaceId),
+    getWorkspaceUsage(workspaceId, workspace),
   ]);
 
   const planId = (workspace.billing?.plan ?? "starter") as PlanId;

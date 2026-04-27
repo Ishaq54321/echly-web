@@ -397,7 +397,7 @@ export function ImageCropModal({
               padding: "0 16px",
               height: 40,
               borderRadius: 10,
-              border: "1px solid #D1D5DB",
+              border: "1px solid var(--border-strong)",
               background: "white",
               color: "var(--text-body)",
               fontSize: 14,

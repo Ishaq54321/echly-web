@@ -80,7 +80,7 @@ export function UsageMeter() {
 
   if (realtimeError || realtimeUsage == null) {
     return (
-      <div className="rounded-xl border border-[var(--border)] bg-white p-4 text-sm text-neutral-500">
+      <div className="rounded-xl border border-[var(--border)] bg-white p-4 text-sm text-[var(--text-secondary)]">
         {realtimeError ? `Usage unavailable: ${realtimeError}` : "Usage unavailable"}
       </div>
     );
@@ -94,7 +94,7 @@ export function UsageMeter() {
     <div className="rounded-xl border border-[var(--border)] bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm font-semibold text-[var(--text-heading)]">Usage</span>
-        <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
+        <span className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wide">
           {planLabel}
         </span>
       </div>

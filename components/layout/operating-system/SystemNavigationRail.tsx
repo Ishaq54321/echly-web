@@ -62,7 +62,7 @@ export function SystemNavigationRail({ onOpenCommandPalette }: SystemNavigationR
 
   return (
     <aside
-      className="w-14 h-screen flex flex-col items-center border-r border-border bg-background py-4 shrink-0"
+      className="w-14 h-screen flex flex-col items-center border-r border-[var(--border)] bg-[var(--surface-page)] py-4 shrink-0"
       aria-label="System navigation"
     >
       {/* Section A — Logo */}
@@ -106,7 +106,7 @@ export function SystemNavigationRail({ onOpenCommandPalette }: SystemNavigationR
                   key={item.label}
                   type="button"
                   onClick={onOpenCommandPalette}
-                  className="w-[38px] h-[38px] rounded-[var(--radius-btn)] flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  className="w-[38px] h-[38px] rounded-[var(--radius-btn)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
                   aria-label={title}
                   title={title}
                 >
@@ -119,7 +119,7 @@ export function SystemNavigationRail({ onOpenCommandPalette }: SystemNavigationR
               return (
                 <span
                   key={item.label}
-                  className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground"
+                  className="w-9 h-9 rounded-lg flex items-center justify-center text-[var(--text-secondary)]"
                   title={title}
                 >
                   {content}
@@ -133,8 +133,8 @@ export function SystemNavigationRail({ onOpenCommandPalette }: SystemNavigationR
                 href={item.href}
                 className={
                   active
-                    ? "w-9 h-9 rounded-lg flex items-center justify-center bg-muted text-foreground"
-                    : "w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                    ? "w-9 h-9 rounded-lg flex items-center justify-center bg-[var(--surface-hover)] text-[var(--text-heading)]"
+                    : "w-9 h-9 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
                 }
                 aria-label={item.label}
                 aria-current={active ? "page" : undefined}

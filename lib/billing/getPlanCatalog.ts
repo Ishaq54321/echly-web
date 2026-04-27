@@ -8,7 +8,8 @@ export interface PlanCatalogEntry {
   annualPricePerSeat: number | null;
   maxFeedbackPerMonth: number | null;
   maxMembers: number | null;
-  insightsEnabled: boolean;
+  insightsAccess: boolean;
+  integrations: boolean;
   customBranding: boolean;
   prioritySupport: boolean;
   displayLimits: {
@@ -33,7 +34,8 @@ function buildDefaultCatalog(): PlanCatalog {
       annualPricePerSeat: def.annualPricePerSeat,
       maxFeedbackPerMonth: def.maxFeedbackPerMonth,
       maxMembers: def.maxMembers,
-      insightsEnabled: def.insightsAccess,
+      insightsAccess: def.insightsAccess,
+      integrations: def.integrations,
       customBranding: def.customBranding,
       prioritySupport: def.prioritySupport,
       displayLimits: def.displayLimits,
@@ -57,7 +59,9 @@ async function fetchPlans(): Promise<PlanCatalog> {
         annualPricePerSeat?: number | null;
         maxFeedbackPerMonth?: number | null;
         maxMembers?: number | null;
-        insightsEnabled?: boolean;
+        insightsAccess?: boolean;
+        insightsEnabled?: boolean; // legacy field name — checked for backwards compatibility
+        integrations?: boolean;
         customBranding?: boolean;
         prioritySupport?: boolean;
       };
@@ -76,8 +80,14 @@ async function fetchPlans(): Promise<PlanCatalog> {
             ? data.maxFeedbackPerMonth
             : current.maxFeedbackPerMonth,
         maxMembers: data.maxMembers !== undefined ? data.maxMembers : current.maxMembers,
-        insightsEnabled:
-          data.insightsEnabled !== undefined ? data.insightsEnabled : current.insightsEnabled,
+        insightsAccess:
+          data.insightsAccess !== undefined
+            ? data.insightsAccess
+            : data.insightsEnabled !== undefined
+            ? data.insightsEnabled
+            : current.insightsAccess,
+        integrations:
+          data.integrations !== undefined ? data.integrations : current.integrations,
         customBranding:
           data.customBranding !== undefined ? data.customBranding : current.customBranding,
         prioritySupport:

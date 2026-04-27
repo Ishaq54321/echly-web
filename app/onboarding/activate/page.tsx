@@ -308,7 +308,7 @@ export default function ActivationPage() {
         {dashboardPhase === "loading" ? (
           <div className="flex items-center justify-center h-[440px] rounded-2xl border border-[var(--border)] bg-white shadow-xl">
             <div className="flex flex-col items-center gap-4">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" aria-hidden />
+              <Loader2 className="h-8 w-8 animate-spin text-[var(--text-tertiary)]" aria-hidden />
               <p className="text-sm font-medium text-[var(--text-secondary)]">Loading feedback...</p>
             </div>
           </div>
@@ -382,7 +382,7 @@ export default function ActivationPage() {
 
       <button
         type="button"
-        className="mt-14 h-12 px-10 rounded-full text-white font-medium bg-gradient-to-r from-[var(--brand)] to-[var(--brand)] shadow-[0_10px_30px_rgba(70,110,255,0.35)] hover:scale-[1.04] transition-all"
+        className="mt-14 h-12 px-10 rounded-full text-white font-medium bg-[var(--brand)] shadow-[0_10px_30px_rgba(23,117,224,0.35)] hover:scale-[1.04] transition-all"
       >
         Go to dashboard
       </button>
@@ -487,7 +487,7 @@ function BrowserDemo({
           <div className="w-3 h-3 bg-yellow-400 rounded-full" />
           <div className="w-3 h-3 bg-green-400 rounded-full" />
         </div>
-        <div className="ml-4 text-xs text-gray-400 select-none">example-website.com</div>
+        <div className="ml-4 text-xs text-[var(--text-tertiary)] select-none">example-website.com</div>
         {showExtensionIconInChrome ? (
           <motion.button
             type="button"
@@ -497,8 +497,8 @@ function BrowserDemo({
             className="ml-auto h-8 w-8 rounded-lg flex items-center justify-center border pointer-events-auto"
             animate={{
               scale: [1, 1.12, 1],
-              backgroundColor: ["#E0EDFF", "#BBD1FF", "#E0EDFF"],
-              borderColor: ["#93B8FF", "#6A9AFF", "#93B8FF"],
+              backgroundColor: ["var(--brand-subtle)", "var(--brand-muted)", "var(--brand-subtle)"],
+              borderColor: ["var(--brand-muted)", "var(--brand)", "var(--brand-muted)"],
             }}
             transition={{
               duration: 1.8,
@@ -508,7 +508,7 @@ function BrowserDemo({
             aria-label="Open Echly extension"
           >
             <motion.span
-              animate={{ color: ["#1462C4", "#1462C4", "#1462C4"] }}
+              animate={{ color: ["var(--brand-hover)", "var(--brand-hover)", "var(--brand-hover)"] }}
               transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
             >
               <Sparkles className="h-4 w-4" />
@@ -519,7 +519,7 @@ function BrowserDemo({
 
       <div
         ref={containerRef}
-        className="demo-container relative h-[440px] p-6 bg-gradient-to-b from-white to-gray-50 overflow-hidden cursor-none"
+        className="demo-container relative h-[440px] p-6 bg-gradient-to-b from-white to-[var(--surface-subtle)] overflow-hidden cursor-none"
         onMouseMove={(e) => {
           if (!containerRef.current) return
           const rect = containerRef.current.getBoundingClientRect()
@@ -547,12 +547,12 @@ function BrowserDemo({
               style={{ willChange: "opacity" }}
             >
               <div
-                className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-white to-gray-50"
+                className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-white to-[var(--surface-subtle)]"
                 aria-busy="true"
                 aria-hidden
               >
                 {!showWebsite ? (
-                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" aria-hidden />
+                  <Loader2 className="h-8 w-8 animate-spin text-[var(--text-tertiary)]" aria-hidden />
                 ) : null}
               </div>
             </motion.div>
@@ -626,7 +626,7 @@ function BrowserDemo({
               animate={{ opacity: 0, scale: 1.6 }}
               transition={{ duration: 0.5, ease: "easeOut" }}
               onAnimationComplete={() => setClickRipple(null)}
-              className="absolute left-0 top-0 z-10 pointer-events-none rounded-full bg-blue-400/50"
+              className="absolute left-0 top-0 z-10 pointer-events-none rounded-full bg-[var(--brand-muted)]/50"
               style={{
                 width: 48,
                 height: 48,
@@ -874,7 +874,7 @@ function OpenWebsiteSequence({
               scale: { duration: 0.22, ease: "easeOut" },
               boxShadow: { duration: 1.4, repeat: Infinity, ease: "easeInOut" },
             }}
-            className="absolute pointer-events-none z-20 border-2 border-[var(--brand)] rounded-md bg-blue-100/10 animate-pulse"
+            className="absolute pointer-events-none z-20 border-2 border-[var(--brand)] rounded-md bg-[var(--brand-subtle)]/10 animate-pulse"
             style={selectionRect}
           />
         ) : null}
@@ -984,7 +984,7 @@ function WriteFeedbackPopup({ onSubmit }: { onSubmit?: (text?: string) => void }
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="e.g. The CTA button spacing looks off..."
-          className="mt-4 w-full h-24 rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-[12px] text-[var(--text-heading)] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:border-transparent resize-none"
+          className="mt-4 w-full h-24 rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-[12px] text-[var(--text-heading)] placeholder:text-[var(--text-placeholder)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:border-transparent resize-none"
           rows={4}
         />
 
@@ -992,7 +992,7 @@ function WriteFeedbackPopup({ onSubmit }: { onSubmit?: (text?: string) => void }
           type="button"
           data-demo-target="submit-feedback"
           onClick={() => onSubmit?.(value)}
-          className="mt-4 h-[38px] w-full rounded-[var(--radius-btn)] bg-gray-900 hover:bg-black text-white text-[14px] font-semibold"
+          className="mt-4 h-[38px] w-full rounded-[var(--radius-btn)] bg-[var(--text-heading)] hover:opacity-85 text-white text-[14px] font-semibold"
         >
           Submit
         </button>
@@ -1105,7 +1105,7 @@ function VoiceFeedbackPopup({
           type="button"
           data-demo-target="finish"
           onClick={onFinish}
-          className="mt-4 h-[38px] w-full rounded-[var(--radius-btn)] bg-gray-900 hover:bg-black text-white text-[14px] font-semibold"
+          className="mt-4 h-[38px] w-full rounded-[var(--radius-btn)] bg-[var(--text-heading)] hover:opacity-85 text-white text-[14px] font-semibold"
         >
           Finish
         </button>
@@ -1115,7 +1115,7 @@ function VoiceFeedbackPopup({
 }
 
 function LoadingIndicator() {
-  return <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-slate-400" aria-hidden />
+  return <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[var(--text-tertiary)]" aria-hidden />
 }
 
 function ProcessingStack() {
@@ -1244,7 +1244,7 @@ function CollapsibleTicketGroup({
         <motion.span
           animate={{ rotate: expanded ? 180 : 0 }}
           transition={{ duration: 0.2 }}
-          className="text-gray-400"
+          className="text-[var(--text-tertiary)]"
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="inline-block">
             <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />

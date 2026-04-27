@@ -43,6 +43,7 @@ import {
 } from "@/lib/repositories/workspacesRepository";
 import { MinimalLoader } from "@/components/ui/MinimalLoader";
 import { authFetch } from "@/lib/authFetch";
+import { useBillingStore } from "@/lib/store/billingStore";
 
 /* Premium workspace settings: wide layout, strong hierarchy */
 const SETTINGS_CARD =
@@ -370,31 +371,31 @@ function WorkspaceTab({
     return (
       <div style={{ maxWidth: 900, width: "100%", padding: "32px 0" }} aria-busy="true" aria-live="polite">
         <style>{`@keyframes shimmer { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } } .skeleton { animation: shimmer 1.5s ease infinite; }`}</style>
-        <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid #F0F0F0" }}>
-          <div className="skeleton" style={{ height: 22, width: 180, background: "#F0F0F0", borderRadius: 6, marginBottom: 8 }} />
-          <div className="skeleton" style={{ height: 14, width: 280, background: "#F0F0F0", borderRadius: 4 }} />
+        <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid var(--surface-hover)" }}>
+          <div className="skeleton" style={{ height: 22, width: 180, background: "var(--surface-hover)", borderRadius: 6, marginBottom: 8 }} />
+          <div className="skeleton" style={{ height: 14, width: 280, background: "var(--surface-hover)", borderRadius: 4 }} />
         </div>
         <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
-          <div style={{ padding: "28px 32px", borderBottom: "1px solid #F0F0F0" }}>
-            <div className="skeleton" style={{ width: 140, height: 14, background: "#F0F0F0", borderRadius: 4, marginBottom: 16 }} />
+          <div style={{ padding: "28px 32px", borderBottom: "1px solid var(--surface-hover)" }}>
+            <div className="skeleton" style={{ width: 140, height: 14, background: "var(--surface-hover)", borderRadius: 4, marginBottom: 16 }} />
             <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-              <div className="skeleton" style={{ width: 88, height: 88, borderRadius: "50%", background: "#F0F0F0", flexShrink: 0 }} />
+              <div className="skeleton" style={{ width: 88, height: 88, borderRadius: "50%", background: "var(--surface-hover)", flexShrink: 0 }} />
               <div style={{ flex: 1 }}>
-                <div className="skeleton" style={{ height: 42, background: "#F0F0F0", borderRadius: 9, width: "100%", marginBottom: 10 }} />
-                <div className="skeleton" style={{ height: 38, background: "#F0F0F0", borderRadius: 9, width: 120 }} />
+                <div className="skeleton" style={{ height: 42, background: "var(--surface-hover)", borderRadius: 9, width: "100%", marginBottom: 10 }} />
+                <div className="skeleton" style={{ height: 38, background: "var(--surface-hover)", borderRadius: 9, width: 120 }} />
               </div>
             </div>
           </div>
           {[0, 1, 2].map((i) => (
-            <div key={i} style={{ padding: "16px 32px", borderBottom: "1px solid #F0F0F0", display: "flex", alignItems: "center", gap: 12 }}>
-              <div className="skeleton" style={{ width: 32, height: 32, borderRadius: "50%", background: "#F0F0F0", flexShrink: 0 }} />
+            <div key={i} style={{ padding: "16px 32px", borderBottom: "1px solid var(--surface-hover)", display: "flex", alignItems: "center", gap: 12 }}>
+              <div className="skeleton" style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--surface-hover)", flexShrink: 0 }} />
               <div style={{ flex: 1 }}>
-                <div className="skeleton" style={{ height: 13, background: "#F0F0F0", borderRadius: 4, width: "55%", marginBottom: 6 }} />
-                <div className="skeleton" style={{ height: 11, background: "#F0F0F0", borderRadius: 4, width: "70%" }} />
+                <div className="skeleton" style={{ height: 13, background: "var(--surface-hover)", borderRadius: 4, width: "55%", marginBottom: 6 }} />
+                <div className="skeleton" style={{ height: 11, background: "var(--surface-hover)", borderRadius: 4, width: "70%" }} />
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                <div className="skeleton" style={{ height: 22, width: 52, borderRadius: 999, background: "#F0F0F0" }} />
-                <div className="skeleton" style={{ height: 22, width: 52, borderRadius: 999, background: "#F0F0F0" }} />
+                <div className="skeleton" style={{ height: 22, width: 52, borderRadius: 999, background: "var(--surface-hover)" }} />
+                <div className="skeleton" style={{ height: 22, width: 52, borderRadius: 999, background: "var(--surface-hover)" }} />
               </div>
             </div>
           ))}
@@ -415,7 +416,7 @@ function WorkspaceTab({
             zIndex: 50,
             padding: "10px 18px",
             borderRadius: 10,
-            background: "#111",
+            background: "var(--text-heading)",
             color: "white",
             fontSize: 14,
             fontWeight: 500,
@@ -448,7 +449,7 @@ function WorkspaceTab({
           alignItems: "flex-start",
           gap: 24,
           padding: "28px 32px",
-          borderBottom: "1px solid #F0F0F0",
+          borderBottom: "1px solid var(--surface-hover)",
         }}
       >
         {/* Logo upload */}
@@ -548,7 +549,7 @@ function WorkspaceTab({
 
         {/* Workspace name */}
         <div style={{ flex: 1 }}>
-          <label style={{ fontSize: 13, fontWeight: 500, color: "#555", display: "block", marginBottom: 6 }}>
+          <label style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", display: "block", marginBottom: 6 }}>
             Workspace name
           </label>
           <input
@@ -560,8 +561,8 @@ function WorkspaceTab({
             style={{
               height: 42,
               borderRadius: 9,
-              border: "1.5px solid #E5E5E5",
-              background: "#FAFAFA",
+              border: "1.5px solid var(--border)",
+              background: "var(--surface-input)",
               padding: "0 12px",
               fontSize: 15,
               color: "var(--text-heading)",
@@ -576,8 +577,8 @@ function WorkspaceTab({
               e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)";
             }}
             onBlur={(e) => {
-              e.target.style.borderColor = "#E5E5E5";
-              e.target.style.background = "#FAFAFA";
+              e.target.style.borderColor = "var(--border)";
+              e.target.style.background = "var(--surface-input)";
               e.target.style.boxShadow = "none";
             }}
           />
@@ -634,7 +635,7 @@ function WorkspaceTab({
 
       {/* Members section inside the card */}
       <div style={{ padding: "0 32px 32px" }}>
-        <div style={{ margin: "28px 0 0", height: 1, background: "#F0F0F0" }} aria-hidden />
+        <div style={{ margin: "28px 0 0", height: 1, background: "var(--surface-hover)" }} aria-hidden />
         <MembersTab workspaceId={workspaceId} loading={loading} />
       </div>
 
@@ -738,7 +739,7 @@ function ChangeEmailModal({ onClose }: { onClose: () => void }) {
       >
         {/* Header */}
         <div style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px", borderBottom: "1px solid var(--border)" }}>
-          <span style={{ fontSize: 16, fontWeight: 600, color: "#111" }}>Change email address</span>
+          <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text-heading)" }}>Change email address</span>
           <button type="button" onClick={onClose} style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", borderRadius: 6, cursor: "pointer", color: "#777" }}>
             <X size={16} />
           </button>
@@ -748,40 +749,40 @@ function ChangeEmailModal({ onClose }: { onClose: () => void }) {
           {success ? (
             <div style={{ textAlign: "center", padding: "12px 0 8px" }}>
               <Check size={32} color="var(--color-success-solid)" style={{ margin: "0 auto 12px" }} />
-              <p style={{ fontSize: 17, fontWeight: 600, color: "#111", margin: "0 0 8px" }}>Confirmation email sent!</p>
+              <p style={{ fontSize: 17, fontWeight: 600, color: "var(--text-heading)", margin: "0 0 8px" }}>Confirmation email sent!</p>
               <p style={{ fontSize: 14, color: "#777", margin: 0 }}>Check {newEmail} for a confirmation link.</p>
             </div>
           ) : (
             <form onSubmit={(e) => { void handleSubmit(e); }}>
               {/* Info note */}
-              <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 10, padding: "12px 14px", display: "flex", gap: 10, marginBottom: 20, alignItems: "flex-start" }}>
+              <div style={{ background: "var(--brand-subtle)", border: "1px solid var(--brand-muted)", borderRadius: 10, padding: "12px 14px", display: "flex", gap: 10, marginBottom: 20, alignItems: "flex-start" }}>
                 <Mail size={16} color="var(--brand)" style={{ flexShrink: 0, marginTop: 1 }} />
-                <span style={{ fontSize: 13, color: "#1462C4", lineHeight: 1.5 }}>
+                <span style={{ fontSize: 13, color: "var(--brand-hover)", lineHeight: 1.5 }}>
                   We&apos;ll send a confirmation link to your new email address. Your email won&apos;t change until you click the link.
                 </span>
               </div>
 
-              <label style={{ fontSize: 13, fontWeight: 500, color: "#555", display: "block", marginBottom: 6 }}>New email address</label>
+              <label style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", display: "block", marginBottom: 6 }}>New email address</label>
               <input
                 type="email"
                 value={newEmail}
                 onChange={(e) => setNewEmail(e.target.value)}
                 required
-                style={{ height: 42, borderRadius: 9, border: "1.5px solid #E5E5E5", background: "#FAFAFA", padding: "0 12px", fontSize: 15, color: "#111", width: "100%", outline: "none", boxSizing: "border-box", marginBottom: 14 }}
+                style={{ height: 42, borderRadius: 9, border: "1.5px solid var(--border)", background: "var(--surface-input)", padding: "0 12px", fontSize: 15, color: "var(--text-heading)", width: "100%", outline: "none", boxSizing: "border-box", marginBottom: 14 }}
                 onFocus={(e) => { e.target.style.borderColor = "var(--brand)"; e.target.style.background = "white"; e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)"; }}
-                onBlur={(e) => { e.target.style.borderColor = "#E5E5E5"; e.target.style.background = "#FAFAFA"; e.target.style.boxShadow = "none"; }}
+                onBlur={(e) => { e.target.style.borderColor = "var(--border)"; e.target.style.background = "var(--surface-input)"; e.target.style.boxShadow = "none"; }}
               />
 
-              <label style={{ fontSize: 13, fontWeight: 500, color: "#555", display: "block", marginBottom: 6 }}>Current password</label>
+              <label style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", display: "block", marginBottom: 6 }}>Current password</label>
               <div style={{ position: "relative" }}>
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  style={{ height: 42, borderRadius: 9, border: "1.5px solid #E5E5E5", background: "#FAFAFA", padding: "0 40px 0 12px", fontSize: 15, color: "#111", width: "100%", outline: "none", boxSizing: "border-box" }}
+                  style={{ height: 42, borderRadius: 9, border: "1.5px solid var(--border)", background: "var(--surface-input)", padding: "0 40px 0 12px", fontSize: 15, color: "var(--text-heading)", width: "100%", outline: "none", boxSizing: "border-box" }}
                   onFocus={(e) => { e.target.style.borderColor = "var(--brand)"; e.target.style.background = "white"; e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)"; }}
-                  onBlur={(e) => { e.target.style.borderColor = "#E5E5E5"; e.target.style.background = "#FAFAFA"; e.target.style.boxShadow = "none"; }}
+                  onBlur={(e) => { e.target.style.borderColor = "var(--border)"; e.target.style.background = "var(--surface-input)"; e.target.style.boxShadow = "none"; }}
                 />
                 <button
                   type="button"
@@ -800,7 +801,7 @@ function ChangeEmailModal({ onClose }: { onClose: () => void }) {
               )}
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
-                <button type="button" onClick={onClose} style={{ height: 38, padding: "0 16px", borderRadius: 9, border: "1px solid #E5E5E5", background: "white", color: "#555", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+                <button type="button" onClick={onClose} style={{ height: 38, padding: "0 16px", borderRadius: 9, border: "1px solid var(--border)", background: "white", color: "var(--text-secondary)", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
                   Cancel
                 </button>
                 <button
@@ -846,10 +847,10 @@ function DeleteAccountModal({ onClose }: { onClose: () => void }) {
           </p>
           <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 20 }}>
             <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} style={{ width: 16, height: 16 }} />
-            <span style={{ fontSize: 14, color: "#555" }}>I understand this is permanent</span>
+            <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>I understand this is permanent</span>
           </label>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-            <button type="button" onClick={onClose} style={{ height: 38, padding: "0 16px", borderRadius: 9, border: "1px solid #E5E5E5", background: "white", color: "#555", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+            <button type="button" onClick={onClose} style={{ height: 38, padding: "0 16px", borderRadius: 9, border: "1px solid var(--border)", background: "white", color: "var(--text-secondary)", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
               Cancel
             </button>
             <button
@@ -1042,11 +1043,11 @@ function MyAccountTab() {
   const inputStyle: React.CSSProperties = {
     height: 42,
     borderRadius: 9,
-    border: "1.5px solid #E5E5E5",
-    background: "#FAFAFA",
+    border: "1.5px solid var(--border)",
+    background: "var(--surface-input)",
     padding: "0 12px",
     fontSize: 15,
-    color: "#111",
+    color: "var(--text-heading)",
     width: "100%",
     outline: "none",
     transition: "border-color 150ms, box-shadow 150ms, background 150ms",
@@ -1055,13 +1056,13 @@ function MyAccountTab() {
 
   const sectionStyle: React.CSSProperties = {
     padding: "28px 32px",
-    borderBottom: "1px solid #F0F0F0",
+    borderBottom: "1px solid var(--surface-hover)",
   };
 
   const sectionTitleStyle: React.CSSProperties = {
     fontSize: 16,
     fontWeight: 600,
-    color: "#111",
+    color: "var(--text-heading)",
     margin: "0 0 4px",
   };
 
@@ -1077,24 +1078,24 @@ function MyAccountTab() {
     return (
       <div style={{ maxWidth: 900, width: "100%", padding: "32px 0" }}>
         <style>{`@keyframes shimmer { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } } .skeleton { animation: shimmer 1.5s ease infinite; }`}</style>
-        <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid #F0F0F0" }}>
-          <div className="skeleton" style={{ height: 22, width: 160, background: "#F0F0F0", borderRadius: 6, marginBottom: 8 }} />
-          <div className="skeleton" style={{ height: 14, width: 280, background: "#F0F0F0", borderRadius: 4 }} />
+        <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid var(--surface-hover)" }}>
+          <div className="skeleton" style={{ height: 22, width: 160, background: "var(--surface-hover)", borderRadius: 6, marginBottom: 8 }} />
+          <div className="skeleton" style={{ height: 14, width: 280, background: "var(--surface-hover)", borderRadius: 4 }} />
         </div>
         <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
-          <div style={{ padding: "28px 32px", borderBottom: "1px solid #F0F0F0" }}>
-            <div className="skeleton" style={{ width: 110, height: 14, background: "#F0F0F0", borderRadius: 4, marginBottom: 16 }} />
+          <div style={{ padding: "28px 32px", borderBottom: "1px solid var(--surface-hover)" }}>
+            <div className="skeleton" style={{ width: 110, height: 14, background: "var(--surface-hover)", borderRadius: 4, marginBottom: 16 }} />
             <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-              <div className="skeleton" style={{ width: 88, height: 88, borderRadius: "50%", background: "#F0F0F0", flexShrink: 0 }} />
+              <div className="skeleton" style={{ width: 88, height: 88, borderRadius: "50%", background: "var(--surface-hover)", flexShrink: 0 }} />
               <div style={{ flex: 1 }}>
-                <div className="skeleton" style={{ height: 42, background: "#F0F0F0", borderRadius: 9, width: "100%", marginBottom: 10 }} />
-                <div className="skeleton" style={{ height: 38, background: "#F0F0F0", borderRadius: 9, width: 120 }} />
+                <div className="skeleton" style={{ height: 42, background: "var(--surface-hover)", borderRadius: 9, width: "100%", marginBottom: 10 }} />
+                <div className="skeleton" style={{ height: 38, background: "var(--surface-hover)", borderRadius: 9, width: 120 }} />
               </div>
             </div>
           </div>
           {[0, 1, 2].map((i) => (
-            <div key={i} style={{ padding: "28px 32px", borderBottom: "1px solid #F0F0F0" }}>
-              <div className="skeleton" style={{ height: 56, background: "#F8F8F8", borderRadius: 9 }} />
+            <div key={i} style={{ padding: "28px 32px", borderBottom: "1px solid var(--surface-hover)" }}>
+              <div className="skeleton" style={{ height: 56, background: "var(--surface-subtle)", borderRadius: 9 }} />
             </div>
           ))}
         </div>
@@ -1105,13 +1106,13 @@ function MyAccountTab() {
   return (
     <div style={{ maxWidth: 900, width: "100%", padding: "32px 0" }} className="ech-content-enter pb-16">
       {toast && (
-        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 50, padding: "10px 18px", borderRadius: 10, background: "#111", color: "white", fontSize: 14, fontWeight: 500, pointerEvents: "none", whiteSpace: "nowrap" }}>
+        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 50, padding: "10px 18px", borderRadius: 10, background: "var(--text-heading)", color: "white", fontSize: 14, fontWeight: 500, pointerEvents: "none", whiteSpace: "nowrap" }}>
           {toast}
         </div>
       )}
 
       {/* Page heading */}
-      <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid #F0F0F0" }}>
+      <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid var(--surface-hover)" }}>
         <h1 className="text-lg font-semibold text-[var(--text-heading)] mb-1">
           Profile Settings
         </h1>
@@ -1137,7 +1138,7 @@ function MyAccountTab() {
                 onMouseEnter={() => setAvatarHovered(true)}
                 onMouseLeave={() => setAvatarHovered(false)}
               >
-                <div style={{ width: 88, height: 88, borderRadius: "50%", boxShadow: "0 0 0 3px #FFFFFF, 0 0 0 5px #E0E0E0", overflow: "hidden", background: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 88, height: 88, borderRadius: "50%", boxShadow: "0 0 0 3px #FFFFFF, 0 0 0 5px var(--border)", overflow: "hidden", background: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {localAvatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={localAvatarUrl} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -1171,7 +1172,7 @@ function MyAccountTab() {
 
             {/* Name field */}
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 13, fontWeight: 500, color: "#555", display: "block", marginBottom: 6 }}>Full name</label>
+              <label style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", display: "block", marginBottom: 6 }}>Full name</label>
               <input
                 type="text"
                 value={nameDraft}
@@ -1180,7 +1181,7 @@ function MyAccountTab() {
                 onKeyDown={(e) => { if (e.key === "Enter") void handleSaveName(); }}
                 style={inputStyle}
                 onFocus={(e) => { e.target.style.borderColor = "var(--brand)"; e.target.style.background = "white"; e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)"; }}
-                onBlur={(e) => { e.target.style.borderColor = "#E5E5E5"; e.target.style.background = "#FAFAFA"; e.target.style.boxShadow = "none"; }}
+                onBlur={(e) => { e.target.style.borderColor = "var(--border)"; e.target.style.background = "var(--surface-input)"; e.target.style.boxShadow = "none"; }}
               />
               <button
                 type="button"
@@ -1202,7 +1203,7 @@ function MyAccountTab() {
         {authProvider === "google" && (
           <div style={sectionStyle}>
             <p style={sectionTitleStyle}>Connected account</p>
-            <div style={{ background: "#F8F9FA", border: "1px solid #E8EAED", borderRadius: 12, padding: "16px 18px", display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ background: "var(--surface-subtle)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px 18px", display: "flex", alignItems: "center", gap: 14 }}>
               <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden>
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                 <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -1210,7 +1211,7 @@ function MyAccountTab() {
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
               </svg>
               <div style={{ flex: 1 }}>
-                <p style={{ fontSize: 15, fontWeight: 600, color: "#111", margin: 0 }}>Signed in with Google</p>
+                <p style={{ fontSize: 15, fontWeight: 600, color: "var(--text-heading)", margin: 0 }}>Signed in with Google</p>
                 <p style={{ fontSize: 13, color: "#777", margin: "2px 0 0" }}>{authEmail ?? ""}</p>
               </div>
               <a href="https://myaccount.google.com" target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "var(--brand)", fontWeight: 500, textDecoration: "none", flexShrink: 0 }}>
@@ -1230,7 +1231,7 @@ function MyAccountTab() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", minHeight: 60 }}>
             <div>
               <p style={{ fontSize: 13, color: "#777", margin: "0 0 2px" }}>Email address</p>
-              <p style={{ fontSize: 15, color: "#111", fontWeight: 500, margin: 0 }}>{authEmail ?? "—"}</p>
+              <p style={{ fontSize: 15, color: "var(--text-heading)", fontWeight: 500, margin: 0 }}>{authEmail ?? "—"}</p>
             </div>
             {authProvider === "google" ? (
               <Lock size={14} color="#BBB" />
@@ -1238,7 +1239,7 @@ function MyAccountTab() {
               <button
                 type="button"
                 onClick={() => setChangeEmailOpen(true)}
-                style={{ height: 34, padding: "0 14px", borderRadius: 8, border: "1px solid #E5E5E5", background: "white", color: "#555", fontSize: 13, fontWeight: 500, cursor: "pointer", transition: "background 150ms" }}
+                style={{ height: 34, padding: "0 14px", borderRadius: 8, border: "1px solid var(--border)", background: "white", color: "var(--text-secondary)", fontSize: 13, fontWeight: 500, cursor: "pointer", transition: "background 150ms" }}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--surface-subtle)"; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "white"; }}
               >
@@ -1259,7 +1260,7 @@ function MyAccountTab() {
           ) : (
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", minHeight: 60 }}>
               <div>
-                <p style={{ fontSize: 14, color: "#111", fontWeight: 500, margin: 0 }}>Password</p>
+                <p style={{ fontSize: 14, color: "var(--text-heading)", fontWeight: 500, margin: 0 }}>Password</p>
                 <p style={{ fontSize: 13, color: "#777", margin: "2px 0 0" }}>Last changed: unknown</p>
               </div>
               <button
@@ -1270,9 +1271,9 @@ function MyAccountTab() {
                   height: 34,
                   padding: "0 14px",
                   borderRadius: 8,
-                  border: "1px solid #E5E5E5",
+                  border: "1px solid var(--border)",
                   background: passwordResetSent ? "var(--color-success-bg)" : "white",
-                  color: passwordResetSent ? "var(--color-success-solid)" : "#555",
+                  color: passwordResetSent ? "var(--color-success-solid)" : "var(--text-secondary)",
                   fontSize: 13,
                   fontWeight: 500,
                   cursor: passwordResetLoading || passwordResetSent ? "default" : "pointer",
@@ -1420,14 +1421,14 @@ function daysUntil(ts: SerializedTs): number {
 }
 
 const MEMBER_AVATAR_COLORS = [
-  { bg: "#EBF4FF", text: "#1462C4" },
-  { bg: "#D1FAE5", text: "#065F46" },
-  { bg: "#FEE2E2", text: "#991B1B" },
-  { bg: "#EDE9FE", text: "#5B21B6" },
-  { bg: "#FEF3C7", text: "#92400E" },
-  { bg: "#FCE7F3", text: "#9D174D" },
-  { bg: "#E0F2FE", text: "#0C4A6E" },
-  { bg: "#F0FDF4", text: "#14532D" },
+  { bg: "var(--brand-subtle)", text: "var(--brand-hover)" },
+  { bg: "var(--color-success-bg)", text: "var(--color-success)" },
+  { bg: "var(--color-danger-bg)", text: "var(--color-danger)" },
+  { bg: "var(--color-insight-bg)", text: "var(--color-insight)" },
+  { bg: "var(--color-warning-bg)", text: "var(--color-warning-text)" },
+  { bg: "var(--color-danger-bg)", text: "var(--color-danger)" },
+  { bg: "var(--brand-subtle)", text: "var(--brand-text)" },
+  { bg: "var(--color-success-bg)", text: "var(--color-success)" },
 ];
 
 function getAvatarColor(email: string): { bg: string; text: string } {
@@ -1476,34 +1477,34 @@ function MembersTableSkeleton() {
       {[0, 1, 2].map((i) => (
         <div
           key={i}
-          className="hidden md:grid items-center border-b border-[#F0F0F0] last:border-b-0 bg-white"
+          className="hidden md:grid items-center border-b border-[var(--surface-hover)] last:border-b-0 bg-white"
           style={{ gridTemplateColumns: TABLE_COLS, minHeight: 56, padding: "12px 16px" }}
         >
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="h-8 w-8 rounded-full bg-muted animate-pulse shrink-0" />
+            <div className="h-8 w-8 rounded-full bg-[var(--surface-hover)] animate-pulse shrink-0" />
             <div className="flex flex-col gap-1 flex-1 min-w-0">
-              <div className="h-[14px] bg-muted animate-pulse rounded" style={{ width: "75%" }} />
-              <div className="h-[12px] bg-muted animate-pulse rounded" style={{ width: "50%" }} />
+              <div className="h-[14px] bg-[var(--surface-hover)] animate-pulse rounded" style={{ width: "75%" }} />
+              <div className="h-[12px] bg-[var(--surface-hover)] animate-pulse rounded" style={{ width: "50%" }} />
             </div>
           </div>
-          <div className="h-[14px] w-16 bg-muted animate-pulse rounded" />
-          <div className="h-[14px] w-24 bg-muted animate-pulse rounded" />
-          <div className="h-[14px] w-14 bg-muted animate-pulse rounded" />
+          <div className="h-[14px] w-16 bg-[var(--surface-hover)] animate-pulse rounded" />
+          <div className="h-[14px] w-24 bg-[var(--surface-hover)] animate-pulse rounded" />
+          <div className="h-[14px] w-14 bg-[var(--surface-hover)] animate-pulse rounded" />
           <div />
         </div>
       ))}
       {[0, 1, 2].map((i) => (
         <div
           key={`m${i}`}
-          className="md:hidden p-4 border-b border-[#F0F0F0] last:border-b-0 animate-pulse"
+          className="md:hidden p-4 border-b border-[var(--surface-hover)] last:border-b-0 animate-pulse"
         >
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-[#F0F0F0] shrink-0" />
+            <div className="w-8 h-8 rounded-full bg-[var(--surface-hover)] shrink-0" />
             <div className="flex-1 space-y-1.5">
-              <div className="h-3 bg-[#F0F0F0] rounded w-32" />
-              <div className="h-2.5 bg-[#F0F0F0] rounded w-44" />
+              <div className="h-3 bg-[var(--surface-hover)] rounded w-32" />
+              <div className="h-2.5 bg-[var(--surface-hover)] rounded w-44" />
             </div>
-            <div className="h-5 bg-[#F0F0F0] rounded-full w-14" />
+            <div className="h-5 bg-[var(--surface-hover)] rounded-full w-14" />
           </div>
         </div>
       ))}
@@ -1558,9 +1559,9 @@ function MembersTableRow({
     ) : (
       <span
         className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center"
-        style={{ background: "#F0F0F0", border: "1.5px dashed #D0D0D0" }}
+        style={{ background: "var(--surface-hover)", border: "1.5px dashed var(--border-strong)" }}
       >
-        <Mail size={14} color="#BBBBBB" />
+        <Mail size={14} color="var(--text-placeholder)" />
       </span>
     );
 
@@ -1583,7 +1584,7 @@ function MembersTableRow({
       )
     ) : (
       <div className="min-w-0">
-        <p className="text-[14px] text-[#AAAAAA] italic" style={{ lineHeight: "1.3" }}>
+        <p className="text-[14px] text-[var(--text-tertiary)] italic" style={{ lineHeight: "1.3" }}>
           Invited
         </p>
         <p className="text-[14px] text-[var(--text-secondary)] truncate" style={{ marginTop: 1 }}>
@@ -1593,16 +1594,16 @@ function MembersTableRow({
     );
 
   const roleBadge = (
-    <span className={row.status === "pending" ? "text-sm font-semibold text-foreground/50" : "text-sm font-semibold text-foreground"}>
+    <span className={row.status === "pending" ? "text-sm font-semibold text-[var(--text-heading)]/50" : "text-sm font-semibold text-[var(--text-heading)]"}>
       {row.role === "OWNER" ? "Owner" : "Member"}
     </span>
   );
 
   const statusBadge =
     row.status === "active" ? (
-      <span className="text-sm font-semibold text-foreground">Active</span>
+      <span className="text-sm font-semibold text-[var(--text-heading)]">Active</span>
     ) : (
-      <span className="text-sm font-semibold text-foreground/50">Pending</span>
+      <span className="text-sm font-semibold text-[var(--text-heading)]/50">Pending</span>
     );
 
   const removeConfirm = (
@@ -1674,12 +1675,12 @@ function MembersTableRow({
     <>
       {/* Desktop row */}
       <div
-        className="hidden md:grid items-center border-b border-[#F0F0F0] last:border-b-0 cursor-pointer transition-colors"
+        className="hidden md:grid items-center border-b border-[var(--surface-hover)] last:border-b-0 cursor-pointer transition-colors"
         style={{
           gridTemplateColumns: TABLE_COLS,
           minHeight: 56,
           padding: "12px 16px",
-          background: row.status === "pending" ? "#FEFEFE" : hovered ? "#FAFAFA" : "white",
+          background: row.status === "pending" ? "var(--surface-card)" : hovered ? "var(--surface-input)" : "white",
           transition: "background 120ms ease",
         }}
         onMouseEnter={() => setHovered(true)}
@@ -1690,15 +1691,15 @@ function MembersTableRow({
           {nameBlock}
         </div>
         <div>{roleBadge}</div>
-        <div className={row.status === "pending" ? "text-sm font-semibold text-foreground/50" : "text-sm font-semibold text-foreground"}>{formatDateAdded(row.joinedAt)}</div>
+        <div className={row.status === "pending" ? "text-sm font-semibold text-[var(--text-heading)]/50" : "text-sm font-semibold text-[var(--text-heading)]"}>{formatDateAdded(row.joinedAt)}</div>
         <div>{statusBadge}</div>
         {actionsDesktop}
       </div>
 
       {/* Mobile card */}
       <div
-        className="md:hidden p-4 border-b border-[#F0F0F0] last:border-b-0"
-        style={{ background: row.status === "pending" ? "#FEFEFE" : "white" }}
+        className="md:hidden p-4 border-b border-[var(--surface-hover)] last:border-b-0"
+        style={{ background: row.status === "pending" ? "var(--surface-card)" : "white" }}
       >
         <div className="flex items-center gap-3">
           {avatarNode}
@@ -1714,7 +1715,7 @@ function MembersTableRow({
               )
             ) : (
               <>
-                <p className="text-[14px] text-[#AAAAAA] italic">Invited</p>
+                <p className="text-[14px] text-[var(--text-tertiary)] italic">Invited</p>
                 <p className="text-[14px] text-[var(--text-secondary)] truncate">{row.email}</p>
               </>
             )}
@@ -1723,7 +1724,7 @@ function MembersTableRow({
         </div>
         <div className="flex items-center gap-3 mt-2 pl-11">
           {roleBadge}
-          <span className="text-[12px] text-[#AAAAAA]">{formatDateAdded(row.joinedAt)}</span>
+          <span className="text-[12px] text-[var(--text-tertiary)]">{formatDateAdded(row.joinedAt)}</span>
         </div>
         {row.status === "active" && !isOwner && isWorkspaceOwner && (
           <div className="flex items-center gap-2 mt-2 pl-11">
@@ -1871,7 +1872,7 @@ function MembersTab({
     <div className="pb-16 ech-content-enter">
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-lg bg-neutral-900 text-white text-sm font-medium shadow-lg pointer-events-none whitespace-nowrap">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-lg bg-[var(--text-heading)] text-white text-sm font-medium shadow-lg pointer-events-none whitespace-nowrap">
           {toast}
         </div>
       )}
@@ -1882,7 +1883,7 @@ function MembersTab({
           <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--text-heading)", lineHeight: "1.3" }}>
             Members
           </h2>
-          <p className="text-sm font-medium text-foreground/60" style={{ marginTop: 4, fontSize: 15, fontWeight: 500 }}>
+          <p className="text-sm font-medium text-[var(--text-heading)]/60" style={{ marginTop: 4, fontSize: 15, fontWeight: 500 }}>
             {totalMembers} member{totalMembers !== 1 ? "s" : ""}
             {totalPending > 0 && ` · ${totalPending} pending`}
           </p>
@@ -1903,7 +1904,7 @@ function MembersTab({
       {/* Header Row 2: Search + Filters */}
       <div className="flex items-center flex-wrap gap-[10px]" style={{ marginTop: 16 }}>
         <div className="relative" style={{ flex: 1, minWidth: 180 }}>
-          <span className="absolute inset-y-0 left-[11px] flex items-center pointer-events-none text-foreground/50">
+          <span className="absolute inset-y-0 left-[11px] flex items-center pointer-events-none text-[var(--text-heading)]/50">
             <svg
               width="14"
               height="14"
@@ -1923,10 +1924,10 @@ function MembersTab({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name or email"
-            className="w-full outline-none placeholder:text-foreground/50"
+            className="w-full outline-none placeholder:text-[var(--text-heading)]/50"
             style={{
               height: 36,
-              background: "#F7F8FA",
+              background: "var(--surface-subtle)",
               border: "1.5px solid var(--border)",
               borderRadius: 10,
               padding: "0 12px 0 34px",
@@ -1957,7 +1958,7 @@ function MembersTab({
             borderRadius: 10,
             padding: "0 10px",
             fontSize: 14,
-            color: "#444444",
+            color: "var(--text-body)",
           }}
         >
           <option value="all">All roles</option>
@@ -1977,7 +1978,7 @@ function MembersTab({
             borderRadius: 10,
             padding: "0 10px",
             fontSize: 14,
-            color: "#444444",
+            color: "var(--text-body)",
           }}
         >
           <option value="all">All members</option>
@@ -2001,16 +2002,16 @@ function MembersTab({
           style={{
             gridTemplateColumns: TABLE_COLS,
             height: 38,
-            background: "#F9FAFB",
+            background: "var(--surface-subtle)",
             borderBottom: "1px solid var(--border)",
             padding: "0 16px",
             alignItems: "center",
           }}
         >
-          <span className="text-sm font-semibold text-foreground">NAME</span>
-          <span className="text-sm font-semibold text-foreground">ROLE</span>
-          <span className="text-sm font-semibold text-foreground">DATE ADDED</span>
-          <span className="text-sm font-semibold text-foreground">STATUS</span>
+          <span className="text-sm font-semibold text-[var(--text-heading)]">NAME</span>
+          <span className="text-sm font-semibold text-[var(--text-heading)]">ROLE</span>
+          <span className="text-sm font-semibold text-[var(--text-heading)]">DATE ADDED</span>
+          <span className="text-sm font-semibold text-[var(--text-heading)]">STATUS</span>
           <span />
         </div>
 
@@ -2019,7 +2020,7 @@ function MembersTab({
           <MembersTableSkeleton />
         ) : fetchError ? (
           <div className="flex flex-col items-center justify-center py-10 gap-3">
-            <AlertCircle className="h-7 w-7 text-neutral-400" />
+            <AlertCircle className="h-7 w-7 text-[var(--text-tertiary)]" />
             <p className="text-sm text-[var(--text-secondary)]">{fetchError}</p>
             <button type="button" onClick={fetchAll} className={BTN_SECONDARY}>
               Try again
@@ -2028,15 +2029,15 @@ function MembersTab({
         ) : filteredRows.length === 0 ? (
           rows.length === 0 ? (
             <div className="flex items-center justify-center py-10">
-              <p style={{ fontSize: 14, color: "#999999" }}>No team members found</p>
+              <p style={{ fontSize: 14, color: "var(--text-tertiary)" }}>No team members found</p>
             </div>
           ) : (
             <div
               className="flex flex-col items-center justify-center gap-[10px]"
               style={{ padding: "32px 0" }}
             >
-              <Users size={32} color="#DDDDDD" />
-              <p style={{ fontSize: 14, color: "#999999" }}>No members match your search</p>
+              <Users size={32} color="var(--border-strong)" />
+              <p style={{ fontSize: 14, color: "var(--text-tertiary)" }}>No members match your search</p>
               <button
                 type="button"
                 onClick={() => { setSearch(""); setRoleFilter("all"); setStatusFilter("all"); }}
@@ -2248,7 +2249,7 @@ function SecurityTab() {
                 key={s.id}
                 className="flex items-center gap-3 py-3 px-3 rounded-lg border border-transparent hover:bg-[var(--surface-hover)]/80 hover:border-[var(--border-default)] transition-all duration-200"
               >
-                <Icon className="w-5 h-5 text-neutral-400 shrink-0" strokeWidth={1.8} />
+                <Icon className="w-5 h-5 text-[var(--text-tertiary)] shrink-0" strokeWidth={1.8} />
                 <div className="flex-1 min-w-0">
                   <p className="text-[15px] font-medium text-[var(--text-heading)]">{s.device}</p>
                   <p className={SETTING_DESC}>{s.browser} · {s.location}</p>
@@ -2271,7 +2272,7 @@ function SecurityTab() {
           aria-expanded={advancedOpen}
         >
           <span className={SECTION_TITLE}>Danger Zone</span>
-          <span className="text-neutral-500 shrink-0" aria-hidden>
+          <span className="text-[var(--text-secondary)] shrink-0" aria-hidden>
             {advancedOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
           </span>
         </button>
@@ -2311,7 +2312,7 @@ function SecurityTab() {
               </div>
             )}
             {!isWorkspaceOwner && (
-              <p className="text-sm text-neutral-500 py-2">Only the workspace owner can perform these actions.</p>
+              <p className="text-sm text-[var(--text-secondary)] py-2">Only the workspace owner can perform these actions.</p>
             )}
           </div>
         </div>
@@ -2340,13 +2341,13 @@ function SecurityTab() {
             </p>
             <form onSubmit={handleTransferSubmit} className="mt-4 space-y-4">
               <div>
-                <label htmlFor="transfer-new-owner" className="block text-sm font-medium text-neutral-700 mb-1">
+                <label htmlFor="transfer-new-owner" className="block text-sm font-medium text-[var(--text-body)] mb-1">
                   Transfer to
                 </label>
                 {transferMembersLoading ? (
-                  <p className="text-sm text-neutral-500">Loading members…</p>
+                  <p className="text-sm text-[var(--text-secondary)]">Loading members…</p>
                 ) : transferMembers.length === 0 ? (
-                  <p className="text-sm text-neutral-500">No other members to transfer to. Invite a member first.</p>
+                  <p className="text-sm text-[var(--text-secondary)]">No other members to transfer to. Invite a member first.</p>
                 ) : (
                   <select
                     id="transfer-new-owner"
@@ -2364,7 +2365,7 @@ function SecurityTab() {
                 )}
               </div>
               <div>
-                <label htmlFor="transfer-confirm-name" className="block text-sm font-medium text-neutral-700 mb-1">
+                <label htmlFor="transfer-confirm-name" className="block text-sm font-medium text-[var(--text-body)] mb-1">
                   Type <strong>{workspaceName}</strong> to confirm
                 </label>
                 <input
@@ -2374,7 +2375,7 @@ function SecurityTab() {
                   placeholder={workspaceName ?? ""}
                   value={transferConfirmName}
                   onChange={(e) => setTransferConfirmName(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text-heading)] placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:border-transparent"
+                  className="w-full px-3 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text-heading)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:border-transparent"
                 />
                 {transferError && <p className="mt-1.5 text-sm text-[var(--color-danger)]">{transferError}</p>}
               </div>
@@ -2423,7 +2424,7 @@ function SecurityTab() {
             </p>
             <form onSubmit={handleDeleteSubmit} className="mt-4 space-y-3">
               <div>
-                <label htmlFor="delete-confirm-name" className="block text-sm font-medium text-neutral-700 mb-1">
+                <label htmlFor="delete-confirm-name" className="block text-sm font-medium text-[var(--text-body)] mb-1">
                   Type <strong>{workspaceName}</strong> to confirm
                 </label>
                 <input
@@ -2433,7 +2434,7 @@ function SecurityTab() {
                   placeholder={workspaceName ?? ""}
                   value={deleteConfirmName}
                   onChange={(e) => setDeleteConfirmName(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text-heading)] placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-danger)] focus:border-transparent"
+                  className="w-full px-3 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text-heading)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-danger)] focus:border-transparent"
                 />
                 {deleteError && <p className="mt-1.5 text-sm text-[var(--color-danger)]">{deleteError}</p>}
               </div>
@@ -2451,7 +2452,7 @@ function SecurityTab() {
                   className={`inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none text-[14px] font-medium transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none ${
                     deleteConfirmName === workspaceName
                       ? "bg-[var(--color-danger)] text-white hover:opacity-95"
-                      : "bg-[var(--surface-hover)] text-neutral-400 disabled:opacity-100"
+                      : "bg-[var(--surface-hover)] text-[var(--text-tertiary)] disabled:opacity-100"
                   }`}
                 >
                   {deleteSubmitting ? "Deleting…" : "Schedule Deletion"}
@@ -2522,7 +2523,7 @@ function IntegrationsTab({ onNavigateToBilling }: { onNavigateToBilling: () => v
 
 /* ——— Billing tab: SaaS pricing, backed by /api/plans/catalog ——— */
 const BILLING_CONTAINER = "w-full";
-const BRAND_BLUE = "#1775E0";
+const BRAND_BLUE = "var(--brand)";
 
 type CatalogPlan = {
   id: "starter" | "business" | "enterprise";
@@ -2655,7 +2656,63 @@ function BillingTab() {
   const [billingPeriod, setBillingPeriod] = useState<"annual" | "monthly">("monthly");
   const [teamSize, setTeamSize] = useState("1");
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [billingError, setBillingError] = useState<string | null>(null);
   const { plans, loading } = usePlanCatalog();
+  const { isWorkspaceOwner } = useWorkspace();
+  const { plan: currentPlan, seats: currentSeats } = useBillingStore();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get("upgraded") === "true") {
+      setBillingError(null);
+    }
+  }, [searchParams]);
+
+  async function handleCheckout(cycle: "monthly" | "annual") {
+    if (!isWorkspaceOwner) return;
+    setBillingError(null);
+    setCheckoutLoading(true);
+    try {
+      const res = await authFetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ billingCycle: cycle }),
+      });
+      if (!res) { setBillingError("Request failed. Try again."); return; }
+      const json = await res.json() as { success: boolean; data?: { checkoutUrl: string }; error?: { message: string } };
+      if (!res.ok || !json.success || !json.data?.checkoutUrl) {
+        setBillingError(json.error?.message ?? "Failed to start checkout. Try again.");
+        return;
+      }
+      window.location.href = json.data.checkoutUrl;
+    } catch {
+      setBillingError("Failed to start checkout. Try again.");
+    } finally {
+      setCheckoutLoading(false);
+    }
+  }
+
+  async function handleManageBilling() {
+    if (!isWorkspaceOwner) return;
+    setBillingError(null);
+    setPortalLoading(true);
+    try {
+      const res = await authFetch("/api/billing/portal", { method: "POST" });
+      if (!res) { setBillingError("Request failed. Try again."); return; }
+      const json = await res.json() as { success: boolean; data?: { portalUrl: string }; error?: { message: string } };
+      if (!res.ok || !json.success || !json.data?.portalUrl) {
+        setBillingError(json.error?.message ?? "Failed to open billing portal. Try again.");
+        return;
+      }
+      window.location.href = json.data.portalUrl;
+    } catch {
+      setBillingError("Failed to open billing portal. Try again.");
+    } finally {
+      setPortalLoading(false);
+    }
+  }
 
   const teamSizeNumber = useMemo(() => {
     const n = Number.parseInt(teamSize, 10);
@@ -2748,8 +2805,81 @@ function BillingTab() {
     );
   }
 
+  const isOnPaidPlan = currentPlan === "business" || currentPlan === "enterprise";
+
   return (
     <div className={`flex flex-col ${BILLING_CONTAINER} pb-20`}>
+
+      {/* Current plan status card — shown for Business/Enterprise */}
+      {isOnPaidPlan && (
+        <div className="billing-container mb-8">
+          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <span className="text-lg font-semibold text-[var(--text-heading)]">
+                  {currentPlan === "enterprise" ? "Enterprise Plan" : "Business Plan"}
+                </span>
+                {currentPlan === "business" && (
+                  <span className="inline-flex items-center rounded-full bg-[var(--color-success-bg)] px-2.5 py-0.5 text-xs font-semibold text-[var(--color-success)]">
+                    Active
+                  </span>
+                )}
+              </div>
+              {isWorkspaceOwner && currentPlan === "business" && (
+                <button
+                  type="button"
+                  onClick={() => void handleManageBilling()}
+                  disabled={portalLoading}
+                  className="inline-flex h-[34px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[13px] font-medium hover:bg-[var(--surface-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  {portalLoading ? "Opening…" : "Manage Billing"}
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 text-sm">
+              <div>
+                <p className="text-[var(--text-secondary)] text-xs mb-0.5">Active seats</p>
+                <p className="font-semibold text-[var(--text-heading)]">{currentSeats}</p>
+              </div>
+              <div>
+                <p className="text-[var(--text-secondary)] text-xs mb-0.5">Feedback tickets</p>
+                <p className="font-semibold text-[var(--text-heading)]">Unlimited</p>
+              </div>
+              <div>
+                <p className="text-[var(--text-secondary)] text-xs mb-0.5">Members</p>
+                <p className="font-semibold text-[var(--text-heading)]">Unlimited</p>
+              </div>
+            </div>
+            {!isWorkspaceOwner && currentPlan === "business" && (
+              <p className="mt-4 text-sm text-[var(--text-secondary)]">
+                Contact your workspace owner to manage billing.
+              </p>
+            )}
+            {currentPlan === "enterprise" && (
+              <p className="mt-4 text-sm text-[var(--text-secondary)]">
+                Contact support for billing inquiries.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Error / success banners */}
+      {billingError && (
+        <div className="billing-container mb-4">
+          <div className="rounded-lg border border-[var(--color-danger-border)] bg-[var(--color-danger-bg)] px-4 py-3 text-sm text-[var(--color-danger)]">
+            {billingError}
+          </div>
+        </div>
+      )}
+      {searchParams.get("upgraded") === "true" && (
+        <div className="billing-container mb-4">
+          <div className="rounded-lg border border-[var(--color-success-border)] bg-[var(--color-success-bg)] px-4 py-3 text-sm text-[var(--color-success-solid)] font-medium">
+            You&apos;re now on the Business plan! Welcome aboard.
+          </div>
+        </div>
+      )}
+
       {/* Hero */}
       <header className="billing-container text-center" style={{ marginBottom: 32 }}>
         <h2
@@ -2763,7 +2893,7 @@ function BillingTab() {
       {/* Billing control bar */}
       <div className="billing-container flex flex-wrap items-center justify-center gap-8" style={{ marginBottom: 32 }}>
         <div className="flex items-center gap-2">
-          <label htmlFor="team-size" className="text-[15px] font-medium text-neutral-700">
+          <label htmlFor="team-size" className="text-[15px] font-medium text-[var(--text-body)]">
             Seats:
           </label>
           <input
@@ -2775,7 +2905,7 @@ function BillingTab() {
           />
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-[15px] font-medium text-neutral-700">Billing:</span>
+          <span className="text-[15px] font-medium text-[var(--text-body)]">Billing:</span>
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -2813,7 +2943,7 @@ function BillingTab() {
             >
               <div className="relative">
                 {plan.badge && (
-                  <span className="absolute -top-1 -right-0 rounded-full bg-[#E8F0FF] px-[10px] py-1 text-xs font-semibold text-[var(--text-heading)]">
+                  <span className="absolute -top-1 -right-0 rounded-full bg-[var(--brand-subtle)] px-[10px] py-1 text-xs font-semibold text-[var(--text-heading)]">
                     {plan.badge}
                   </span>
                 )}
@@ -2834,7 +2964,7 @@ function BillingTab() {
                     <span className="feature-icon mt-[2px]" aria-hidden>
                       <CheckMarkIcon />
                     </span>
-                    <span className="plan-feature-text text-neutral-700">{f}</span>
+                    <span className="plan-feature-text text-[var(--text-body)]">{f}</span>
                   </li>
                 ))}
               </ul>
@@ -2846,16 +2976,33 @@ function BillingTab() {
                       ? "w-full rounded-[var(--radius-btn)] px-4 py-2.5 text-sm font-semibold bg-[var(--brand)] text-white hover:brightness-110 border border-transparent"
                       : "secondary-cta w-full text-sm"
                   }
+                  disabled={
+                    (plan.id === "business" && checkoutLoading) ||
+                    (plan.id === "business" && isOnPaidPlan)
+                  }
                   onClick={() => {
                     if (plan.id === "enterprise") {
                       router.push(`/settings?tab=billing&plan=enterprise`);
                       return;
                     }
-                    if (plan.id === "starter") return; // already on starter
+                    if (plan.id === "starter") return;
+                    if (plan.id === "business") {
+                      if (isOnPaidPlan) return;
+                      if (!isWorkspaceOwner) {
+                        setBillingError("Only the workspace owner can upgrade. Contact your owner to upgrade.");
+                        return;
+                      }
+                      void handleCheckout(billingPeriod);
+                      return;
+                    }
                     router.push(`/settings?tab=billing&plan=${plan.id}&cycle=${billingPeriod}`);
                   }}
                 >
-                  {plan.cta}
+                  {plan.id === "business" && checkoutLoading
+                    ? "Redirecting…"
+                    : plan.id === "business" && isOnPaidPlan
+                    ? "Current plan"
+                    : plan.cta}
                 </Button>
               </div>
             </div>
@@ -2877,18 +3024,18 @@ function BillingTab() {
               <tbody>
                 {COMPARISON_SECTIONS.map(({ section, rows }) => (
                   <Fragment key={section}>
-                    <tr className="bg-[#F8FAFC]">
-                      <td colSpan={4} className="py-2.5 px-4 text-[14px] font-semibold tracking-[0.04em] text-neutral-700">
+                    <tr className="bg-[var(--surface-subtle)]">
+                      <td colSpan={4} className="py-2.5 px-4 text-[14px] font-semibold tracking-[0.04em] text-[var(--text-body)]">
                         {section}
                       </td>
                     </tr>
                     {rows.map((row, rowIdx) => (
                       <tr
                         key={row.feature}
-                        className={rowIdx % 2 === 1 ? "bg-[#FBFBFB]" : ""}
+                        className={rowIdx % 2 === 1 ? "bg-[var(--surface-subtle)]" : ""}
                         style={{ borderBottom: "1px solid rgba(0,0,0,0.05)" }}
                       >
-                        <td className="py-3 px-4 text-[15px] text-neutral-700">{row.feature}</td>
+                        <td className="py-3 px-4 text-[15px] text-[var(--text-body)]">{row.feature}</td>
                         {(["starter", "business", "enterprise"] as const).map((col) => {
                           const v = row[col];
                           return (
@@ -2899,7 +3046,7 @@ function BillingTab() {
                               {v === true ? (
                                 <span className="inline-flex items-center"><CheckMarkIcon /></span>
                               ) : v === false ? (
-                                <Minus className="w-5 h-5 text-neutral-300 inline" strokeWidth={2} aria-hidden />
+                                <Minus className="w-5 h-5 text-[var(--text-placeholder)] inline" strokeWidth={2} aria-hidden />
                               ) : (
                                 <span>{v}</span>
                               )}
@@ -2933,7 +3080,7 @@ function BillingTab() {
                   >
                     <span>{q}</span>
                     <ChevronDown
-                      className={`w-5 h-5 shrink-0 text-neutral-700 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                      className={`w-5 h-5 shrink-0 text-[var(--text-body)] transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
                       aria-hidden
                     />
                   </button>

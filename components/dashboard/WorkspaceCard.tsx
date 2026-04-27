@@ -231,7 +231,7 @@ export function WorkspaceCard({
 
           <div className="flex min-h-[28px] flex-wrap items-center gap-2 mb-4">
             {counts != null && counts.total > 0 ? (
-              <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--surface-hover)] text-neutral-700 tabular-nums">
+              <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--surface-hover)] text-[var(--text-body)] tabular-nums">
                 {counts.total} feedback
               </span>
             ) : null}

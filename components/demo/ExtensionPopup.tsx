@@ -71,8 +71,8 @@ export default function ExtensionPopup({
             className={
               "echly-start-session h-[38px] px-4 rounded-[var(--radius-btn)] text-[14px] font-semibold transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed " +
               (startSessionActive
-                ? "bg-[#FF4B14] text-white hover:bg-[#FF4B14] active:bg-[#E64112]"
-                : "bg-[var(--border)] text-[var(--text-body)] hover:bg-[#D1D5DB] active:bg-[#D1D5DB]")
+                ? "bg-[var(--color-warning)] text-white hover:bg-[var(--color-warning)] active:bg-[var(--color-warning)]"
+                : "bg-[var(--border)] text-[var(--text-body)] hover:bg-[var(--border-strong)] active:bg-[var(--border-strong)]")
             }
           >
             Start Session

@@ -2731,7 +2731,7 @@ export default function SessionPageClient({
               <button
                 type="button"
                 onClick={() => handleDeleteFeedback(effectiveSelectedId)}
-                className="px-4 py-2 text-[14px] font-medium rounded-xl bg-[#ef4444] text-white hover:bg-[#dc2626] focus:outline-none focus:ring-2 focus:ring-[#ef4444]/40 transition-colors duration-[120ms] cursor-pointer"
+                className="px-4 py-2 text-[14px] font-medium rounded-xl bg-[var(--color-danger)] text-white hover:bg-[var(--color-danger)] focus:outline-none focus:ring-2 focus:ring-[var(--color-danger)]/40 transition-colors duration-[120ms] cursor-pointer"
               >
                 Delete
               </button>

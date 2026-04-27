@@ -32,16 +32,16 @@ interface AssignDropdownProps {
 }
 
 const AVATAR_COLORS: { bg: string; text: string }[] = [
-  { bg: '#EBF4FF', text: '#0F5BB5' },
-  { bg: '#F3F0FF', text: '#5B21B6' },
-  { bg: '#FDF4FF', text: '#7E22CE' },
-  { bg: '#FFF0F3', text: '#9D174D' },
-  { bg: '#FFF7ED', text: '#C2410C' },
-  { bg: '#ECFDF5', text: '#059669' },
-  { bg: '#F0FDF4', text: '#166534' },
-  { bg: '#FEFCE8', text: '#854D0E' },
-  { bg: '#FFF1F2', text: '#BE123C' },
-  { bg: '#F0FDFA', text: '#115E59' },
+  { bg: 'var(--brand-subtle)', text: 'var(--brand-text)' },
+  { bg: 'var(--color-insight-bg)', text: 'var(--color-insight)' },
+  { bg: 'var(--color-insight-bg)', text: 'var(--color-insight)' },
+  { bg: 'var(--color-danger-bg)', text: 'var(--color-danger)' },
+  { bg: 'var(--color-warning-bg)', text: 'var(--color-warning-text)' },
+  { bg: 'var(--color-success-bg)', text: 'var(--color-success)' },
+  { bg: 'var(--color-success-bg)', text: 'var(--color-success)' },
+  { bg: 'var(--color-warning-bg)', text: 'var(--color-warning-text)' },
+  { bg: 'var(--color-danger-bg)', text: 'var(--color-danger)' },
+  { bg: 'var(--color-success-bg)', text: 'var(--color-success)' },
 ];
 
 function hashColor(str: string): { bg: string; text: string } {

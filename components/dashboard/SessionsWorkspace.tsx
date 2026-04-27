@@ -616,7 +616,7 @@ export function SessionsWorkspace({
                 type="button"
                 onClick={() => setSelectedSessions([])}
                 disabled={bulkBusy}
-                className="text-sm text-gray-300 hover:text-white disabled:opacity-50 inline-flex items-center gap-2"
+                className="text-sm text-[var(--text-placeholder)] hover:text-white disabled:opacity-50 inline-flex items-center gap-2"
               >
                 <X className="h-4 w-4" strokeWidth={2.5} aria-hidden />
                 Cancel

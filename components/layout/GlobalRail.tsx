@@ -294,7 +294,7 @@ export default function GlobalRail() {
                     onError={() => setLogoError(true)}
                   />
                 ) : workspaceDocLoading && !effectiveName ? (
-                  <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
+                  <div className="w-8 h-8 rounded-full bg-[var(--surface-hover)] animate-pulse" />
                 ) : (
                   displayName.trim().charAt(0).toUpperCase() || "W"
                 )}
@@ -454,7 +454,7 @@ export default function GlobalRail() {
                       )}
                       <span className="flex-1 min-w-0 truncate">{ws.name}</span>
                       {switchingTo === ws.workspaceId ? (
-                        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground ml-auto" aria-hidden />
+                        <Loader2 className="h-3 w-3 animate-spin text-[var(--text-secondary)] ml-auto" aria-hidden />
                       ) : isActive ? (
                         <Check className="h-4 w-4 shrink-0 text-[var(--brand)]" strokeWidth={2.5} aria-hidden />
                       ) : null}
@@ -480,7 +480,7 @@ export default function GlobalRail() {
                 }
               </span>
             ) : workspaceDocLoading && !effectiveName ? (
-              <div className="h-8 w-8 rounded-full bg-muted animate-pulse shrink-0" />
+              <div className="h-8 w-8 rounded-full bg-[var(--surface-hover)] animate-pulse shrink-0" />
             ) : (
               <WorkspaceInitialsAvatar name={displayName} />
             )}

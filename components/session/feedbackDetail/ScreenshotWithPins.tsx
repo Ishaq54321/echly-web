@@ -161,7 +161,7 @@ const PinMarker = memo(function PinMarker({
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
       </svg>
       {showTooltip && preview && (
-        <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1.5 rounded bg-neutral-800 text-white text-[12px] leading-snug whitespace-nowrap overflow-hidden max-w-[200px] truncate pointer-events-none z-30 shadow-lg">
+        <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1.5 rounded bg-[var(--text-heading)] text-white text-[12px] leading-snug whitespace-nowrap overflow-hidden max-w-[200px] truncate pointer-events-none z-30 shadow-lg">
           {preview}
         </span>
       )}
@@ -596,7 +596,7 @@ const ScreenshotWithPinsInner = ({
                   e.stopPropagation();
                   onEdit();
                 }}
-                className="absolute top-2.5 right-[50px] flex items-center justify-center h-[38px] w-[38px] rounded-[var(--radius-btn)] bg-neutral-800 text-white hover:bg-neutral-700 opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer focus:outline-none z-10 shadow-sm"
+                className="absolute top-2.5 right-[50px] flex items-center justify-center h-[38px] w-[38px] rounded-[var(--radius-btn)] bg-[var(--text-heading)] text-white hover:bg-[var(--text-body)] opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer focus:outline-none z-10 shadow-sm"
                 aria-label="Edit screenshot"
               >
                 <Pencil className="h-4 w-4" strokeWidth={2} />
@@ -608,7 +608,7 @@ const ScreenshotWithPinsInner = ({
                 e.stopPropagation();
                 onExpand();
               }}
-              className="absolute top-2.5 right-2.5 flex items-center justify-center h-[38px] w-[38px] rounded-[var(--radius-btn)] bg-neutral-800 text-white hover:bg-neutral-700 opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer focus:outline-none z-10 shadow-sm"
+              className="absolute top-2.5 right-2.5 flex items-center justify-center h-[38px] w-[38px] rounded-[var(--radius-btn)] bg-[var(--text-heading)] text-white hover:bg-[var(--text-body)] opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer focus:outline-none z-10 shadow-sm"
               aria-label="Expand screenshot"
             >
               <Expand className="h-4 w-4" strokeWidth={2} />

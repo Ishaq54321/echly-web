@@ -16,14 +16,14 @@ function getReturnPath(searchParams: ReturnType<typeof useSearchParams>): string
 }
 
 const inputClass =
-  "w-full h-11 rounded-[var(--radius-sm)] border border-[var(--border)] bg-white text-[var(--text-heading)] text-base pl-3 placeholder:text-gray-400 focus:outline-none focus:border-[#466EFF] focus:ring-[3px] focus:ring-[rgba(70,110,255,0.15)]";
+  "w-full h-11 rounded-[var(--radius-sm)] border border-[var(--border)] bg-white text-[var(--text-heading)] text-base pl-3 placeholder:text-[var(--text-placeholder)] focus:outline-none focus:border-[var(--brand)] focus:ring-[3px] focus:ring-[rgba(23,117,224,0.15)]";
 
 const primaryButtonClass =
   "w-full h-11 rounded-[var(--radius-sm)] text-white font-medium text-base transition-all disabled:opacity-50 hover:brightness-105 flex items-center justify-center";
 
 const primaryButtonStyle = {
-  background: "linear-gradient(135deg,#466EFF,#5F7DFF)",
-  boxShadow: "0 10px 28px rgba(70,110,255,0.28)"
+  background: "var(--brand)",
+  boxShadow: "0 10px 28px rgba(23,117,224,0.28)"
 };
 
 /** Call POST /api/auth/session to create server session cookie. Does not block on failure. */
@@ -307,7 +307,7 @@ function LoginSuspenseFallback() {
       className="relative h-full bg-[var(--surface-subtle)] flex items-center justify-center"
       aria-busy="true"
     >
-      <Loader2 className="h-8 w-8 animate-spin text-gray-400" aria-hidden />
+      <Loader2 className="h-8 w-8 animate-spin text-[var(--text-tertiary)]" aria-hidden />
     </div>
   );
 }

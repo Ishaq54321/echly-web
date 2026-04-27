@@ -203,7 +203,7 @@ export function AttachmentUploadModal({
             <button
               type="button"
               onClick={handleClose}
-              className="p-2 rounded-lg text-secondary hover:bg-[var(--surface-hover)] hover:text-neutral-700 transition-colors"
+              className="p-2 rounded-lg text-secondary hover:bg-[var(--surface-hover)] hover:text-[var(--text-body)] transition-colors"
               aria-label="Close"
             >
               <X className="h-5 w-5" strokeWidth={1.5} />
@@ -233,13 +233,13 @@ export function AttachmentUploadModal({
                 <div className="flex justify-center text-meta mb-3">
                   <Upload className="h-10 w-10" strokeWidth={1.25} />
                 </div>
-                <p className="text-sm font-medium text-neutral-700">
+                <p className="text-sm font-medium text-[var(--text-body)]">
                   Drag & drop a file here
                 </p>
                 <p className="text-sm text-secondary mt-0.5">or</p>
                 <button
                   type="button"
-                  className="mt-2 px-4 py-2 rounded-lg bg-[var(--surface-hover)] text-neutral-700 text-sm font-medium hover:bg-[var(--surface-hover)] transition-colors"
+                  className="mt-2 px-4 py-2 rounded-lg bg-[var(--surface-hover)] text-[var(--text-body)] text-sm font-medium hover:bg-[var(--surface-hover)] transition-colors"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleChooseFile();
@@ -258,7 +258,7 @@ export function AttachmentUploadModal({
 
             {!showPreview && (
               <p className="mt-4 text-sm text-secondary">
-                Max file size: <strong className="text-neutral-700">15 MB</strong>
+                Max file size: <strong className="text-[var(--text-body)]">15 MB</strong>
               </p>
             )}
 
@@ -274,7 +274,7 @@ export function AttachmentUploadModal({
                       alt=""
                       className="max-h-[220px] w-auto rounded-lg object-contain bg-[var(--surface-subtle)]"
                     />
-                    <p className="mt-2 text-sm font-medium text-neutral-700 truncate max-w-full">
+                    <p className="mt-2 text-sm font-medium text-[var(--text-body)] truncate max-w-full">
                       {selectedFile.name}
                     </p>
                     <p className="text-xs text-secondary">
@@ -287,7 +287,7 @@ export function AttachmentUploadModal({
                       <FileIcon className="h-5 w-5" strokeWidth={1.5} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-neutral-800 truncate">
+                      <p className="text-sm font-medium text-[var(--text-heading)] truncate">
                         {selectedFile.name}
                       </p>
                       <p className="text-xs text-secondary">
@@ -320,7 +320,7 @@ export function AttachmentUploadModal({
                 )}
 
                 <p className="mt-4 text-sm text-secondary">
-                  Max file size: <strong className="text-neutral-700">15 MB</strong>
+                  Max file size: <strong className="text-[var(--text-body)]">15 MB</strong>
                 </p>
               </div>
             ) : null}

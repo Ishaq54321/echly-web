@@ -5,12 +5,13 @@ export async function fetchBillingUsage() {
   if (res == null) throw new Error("Failed to fetch billing");
   if (!res.ok) throw new Error("Failed to fetch billing");
 
-  const data = await res.json();
+  const envelope = await res.json();
+  const data = envelope?.data ?? {};
 
   return {
-    plan: data?.plan ?? null,
-    feedbackTicketsUsed: data?.feedbackTicketsUsed ?? 0,
-    feedbackTicketsLimit: data?.feedbackTicketsLimit ?? null,
-    seats: data?.seats ?? 1,
+    plan: data.plan ?? null,
+    feedbackTicketsUsed: data.feedbackTicketsUsed ?? 0,
+    feedbackTicketsLimit: data.feedbackTicketsLimit ?? null,
+    seats: data.seats ?? 1,
   };
 }

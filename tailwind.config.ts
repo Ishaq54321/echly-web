@@ -18,9 +18,9 @@ const config: Config = {
           text:    "#0F5BB5",
         },
         surface: {
-          page:    "#F7F8FA",
+          page:    "#FFFFFF",
           card:    "#FFFFFF",
-          subtle:  "#F6F7F8",
+          subtle:  "#F8F8F8",
           hover:   "#F0F1F3",
           active:  "#EBF4FF",
           input:   "#FAFAFA",

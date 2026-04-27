@@ -35,7 +35,7 @@ export function Toast({
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[9999] px-4 py-2.5 rounded-lg bg-neutral-900 text-white text-sm font-medium shadow-lg transition-opacity duration-200"
+      className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[9999] px-4 py-2.5 rounded-lg bg-[var(--text-heading)] text-white text-sm font-medium shadow-lg transition-opacity duration-200"
     >
       {message}
     </div>,

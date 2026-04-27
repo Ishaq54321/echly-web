@@ -338,7 +338,7 @@ export default function SessionOverviewPage() {
           aria-busy="true"
           aria-label="Loading overview"
         >
-          <Loader2 className="h-8 w-8 animate-spin text-gray-400" strokeWidth={2} aria-hidden />
+          <Loader2 className="h-8 w-8 animate-spin text-[var(--text-tertiary)]" strokeWidth={2} aria-hidden />
         </div>
       ) : (
         <main className="px-6 py-4 max-w-6xl mx-auto">

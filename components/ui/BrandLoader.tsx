@@ -29,7 +29,7 @@ export default function BrandLoader() {
         repeatCount="indefinite"
       />
     </stop>
-    <stop offset="100%" stopColor="#38bdf8">
+    <stop offset="100%" stopColor="#C3DFFE">
       <animate
         attributeName="offset"
         values="1;2"

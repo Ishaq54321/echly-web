@@ -86,18 +86,18 @@ function daysUntilExpiry(expiresAt: { seconds: number }): number {
 const inputStyle: React.CSSProperties = {
   width: '100%',
   height: '48px',
-  background: '#F7F8FA',
+  background: 'var(--surface-subtle)',
   border: '1.5px solid var(--border)',
   borderRadius: '12px',
   padding: '0 14px',
   fontSize: '15px',
-  color: '#111111',
+  color: 'var(--text-heading)',
   outline: 'none',
   transition: 'border-color 160ms ease, box-shadow 160ms ease',
   fontFamily: 'inherit',
 };
 
-function Spinner({ size = 20, color = "#1775E0" }: { size?: number; color?: string }) {
+function Spinner({ size = 20, color = "var(--brand)" }: { size?: number; color?: string }) {
   return (
     <div
       aria-hidden
@@ -122,8 +122,8 @@ function FormError({ message }: { message: string }) {
         display: "flex",
         alignItems: "flex-start",
         gap: 8,
-        background: "#FEF2F2",
-        border: "1px solid #FECACA",
+        background: "var(--color-danger-bg)",
+        border: "1px solid var(--color-danger-border)",
         borderRadius: "8px",
         padding: "10px 12px",
         marginTop: 8,
@@ -142,15 +142,15 @@ function EmailChip({ email }: { email: string }) {
         display: "inline-flex",
         alignItems: "center",
         gap: 6,
-        background: "#F7F7F7",
+        background: "var(--surface-input)",
         border: "1px solid var(--border)",
         borderRadius: "9999px",
         padding: "4px 12px",
         marginBottom: 20,
       }}
     >
-      <Lock size={13} color="#777777" />
-      <span style={{ fontSize: 14, fontWeight: 500, color: "#333333" }}>{email}</span>
+      <Lock size={13} color="var(--text-secondary)" />
+      <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-body)" }}>{email}</span>
     </div>
   );
 }
@@ -178,7 +178,7 @@ function PrimaryButton({
       style={{
         width: "100%",
         height: 48,
-        background: "#1775E0",
+        background: "var(--brand)",
         color: "#FFFFFF",
         border: "none",
         borderRadius: 14,
@@ -224,7 +224,7 @@ function BackButton({ onClick }: { onClick: () => void }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: "#777777",
+        color: "var(--text-secondary)",
         marginBottom: 16,
         padding: 0,
       }}
@@ -271,7 +271,7 @@ function PasswordInput({
           display: 'block',
           fontSize: '13px',
           fontWeight: '500',
-          color: '#555555',
+          color: 'var(--text-secondary)',
           marginBottom: '6px',
         }}
       >
@@ -290,7 +290,7 @@ function PasswordInput({
           style={{
             ...inputStyle,
             paddingRight: '44px',
-            border: focused ? '1.5px solid #1775E0' : '1.5px solid var(--border)',
+            border: focused ? '1.5px solid var(--brand)' : '1.5px solid var(--border)',
             boxShadow: focused ? '0 0 0 3px rgba(23,117,224,0.12)' : 'none',
           }}
           onFocus={() => setFocused(true)}
@@ -311,7 +311,7 @@ function PasswordInput({
             padding: '4px',
             display: 'flex',
             alignItems: 'center',
-            color: '#999999',
+            color: 'var(--text-tertiary)',
             outline: 'none',
           }}
         >
@@ -711,7 +711,7 @@ export default function InviteAcceptPage() {
       <div
         style={{
           minHeight: "100dvh",
-          background: "#F7F8FA",
+          background: "var(--surface-subtle)",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -736,7 +736,7 @@ export default function InviteAcceptPage() {
           <div style={{ position: "relative", width: 36, height: 36, flexShrink: 0 }}>
             <Image src="/Echly_logo.svg" alt="" fill sizes="36px" style={{ objectFit: "contain" }} />
           </div>
-          <span style={{ fontSize: 22, fontWeight: 600, color: "#111111", whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: 22, fontWeight: 600, color: "var(--text-heading)", whiteSpace: "nowrap" }}>
             Echly
           </span>
         </Link>
@@ -744,8 +744,8 @@ export default function InviteAcceptPage() {
         {/* FIX 3 — card with visible shadow and border */}
         <div
           style={{
-            background: "#FFFFFF",
-            border: "1px solid #E5E5E5",
+            background: "var(--surface-card)",
+            border: "1px solid var(--border)",
             borderRadius: "24px",
             boxShadow: "0 8px 40px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)",
             width: "100%",
@@ -768,7 +768,7 @@ export default function InviteAcceptPage() {
                 }}
               >
                 <Spinner size={24} />
-                <span style={{ fontSize: 14, color: "#777777" }}>Loading invitation…</span>
+                <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>Loading invitation…</span>
               </div>
             )}
 
@@ -784,7 +784,7 @@ export default function InviteAcceptPage() {
                 }}
               >
                 <Spinner size={24} />
-                <span style={{ fontSize: 14, color: "#777777" }}>Just a moment…</span>
+                <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>Just a moment…</span>
               </div>
             )}
 
@@ -800,7 +800,7 @@ export default function InviteAcceptPage() {
                 }}
               >
                 <Spinner size={28} />
-                <span style={{ fontSize: 15, color: "#777777" }}>Joining workspace…</span>
+                <span style={{ fontSize: 15, color: "var(--text-secondary)" }}>Joining workspace…</span>
               </div>
             )}
 
@@ -809,13 +809,13 @@ export default function InviteAcceptPage() {
               <div style={{ padding: "32px 32px 28px", textAlign: "center" }}>
                 <XCircle
                   size={32}
-                  color="#777777"
+                  color="var(--text-secondary)"
                   style={{ margin: "0 auto 16px", display: "block" }}
                 />
-                <h2 style={{ fontSize: 20, fontWeight: 700, color: "#111111", marginBottom: 8 }}>
+                <h2 style={{ fontSize: 20, fontWeight: 700, color: "var(--text-heading)", marginBottom: 8 }}>
                   {state.invalidReason === "expired" ? "Invite expired" : "Invite not valid"}
                 </h2>
-                <p style={{ fontSize: 14, color: "#777777", lineHeight: 1.5 }}>
+                <p style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.5 }}>
                   {state.invalidReason === "expired"
                     ? "This invitation has expired. Ask your workspace admin to send a new one."
                     : "This invitation link is no longer valid."}
@@ -841,7 +841,7 @@ export default function InviteAcceptPage() {
                     width: "64px",
                     height: "64px",
                     borderRadius: "50%",
-                    background: "#1775E0",
+                    background: "var(--brand)",
                     color: "#FFFFFF",
                     fontSize: "26px",
                     fontWeight: "700",
@@ -859,7 +859,7 @@ export default function InviteAcceptPage() {
                 <p
                   style={{
                     fontSize: "14px",
-                    color: "#777777",
+                    color: "var(--text-secondary)",
                     marginBottom: "4px",
                     fontWeight: "400",
                   }}
@@ -872,7 +872,7 @@ export default function InviteAcceptPage() {
                   style={{
                     fontSize: "22px",
                     fontWeight: "700",
-                    color: "#111111",
+                    color: "var(--text-heading)",
                     letterSpacing: "-0.3px",
                     marginBottom: "20px",
                     lineHeight: "1.2",
@@ -885,7 +885,7 @@ export default function InviteAcceptPage() {
                 <div
                   style={{
                     height: 1,
-                    background: "#EDEDED",
+                    background: "var(--surface-hover)",
                     margin: "0 -32px 20px",
                     alignSelf: "stretch",
                   }}
@@ -900,20 +900,20 @@ export default function InviteAcceptPage() {
                     gap: "6px",
                     marginBottom: "24px",
                     fontSize: "14px",
-                    color: "#777777",
+                    color: "var(--text-secondary)",
                   }}
                 >
                   <span>You&apos;ll join as</span>
                   {/* FIX 5 — member badge */}
                   <span
                     style={{
-                      background: "#F4F4F4",
-                      border: "1px solid #E0E0E0",
+                      background: "var(--surface-input)",
+                      border: "1px solid var(--border)",
                       borderRadius: "9999px",
                       padding: "3px 10px",
                       fontSize: "13px",
                       fontWeight: "600",
-                      color: "#444444",
+                      color: "var(--text-body)",
                     }}
                   >
                     {preview.role === "OWNER" ? "Owner" : "Member"}
@@ -930,16 +930,16 @@ export default function InviteAcceptPage() {
                           display: "flex",
                           alignItems: "center",
                           gap: 6,
-                          background: "#FFFBEB",
-                          border: "1px solid #FDE68A",
+                          background: "var(--color-warning-bg)",
+                          border: "1px solid var(--color-warning-border)",
                           borderRadius: "8px",
                           padding: "8px 12px",
                           marginBottom: 16,
                           alignSelf: "stretch",
                         }}
                       >
-                        <Clock size={14} color="#92400E" style={{ flexShrink: 0 }} />
-                        <span style={{ fontSize: 13, color: "#92400E" }}>
+                        <Clock size={14} color="var(--color-warning-text)" style={{ flexShrink: 0 }} />
+                        <span style={{ fontSize: 13, color: "var(--color-warning-text)" }}>
                           Expires in{" "}
                           {days <= 0
                             ? "less than a day"
@@ -960,7 +960,7 @@ export default function InviteAcceptPage() {
                     style={{
                       width: "100%",
                       height: "52px",
-                      background: "#1775E0",
+                      background: "var(--brand)",
                       color: "#FFFFFF",
                       border: "none",
                       borderRadius: "14px",
@@ -997,14 +997,14 @@ export default function InviteAcceptPage() {
                   style={{
                     fontSize: 20,
                     fontWeight: 700,
-                    color: "#111111",
+                    color: "var(--text-heading)",
                     letterSpacing: "-0.3px",
                     marginBottom: 4,
                   }}
                 >
                   Login to Accept
                 </h2>
-                <p style={{ fontSize: 14, color: "#777777", marginBottom: 12 }}>
+                <p style={{ fontSize: 14, color: "var(--text-secondary)", marginBottom: 12 }}>
                   Signing in as
                 </p>
                 <EmailChip email={preview.email} />
@@ -1031,7 +1031,7 @@ export default function InviteAcceptPage() {
                     onClick={() => void handleForgotPassword()}
                     style={{
                       fontSize: 13,
-                      color: "#1260BE",
+                      color: "var(--brand-hover)",
                       textAlign: "right",
                       display: "block",
                       marginLeft: "auto",
@@ -1075,7 +1075,7 @@ export default function InviteAcceptPage() {
                   style={{
                     fontSize: 20,
                     fontWeight: 700,
-                    color: "#111111",
+                    color: "var(--text-heading)",
                     letterSpacing: "-0.3px",
                     marginBottom: 20,
                   }}
@@ -1103,7 +1103,7 @@ export default function InviteAcceptPage() {
                         display: 'block',
                         fontSize: '13px',
                         fontWeight: '500',
-                        color: '#555555',
+                        color: 'var(--text-secondary)',
                         marginBottom: '6px',
                       }}
                     >
@@ -1167,7 +1167,7 @@ export default function InviteAcceptPage() {
                     width: 56,
                     height: 56,
                     borderRadius: "50%",
-                    background: "#F0FDF4",
+                    background: "var(--color-success-bg)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -1180,20 +1180,20 @@ export default function InviteAcceptPage() {
                   style={{
                     fontSize: 20,
                     fontWeight: 700,
-                    color: "#111111",
+                    color: "var(--text-heading)",
                     marginBottom: 8,
                   }}
                 >
                   Check your email
                 </h2>
-                <p style={{ fontSize: 14, color: "#777777", lineHeight: 1.5 }}>
+                <p style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.5 }}>
                   We sent a password reset link to
                 </p>
                 <p
                   style={{
                     fontSize: 14,
                     fontWeight: 600,
-                    color: "#333333",
+                    color: "var(--text-body)",
                     marginTop: 4,
                   }}
                 >
@@ -1202,7 +1202,7 @@ export default function InviteAcceptPage() {
                 <p
                   style={{
                     fontSize: 14,
-                    color: "#777777",
+                    color: "var(--text-secondary)",
                     marginTop: 8,
                     lineHeight: 1.5,
                   }}
@@ -1216,12 +1216,12 @@ export default function InviteAcceptPage() {
                     marginTop: 20,
                     width: "100%",
                     height: 44,
-                    background: "#F7F7F7",
+                    background: "var(--surface-input)",
                     border: "1px solid var(--border)",
                     borderRadius: 14,
                     fontSize: 15,
                     fontWeight: 600,
-                    color: "#333333",
+                    color: "var(--text-body)",
                     cursor: "pointer",
                     fontFamily: "inherit",
                   }}
@@ -1239,7 +1239,7 @@ export default function InviteAcceptPage() {
                     width: 64,
                     height: 64,
                     borderRadius: "50%",
-                    background: "#F0FDF4",
+                    background: "var(--color-success-bg)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -1264,14 +1264,14 @@ export default function InviteAcceptPage() {
                   style={{
                     fontSize: 24,
                     fontWeight: 700,
-                    color: "#111111",
+                    color: "var(--text-heading)",
                     letterSpacing: "-0.4px",
                     marginBottom: 6,
                   }}
                 >
                   You&apos;re in!
                 </h2>
-                <p style={{ fontSize: 15, color: "#777777" }}>
+                <p style={{ fontSize: 15, color: "var(--text-secondary)" }}>
                   Taking you to {preview.workspaceName}…
                 </p>
                 {/* Countdown dots: n fills when n + countdown <= 4 */}
@@ -1291,7 +1291,7 @@ export default function InviteAcceptPage() {
                         width: 8,
                         height: 8,
                         borderRadius: "50%",
-                        background: n + countdown <= 4 ? "#1775E0" : "#EDEDED",
+                        background: n + countdown <= 4 ? "var(--brand)" : "var(--surface-hover)",
                         transition: "background 300ms ease",
                       }}
                     />
@@ -1306,27 +1306,27 @@ export default function InviteAcceptPage() {
                 <div style={{ textAlign: "center", marginBottom: 20 }}>
                   <AlertCircle
                     size={32}
-                    color="#92400E"
+                    color="var(--color-warning-text)"
                     style={{ margin: "0 auto 16px", display: "block" }}
                   />
                   <h2
                     style={{
                       fontSize: 20,
                       fontWeight: 700,
-                      color: "#111111",
+                      color: "var(--text-heading)",
                       marginBottom: 8,
                     }}
                   >
                     Wrong account
                   </h2>
-                  <p style={{ fontSize: 14, color: "#777777" }}>
+                  <p style={{ fontSize: 14, color: "var(--text-secondary)" }}>
                     This invite was sent to
                   </p>
                   <span
                     style={{
                       fontSize: 14,
                       fontWeight: 600,
-                      color: "#111111",
+                      color: "var(--text-heading)",
                       display: "block",
                     }}
                   >
@@ -1335,7 +1335,7 @@ export default function InviteAcceptPage() {
                   <span
                     style={{
                       fontSize: 13,
-                      color: "#777777",
+                      color: "var(--text-secondary)",
                       marginTop: 4,
                       display: "block",
                     }}
@@ -1357,12 +1357,12 @@ export default function InviteAcceptPage() {
                   style={{
                     width: "100%",
                     height: 44,
-                    background: "#F7F7F7",
+                    background: "var(--surface-input)",
                     border: "1px solid var(--border)",
                     borderRadius: 14,
                     fontSize: 15,
                     fontWeight: 600,
-                    color: "#333333",
+                    color: "var(--text-body)",
                     cursor: "pointer",
                     fontFamily: "inherit",
                     display: "flex",
@@ -1371,7 +1371,7 @@ export default function InviteAcceptPage() {
                     gap: 8,
                   }}
                 >
-                  <LogOut size={15} color="#555555" />
+                  <LogOut size={15} color="var(--text-secondary)" />
                   Sign out and try again
                 </button>
               </div>

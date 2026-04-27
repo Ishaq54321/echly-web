@@ -16,8 +16,8 @@ export default function NoWorkspacePage() {
         {/* Icon */}
         <div style={{ width: 60, height: 60, marginBottom: 20 }}>
           <svg viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg" width={60} height={60}>
-            <rect x="4" y="14" width="30" height="30" rx="7" stroke="var(--ink-7, #d1d5db)" strokeWidth="2.5" fill="none" />
-            <rect x="26" y="16" width="30" height="30" rx="7" stroke="var(--ink-7, #d1d5db)" strokeWidth="2.5" fill="none" />
+            <rect x="4" y="14" width="30" height="30" rx="7" stroke="var(--border-strong)" strokeWidth="2.5" fill="none" />
+            <rect x="26" y="16" width="30" height="30" rx="7" stroke="var(--border-strong)" strokeWidth="2.5" fill="none" />
           </svg>
         </div>
 
@@ -29,7 +29,7 @@ export default function NoWorkspacePage() {
         </h1>
 
         <p
-          className="text-gray-400"
+          className="text-[var(--text-tertiary)]"
           style={{ fontSize: 15, lineHeight: 1.6, maxWidth: 340, marginBottom: 28 }}
         >
           You&apos;ve been removed from your workspace, or your invitation has expired.
@@ -40,7 +40,7 @@ export default function NoWorkspacePage() {
           <Link
             href="/onboarding"
             className="w-full flex items-center justify-center text-white font-medium rounded-xl transition hover:brightness-105"
-            style={{ height: 44, background: "linear-gradient(135deg, #466EFF, #5F7DFF)", fontSize: 15 }}
+            style={{ height: 44, background: "var(--brand)", fontSize: 15 }}
           >
             Create a workspace
           </Link>
@@ -55,12 +55,12 @@ export default function NoWorkspacePage() {
           </button>
         </div>
 
-        <p className="text-gray-400 mt-8" style={{ fontSize: 13 }}>
+        <p className="text-[var(--text-tertiary)] mt-8" style={{ fontSize: 13 }}>
           Need help?{" "}
           <a
             href="mailto:support@echly.com"
             className="hover:underline"
-            style={{ color: "var(--brand-text, #466EFF)" }}
+            style={{ color: "var(--brand-text)" }}
           >
             Contact support
           </a>

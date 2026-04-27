@@ -1,11 +1,12 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check } from "lucide-react";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import { useWorkspaceUsageRealtime } from "@/lib/hooks/useWorkspaceUsageRealtime";
 import { useBillingStore } from "@/lib/store/billingStore";
+import { authFetch } from "@/lib/authFetch";
 
 export interface UpgradeModalProps {
   open: boolean;
@@ -23,11 +24,15 @@ const VALUE_BULLETS = [
 ];
 
 export function UpgradeModal({ open, onClose, message }: UpgradeModalProps) {
-  const { isIdentityReady, workspaceId } = useWorkspace();
+  const { isIdentityReady, workspaceId, isWorkspaceOwner } = useWorkspace();
   const { data: workspaceUsage } = useWorkspaceUsageRealtime({
     enabled: open && isIdentityReady && workspaceId != null && workspaceId.trim() !== "",
   });
   const { feedbackTicketsLimit, plan: cachedPlan } = useBillingStore();
+
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   const currentPlan = cachedPlan ?? workspaceUsage?.plan ?? "starter";
   const planLabel =
@@ -44,6 +49,30 @@ export function UpgradeModal({ open, onClose, message }: UpgradeModalProps) {
       ? Math.min(100, (ticketsUsed / ticketsLimit) * 100)
       : 0;
   const isFull = ticketsLimit != null && ticketsLimit > 0 && ticketsUsed >= ticketsLimit;
+
+  async function handleUpgradeClick() {
+    if (!isWorkspaceOwner) return;
+    setCheckoutError(null);
+    setCheckoutLoading(true);
+    try {
+      const res = await authFetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ billingCycle }),
+      });
+      if (!res) { setCheckoutError("Request failed. Try again."); return; }
+      const json = await res.json() as { success: boolean; data?: { checkoutUrl: string }; error?: { message: string } };
+      if (!res.ok || !json.success || !json.data?.checkoutUrl) {
+        setCheckoutError(json.error?.message ?? "Failed to start checkout. Try again.");
+        return;
+      }
+      window.location.href = json.data.checkoutUrl;
+    } catch {
+      setCheckoutError("Failed to start checkout. Try again.");
+    } finally {
+      setCheckoutLoading(false);
+    }
+  }
 
   return (
     <AnimatePresence>
@@ -101,7 +130,7 @@ export function UpgradeModal({ open, onClose, message }: UpgradeModalProps) {
             </h2>
 
             {/* Description */}
-            <p className="mt-2 text-[15px] leading-relaxed text-neutral-700">
+            <p className="mt-2 text-[15px] leading-relaxed text-[var(--text-body)]">
               {isFull
                 ? "Your workspace has reached its monthly ticket limit. Upgrade to Business for unlimited feedback collection."
                 : "Collect unlimited feedback, collaborate with your full team, and unlock deeper insights by upgrading your workspace."}
@@ -132,7 +161,7 @@ export function UpgradeModal({ open, onClose, message }: UpgradeModalProps) {
             <div className="mt-5 rounded-xl bg-[var(--surface-subtle)]/80 p-4">
               <ul className="space-y-2.5" role="list">
                 {VALUE_BULLETS.map((bullet) => (
-                  <li key={bullet} className="flex items-center gap-2.5 text-sm text-neutral-700">
+                  <li key={bullet} className="flex items-center gap-2.5 text-sm text-[var(--text-body)]">
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--brand)]/10 text-[var(--brand)]">
                       <Check className="h-3 w-3" strokeWidth={2.5} aria-hidden />
                     </span>
@@ -141,6 +170,45 @@ export function UpgradeModal({ open, onClose, message }: UpgradeModalProps) {
                 ))}
               </ul>
             </div>
+
+            {/* Billing cycle toggle — only for owners */}
+            {isWorkspaceOwner && (
+              <div className="mt-5 flex items-center gap-4">
+                <span className="text-sm font-medium text-[var(--text-secondary)]">Billing:</span>
+                <label className="flex items-center gap-1.5 cursor-pointer text-sm">
+                  <input
+                    type="radio"
+                    name="upgrade-cycle"
+                    checked={billingCycle === "monthly"}
+                    onChange={() => setBillingCycle("monthly")}
+                    className="w-4 h-4 text-[var(--brand)]"
+                  />
+                  Monthly
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer text-sm">
+                  <input
+                    type="radio"
+                    name="upgrade-cycle"
+                    checked={billingCycle === "annual"}
+                    onChange={() => setBillingCycle("annual")}
+                    className="w-4 h-4 text-[var(--brand)]"
+                  />
+                  Annual <span className="text-xs text-[var(--brand)] font-semibold ml-1">Save 20%</span>
+                </label>
+              </div>
+            )}
+
+            {/* Error */}
+            {checkoutError && (
+              <p className="mt-3 text-sm text-[var(--color-danger)]">{checkoutError}</p>
+            )}
+
+            {/* Non-owner message */}
+            {!isWorkspaceOwner && (
+              <p className="mt-4 text-sm text-[var(--text-secondary)]">
+                Contact your workspace owner to upgrade.
+              </p>
+            )}
 
             {/* Buttons */}
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
@@ -151,14 +219,16 @@ export function UpgradeModal({ open, onClose, message }: UpgradeModalProps) {
               >
                 Maybe Later
               </button>
-              <Link href="/settings?tab=billing" onClick={onClose}>
+              {isWorkspaceOwner ? (
                 <button
                   type="button"
-                  className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer"
+                  disabled={checkoutLoading}
+                  onClick={() => void handleUpgradeClick()}
+                  className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
                 >
-                  Upgrade to Business — $39/seat/mo
+                  {checkoutLoading ? "Redirecting…" : `Upgrade to Business — $${billingCycle === "annual" ? "31.20" : "39"}/seat/mo`}
                 </button>
-              </Link>
+              ) : null}
             </div>
 
           </motion.div>

@@ -248,7 +248,7 @@ export function ResumeSessionModal({
                       borderRadius: 10,
                       border: filter === key ? "1px solid rgba(59,130,246,.45)" : "1px solid transparent",
                       background: filter === key ? "rgba(59,130,246,.18)" : isLight ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.08)",
-                      color: filter === key ? "#60A5FA" : isLight ? "var(--text-heading)" : "var(--text-on-dark)",
+                      color: filter === key ? "var(--brand)" : isLight ? "var(--text-heading)" : "var(--text-on-dark)",
                       fontSize: 12,
                       fontWeight: 500,
                       cursor: "pointer",
@@ -284,7 +284,7 @@ export function ResumeSessionModal({
               <p style={{
                 margin: "0 0 20px",
                 fontSize: 14,
-                color: isLight ? "rgba(0,0,0,.6)" : "#A1A1AA",
+                color: isLight ? "rgba(0,0,0,.6)" : "var(--text-tertiary)",
                 maxWidth: 320,
               }}>
                 To view your previous sessions, please sign in to your Echly dashboard.
@@ -299,7 +299,7 @@ export function ResumeSessionModal({
                   padding: "10px 20px",
                   borderRadius: 10,
                   border: "none",
-                  background: "#1775E0",
+                  background: "var(--brand)",
                   color: "white",
                   fontSize: 14,
                   fontWeight: 600,
@@ -314,7 +314,7 @@ export function ResumeSessionModal({
             <div style={{
               padding: 24,
               textAlign: "center",
-              color: isLight ? "rgba(0,0,0,.55)" : "#A1A1AA",
+              color: isLight ? "rgba(0,0,0,.55)" : "var(--text-tertiary)",
               fontSize: 14,
             }}>
               <span className="echly-spinner" style={{ display: "inline-block", marginRight: 8, verticalAlign: "middle" }} aria-hidden />
@@ -330,7 +330,7 @@ export function ResumeSessionModal({
             <div style={{
               padding: 24,
               textAlign: "center",
-              color: isLight ? "rgba(0,0,0,.55)" : "#A1A1AA",
+              color: isLight ? "rgba(0,0,0,.55)" : "var(--text-tertiary)",
               fontSize: 14,
             }}>
               {sessions.length === 0 ? "No previous sessions yet" : "No sessions match."}
@@ -378,7 +378,7 @@ export function ResumeSessionModal({
                       <div style={{
                         fontSize: 12,
                         fontWeight: 500,
-                        color: isLight ? "rgba(0,0,0,.55)" : "#A1A1AA",
+                        color: isLight ? "rgba(0,0,0,.55)" : "var(--text-tertiary)",
                         marginTop: 4,
                       }}>
                         {feedbackCount(s)} feedback items ·{" "}
@@ -404,7 +404,7 @@ export function ResumeSessionModal({
               borderRadius: 10,
               border: isLight ? "1px solid rgba(0,0,0,0.08)" : "1px solid rgba(255,255,255,0.08)",
               background: "transparent",
-              color: isLight ? "rgba(0,0,0,.55)" : "#A1A1AA",
+              color: isLight ? "rgba(0,0,0,.55)" : "var(--text-tertiary)",
               fontSize: 13,
               fontWeight: 500,
               cursor: "pointer",

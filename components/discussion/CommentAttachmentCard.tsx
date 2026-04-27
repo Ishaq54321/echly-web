@@ -59,14 +59,14 @@ export function CommentAttachmentCard({ attachment, onImageClick }: CommentAttac
           )}
           <div className="flex items-center gap-2 mt-1">
             <FileIcon className="h-4 w-4 text-secondary shrink-0" strokeWidth={1.5} />
-            <span className="text-sm text-neutral-700 truncate min-w-0" title={name}>
+            <span className="text-sm text-[var(--text-body)] truncate min-w-0" title={name}>
               {name}
             </span>
             <a
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[var(--brand)] hover:text-[#1255b0] shrink-0 inline-flex items-center"
+              className="text-[var(--brand)] hover:text-[var(--brand-hover)] shrink-0 inline-flex items-center"
             >
               <Download className="h-5 w-5" strokeWidth={2} />
             </a>
@@ -75,14 +75,14 @@ export function CommentAttachmentCard({ attachment, onImageClick }: CommentAttac
       ) : (
         <div className="flex items-center gap-2">
           <FileIcon className="h-4 w-4 text-secondary shrink-0" strokeWidth={1.5} />
-          <span className="text-sm text-neutral-700 truncate min-w-0" title={name}>
+          <span className="text-sm text-[var(--text-body)] truncate min-w-0" title={name}>
             {name}
           </span>
           <a
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[var(--brand)] hover:text-[#1255b0] shrink-0 inline-flex items-center"
+            className="text-[var(--brand)] hover:text-[var(--brand-hover)] shrink-0 inline-flex items-center"
           >
             <Download className="h-5 w-5" strokeWidth={2} />
           </a>

@@ -1,4 +1,5 @@
 import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
+import type { Workspace } from "@/lib/domain/workspace";
 
 export interface WorkspaceUsage {
   memberCount: number;
@@ -7,13 +8,14 @@ export interface WorkspaceUsage {
 
 /**
  * Returns current usage counts for a workspace. Used for limit checks and billing.
+ * Pass a pre-fetched workspace to avoid an extra Firestore read.
  */
-export async function getWorkspaceUsage(workspaceId: string): Promise<WorkspaceUsage | null> {
-  const workspace = await getWorkspace(workspaceId);
-  if (!workspace) return null;
+export async function getWorkspaceUsage(workspaceId: string, workspace?: Workspace): Promise<WorkspaceUsage | null> {
+  const ws = workspace ?? await getWorkspace(workspaceId);
+  if (!ws) return null;
 
-  const memberCount = workspace.usage?.members ?? 0;
-  const feedbackCreatedThisMonth = workspace.usage?.feedbackCreatedThisMonth ?? 0;
+  const memberCount = ws.usage?.members ?? 0;
+  const feedbackCreatedThisMonth = ws.usage?.feedbackCreatedThisMonth ?? 0;
 
   return {
     memberCount,

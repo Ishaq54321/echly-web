@@ -86,7 +86,7 @@ function ActivityContextBlock({ children }: { children: ReactNode }) {
 }
 
 /** Same semantic color as the row body; weight carries hierarchy. */
-const FEEDBACK_TITLE_EMPHASIS = "font-medium text-foreground";
+const FEEDBACK_TITLE_EMPHASIS = "font-medium text-[var(--text-heading)]";
 
 /** Display string for inline feedback title; primary titles include a # prefix when missing. */
 function feedbackTitleDisplay(primaryFromMeta: string | null, fallback: string): string {
@@ -462,7 +462,7 @@ const PILL_STYLES: Record<string, { label: string; className: string; icon?: "ch
   },
   "session.archived": {
     label: "Archived",
-    className: "bg-[var(--surface-hover)] text-muted-foreground border-[var(--border)]",
+    className: "bg-[var(--surface-hover)] text-[var(--text-secondary)] border-[var(--border)]",
   },
   "access_request.approved": {
     label: "Approved",
@@ -495,7 +495,7 @@ function renderMentions(text: string): ReactNode {
   const parts = text.split(/(@[\w.-]+)/g);
   return parts.map((part, i) =>
     part.startsWith("@") ? (
-      <span key={i} className="font-medium text-[12px] text-foreground">
+      <span key={i} className="font-medium text-[12px] text-[var(--text-heading)]">
         {part}
       </span>
     ) : (
@@ -596,14 +596,14 @@ function ActivityItemBase(props: ActivityItemProps) {
 
   const badgeEntry = eventIconMap[eventType];
   const BadgeIcon = badgeEntry?.icon;
-  const badgeColorClass = badgeEntry?.badgeClass ?? "bg-neutral-300";
+  const badgeColorClass = badgeEntry?.badgeClass ?? "bg-[var(--text-tertiary)]";
 
   /** Rows with preview or group chrome stack below the headline; keep cross-axis alignment sensible. */
   const isTallRow = hasCommentPreview || props.kind === "group";
 
   return (
     <div
-      className={`flex w-full gap-3 py-3 transition-colors hover:bg-muted/20 ${isTallRow ? "items-start" : "items-center"}`}
+      className={`flex w-full gap-3 py-3 transition-colors hover:bg-[var(--surface-hover)]/50 ${isTallRow ? "items-start" : "items-center"}`}
     >
       {/* Fixed-width avatar column — w-[52px] keeps the timeline spine centred */}
       <div className="relative z-10 flex w-[52px] shrink-0 justify-center">
@@ -640,12 +640,12 @@ function ActivityItemBase(props: ActivityItemProps) {
                   className={`inline-flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 text-left underline-offset-2 transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                     hasPrimaryEntityTitle
                       ? FEEDBACK_TITLE_EMPHASIS
-                      : "font-medium text-muted-foreground"
+                      : "font-medium text-[var(--text-secondary)]"
                   }`}
                 >
                   <span className="min-w-0 break-words">{inlineTitleText}</span>
                   <ExternalLink
-                    className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                    className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)]"
                     aria-hidden
                   />
                 </button>
@@ -654,7 +654,7 @@ function ActivityItemBase(props: ActivityItemProps) {
                   className={
                     hasPrimaryEntityTitle
                       ? FEEDBACK_TITLE_EMPHASIS
-                      : "font-medium text-muted-foreground"
+                      : "font-medium text-[var(--text-secondary)]"
                   }
                 >
                   {inlineTitleText}
@@ -665,7 +665,7 @@ function ActivityItemBase(props: ActivityItemProps) {
             {hasStatePill && <StatePill eventType={eventType} />}
 
             {row.sessionContext ? (
-              <span className="text-[15px] text-muted-foreground">
+              <span className="text-[15px] text-[var(--text-secondary)]">
                 in {row.sessionContext}
               </span>
             ) : null}
@@ -674,7 +674,7 @@ function ActivityItemBase(props: ActivityItemProps) {
           {props.relativeTime ? (
             <time
               dateTime={props.isoTime}
-              className="shrink-0 text-right text-sm tabular-nums text-muted-foreground whitespace-nowrap"
+              className="shrink-0 text-right text-sm tabular-nums text-[var(--text-secondary)] whitespace-nowrap"
             >
               {props.relativeTime}
             </time>
@@ -684,7 +684,7 @@ function ActivityItemBase(props: ActivityItemProps) {
         {/* Comment preview — blue accent only */}
         {hasCommentPreview && row.previewText ? (
           <ActivityContextBlock>
-            <div className="text-sm leading-relaxed text-muted-foreground line-clamp-2">
+            <div className="text-sm leading-relaxed text-[var(--text-secondary)] line-clamp-2">
               {renderMentions(row.previewText)}
             </div>
           </ActivityContextBlock>
@@ -699,7 +699,7 @@ function ActivityItemBase(props: ActivityItemProps) {
               e.stopPropagation();
               props.onToggleExpand(props.group);
             }}
-            className="mt-2 flex w-fit cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-xs text-[var(--text-body)] transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="mt-2 flex w-fit cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-xs text-[var(--text-body)] transition-colors hover:text-[var(--text-heading)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <ChevronDown
               className={`h-4 w-4 shrink-0 text-[var(--text-heading)] transition-transform duration-150 ${props.isExpanded ? "rotate-180" : ""}`}
@@ -724,7 +724,7 @@ function ActivityItemBase(props: ActivityItemProps) {
                 <>
                   {showMembersLoading ? (
                     <div
-                      className="flex items-center gap-1.5 py-2 text-muted-foreground"
+                      className="flex items-center gap-1.5 py-2 text-[var(--text-secondary)]"
                       aria-live="polite"
                       aria-busy="true"
                     >
@@ -764,14 +764,14 @@ function ActivityItemBase(props: ActivityItemProps) {
                 <div
                   key={ev.id}
                   role="listitem"
-                  className={`flex w-full min-w-0 justify-between gap-3 py-3 transition-colors hover:bg-muted/20 ${subTallRow ? "items-start" : "items-center"}`}
+                  className={`flex w-full min-w-0 justify-between gap-3 py-3 transition-colors hover:bg-[var(--surface-hover)]/50 ${subTallRow ? "items-start" : "items-center"}`}
                 >
                   <div
                     className={`flex min-w-0 flex-1 gap-3 ${subTallRow ? "items-start" : "items-center"}`}
                   >
                     {SubIcon ? (
                       <SubIcon
-                        className="h-4 w-4 shrink-0 text-muted-foreground"
+                        className="h-4 w-4 shrink-0 text-[var(--text-secondary)]"
                         aria-hidden
                       />
                     ) : (
@@ -793,14 +793,14 @@ function ActivityItemBase(props: ActivityItemProps) {
                               className={`inline-flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 text-left underline-offset-2 transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                                 subHasPrimaryTitle
                                   ? FEEDBACK_TITLE_EMPHASIS
-                                  : "font-medium text-muted-foreground"
+                                  : "font-medium text-[var(--text-secondary)]"
                               }`}
                             >
                               <span className="min-w-0 break-words">
                                 {subInlineTitleText}
                               </span>
                               <ExternalLink
-                                className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                                className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)]"
                                 aria-hidden
                               />
                             </button>
@@ -809,7 +809,7 @@ function ActivityItemBase(props: ActivityItemProps) {
                               className={
                                 subHasPrimaryTitle
                                   ? FEEDBACK_TITLE_EMPHASIS
-                                  : "font-medium text-muted-foreground"
+                                  : "font-medium text-[var(--text-secondary)]"
                               }
                             >
                               {subInlineTitleText}
@@ -819,7 +819,7 @@ function ActivityItemBase(props: ActivityItemProps) {
                       </p>
                       {subHasPreview && evRow.previewText ? (
                         <ActivityContextBlock>
-                          <div className="text-sm leading-relaxed text-muted-foreground line-clamp-2">
+                          <div className="text-sm leading-relaxed text-[var(--text-secondary)] line-clamp-2">
                             {renderMentions(evRow.previewText)}
                           </div>
                         </ActivityContextBlock>
@@ -833,7 +833,7 @@ function ActivityItemBase(props: ActivityItemProps) {
                           ? new Date(ev.createdAt).toISOString()
                           : undefined
                       }
-                      className={`shrink-0 text-right text-sm tabular-nums text-muted-foreground whitespace-nowrap ${subTallRow ? "self-start" : ""}`}
+                      className={`shrink-0 text-right text-sm tabular-nums text-[var(--text-secondary)] whitespace-nowrap ${subTallRow ? "self-start" : ""}`}
                     >
                       {timeLabel}
                     </time>

@@ -49,12 +49,12 @@ export interface DiscussionListProps {
 
 // Deterministic avatar palette derived from item id
 const AVATAR_PALETTES = [
-  { bg: "#EBF4FF", text: "#1e40af" },
-  { bg: "#F0FDF4", text: "#166534" },
-  { bg: "#FFF7ED", text: "#9A3412" },
-  { bg: "#FDF4FF", text: "#7E22CE" },
-  { bg: "#F0F9FF", text: "#0C4A6E" },
-  { bg: "#FEFCE8", text: "#854D0E" },
+  { bg: "var(--brand-subtle)", text: "var(--brand-text)" },
+  { bg: "var(--color-success-bg)", text: "var(--color-success)" },
+  { bg: "var(--color-warning-bg)", text: "var(--color-warning-text)" },
+  { bg: "var(--color-insight-bg)", text: "var(--color-insight)" },
+  { bg: "var(--brand-subtle)", text: "var(--brand-text)" },
+  { bg: "var(--color-warning-bg)", text: "var(--color-warning-text)" },
 ];
 
 function getAvatarPalette(seed: string) {
@@ -223,7 +223,7 @@ export function DiscussionList({
           </div>
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 text-center h-full">
-            <MessageSquareMore className="w-10 h-10 text-neutral-300 mb-3" />
+            <MessageSquareMore className="w-10 h-10 text-[var(--text-placeholder)] mb-3" />
             <h3 className="text-[16px] font-semibold text-discussion-title">No discussions yet</h3>
             <p className="mt-1.5 text-[14px] text-discussion-supporting max-w-[240px]">
               When feedback receives comments, they will appear here.
@@ -302,7 +302,7 @@ export function DiscussionList({
                     <div className="flex items-center gap-1.5">
                       <span
                         className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                          item.status === "open" ? "bg-[var(--color-success)]/75" : "bg-neutral-400/60"
+                          item.status === "open" ? "bg-[var(--color-success)]/75" : "bg-[var(--text-tertiary)]/60"
                         }`}
                         aria-hidden
                       />

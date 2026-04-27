@@ -1,9 +1,9 @@
 export type PriorityLevel = "high" | "medium" | "low";
 
 const STYLES: Record<PriorityLevel, string> = {
-  high: "bg-[var(--surface-hover)] text-neutral-700",
+  high: "bg-[var(--surface-hover)] text-[var(--text-body)]",
   medium: "bg-[var(--surface-hover)] text-[var(--text-secondary)]",
-  low: "bg-[var(--surface-subtle)] text-neutral-500",
+  low: "bg-[var(--surface-subtle)] text-[var(--text-secondary)]",
 };
 
 const LABELS: Record<PriorityLevel, string> = {

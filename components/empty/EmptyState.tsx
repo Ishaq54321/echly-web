@@ -25,7 +25,7 @@ export type EmptyStateProps = {
 
 export function EmptyState({
   icon: Icon,
-  iconClassName = "w-12 h-12 text-neutral-400",
+  iconClassName = "w-12 h-12 text-[var(--text-tertiary)]",
   media,
   title,
   description,

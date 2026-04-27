@@ -362,7 +362,7 @@ export function DiscussionThread({
                 <span className="min-w-0 truncate text-[var(--text-body)]">{sessionName}</span>
               ) : null}
               {threadIndex !== undefined && threadTotal !== undefined ? (
-                <span className="shrink-0 tabular-nums text-[14px] text-[#64748B]/80">
+                <span className="shrink-0 tabular-nums text-[14px] text-[var(--text-secondary)]/80">
                   {threadIndex} of {threadTotal}
                 </span>
               ) : null}
@@ -371,11 +371,11 @@ export function DiscussionThread({
           {ticket.sessionId && feedbackId ? (
             <Link
               href={`/session/${ticket.sessionId}?ticket=${feedbackId}`}
-              className="group inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface-card)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--text-body)] shadow-[0_1px_0_rgba(15,23,42,0.03)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-subtle)]/90 hover:text-[var(--text-heading)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/20"
+              className="group inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface-card)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--text-body)] shadow-[0_1px_0_rgba(15,23,42,0.03)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-subtle)]/90 hover:text-[var(--text-heading)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]/20"
             >
               View Ticket
               <ArrowUpRight
-                className="h-3 w-3 shrink-0 text-[#64748B] transition-colors group-hover:text-[var(--text-heading)]"
+                className="h-3 w-3 shrink-0 text-[var(--text-secondary)] transition-colors group-hover:text-[var(--text-heading)]"
                 strokeWidth={2}
                 aria-hidden
               />
@@ -419,7 +419,7 @@ export function DiscussionThread({
                     className="absolute top-2.5 right-2.5 w-7 h-7 rounded-md bg-[var(--surface-card)]/90 flex items-center justify-center border border-[var(--border)]/80 shadow-level-1 hover:bg-white hover:shadow-level-2 transition-all"
                     aria-label="Expand screenshot"
                   >
-                    <Expand className="w-3.5 h-3.5 text-neutral-700" strokeWidth={2} />
+                    <Expand className="w-3.5 h-3.5 text-[var(--text-body)]" strokeWidth={2} />
                   </button>
                 )}
               </div>

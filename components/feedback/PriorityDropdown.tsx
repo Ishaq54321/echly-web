@@ -36,7 +36,7 @@ const PRIORITIES: PriorityConfig[] = [
     value: "low",
     label: "Low",
     color: "var(--text-secondary)",
-    bg: "#F9FAFB",
+    bg: "var(--surface-subtle)",
     border: "var(--border)",
     icon: <Flag size={14} style={{ fill: "var(--text-body)", color: "var(--text-body)" }} />,
   },

@@ -244,7 +244,7 @@ export function DiscussionPanel({
                       {sessionName}
                     </Link>
                   ) : (
-                    <span className="text-sm text-neutral-400" aria-busy="true">
+                    <span className="text-sm text-[var(--text-tertiary)]" aria-busy="true">
                       Loading…
                     </span>
                   )}
@@ -286,7 +286,7 @@ export function DiscussionPanel({
                                   {formatCommentDate(root.createdAt)}
                                 </span>
                               </div>
-                              <p className="text-sm text-neutral-700 mt-0.5">
+                              <p className="text-sm text-[var(--text-body)] mt-0.5">
                                 {root.message}
                               </p>
                               {replies.map((r) => (

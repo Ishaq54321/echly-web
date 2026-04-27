@@ -93,7 +93,7 @@ export function TicketDetailsPanel({ feedbackId }: TicketDetailsPanelProps) {
             <p className="text-[12px] uppercase font-semibold tracking-wide text-secondary mb-2">
               Action steps
             </p>
-            <ul className="text-[14px] leading-relaxed text-neutral-700 space-y-1 list-disc list-inside">
+            <ul className="text-[14px] leading-relaxed text-[var(--text-body)] space-y-1 list-disc list-inside">
               {steps!.map((step, i) => (
                 <li key={i}>{step}</li>
               ))}

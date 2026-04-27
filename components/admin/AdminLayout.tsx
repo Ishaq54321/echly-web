@@ -61,7 +61,7 @@ export default function AdminLayout({
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
                   active
                     ? "bg-[var(--brand-subtle)] text-[var(--brand)]"
-                    : "text-neutral-700 hover:bg-[var(--surface-hover)]"
+                    : "text-[var(--text-body)] hover:bg-[var(--surface-hover)]"
                 }`}
                 aria-current={active ? "page" : undefined}
               >

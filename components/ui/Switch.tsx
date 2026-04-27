@@ -31,7 +31,7 @@ export const Switch = forwardRef<HTMLButtonElement, SwitchProps>(
           className={`
             pointer-events-none inline-block h-[18px] w-[18px] rounded-[50%]
             transition-[transform,background-color,box-shadow] duration-150 ease-in-out
-            ${checked ? "translate-x-[21px] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.15)]" : "translate-x-0.5 bg-neutral-600"}
+            ${checked ? "translate-x-[21px] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.15)]" : "translate-x-0.5 bg-[var(--text-secondary)]"}
           `}
         />
       </button>
