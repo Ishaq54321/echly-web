@@ -12,197 +12,74 @@ export type SessionControlPanelProps = {
   onEnd: () => void;
 };
 
-function InlineSpinner() {
-  return (
-    <>
-      <style>{`
-        @keyframes echly-inline-spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-      `}</style>
-      <span
-        aria-hidden
-        style={{
-          width: 12,
-          height: 12,
-          borderRadius: "50%",
-          border: "2px solid rgba(255,255,255,0.28)",
-          borderTopColor: "rgba(255,255,255,0.92)",
-          opacity: 0.8,
-          animation: "echly-inline-spin 0.8s linear infinite",
-          flexShrink: 0,
-        }}
-      />
-    </>
-  );
-}
-
 export function SessionControlPanel({
   sessionPaused,
   pausePending = false,
   endPending = false,
-  __extensionSavingState,
+  __extensionSavingState: _ignored,
   onPause,
   onResume,
   onEnd,
 }: SessionControlPanelProps) {
-  const saving = Boolean(__extensionSavingState);
+  const isSaving = endPending || pausePending;
+  const isPaused = sessionPaused && !isSaving;
 
   return (
-    <div
-      data-echly-ui="true"
-      className="echly-session-controls"
-      style={{
-        position: "fixed",
-        bottom: 24,
-        left: "50%",
-        transform: "translateX(-50%)",
-        pointerEvents: "auto",
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        padding: "12px 20px",
-        borderRadius: 18,
-        background: "rgba(20,22,28,0.82)",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
-        zIndex: 2147483646,
-        border: "1px solid rgba(255,255,255,0.08)",
-        fontFamily: '"DM Sans", "SF Pro Display", Inter, system-ui, sans-serif',
-      }}
-    >
-      <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-on-dark)" }}>
-        {sessionPaused ? "Session paused" : "Session started"}
-      </span>
-      {pausePending ? (
-        <button
-          type="button"
-          disabled
-          style={{
-            padding: "8px 14px",
-            borderRadius: 10,
-            border: "none",
-            background: "rgba(255,255,255,0.08)",
-            color: "rgba(255,255,255,0.9)",
-            fontSize: 13,
-            fontWeight: 500,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            opacity: 0.9,
-            cursor: "default",
-          }}
-        >
-          <InlineSpinner />
-          <span>Pausing…</span>
-        </button>
-      ) : sessionPaused ? (
-        <button
-          type="button"
-          onClick={onResume}
-          disabled={pausePending}
-          style={{
-            padding: "8px 14px",
-            borderRadius: 10,
-            border: "none",
-            background: "#1775E0",
-            color: "#fff",
-            fontSize: 13,
-            fontWeight: 500,
-            cursor: pausePending ? "default" : "pointer",
-            opacity: pausePending ? 0.7 : 1,
-          }}
-        >
-          Resume Feedback Session
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={onPause}
-          disabled={endPending}
-          style={{
-            padding: "8px 14px",
-            borderRadius: 10,
-            border: "none",
-            background: "rgba(255,255,255,0.08)",
-            color: "rgba(255,255,255,0.9)",
-            fontSize: 13,
-            fontWeight: 500,
-            cursor: endPending ? "default" : "pointer",
-            opacity: endPending ? 0.7 : 1,
-          }}
-        >
-          Pause
-        </button>
-      )}
-      {endPending ? (
-        <button
-          type="button"
-          disabled
-          style={{
-            padding: "8px 14px",
-            borderRadius: 10,
-            border: "none",
-            background: "var(--color-danger)",
-            color: "#fff",
-            fontSize: 13,
-            fontWeight: 500,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            opacity: 0.9,
-            cursor: "default",
-          }}
-        >
-          <InlineSpinner />
-          <span>Ending…</span>
-        </button>
-      ) : saving ? (
-        <button
-          type="button"
-          onClick={onEnd}
-          disabled={pausePending}
-          style={{
-            padding: "8px 14px",
-            borderRadius: 10,
-            border: "none",
-            background: "var(--color-danger)",
-            color: "#fff",
-            fontSize: 13,
-            fontWeight: 500,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            cursor: pausePending ? "default" : "pointer",
-            opacity: pausePending ? 0.7 : 1,
-          }}
-        >
-          <InlineSpinner />
-          <span>Saving…</span>
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={onEnd}
-          disabled={pausePending}
-          style={{
-            padding: "8px 14px",
-            borderRadius: 10,
-            border: "none",
-            background: "var(--color-danger)",
-            color: "#fff",
-            fontSize: 13,
-            fontWeight: 500,
-            cursor: pausePending ? "default" : "pointer",
-            opacity: pausePending ? 0.7 : 1,
-          }}
-        >
-          End
-        </button>
-      )}
+    <div data-echly-ui="true" className="echly-sc-root">
+      <div className="sc-bar">
+
+        {/* Status: spinner | amber pause icon | green live dot + label */}
+        <span className="sc-status">
+          {isSaving ? (
+            <span className="sc-spinner" aria-hidden />
+          ) : isPaused ? (
+            <span className="paused" aria-hidden />
+          ) : (
+            <span className="live" aria-hidden />
+          )}
+          {isSaving
+            ? "Saving session…"
+            : isPaused
+            ? "Session paused"
+            : "Session started"}
+        </span>
+
+        <span className="sc-divider" aria-hidden />
+
+        {/* Pause / Resume */}
+        {isSaving ? (
+          <button type="button" className="sc-btn disabled" disabled>
+            Pause
+          </button>
+        ) : isPaused ? (
+          <button type="button" className="sc-btn brand" onClick={onResume}>
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden>
+              <path d="M5 3.5l8 4.5-8 4.5z" fill="currentColor" />
+            </svg>
+            Resume
+          </button>
+        ) : (
+          <button type="button" className="sc-btn ghost" onClick={onPause}>
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden>
+              <path d="M6 4v8M10 4v8" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+            </svg>
+            Pause
+          </button>
+        )}
+
+        {/* End */}
+        {isSaving ? (
+          <button type="button" className="sc-btn disabled" disabled>
+            End
+          </button>
+        ) : (
+          <button type="button" className="sc-btn danger" onClick={onEnd}>
+            <span className="sc-stop-sq" aria-hidden />
+            End
+          </button>
+        )}
+
+      </div>
     </div>
   );
 }

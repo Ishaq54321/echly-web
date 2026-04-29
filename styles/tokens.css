@@ -3,7 +3,7 @@
    Single source of truth. Legacy aliases keep old code unbroken.
 ====================================================================== */
 
-:root {
+:root, :host {
 
   /* ─── BRAND ─────────────────────────────── */
   --brand:              #1775E0;

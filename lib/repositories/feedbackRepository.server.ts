@@ -1,4 +1,5 @@
 import "server-only";
+import { after } from "next/server";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { FieldPath, FieldValue, Timestamp } from "firebase-admin/firestore";
 import { assertQueryLimit } from "@/lib/querySafety";
@@ -129,24 +130,31 @@ export async function addFeedbackWithSessionCountersRepo(
   _ownerUserId: string,
   data: StructuredFeedback,
   feedbackId?: string,
-  screenshotId?: string
+  screenshotId?: string,
+  options?: { preloadedWorkspaceId?: string }
 ): Promise<AddFeedbackWithSessionCountersResult> {
   const resolvedUserId = requireUserId(
     userId,
     "addFeedbackWithSessionCountersRepo"
   );
   const sessionRef = adminDb.doc(`sessions/${sessionId}`);
-  const sessionSnap = await sessionRef.get();
-  if (!sessionSnap.exists) {
-    throw new Error("Session not found");
-  }
-  const sessionData = sessionSnap.data();
-  const resolvedWorkspaceId =
-    typeof sessionData?.workspaceId === "string"
-      ? sessionData.workspaceId.trim()
-      : "";
+
+  // Skip session pre-read if caller already resolved workspaceId (saves ~200ms Firestore round-trip).
+  // Transaction reads below are still required for Firestore consistency guarantees.
+  let resolvedWorkspaceId = options?.preloadedWorkspaceId?.trim() ?? "";
   if (!resolvedWorkspaceId) {
-    throw new Error("Missing workspaceId on session");
+    const sessionSnap = await sessionRef.get();
+    if (!sessionSnap.exists) {
+      throw new Error("Session not found");
+    }
+    const sessionData = sessionSnap.data();
+    resolvedWorkspaceId =
+      typeof sessionData?.workspaceId === "string"
+        ? sessionData.workspaceId.trim()
+        : "";
+    if (!resolvedWorkspaceId) {
+      throw new Error("Missing workspaceId on session");
+    }
   }
 
   const issueTypeForInsights = normalizeIssueTypeForInsights(data.type);
@@ -218,32 +226,42 @@ export async function addFeedbackWithSessionCountersRepo(
 
   if (txResult.inserted && txResult.createdAt) {
     const feedbackDay = txResult.createdAt.toISOString().slice(0, 10);
-    try {
-      await incrementInsightsOnFeedbackCreateRepo({
-        workspaceId: resolvedWorkspaceId,
-        sessionId,
-        type: issueTypeForInsights,
-        feedbackDay,
-      });
-      console.log("\u2705 INSIGHTS SYNC SUCCESS");
-    } catch (e) {
-      console.error("\u274c INSIGHTS SYNC FAILED", e);
-    }
-    const actor = await resolveActorForActivityEvent(resolvedUserId);
-    const sessionTitle = await sessionTitleForActivityEvent(sessionId);
     const feedbackTitle = normalizeFeedbackTitleForActivity(data.title);
-    await createActivityEvent({
-      workspaceId: resolvedWorkspaceId,
-      sessionId,
-      eventType: "feedback.created",
-      actorId: resolvedUserId,
-      actorName: actor.actorName,
-      actorPhotoURL: actor.actorPhotoURL,
-      feedbackId: txResult.ref.id,
-      metadata: {
-        feedbackTitle,
-        sessionTitle,
-      },
+    // Use after() so Vercel keeps the Lambda alive until background work completes (prevents data loss).
+    after(async () => {
+      await Promise.all([
+        incrementInsightsOnFeedbackCreateRepo({
+          workspaceId: resolvedWorkspaceId,
+          sessionId,
+          type: issueTypeForInsights,
+          feedbackDay,
+        })
+          .then(() => console.log("\u2705 INSIGHTS SYNC SUCCESS"))
+          .catch((err) => console.error("\u274c INSIGHTS SYNC FAILED", err)),
+        (async () => {
+          try {
+            const [actor, sessionTitle] = await Promise.all([
+              resolveActorForActivityEvent(resolvedUserId),
+              sessionTitleForActivityEvent(sessionId),
+            ]);
+            await createActivityEvent({
+              workspaceId: resolvedWorkspaceId,
+              sessionId,
+              eventType: "feedback.created",
+              actorId: resolvedUserId,
+              actorName: actor.actorName,
+              actorPhotoURL: actor.actorPhotoURL,
+              feedbackId: txResult.ref.id,
+              metadata: {
+                feedbackTitle,
+                sessionTitle,
+              },
+            });
+          } catch (err) {
+            console.error("[ACTIVITY_EVENT] failed:", err);
+          }
+        })(),
+      ]);
     });
   }
 

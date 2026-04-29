@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useSyncExternalStore } from "react";
+import React, { useEffect, useState } from "react";
 
 export type TextFeedbackPanelProps = {
   screenshot?: string;
@@ -8,85 +8,119 @@ export type TextFeedbackPanelProps = {
   onCancel?: () => void;
   /** When set, drives modal light/dark. When omitted, syncs from `#echly-root[data-theme]`. */
   theme?: "light" | "dark";
+  /** When provided, renders a "Switch to Voice Mode" row that calls this on click. */
+  onSwitchToVoice?: () => void;
+  /** Element selector badge (e.g. "#pricing-cta") */
+  elementSelector?: string;
+  /** Element width in px for badge */
+  elementWidth?: number;
+  /** Element height in px for badge */
+  elementHeight?: number;
 };
-
-function subscribeEchlyRootTheme(onChange: () => void): () => void {
-  if (typeof document === "undefined") return () => {};
-  const root = document.getElementById("echly-root");
-  if (!root) return () => {};
-  const obs = new MutationObserver(onChange);
-  obs.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
-  return () => obs.disconnect();
-}
-
-function getEchlyRootThemeSnapshot(): "light" | "dark" {
-  const t = document.getElementById("echly-root")?.getAttribute("data-theme");
-  return t === "light" ? "light" : "dark";
-}
-
-function getEchlyRootThemeServerSnapshot(): "light" | "dark" {
-  return "dark";
-}
-
-function useResolvedTheme(prop?: "light" | "dark"): "light" | "dark" {
-  const fromDom = useSyncExternalStore(
-    subscribeEchlyRootTheme,
-    getEchlyRootThemeSnapshot,
-    getEchlyRootThemeServerSnapshot
-  );
-  return prop ?? fromDom;
-}
 
 export function TextFeedbackPanel({
   screenshot,
   onSubmit,
   onCancel,
-  theme: themeProp,
+  onSwitchToVoice,
+  elementSelector,
+  elementWidth,
+  elementHeight,
 }: TextFeedbackPanelProps) {
   const [text, setText] = useState("");
-  const theme = useResolvedTheme(themeProp);
-  const isDark = theme === "dark";
 
   const handleSubmit = () => {
     const t = text.trim();
     if (t) onSubmit(t);
   };
 
+  useEffect(() => {
+    if (!onCancel) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onCancel();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onCancel]);
+
+  const shotBadge =
+    elementSelector ? (
+      <span className="ovl-shot-tag">
+        {elementSelector}
+        {elementWidth && elementHeight ? ` · ${elementWidth} × ${elementHeight}` : ""}
+      </span>
+    ) : null;
+
   return (
-    <div
-      className={`echly-text-modal ${isDark ? "dark" : "light"}`}
-      data-echly-ui="true"
-    >
-      {screenshot && (
-        <div className="echly-text-modal__shot-wrap">
-          <div className="echly-text-modal__shot-frame">
-            {/* eslint-disable-next-line @next/next/no-img-element -- session capture data URL */}
-            <img
-              src={screenshot}
-              alt="Capture"
-              style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
-            />
+    <div className="echly-v2 echly-v2-overlay-anchor" data-echly-ui="true">
+      <div className="center-card" data-echly-ui="true">
+        <div className="esc-hint">
+          Press <kbd>Esc</kbd> to cancel
+        </div>
+
+        {screenshot && (
+          <div className="ovl-shot">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={screenshot} alt="Capture" />
+            {shotBadge}
+          </div>
+        )}
+
+        <div className="ovl-title">Write feedback</div>
+        <div className="ovl-sub" style={{ marginBottom: "16px" }}>
+          Type a note—Echly structures it for your team.
+        </div>
+
+        <div className="ovl-textarea-wrap">
+          <textarea
+            className="ovl-textarea"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Describe what you noticed…"
+            aria-label="Feedback text"
+            autoFocus
+          />
+          <div className="ovl-textarea-foot">
+            <span className="hint">
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
+                <path d="M8 2v12M8 2l4 3M8 2L4 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              AI will structure this into a ticket
+            </span>
+            <span className="count">{text.length} / 1000</span>
           </div>
         </div>
-      )}
-      <div className="echly-text-modal__body">
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Describe the feedback..."
-          aria-label="Feedback text"
-          rows={3}
-          className="echly-textarea"
-        />
-        <div className="echly-text-actions">
+
+        {onSwitchToVoice && (
+          <button
+            type="button"
+            className="mic-row"
+            onClick={onSwitchToVoice}
+          >
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <rect x="6" y="2" width="4" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            <span className="mic-name">Switch to voice mode</span>
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+              <path d="M5 6l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        )}
+
+        <div className="ovl-actions ovl-actions--text">
+          <span />
           {onCancel && (
-            <button type="button" onClick={onCancel} className="echly-btn-cancel">
+            <button type="button" className="ti-cancel" onClick={onCancel}>
               Cancel
             </button>
           )}
           <button
             type="button"
-            className="echly-btn-save submit-feedback"
+            className={`save-btn${!text.trim() ? " disabled" : ""}`}
             onClick={handleSubmit}
             disabled={!text.trim()}
           >

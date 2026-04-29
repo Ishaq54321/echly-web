@@ -78,21 +78,6 @@ export async function POST(req: NextRequest): Promise<Response> {
     });
   }
 
-  try {
-    await resolveWorkspaceForUser(user.uid);
-  } catch (err) {
-    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return apiError({
-        code: "FORBIDDEN",
-        message: WORKSPACE_SUSPENDED_MESSAGE,
-        status: 403,
-        data: { tickets: [] },
-        init: { headers: corsHeaders(req) },
-      });
-    }
-    throw err;
-  }
-
   let client: OpenAI;
   try {
     client = getOpenAIClient();
@@ -129,27 +114,29 @@ export async function POST(req: NextRequest): Promise<Response> {
     });
   }
 
-  try {
-    const result = await runFeedbackPipeline(client, { transcript, context: body?.context });
+  // Parallelize workspace auth check with AI pipeline — workspace check is ~400ms,
+  // pipeline is 3-4s, so running them together saves ~400ms off the critical path.
+  const [workspaceSettled, pipelineSettled] = await Promise.allSettled([
+    resolveWorkspaceForUser(user.uid),
+    runFeedbackPipeline(client, { transcript, context: body?.context }),
+  ]);
 
-    console.log("[PHASE3_FINAL]", {
-      fields: Object.keys(result.tickets?.[0] || {}),
-    });
-    console.log("[PHASE3_READY]", {
-      status: "clean",
-      readyForPhase4: true,
-    });
+  if (workspaceSettled.status === "rejected") {
+    const err = workspaceSettled.reason;
+    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+      return apiError({
+        code: "FORBIDDEN",
+        message: WORKSPACE_SUSPENDED_MESSAGE,
+        status: 403,
+        data: { tickets: [] },
+        init: { headers: corsHeaders(req) },
+      });
+    }
+    throw err;
+  }
 
-    return apiSuccess(
-      {
-        tickets: result.tickets ?? [],
-        structuredSuccess: result.success,
-      },
-      null,
-      { headers: corsHeaders(req), status: 200 }
-    );
-  } catch (err) {
-    console.error("STRUCTURING ERROR:", err);
+  if (pipelineSettled.status === "rejected") {
+    console.error("STRUCTURING ERROR:", pipelineSettled.reason);
     return apiError({
       code: "INTERNAL_ERROR",
       message: "AI pipeline failed",
@@ -158,4 +145,22 @@ export async function POST(req: NextRequest): Promise<Response> {
       init: { headers: corsHeaders(req) },
     });
   }
+
+  const result = pipelineSettled.value;
+  console.log("[PHASE3_FINAL]", {
+    fields: Object.keys(result.tickets?.[0] || {}),
+  });
+  console.log("[PHASE3_READY]", {
+    status: "clean",
+    readyForPhase4: true,
+  });
+
+  return apiSuccess(
+    {
+      tickets: result.tickets ?? [],
+      structuredSuccess: result.success,
+    },
+    null,
+    { headers: corsHeaders(req), status: 200 }
+  );
 }

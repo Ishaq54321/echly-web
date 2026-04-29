@@ -132,19 +132,8 @@ export async function POST(req: NextRequest): Promise<Response> {
     });
   }
 
-  try {
-    await resolveWorkspaceForUser(user.uid);
-  } catch (err) {
-    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return apiError({
-        code: "FORBIDDEN",
-        message: WORKSPACE_SUSPENDED_MESSAGE,
-        status: 403,
-        init: { headers },
-      });
-    }
-    throw err;
-  }
+  // Start workspace check immediately so it runs in parallel with form data parsing (~400ms saved).
+  const workspacePromise = resolveWorkspaceForUser(user.uid);
 
   let file: FormDataEntryValue | null = null;
 
@@ -163,10 +152,27 @@ export async function POST(req: NextRequest): Promise<Response> {
     });
   }
 
+  // Await workspace check and form data parsing together.
+  const [workspaceSettled, formDataSettled] = await Promise.allSettled([
+    workspacePromise,
+    req.formData(),
+  ]);
+
+  if (workspaceSettled.status === "rejected") {
+    const err = workspaceSettled.reason;
+    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
+      return apiError({
+        code: "FORBIDDEN",
+        message: WORKSPACE_SUSPENDED_MESSAGE,
+        status: 403,
+        init: { headers },
+      });
+    }
+    throw err;
+  }
+
   let formData: FormData;
-  try {
-    formData = await req.formData();
-  } catch {
+  if (formDataSettled.status === "rejected") {
     const debugMeta = getFileDebugMeta(file);
     logger.warn("transcribe", "failure", {
       reason: "invalid_multipart_body",
@@ -180,6 +186,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       init: { headers },
     });
   }
+  formData = formDataSettled.value;
 
   file = formData.get("file");
 

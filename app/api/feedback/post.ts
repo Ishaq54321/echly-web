@@ -307,7 +307,8 @@ export async function POST(req: NextRequest) {
       user.uid,
       structuredData,
       normalizedFeedbackId,
-      normalizedScreenshotId
+      normalizedScreenshotId,
+      { preloadedWorkspaceId: sessionWorkspaceId }
     );
     const { ref, inserted } = result;
     let created: Feedback;

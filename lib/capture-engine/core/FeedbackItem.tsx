@@ -93,83 +93,113 @@ function FeedbackItem({
     }
   }, [ticket.id, onDelete, isDeleting]);
 
-  return (
-    <div
-      className={`echly-feedback-item ${highlighted ? "echly-ticket-highlight" : ""}`}
-      data-priority={priority}
-    >
-      <div className="echly-ticket-row">
-        <div className="echly-ticket-dot echly-priority-dot" aria-hidden />
-        <div className="echly-ticket-content">
-          {!expanded ? (
-            <div className="echly-ticket-header">
-              <div className="echly-ticket-title">
-                {ticket.title}
-              </div>
-              <div className="echly-header-actions">
-                <button
-                  type="button"
-                  onClick={handleExpand}
-                  className="echly-expand-btn echly-widget-action-icon"
-                  aria-label="Expand"
-                >
-                  <Expand size={16} strokeWidth={1.5} />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  disabled={isDeleting}
-                  className="echly-delete-btn echly-widget-action-icon echly-widget-action-icon--delete"
-                  aria-label={isDeleting ? "Deleting…" : "Delete"}
-                >
-                  {isDeleting ? (
-                    <span className="echly-spinner" aria-hidden />
-                  ) : (
-                    <Trash2 size={16} strokeWidth={1.5} />
-                  )}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="echly-ticket-expanded">
-              <textarea
-                className="echly-title-editor"
-                value={editedTitle}
-                onChange={(e) => setEditedTitle(e.target.value)}
-              />
-              <textarea
-                className="echly-action-editor"
-                value={editedSteps.join("\n\n")}
-                onChange={(e) => {
-                  setEditedSteps(e.target.value.split(/\n\s*\n/));
-                }}
-              />
-              {error && (
-                <div className="echly-ticket-error" role="alert">
-                  {error}
-                </div>
-              )}
-              <div className="echly-edit-actions">
-                <button
-                  type="button"
-                  className="echly-primary-button"
-                  disabled={isSaving}
-                  onClick={handleSave}
-                >
-                  {isSaving ? "Saving..." : "Save"}
-                </button>
-                <button
-                  type="button"
-                  className="echly-secondary-button"
-                  onClick={handleCancel}
-                >
-                  Cancel
-                </button>
-              </div>
+  const stepCount = ticket.actionSteps?.length ?? 0;
+  const stepLabel = stepCount === 1 ? "action step" : "action steps";
+
+  if (expanded) {
+    return (
+      <div
+        className="ticket ticket--expanded"
+        data-priority={priority}
+        data-id={ticket.id}
+      >
+        <div className="ticket-expanded-body">
+          <textarea
+            className="echly-title-editor"
+            value={editedTitle}
+            onChange={(e) => setEditedTitle(e.target.value)}
+          />
+          <textarea
+            className="echly-action-editor"
+            value={editedSteps.join("\n\n")}
+            onChange={(e) => {
+              setEditedSteps(e.target.value.split(/\n\s*\n/));
+            }}
+          />
+          {error && (
+            <div className="echly-ticket-error" role="alert">
+              {error}
             </div>
           )}
+          <div className="echly-edit-actions">
+            <button
+              type="button"
+              className="echly-primary-button"
+              disabled={isSaving}
+              onClick={handleSave}
+            >
+              {isSaving ? "Saving..." : "Save"}
+            </button>
+            <button
+              type="button"
+              className="echly-secondary-button"
+              onClick={handleCancel}
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       </div>
+    );
+  }
+
+  return (
+    <div
+      className={`ticket${highlighted ? " success-flash" : ""}`}
+      data-priority={priority}
+      data-id={ticket.id}
+    >
+      {/* Thumbnail placeholder */}
+      <span className="ticket-thumb" aria-hidden />
+
+      {/* Title + meta */}
+      <div className="ticket-main">
+        <div className="ticket-title">{ticket.title}</div>
+        <div className="ticket-meta">
+          <span>
+            <b>{stepCount}</b> {stepLabel}
+          </span>
+        </div>
+      </div>
+
+      {/* Right column: success check or action icons */}
+      {highlighted ? (
+        <span className="ticket-check" aria-hidden>
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+            <path
+              d="M3.5 8L6.5 11L12.5 5"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </span>
+      ) : (
+        <div className="ticket-icon-row">
+          <button
+            type="button"
+            onClick={handleExpand}
+            className="pill-icon-btn"
+            aria-label="Edit"
+          >
+            <Expand size={13} strokeWidth={1.5} />
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="pill-icon-btn"
+            aria-label={isDeleting ? "Deleting…" : "Delete"}
+          >
+            {isDeleting ? (
+              <span className="echly-spinner" aria-hidden />
+            ) : (
+              <Trash2 size={13} strokeWidth={1.5} />
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -2,7 +2,6 @@
 
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { MicOff } from "lucide-react";
 import type { VoiceCaptureError } from "@/lib/capture-engine/core/types";
 
 const BAR_WIDTH = 2;
@@ -58,6 +57,12 @@ export type VoiceCapturePanelProps = {
   onSelectMicrophone?: (deviceId: string) => void;
   /** Currently selected input device (for picker highlight) */
   voiceMicDeviceId?: string;
+  /** Element selector badge (e.g. "#pricing-cta") */
+  elementSelector?: string;
+  /** Element width in px for badge */
+  elementWidth?: number;
+  /** Element height in px for badge */
+  elementHeight?: number;
 };
 
 export function VoiceCapturePanel({
@@ -73,6 +78,9 @@ export function VoiceCapturePanel({
   onRetryVoice,
   onSelectMicrophone,
   voiceMicDeviceId = "",
+  elementSelector,
+  elementWidth,
+  elementHeight,
 }: VoiceCapturePanelProps) {
   const [recordingStarted, setRecordingStarted] = useState(false);
   const [micPickerOpen, setMicPickerOpen] = useState(false);
@@ -95,6 +103,9 @@ export function VoiceCapturePanel({
   const barCountRef = useRef(48);
   const waveformRafRef = useRef<number>(0);
   const lastWaveformSampleRef = useRef(0);
+
+  /** Recording elapsed time (seconds) */
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
     barCountRef.current = barCount;
@@ -142,6 +153,50 @@ export function VoiceCapturePanel({
       setRecordingStarted(true);
     }
   }, [showFailure]);
+
+  /** Pre-load mic devices on mount so the label is available immediately. */
+  useEffect(() => {
+    let cancelled = false;
+    navigator.mediaDevices
+      .enumerateDevices()
+      .then((devices) => {
+        if (cancelled) return;
+        const inputs = devices.filter((d) => d.kind === "audioinput");
+        setMicDevices(
+          inputs.map((d, i) => ({
+            deviceId: d.deviceId,
+            label: d.label?.trim() || `Microphone ${i + 1}`,
+          }))
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /** Recording timer — increments every second while listening. */
+  useEffect(() => {
+    if (!isListening || isFinishing) {
+      setElapsedSeconds(0);
+      return;
+    }
+    const id = setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [isListening, isFinishing]);
+
+  const timeDisplay = `${String(Math.floor(elapsedSeconds / 60)).padStart(2, "0")}:${String(elapsedSeconds % 60).padStart(2, "0")}`;
+
+  /** Current mic label derived from devices list + selected deviceId. */
+  const currentMicLabel = useMemo(() => {
+    if (!micDevices.length) return "Select microphone";
+    if (!voiceMicDeviceId) {
+      const first = micDevices[0];
+      return first ? formatMicLabel(first.label) : "Select microphone";
+    }
+    const found = micDevices.find((d) => d.deviceId === voiceMicDeviceId);
+    return found ? formatMicLabel(found.label) : "Select microphone";
+  }, [micDevices, voiceMicDeviceId]);
 
   const updateMicDropdownPosition = useCallback(() => {
     const btn = micTriggerRef.current;
@@ -419,115 +474,155 @@ export function VoiceCapturePanel({
     />
   );
 
-  const failureBody = showFailure && (
-    <div className="echly-voice-failure-body">
-      <div className="echly-voice-failure-icon-wrap" aria-hidden>
-        <MicOff size={40} strokeWidth={1.5} />
+  const shotBadge =
+    elementSelector ? (
+      <span className="ovl-shot-tag">
+        {elementSelector}
+        {elementWidth && elementHeight ? ` · ${elementWidth} × ${elementHeight}` : ""}
+      </span>
+    ) : null;
+
+  const failureCard = (
+    <div className="echly-v2 echly-v2-overlay-anchor" data-echly-ui="true">
+      <div className="center-card" data-echly-ui="true">
+        {screenshot && (
+          <div className="ovl-shot">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={screenshot} alt="Capture" />
+            {shotBadge}
+          </div>
+        )}
+        <div className="err-body">
+          <div className="err-icon" aria-hidden>
+            {/* mic-off icon */}
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="1" y1="1" x2="23" y2="23" />
+              <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
+              <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23" />
+              <line x1="12" y1="19" x2="12" y2="23" />
+              <line x1="8" y1="23" x2="16" y2="23" />
+            </svg>
+          </div>
+          <div className="err-title">{failureCopy.title}</div>
+          <div className="err-sub">{failureCopy.description}</div>
+          <div className="err-actions">
+            <button
+              type="button"
+              className="err-primary"
+              onClick={() => onRetryVoice?.()}
+            >
+              Try Again
+            </button>
+            <button
+              ref={micTriggerRef}
+              type="button"
+              className="err-secondary"
+              onClick={() => void openMicPicker()}
+              aria-expanded={micPickerOpen}
+              aria-haspopup="listbox"
+            >
+              Select Microphone
+            </button>
+          </div>
+        </div>
       </div>
-      <div className="echly-capture-header echly-voice-failure-header">
-        <h2 className="echly-capture-title">{failureCopy.title}</h2>
-        <p className="echly-capture-instruction">{failureCopy.description}</p>
-      </div>
-      <div className="echly-voice-failure-actions">
+    </div>
+  );
+
+  const normalCard = (
+    <div className="echly-v2 echly-v2-overlay-anchor" data-echly-ui="true">
+      <div className="center-card" data-echly-ui="true">
+        <div className="esc-hint">
+          Press <kbd>Esc</kbd> to cancel
+        </div>
+
+        {screenshot && (
+          <div className="ovl-shot">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={screenshot} alt="Capture" />
+            {shotBadge}
+          </div>
+        )}
+
+        <div className="ovl-status-row">
+          <span
+            className={`rec-dot${!isListening || isFinishing ? " rec-dot--idle" : ""}`}
+            aria-hidden
+          />
+          <span className="ovl-status-text">
+            {isFinishing ? "Wrapping up…" : "Capturing feedback…"}
+          </span>
+          <span className="ovl-time">{timeDisplay}</span>
+        </div>
+
+        <div className="ovl-title">Voice feedback</div>
+        <div className="ovl-sub">
+          Describe what you noticed—Echly structures it for your team.
+        </div>
+
+        <div className="ovl-wave" aria-hidden>
+          <div ref={waveformRef} className="echly-waveform">
+            {bars.map((value, i) => {
+              const n = bars.length;
+              const fade = n <= 1 ? 1 : 0.4 + 0.6 * (1 - i / (n - 1));
+              return (
+                <div
+                  key={i}
+                  className="echly-bar"
+                  style={{
+                    height: `${value * 100}%`,
+                    opacity: fade,
+                  }}
+                />
+              );
+            })}
+          </div>
+        </div>
+
         <button
+          ref={micTriggerRef}
           type="button"
-          className="echly-finish-btn"
-          onClick={() => onRetryVoice?.()}
+          className="mic-row"
+          onClick={() => void openMicPicker()}
+          aria-expanded={micPickerOpen}
+          aria-haspopup="listbox"
         >
-          Try Again
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+            <rect x="6" y="2" width="4" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          <span className="mic-name">
+            {currentMicLabel}
+            <span className="mic-level" aria-hidden>
+              <span /><span /><span />
+            </span>
+          </span>
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+            <path d="M5 6l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </button>
-        <div className="echly-voice-failure-secondary-wrap">
+
+        <div className="ovl-actions">
+          <button type="button" className="rec-pause" aria-label="Pause" disabled>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M6 4v8M10 4v8" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+            </svg>
+          </button>
           <button
-            ref={micTriggerRef}
             type="button"
-            className="echly-voice-failure-secondary"
-            onClick={() => void openMicPicker()}
-            aria-expanded={micPickerOpen}
-            aria-haspopup="listbox"
+            className="finish-btn"
+            onClick={onFinish}
+            disabled={isFinishing}
           >
-            Select Microphone
+            <span className="stop-square" aria-hidden />
+            {isFinishing ? "Finishing..." : "Finish"}
           </button>
         </div>
       </div>
     </div>
   );
 
-  const normalBody = !showFailure && (
-    <>
-      <div className="echly-voice-header">
-        <div className="echly-voice-status">
-          {!isFinishing && isListening ? (
-            <>
-              <span className="echly-dot" aria-hidden />
-              Capturing feedback…
-            </>
-          ) : (
-            <>
-              <span className="echly-dot echly-dot--idle" aria-hidden />
-              Wrapping up…
-            </>
-          )}
-        </div>
-        <div className="echly-voice-cancel">{isFinishing ? "Finishing…" : "Press Esc to cancel"}</div>
-      </div>
-
-      <div className="echly-capture-header">
-        <h2 className="echly-capture-title">Voice feedback</h2>
-        <p className="echly-capture-instruction">Describe what you noticed—Echly structures it for your team.</p>
-      </div>
-
-      {isListening && !isFinishing ? (
-        <div className="echly-capture-visualizer">
-          <div className="echly-waveform-container">
-            <div ref={waveformRef} className="echly-waveform" aria-hidden>
-              {bars.map((value, i) => {
-                const n = bars.length;
-                const fade =
-                  n <= 1 ? 1 : 0.4 + 0.6 * (1 - i / (n - 1));
-                return (
-                  <div
-                    key={i}
-                    className="echly-bar"
-                    style={{
-                      height: `${value * 100}%`,
-                      opacity: fade,
-                    }}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      <button
-        type="button"
-        className="echly-finish-btn"
-        onClick={onFinish}
-        disabled={isFinishing}
-      >
-        {isFinishing ? "Finishing..." : "Finish"}
-      </button>
-    </>
-  );
-
-  const card = (
-    <div
-      className={`echly-capture-card panel ${cardVisible ? "echly-capture-card--visible" : ""}`}
-      data-echly-ui="true"
-    >
-      <div className="echly-capture-card-blur-bg panel-bg" aria-hidden />
-      <div className="echly-capture-card-content panel-content">
-        {screenshot && (
-          <div className="echly-capture-screenshot-preview">
-            <img src={screenshot} alt="Capture" />
-          </div>
-        )}
-        {failureBody}
-        {normalBody}
-      </div>
-    </div>
-  );
+  const cardContent = showFailure ? failureCard : cardVisible ? normalCard : null;
 
   return (
     <>
@@ -535,12 +630,12 @@ export function VoiceCapturePanel({
         createPortal(
           <>
             {dimLayer}
-            {card}
+            {cardContent}
           </>,
           captureRoot
         )
       ) : (
-        card
+        cardContent
       )}
       {micDropdownMenu}
     </>

@@ -687,7 +687,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       try {
         const result = await Promise.race([
           getVisibleTextFromScreenshot(imageForOcr),
-          new Promise<string>((resolve) => setTimeout(() => resolve(""), 1500)),
+          new Promise<string>((resolve) => setTimeout(() => resolve(""), 500)),
         ]);
         extractedVisibleText = result ?? "";
       } catch (e) {
@@ -723,32 +723,35 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         suggestedTags?: string[];
         actionSteps?: string[];
       };
-      let structuredPayload: {
-        tickets?: StructureTicket[];
-        structuredSuccess?: boolean;
-      } | null = null;
-      let structuredErrorMessage: string | undefined;
-      try {
-        const res = await apiFetch("/api/structure-feedback", {
+      const [structureSettled, uploadSettled] = await Promise.allSettled([
+        apiFetch("/api/structure-feedback", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             transcript,
             context: enrichedContext,
           }),
-        });
-        throwIfHttpError(res, "structure-feedback");
-        const envelope = (await res.json()) as {
-          success?: boolean;
-          data?: { tickets?: StructureTicket[]; structuredSuccess?: boolean };
-          error?: { message?: string };
-        };
-        structuredPayload = envelope.data ?? null;
-        structuredErrorMessage = envelope.error?.message;
-      } catch (e) {
-        console.error("[ECHLY] structure-feedback request failed", e);
-        throw e;
+        }).then(async (res) => {
+          throwIfHttpError(res, "structure-feedback");
+          return (await res.json()) as {
+            success?: boolean;
+            data?: { tickets?: StructureTicket[]; structuredSuccess?: boolean };
+            error?: { message?: string };
+          };
+        }),
+        screenshot
+          ? uploadScreenshot(screenshot, effectiveSessionId)
+          : Promise.reject(new Error("Screenshot is required.")),
+      ]);
+
+      if (structureSettled.status === "rejected") {
+        console.error("[ECHLY] structure-feedback request failed", structureSettled.reason);
+        throw structureSettled.reason;
       }
+
+      const structureEnvelope = structureSettled.value;
+      const structuredPayload = structureEnvelope.data ?? null;
+      const structuredErrorMessage = structureEnvelope.error?.message;
 
       if (
         !structuredPayload?.structuredSuccess ||
@@ -760,16 +763,20 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       }
       const normalized = structuredPayload.tickets[0];
 
-      try {
-        if (!screenshot) {
-          throw new Error("Screenshot is required.");
+      let finalScreenshotId: string | null = null;
+      if (uploadSettled.status === "fulfilled") {
+        finalScreenshotId = uploadSettled.value.screenshotId;
+      } else {
+        console.error("[ECHLY] screenshot upload failed", uploadSettled.reason);
+        if (ECHLY_STRICT_MODE) {
+          throw uploadSettled.reason as Error;
         }
+      }
+      if (ECHLY_STRICT_MODE && !finalScreenshotId) {
+        throw new Error("Attempted create without screenshot");
+      }
 
-        const uploadResult = await uploadScreenshot(screenshot, effectiveSessionId);
-        const finalScreenshotId = uploadResult.screenshotId;
-        if (ECHLY_STRICT_MODE && !finalScreenshotId) {
-          throw new Error("Attempted create without screenshot");
-        }
+      try {
 
         const token = await getExtensionToken();
         if (!token) {
@@ -1223,23 +1230,13 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
 
   if (authState === "loading" && !user) {
     return (
-      <div
-        style={{
-          minWidth: 200,
-          padding: "8px 12px",
-          borderRadius: 10,
-          border: "1px solid #EBF4FF",
-          background: "#F8F8F8",
-          color: "var(--text-body)",
-          fontSize: 13,
-          boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-        }}
-      >
-        <span className="echly-spinner" style={{ width: 14, height: 14 }} aria-hidden />
-        Checking sign-in…
+      <div className="echly-v2">
+        <div className="pill pill-sm">
+          <div className="auth-loading-card">
+            <span className="echly-spinner" style={{ width: 20, height: 20 }} aria-hidden />
+            <span className="auth-loading-text">Checking sign-in…</span>
+          </div>
+        </div>
       </div>
     );
   }
@@ -1251,38 +1248,37 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
 
   if (authState === "unauthenticated" || !user) {
     return (
-      <div
-        style={{
-          minWidth: 280,
-          padding: "16px",
-          borderRadius: 12,
-          border: "1px solid #EBF4FF",
-          background: "#F8F8F8",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
-        }}
-      >
-        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-heading)", marginBottom: 8 }}>
-          Sign in to use Echly
+      <div className="echly-v2">
+        <div className="pill pill-sm">
+          <div className="auth-body">
+            <div className="auth-icon">
+              <svg width="22" height="22" viewBox="0 0 16 16" fill="none">
+                <rect x="3.5" y="7" width="9" height="6.5" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+                <path d="M5.5 7V5a2.5 2.5 0 1 1 5 0v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <circle cx="8" cy="10" r="1" fill="currentColor"/>
+              </svg>
+            </div>
+            <div className="auth-title">Sign in to use Echly</div>
+            <div className="auth-sub">
+              Capture voice or written feedback on any page — Echly will sync it to your workspace.
+            </div>
+            <button type="button" className="auth-cta" onClick={onTriggerLogin}>
+              Open Login
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            <div className="auth-foot">
+              New to Echly?{" "}
+              <a
+                href="#"
+                onClick={(e) => { e.preventDefault(); onTriggerLogin(); }}
+              >
+                Create an account
+              </a>
+            </div>
+          </div>
         </div>
-        <div style={{ fontSize: 13, color: "#78716C", marginBottom: 12 }}>
-          You are not signed in on the dashboard.
-        </div>
-        <button
-          type="button"
-          onClick={onTriggerLogin}
-          style={{
-            background: "#1775E0",
-            color: "#FFFFFF",
-            border: "none",
-            borderRadius: 8,
-            padding: "8px 14px",
-            fontSize: 14,
-            fontWeight: 500,
-            cursor: "pointer",
-          }}
-        >
-          Login
-        </button>
       </div>
     );
   }

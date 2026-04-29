@@ -8,7 +8,6 @@ import {
 import { tryBuildRequestContext } from "@/lib/server/requestContext";
 import {
   createScreenshotRepoSync,
-  getScreenshotByIdRepo,
 } from "@/lib/repositories/screenshotsRepository";
 import { corsHeaders } from "@/lib/server/cors";
 import { createScreenshotId } from "@/lib/uploadScreenshot";
@@ -120,7 +119,10 @@ export async function POST(req: NextRequest) {
 
     const userId = user.uid;
 
-    const storagePath = `sessions/${sid}/screenshots/${ssId}.png`;
+    const isJpeg = imageDataUrl.startsWith("data:image/jpeg");
+    const contentType = isJpeg ? "image/jpeg" : "image/png";
+    const ext = isJpeg ? "jpg" : "png";
+    const storagePath = `sessions/${sid}/screenshots/${ssId}.${ext}`;
 
     const uploadStart = Date.now();
     // Convert data URL → buffer
@@ -132,21 +134,19 @@ export async function POST(req: NextRequest) {
 
     await file.save(buffer, {
       metadata: {
-        contentType: "image/png",
+        contentType,
         cacheControl: "public, max-age=31536000, immutable",
       },
     });
 
-    const existing = await getScreenshotByIdRepo(ssId);
-    if (existing?.status !== "ATTACHED") {
-      await createScreenshotRepoSync(
-        userId,
-        ssId,
-        storagePath,
-        sid,
-        workspaceId
-      );
-    }
+    // New screenshots never exist yet — write directly without an existence check (~200ms saved).
+    await createScreenshotRepoSync(
+      userId,
+      ssId,
+      storagePath,
+      sid,
+      workspaceId
+    );
 
     const elapsedMs = Date.now() - uploadStart;
     console.log(`[UPLOAD] screenshot upload (+ record) duration: ${elapsedMs}ms`);

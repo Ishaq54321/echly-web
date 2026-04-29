@@ -1673,7 +1673,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     (async () => {
       try {
         const dataUrl = await new Promise<string>((resolve, reject) => {
-          chrome.tabs.captureVisibleTab(sender.tab!.windowId, { format: "png" }, (result) => {
+          chrome.tabs.captureVisibleTab(sender.tab!.windowId, { format: "jpeg", quality: 80 }, (result) => {
             if (chrome.runtime.lastError) {
               reject(new Error(chrome.runtime.lastError?.message ?? "Capture failed"));
               return;

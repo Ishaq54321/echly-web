@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { attachElementHighlighter, detachElementHighlighter } from "./session/elementHighlighter";
 import { attachClickCapture, detachClickCapture } from "./session/clickCapture";
@@ -19,6 +19,19 @@ function createCommentCursor() {
 }
 
 const COMMENT_CURSOR = createCommentCursor();
+
+/** Derive a short readable selector from a full domPath (e.g. "div#hero > button.cta" → "#cta"). */
+function shortSelector(domPath: string | null | undefined): string | undefined {
+  if (!domPath) return undefined;
+  const parts = domPath.split(" > ");
+  const last = parts[parts.length - 1] || "";
+  const idMatch = last.match(/#[a-zA-Z0-9_-]+/);
+  if (idMatch) return idMatch[0];
+  const classMatch = last.match(/\.[a-zA-Z0-9_-]+/);
+  if (classMatch) return classMatch[0];
+  const tagMatch = last.match(/^[a-zA-Z0-9]+/);
+  return tagMatch ? tagMatch[0] : undefined;
+}
 
 export type SessionOverlayProps = {
   captureRoot: HTMLDivElement;
@@ -85,6 +98,27 @@ export function SessionOverlay({
   const sessionActionPending = pausePending || endPending;
   const sessionCursorActive = sessionMode && !sessionPaused && !sessionActionPending;
 
+  /**
+   * Local captureMode override: when the user switches from text → voice inside the panel,
+   * we flip to "voice" locally without needing to change the external captureMode prop.
+   * Resets whenever sessionFeedbackPending clears.
+   */
+  const [overrideCaptureMode, setOverrideCaptureMode] = useState<"voice" | "text" | null>(null);
+  const effectiveCaptureMode = overrideCaptureMode ?? captureMode;
+
+  useEffect(() => {
+    if (!sessionFeedbackPending) setOverrideCaptureMode(null);
+  }, [sessionFeedbackPending]);
+
+  /** Switch from text panel to voice panel while keeping the same pending feedback. */
+  const handleSwitchToVoice = useCallback(() => {
+    setOverrideCaptureMode("voice");
+    if (!voiceStartedForPendingRef.current) {
+      voiceStartedForPendingRef.current = true;
+      onRecordVoice();
+    }
+  }, [onRecordVoice]);
+
   useEffect(() => {
     if (!sessionMode || !captureRoot) return;
     const getActive = () =>
@@ -141,6 +175,17 @@ export function SessionOverlay({
 
   const saving = Boolean(__extensionSavingState);
 
+  /* Derive element selector + dimensions for the screenshot badge. */
+  const elemSelector = sessionFeedbackPending
+    ? shortSelector(sessionFeedbackPending.context?.domPath)
+    : undefined;
+  const elemWidth = sessionFeedbackPending?.elementRect?.width
+    ? Math.round(sessionFeedbackPending.elementRect.width)
+    : undefined;
+  const elemHeight = sessionFeedbackPending?.elementRect?.height
+    ? Math.round(sessionFeedbackPending.elementRect.height)
+    : undefined;
+
   const content = (
     <>
       {sessionFeedbackPending && (
@@ -169,7 +214,7 @@ export function SessionOverlay({
         onResume={onResume}
         onEnd={onEnd}
       />
-      {sessionFeedbackPending && captureMode === "voice" && (
+      {sessionFeedbackPending && effectiveCaptureMode === "voice" && (
         <VoiceCapturePanel
           captureRoot={captureRoot}
           screenshot={sessionFeedbackPending.screenshot ?? undefined}
@@ -183,14 +228,21 @@ export function SessionOverlay({
           onRetryVoice={onRetryVoice}
           onSelectMicrophone={onSelectMicrophone}
           voiceMicDeviceId={voiceMicDeviceId}
+          elementSelector={elemSelector}
+          elementWidth={elemWidth}
+          elementHeight={elemHeight}
         />
       )}
-      {sessionFeedbackPending && captureMode === "text" && (
+      {sessionFeedbackPending && effectiveCaptureMode === "text" && (
         <TextFeedbackPanel
           screenshot={sessionFeedbackPending.screenshot ?? undefined}
           onSubmit={onSaveText}
           onCancel={onCancel}
           theme={theme}
+          onSwitchToVoice={handleSwitchToVoice}
+          elementSelector={elemSelector}
+          elementWidth={elemWidth}
+          elementHeight={elemHeight}
         />
       )}
     </>
