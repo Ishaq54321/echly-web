@@ -216,6 +216,9 @@ type CanonicalGlobalState = {
   lastPaginationAt: number | null;
   /** max(lastSyncedAt, lastPaginationAt); null when neither set. */
   lastActivityAt: number | null;
+  feedbackLimitReached: boolean;
+  feedbackLimitMessage: string | null;
+  feedbackUpgradePlan: string | null;
 };
 
 const globalUIState: {
@@ -239,6 +242,9 @@ const globalUIState: {
   captureMode: "voice" | "text";
   lastSyncedAt: number | null;
   lastPaginationAt: number | null;
+  feedbackLimitReached: boolean;
+  feedbackLimitMessage: string | null;
+  feedbackUpgradePlan: string | null;
 } = {
   visible: false,
   expanded: false,
@@ -260,6 +266,9 @@ const globalUIState: {
   captureMode: "voice",
   lastSyncedAt: null,
   lastPaginationAt: null,
+  feedbackLimitReached: false,
+  feedbackLimitMessage: null,
+  feedbackUpgradePlan: null,
 };
 
 function mapFeedbackToPointers(feedback: FeedbackApiItem[]): StructuredFeedback[] {
@@ -944,6 +953,9 @@ function getCanonicalGlobalState(): CanonicalGlobalState {
       const t = effectiveFreshnessAt();
       return t === 0 ? null : t;
     })(),
+    feedbackLimitReached: globalUIState.feedbackLimitReached,
+    feedbackLimitMessage: globalUIState.feedbackLimitMessage,
+    feedbackUpgradePlan: globalUIState.feedbackUpgradePlan,
   };
 }
 
@@ -1129,8 +1141,14 @@ async function createFeedbackInternal({
     screenshotId,
   });
 
-  const res = await apiFetch(`${API_BASE}/api/feedback`, {
+  const token = await getOrRefreshToken();
+  const res = await fetch(`${API_BASE}/api/feedback`, {
     method: "POST",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      "x-extension-token": token,
+    },
     body: JSON.stringify(body),
   });
 
@@ -1660,7 +1678,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "ECHLY_GET_AUTH_STATE" || request.type === "GET_AUTH_STATE") {
     (async () => {
       const authState = await getAuthStateResponse();
-      sendResponse(authState);
+      let feedbackUsage: number | null = null;
+      let feedbackLimit: number | null = null;
+      if (authState.authenticated) {
+        try {
+          const usageRes = await apiFetch(`${API_BASE}/api/billing/usage`, {});
+          if (usageRes.ok) {
+            const usageJson = (await usageRes.json()) as {
+              data?: { feedbackTicketsUsed?: number; feedbackTicketsLimit?: number | null; canCreateFeedback?: boolean };
+            };
+            feedbackUsage = usageJson.data?.feedbackTicketsUsed ?? null;
+            feedbackLimit = usageJson.data?.feedbackTicketsLimit ?? null;
+            if (usageJson.data?.canCreateFeedback === false) {
+              globalUIState.feedbackLimitReached = true;
+              globalUIState.feedbackLimitMessage = "Monthly ticket limit reached";
+              globalUIState.feedbackUpgradePlan = globalUIState.feedbackUpgradePlan ?? "business";
+              broadcastUIState();
+            }
+          }
+        } catch {
+          // Usage fetch is best-effort; degrade gracefully
+        }
+      }
+      sendResponse({ ...authState, feedbackUsage, feedbackLimit });
     })();
     return true;
   }
@@ -1874,13 +1914,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         const data = (await feedbackRes.json()) as {
           success?: boolean;
-          error?: { message?: string };
+          message?: string;
+          error?: { message?: string; code?: string; data?: { upgradePlan?: string } };
+          data?: { upgradePlan?: string };
+          upgradePlan?: string;
         };
 
         if (!feedbackRes.ok || data.success === false) {
+          const upgradePlan = data?.data?.upgradePlan || data?.upgradePlan || data?.error?.data?.upgradePlan;
+          const isLimitError = feedbackRes.status === 403 && (
+            !!upgradePlan ||
+            (data?.error?.message || "").toLowerCase().includes("limit") ||
+            (data?.error?.code || "").includes("FORBIDDEN")
+          );
+          if (isLimitError) {
+            globalUIState.feedbackLimitReached = true;
+            globalUIState.feedbackLimitMessage = data?.error?.message || data?.message || "Monthly feedback ticket limit reached";
+            globalUIState.feedbackUpgradePlan = upgradePlan || "business";
+            broadcastUIState();
+          }
           sendResponse({
             success: false,
-            error: data?.error?.message || "API failed",
+            error: data?.error?.message || data?.message || "API failed",
+            ...(isLimitError ? { limitReached: true, upgradePlan: upgradePlan || "business" } : {}),
           });
           return;
         }

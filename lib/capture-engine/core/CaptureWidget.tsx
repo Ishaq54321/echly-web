@@ -83,6 +83,9 @@ export default function CaptureWidget({
   getAssetUrl,
   __extensionSavingState,
   onExtensionSavingSignalsChange,
+  feedbackLimitReached,
+  feedbackUsage,
+  feedbackLimit,
 }: CaptureWidgetProps) {
   const [resumeModalOpen, setResumeModalOpen] = useState(false);
   const showResumeModal = resumeModalOpen || (openResumeModalProp ?? false);
@@ -98,6 +101,8 @@ export default function CaptureWidget({
   const [micDropdownOpen, setMicDropdownOpen] = useState(false);
   /** V2: when true, show mode selection screen instead of home screen. */
   const [showModeSelection, setShowModeSelection] = useState(false);
+  /** Feedback ticket limit: when true, show full upgrade screen (pre-session proactive check). */
+  const [showUpgradeScreen, setShowUpgradeScreen] = useState(false);
   /** S9: Keep Recording pill — shown once per session on first processing trigger. */
   const [keepRecordingVisible, setKeepRecordingVisible] = useState(false);
   const [keepRecordingFading, setKeepRecordingFading] = useState(false);
@@ -553,8 +558,70 @@ export default function CaptureWidget({
                     />
                   </div>
                 </>
+              ) : extensionMode && showHomeScreen && showUpgradeScreen ? (
+                /* ── Case 2a: Full ticket-limit upgrade screen (Screen 1) ── */
+                <div className="echly-v2">
+                  <div className="pill upgrade-full">
+                    <div className="upgrade-full-head">
+                      <div className="upgrade-full-head-left">
+                        <div className="upgrade-full-mark">
+                          <svg viewBox="0 0 18 18" fill="none" width="14" height="14">
+                            <text x="4" y="13.5" fontSize="12" fontWeight="700" fill="#fff" fontFamily="DM Sans, sans-serif">E</text>
+                          </svg>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="upgrade-full-close"
+                        onClick={() => setShowUpgradeScreen(false)}
+                        title="Close"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                          <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <div className="upgrade-full-body">
+                      <div className="upgrade-icon-wrap">
+                        <div className="upgrade-sparkles">
+                          <span className="upgrade-sparkle" />
+                          <span className="upgrade-sparkle" />
+                          <span className="upgrade-sparkle" />
+                          <span className="upgrade-sparkle" />
+                        </div>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M2 20h20"/>
+                          <path d="M4 20V10l4 4 4-8 4 8 4-4v10"/>
+                          <circle cx="4" cy="10" r="1" fill="currentColor" stroke="none"/>
+                          <circle cx="12" cy="6" r="1" fill="currentColor" stroke="none"/>
+                          <circle cx="20" cy="10" r="1" fill="currentColor" stroke="none"/>
+                        </svg>
+                      </div>
+                      {feedbackUsage != null && feedbackLimit != null && (
+                        <span className="upgrade-counter">
+                          <span className="upgrade-counter-dot" />
+                          {feedbackUsage} of {feedbackLimit} tickets used this month
+                        </span>
+                      )}
+                      <h2 className="upgrade-title">You've reached your monthly limit</h2>
+                      <p className="upgrade-desc">
+                        Upgrade to Business for unlimited feedback tickets, unlimited team members, and priority support.
+                      </p>
+                      <button
+                        type="button"
+                        className="upgrade-cta"
+                        onClick={() => onOpenBilling?.()}
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                        </svg>
+                        Upgrade to Business
+                      </button>
+                    </div>
+                  </div>
+                </div>
               ) : extensionMode && showHomeScreen ? (
-                /* ── Case 2: Extension home screen → V2 design ── */
+                /* ── Case 2b: Extension home screen → V2 design ── */
                 <div className="echly-v2">
                   {showPreviousFeedback ? (
                     <PreviousFeedbackView
@@ -692,6 +759,9 @@ export default function CaptureWidget({
                           onClick={async () => {
                             if (isStartingSession) return;
                             if (!(await checkAuthBeforeAction())) return;
+                            const limitHit = feedbackLimitReached != null ||
+                              (feedbackUsage != null && feedbackLimit != null && feedbackUsage >= feedbackLimit);
+                            if (limitHit) { setShowUpgradeScreen(true); return; }
                             setShowModeSelection(true);
                           }}
                           disabled={isStartingSession}
@@ -716,6 +786,9 @@ export default function CaptureWidget({
                             className="ghost-btn"
                             onClick={async () => {
                               if (!(await checkAuthBeforeAction())) return;
+                              const limitHit = feedbackLimitReached != null ||
+                                (feedbackUsage != null && feedbackLimit != null && feedbackUsage >= feedbackLimit);
+                              if (limitHit) { setShowUpgradeScreen(true); return; }
                               setShowPreviousFeedback(true);
                             }}
                           >
@@ -893,6 +966,32 @@ export default function CaptureWidget({
                               <span />
                             </span>
                           </span>
+                        </div>
+                      )}
+
+                      {/* Inline ticket-limit upgrade card (Screen 2) */}
+                      {!showSessionLoading && feedbackLimitReached && (
+                        <div className="upgrade-inline" role="alert">
+                          <div className="upgrade-inline-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M2 20h20"/>
+                              <path d="M4 20V10l4 4 4-8 4 8 4-4v10"/>
+                            </svg>
+                          </div>
+                          <div className="upgrade-inline-content">
+                            <div className="upgrade-inline-title">Monthly ticket limit reached</div>
+                            <div className="upgrade-inline-desc">Upgrade to keep capturing feedback without interruption.</div>
+                            <button
+                              type="button"
+                              className="upgrade-inline-btn"
+                              onClick={() => onOpenBilling?.()}
+                            >
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                              </svg>
+                              Upgrade
+                            </button>
+                          </div>
                         </div>
                       )}
 

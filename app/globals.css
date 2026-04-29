@@ -27,6 +27,12 @@
 ====================================== */
 
 :root {
+  /* ── Amber / upgrade palette ──────────────────────────── */
+  --color-amber: #F59E0B;
+  --color-amber-soft: #FEF3C7;
+  --color-amber-ink: #92400E;
+  --color-amber-mid: #D97706;
+
   /* ── Atmospheric surface gradients ────────────────────── */
   --env-base: var(--surface-page);
   --env-gradient-top: rgba(226, 232, 240, 0.045);
@@ -7684,4 +7690,318 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
 @keyframes echly-skeleton-shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   UPGRADE SCREENS  (ticket limit — amber/gold palette)
+   Screen 1: Full upgrade (pre-session proactive check)
+   Screen 2: Inline card (mid-session reactive 403)
+   All px values = design values × 1.15
+   ═══════════════════════════════════════════════════════════ */
+
+/* Amber tokens (local to upgrade screens) */
+.echly-v2 .upgrade-full,
+.echly-v2 .upgrade-inline {
+  --amber: #F59E0B;
+  --amber-soft: #FEF3C7;
+  --amber-ink: #92400E;
+}
+
+/* ── Screen 1: Full upgrade pill ─────────────────────────── */
+.echly-v2 .upgrade-full {
+  background: var(--surface);
+  border-radius: 22px;
+  border: 1px solid rgba(28,25,23,0.06);
+  box-shadow:
+    0 1px 3px rgba(28,25,23,0.04),
+    0 4px 12px -2px rgba(28,25,23,0.06);
+  overflow: hidden;
+}
+
+.echly-v2 .upgrade-full-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.echly-v2 .upgrade-full-head-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.echly-v2 .upgrade-full-mark {
+  width: 25px;
+  height: 25px;
+  border-radius: 8px;
+  background: var(--ink);
+  display: grid;
+  place-items: center;
+}
+
+.echly-v2 .upgrade-full-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: var(--soft);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.echly-v2 .upgrade-full-close:hover {
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+
+.echly-v2 .upgrade-full-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 28px 32px;
+  gap: 16px;
+  text-align: center;
+}
+
+/* Animated icon */
+.echly-v2 .upgrade-icon-wrap {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, var(--amber-soft) 0%, #FDE68A 100%);
+  display: grid;
+  place-items: center;
+  position: relative;
+  animation: echly-upgrade-icon-float 3s ease-in-out infinite;
+}
+
+.echly-v2 .upgrade-icon-wrap::before {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border-radius: 24px;
+  border: 2px solid var(--amber);
+  opacity: 0;
+  animation: echly-upgrade-ring-pulse 3s ease-out infinite;
+}
+
+.echly-v2 .upgrade-icon-wrap > svg {
+  width: 32px;
+  height: 32px;
+  color: var(--amber-ink);
+  animation: echly-upgrade-icon-sparkle 3s ease-in-out infinite;
+}
+
+/* Sparkle dots */
+.echly-v2 .upgrade-sparkles {
+  position: absolute;
+  inset: -12px;
+  pointer-events: none;
+}
+
+.echly-v2 .upgrade-sparkle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--amber);
+}
+
+.echly-v2 .upgrade-sparkle:nth-child(1) {
+  top: 2px; left: 50%;
+  animation: echly-sparkle-pop 3s ease-in-out infinite 0s;
+}
+.echly-v2 .upgrade-sparkle:nth-child(2) {
+  top: 30%; right: 0;
+  animation: echly-sparkle-pop 3s ease-in-out infinite 0.5s;
+}
+.echly-v2 .upgrade-sparkle:nth-child(3) {
+  bottom: 2px; left: 30%;
+  animation: echly-sparkle-pop 3s ease-in-out infinite 1s;
+}
+.echly-v2 .upgrade-sparkle:nth-child(4) {
+  top: 40%; left: 0;
+  animation: echly-sparkle-pop 3s ease-in-out infinite 1.5s;
+}
+
+/* Counter badge */
+.echly-v2 .upgrade-counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: var(--amber-soft);
+  border: 1px solid rgba(245,158,11,0.2);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--amber-ink);
+  letter-spacing: -0.005em;
+}
+
+.echly-v2 .upgrade-counter-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--amber);
+}
+
+/* Title */
+.echly-v2 .upgrade-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  margin: 0;
+}
+
+/* Description */
+.echly-v2 .upgrade-desc {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--muted);
+  line-height: 1.55;
+  max-width: 320px;
+  margin: 0;
+}
+
+/* CTA button */
+.echly-v2 .upgrade-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 24px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: -0.005em;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.15) inset,
+    0 2px 8px -2px rgba(217,119,6,0.4);
+  transition: transform .12s, box-shadow .12s;
+  margin-top: 4px;
+}
+.echly-v2 .upgrade-cta:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.15) inset,
+    0 4px 16px -2px rgba(217,119,6,0.5);
+}
+.echly-v2 .upgrade-cta:active {
+  transform: translateY(0);
+}
+.echly-v2 .upgrade-cta svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ── Screen 2: Inline upgrade card ───────────────────────── */
+.echly-v2 .upgrade-inline {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(254,243,199,0.4) 0%, rgba(253,230,138,0.2) 100%);
+  border: 1px solid rgba(245,158,11,0.15);
+  margin: 0 9px;
+}
+
+.echly-v2 .upgrade-inline-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--amber-soft);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  animation: echly-upgrade-inline-pulse 2.5s ease-in-out infinite;
+}
+
+.echly-v2 .upgrade-inline-icon svg {
+  width: 18px;
+  height: 18px;
+  color: var(--amber-ink);
+}
+
+.echly-v2 .upgrade-inline-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.echly-v2 .upgrade-inline-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+  margin-bottom: 3px;
+}
+
+.echly-v2 .upgrade-inline-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.45;
+  margin-bottom: 10px;
+}
+
+.echly-v2 .upgrade-inline-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 7px;
+  background: var(--amber);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background .12s;
+}
+.echly-v2 .upgrade-inline-btn:hover { background: #D97706; }
+.echly-v2 .upgrade-inline-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ── Keyframe animations ──────────────────────────────────── */
+@keyframes echly-upgrade-icon-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes echly-upgrade-ring-pulse {
+  0% { transform: scale(0.92); opacity: 0.5; }
+  100% { transform: scale(1.1); opacity: 0; }
+}
+
+@keyframes echly-upgrade-icon-sparkle {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(3deg) scale(1.05); }
+  75% { transform: rotate(-3deg) scale(1.02); }
+}
+
+@keyframes echly-sparkle-pop {
+  0%, 100% { transform: scale(0); opacity: 0; }
+  20% { transform: scale(1.2); opacity: 1; }
+  40% { transform: scale(0.8); opacity: 0.6; }
+  60% { transform: scale(0); opacity: 0; }
+}
+
+@keyframes echly-upgrade-inline-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
 }

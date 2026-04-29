@@ -25,6 +25,7 @@ import { ArchiveEmptyState } from "@/components/empty/ArchiveEmptyState";
 import { ToastProvider, useToast } from "@/components/dashboard/context/ToastContext";
 import { SessionsSearchProvider } from "@/components/dashboard/context/SessionsSearchContext";
 import DashboardCaptureHost from "./components/DashboardCaptureHost";
+import { DashboardUpgradeBanner } from "@/components/dashboard/DashboardUpgradeBanner";
 
 const DeleteSessionModal = dynamic(
   () =>
@@ -188,6 +189,8 @@ function DashboardContent() {
                   </div>
                 }
               />
+
+              <DashboardUpgradeBanner />
 
               <div>
                 {isLoading ? (

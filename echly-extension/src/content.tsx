@@ -191,6 +191,9 @@ type GlobalUIState = {
   captureMode: "voice" | "text";
   openCount: number;
   resolvedCount: number;
+  feedbackLimitReached?: boolean;
+  feedbackLimitMessage?: string | null;
+  feedbackUpgradePlan?: string | null;
 };
 
 /** Generate a unique id for a feedback job (used for concurrent job queue). */
@@ -465,6 +468,13 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   const [isProcessingFeedback, setIsProcessingFeedback] = React.useState(false);
   /** Job queue for concurrent feedback captures; each job shows its own Processing/failed card in the tray. */
   const [feedbackJobs, setFeedbackJobs] = React.useState<FeedbackJob[]>([]);
+  /** When POST /api/feedback returns 403 PLAN_LIMIT_REACHED (ticket limit), show upgrade screens. */
+  const [feedbackLimitReached, setFeedbackLimitReached] = React.useState<{
+    message: string;
+    upgradePlan: string;
+  } | null>(null);
+  const [feedbackUsage, setFeedbackUsage] = React.useState<number | null>(null);
+  const [feedbackLimit, setFeedbackLimit] = React.useState<number | null>(null);
 
   React.useEffect(() => {
     if (!isProcessingFeedback) return;
@@ -558,6 +568,14 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       if (!normalized) return;
       setHostVisibilityFromState(normalized);
       setGlobalState(normalized);
+      if (normalized.feedbackLimitReached) {
+        setFeedbackLimitReached({
+          message: normalized.feedbackLimitMessage || "Monthly ticket limit reached",
+          upgradePlan: normalized.feedbackUpgradePlan || "business",
+        });
+      } else {
+        setFeedbackLimitReached(null);
+      }
     };
     window.addEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
     return () => window.removeEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
@@ -738,7 +756,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     setAuthState("loading");
     chrome.runtime.sendMessage(
       { type: "GET_AUTH_STATE" },
-      (response: { authenticated?: boolean; user?: AuthUser | null } | undefined) => {
+      (response: { authenticated?: boolean; user?: AuthUser | null; feedbackUsage?: number | null; feedbackLimit?: number | null } | undefined) => {
         logRuntimeLastError("GET_AUTH_STATE");
         if (response?.authenticated && response.user?.uid) {
           setUser({
@@ -752,6 +770,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           setUser(null);
           setAuthState("unauthenticated");
         }
+        if (typeof response?.feedbackUsage === "number") setFeedbackUsage(response.feedbackUsage);
+        if (typeof response?.feedbackLimit === "number") setFeedbackLimit(response.feedbackLimit);
       }
     );
   }, [globalState?.visible]);
@@ -917,7 +937,14 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                   return;
                 }
                 if (!response?.success) {
-                  reject(new Error(response?.error || "Failed to create feedback"));
+                  if (response?.limitReached) {
+                    const limitErr = new Error(response?.error || "Monthly ticket limit reached") as Error & { limitReached: boolean; upgradePlan: string };
+                    limitErr.limitReached = true;
+                    limitErr.upgradePlan = (response as { upgradePlan?: string }).upgradePlan ?? "business";
+                    reject(limitErr);
+                  } else {
+                    reject(new Error(response?.error || "Failed to create feedback"));
+                  }
                   return;
                 }
                 resolve(response);
@@ -1031,7 +1058,14 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         return ticket;
       } catch (err) {
         logger.error("error", "feedback_pipeline_failed", err);
-        if (jobId) {
+        const isLimitErr = err instanceof Error && (err as Error & { limitReached?: boolean }).limitReached === true;
+        if (isLimitErr) {
+          if (jobId) setFeedbackJobs((prev) => prev.filter((j) => j.id !== jobId));
+          setFeedbackLimitReached({
+            message: (err as Error).message || "Monthly ticket limit reached",
+            upgradePlan: (err as Error & { upgradePlan?: string }).upgradePlan ?? "business",
+          });
+        } else if (jobId) {
           const failMsg =
             err instanceof Error
               ? err.message.startsWith("API_ERROR_")
@@ -1049,7 +1083,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         endLocalOp();
       }
     },
-    [processFeedbackPipeline, startLocalOp, endLocalOp]
+    [processFeedbackPipeline, startLocalOp, endLocalOp, setFeedbackLimitReached]
   );
 
   const handleDelete = React.useCallback(
@@ -1529,6 +1563,9 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           openResumeModal={openResumeModalFromMessage}
           onResumeModalClose={() => setOpenResumeModalFromMessage(false)}
           sessionLimitReached={sessionLimitReached}
+          feedbackLimitReached={feedbackLimitReached}
+          feedbackUsage={feedbackUsage}
+          feedbackLimit={feedbackLimit}
           sessionStartErrorBanner={sessionStartErrorBanner}
           onSessionStartErrorDismiss={() => setSessionStartErrorBanner(null)}
           environment={environment}
@@ -1655,6 +1692,9 @@ function normalizeGlobalState(state: GlobalUIState | undefined): GlobalUIState |
     openCount: typeof state.openCount === "number" ? state.openCount : 0,
     resolvedCount: typeof state.resolvedCount === "number" ? state.resolvedCount : 0,
     captureMode: state.captureMode === "text" ? "text" : "voice",
+    feedbackLimitReached: state.feedbackLimitReached === true,
+    feedbackLimitMessage: typeof state.feedbackLimitMessage === "string" ? state.feedbackLimitMessage : null,
+    feedbackUpgradePlan: typeof state.feedbackUpgradePlan === "string" ? state.feedbackUpgradePlan : null,
   };
 }
 

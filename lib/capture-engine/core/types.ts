@@ -200,6 +200,12 @@ export type CaptureWidgetProps = {
   onTriggerLogin?: () => void;
   /** Extension: when set (POST /api/sessions returned 403 PLAN_LIMIT_REACHED), show upgrade view instead of session controls. */
   sessionLimitReached?: { message: string; upgradePlan: unknown } | null;
+  /** Extension: when set (POST /api/feedback returned 403 PLAN_LIMIT_REACHED for tickets), show ticket upgrade screens. */
+  feedbackLimitReached?: { message: string; upgradePlan: string } | null;
+  /** Extension: current feedback tickets used this month (from GET_AUTH_STATE usage fetch). */
+  feedbackUsage?: number | null;
+  /** Extension: max feedback tickets allowed per month for this plan (null = unlimited). */
+  feedbackLimit?: number | null;
   /** Extension: transient banner when session start failed (e.g. background-triggered createSession). */
   sessionStartErrorBanner?: string | null;
   /** Extension: clear session start error banner (e.g. after user dismisses or retries). */
