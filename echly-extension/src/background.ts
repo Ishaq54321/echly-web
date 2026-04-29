@@ -325,7 +325,7 @@ function setRehydratingLoadingState(sessionId: string, mode: RehydrateMode = "co
   globalUIState.sessionModeActive = true;
   globalUIState.sessionPaused = false;
   // Same-session refresh: keep list visible; only block full chrome on session change / recovery.
-  globalUIState.sessionLoading = sessionChanged || mode === "forced_recovery";
+  globalUIState.sessionLoading = sessionChanged || mode === "forced_recovery" || globalUIState.pointers.length === 0;
   globalUIState.isFetching = true;
   const clearList = mode === "forced_recovery" || (mode === "cold" && sessionChanged);
   if (clearList) {
@@ -378,6 +378,11 @@ async function rehydrateSession(sessionId: string, mode: RehydrateMode = "cold")
       const now = Date.now();
       globalUIState.lastSyncedAt = now;
       globalUIState.lastPaginationAt = null;
+      // Bail if session was ended while we were fetching
+      if (activeSessionId === null) {
+        globalUIState.sessionLoading = false;
+        return;
+      }
       globalUIState.sessionModeActive = true;
       globalUIState.sessionPaused = false;
     } catch (error) {
@@ -482,6 +487,7 @@ async function loadMore(): Promise<void> {
 
 async function drainAllFeedbackPages(sessionId: string): Promise<void> {
   if (!sessionId) return;
+  if (activeSessionId === null) return;
   while (
     globalUIState.sessionId === sessionId &&
     globalUIState.hasMore === true &&
@@ -563,6 +569,7 @@ function clearSessionIdleTimer(): void {
 function endSessionFromIdle(): void {
   echlyLog("BACKGROUND", "session idle timeout — ending session");
   clearSessionIdleTimer();
+  chrome.alarms.clear("echly-keepalive");
   activeSessionId = null;
   globalUIState.sessionId = null;
   globalUIState.sessionTitle = null;
@@ -580,17 +587,18 @@ function endSessionFromIdle(): void {
     activeSessionId: null,
     sessionModeActive: false,
     sessionPaused: false,
+    echlyActive: false,
   });
   broadcastUIState();
-  chrome.tabs.query({}, (tabs) => {
-    tabs.forEach((tab) => {
-      if (tab.id) {
-        chrome.tabs
-          .sendMessage(tab.id, { type: "ECHLY_RESET_WIDGET" })
-          .catch((error) => logMessageDeliveryError("ECHLY_RESET_WIDGET", error));
-      }
+  setTimeout(() => {
+    chrome.tabs.query({}, (tabs) => {
+      tabs.forEach((tab) => {
+        if (tab.id) {
+          chrome.tabs.sendMessage(tab.id, { type: "ECHLY_RESET_WIDGET" }).catch(() => {});
+        }
+      });
     });
-  });
+  }, 150);
 }
 
 function resetSessionIdleTimer(): void {
@@ -667,6 +675,24 @@ chrome.runtime.onSuspend.addListener(() => {
   })();
 });
 
+// Keep SW alive while sessions are active via port connection
+const keepalivePorts = new Set<chrome.runtime.Port>();
+
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name === "echly-keepalive") {
+    keepalivePorts.add(port);
+    port.onDisconnect.addListener(() => {
+      keepalivePorts.delete(port);
+    });
+  }
+});
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === "echly-keepalive") {
+    // No-op — just keeps the SW alive
+  }
+});
+
 (async () => {
   try {
     const stored = await chrome.storage.local.get([
@@ -678,6 +704,7 @@ chrome.runtime.onSuspend.addListener(() => {
     if (stored?.echlyActive) {
       trayOpen = true;
       globalUIState.visible = true;
+      globalUIState.expanded = true;
     }
 
     await initializeSessionState();
@@ -864,15 +891,15 @@ async function flushBroadcastUIState(): Promise<void> {
   const patch = buildStatePatch(lastBroadcastState, state);
   if (Object.keys(patch).length === 0) return;
 
-  const tabId = await getActiveTabIdForBroadcast();
-  if (typeof tabId !== "number") return;
-
-  echlyLog("BACKGROUND", "broadcast global state", { tabId, patch });
-  chrome.tabs
-    .sendMessage(tabId, { type: "ECHLY_GLOBAL_STATE", state, patch })
-    .catch((error) => {
-      console.error("[ECHLY] broadcast ECHLY_GLOBAL_STATE to tab failed", tabId, error);
-    });
+  echlyLog("BACKGROUND", "broadcast global state", { patch });
+  try {
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+      if (tab.id) {
+        chrome.tabs.sendMessage(tab.id, { type: "ECHLY_GLOBAL_STATE", state, patch }).catch(() => {});
+      }
+    }
+  } catch {}
 
   lastBroadcastState = state;
 }
@@ -1008,7 +1035,10 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
   if (!echlyActive) return;
   const sessionIdForRehydrate = activeSessionId ?? globalUIState.sessionId;
   if (sessionIdForRehydrate && shouldForceRehydrate(sessionIdForRehydrate)) {
+    globalUIState.sessionLoading = true;
     void rehydrateSession(sessionIdForRehydrate);
+  } else if (sessionIdForRehydrate && globalUIState.pointers.length === 0) {
+    globalUIState.sessionLoading = true;
   }
   try {
     await ensureContentScriptInjected(activeInfo.tabId);
@@ -1045,6 +1075,11 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (!echlyActive) return;
   try {
     await ensureContentScriptInjected(tabId);
+    const activeSessionForRehydrate = activeSessionId ?? globalUIState.sessionId;
+    if (activeSessionForRehydrate && globalUIState.sessionModeActive && globalUIState.pointers.length === 0) {
+      globalUIState.sessionLoading = true;
+      void rehydrateSession(activeSessionForRehydrate);
+    }
     chrome.tabs
       .sendMessage(tabId, { type: "ECHLY_GLOBAL_STATE", state: getCanonicalGlobalState() })
       .catch((error) => logMessageDeliveryError("ECHLY_GLOBAL_STATE", error));
@@ -1057,6 +1092,11 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 chrome.tabs.onCreated.addListener((tab) => {
   if (!tab.active) return;
   if (!tab.id) return;
+  const activeSessionForRehydrate = activeSessionId ?? globalUIState.sessionId;
+  if (activeSessionForRehydrate && globalUIState.sessionModeActive && globalUIState.pointers.length === 0) {
+    globalUIState.sessionLoading = true;
+    void rehydrateSession(activeSessionForRehydrate);
+  }
   chrome.tabs
     .sendMessage(tab.id, { type: "ECHLY_GLOBAL_STATE", state: getCanonicalGlobalState() })
     .catch((e) => {
@@ -1489,6 +1529,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     persistSessionLifecycleState();
     broadcastUIState();
     resetSessionIdleTimer();
+    chrome.alarms.create("echly-keepalive", { periodInMinutes: 0.4 });
     sendResponse({ ok: true });
     return false;
   }
@@ -1526,6 +1567,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "ECHLY_SESSION_MODE_END") {
     echlyLog("BACKGROUND", "session end broadcast");
     clearSessionIdleTimer();
+    chrome.alarms.clear("echly-keepalive");
     activeSessionId = null;
     globalUIState.sessionId = null;
     globalUIState.sessionTitle = null;
@@ -1543,17 +1585,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       activeSessionId: null,
       sessionModeActive: false,
       sessionPaused: false,
+      echlyActive: false,
     });
+    trayOpen = false;
+    globalUIState.visible = false;
+    globalUIState.expanded = false;
     broadcastUIState();
-    chrome.tabs.query({}, (tabs) => {
-      tabs.forEach((tab) => {
-        if (tab.id) {
-          chrome.tabs
-            .sendMessage(tab.id, { type: "ECHLY_RESET_WIDGET" })
-            .catch((error) => logMessageDeliveryError("ECHLY_RESET_WIDGET", error));
-        }
+    setTimeout(() => {
+      chrome.tabs.query({}, (tabs) => {
+        tabs.forEach((tab) => {
+          if (tab.id) {
+            chrome.tabs.sendMessage(tab.id, { type: "ECHLY_RESET_WIDGET" }).catch(() => {});
+          }
+        });
       });
-    });
+    }, 150);
     sendResponse({ success: true });
     return true;
   }

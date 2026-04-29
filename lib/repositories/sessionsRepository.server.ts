@@ -35,7 +35,8 @@ function requireUserId(userId: string, context: string): string {
  */
 export async function createSessionRepo(
   workspaceId: string,
-  actorUserId: string
+  actorUserId: string,
+  title?: string
 ): Promise<string> {
   const resolvedWorkspaceId = requireUserId(workspaceId, "createSessionRepo");
   const resolvedActorUserId = requireUserId(actorUserId, "createSessionRepo");
@@ -44,7 +45,7 @@ export async function createSessionRepo(
   const sessionData = {
     workspaceId: resolvedWorkspaceId,
     createdByUserId: resolvedActorUserId,
-    title: "Untitled Session",
+    title: title || "Untitled Session",
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
     viewCount: 0,

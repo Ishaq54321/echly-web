@@ -199,6 +199,10 @@ export function useCaptureWidget({
   const sessionFeedbackPendingRef = useRef(false);
   /** Prevent duplicate Start Session requests before React state updates land. */
   const startSessionPendingRef = useRef(false);
+  /** Synchronous guard: prevents spam-clicks from re-entering endSession before React re-renders. */
+  const isEndingRef = useRef(false);
+  /** Synchronous guard: prevents spam-clicks from re-entering pauseSession before React re-renders. */
+  const isPausingRef = useRef(false);
 
   useEffect(() => {
     stateRef.current = state;
@@ -1178,6 +1182,7 @@ export function useCaptureWidget({
   ]);
 
   const pauseSession = useCallback(() => {
+    if (isPausingRef.current) return;
     if (
       (!sessionModeRef.current && !globalSessionModeActive) ||
       sessionPausedRef.current ||
@@ -1186,6 +1191,8 @@ export function useCaptureWidget({
     ) {
       return;
     }
+    isPausingRef.current = true;
+    setPausePending(true);
     echlyLog("SESSION", "pause requested");
 
     const finalizePause = () => {
@@ -1193,12 +1200,10 @@ export function useCaptureWidget({
       clearSessionWaitTimeout("pause");
       logSession("pause");
       onSessionModePause?.();
-      setPausePending(false);
     };
 
     if (pipelineActiveRef.current) {
       clearSessionWaitTimeout("pause");
-      setPausePending(true);
 
       const waitForPipeline = () => {
         if (pipelineActiveRef.current) {
@@ -1235,7 +1240,10 @@ export function useCaptureWidget({
   }, [globalSessionModeActive, onSessionModeResume]);
 
   const endSession = useCallback((afterEnd?: () => void) => {
+    if (isEndingRef.current) return;
     if ((!sessionModeRef.current && !globalSessionModeActive) || endPending) return;
+    isEndingRef.current = true;
+    setEndPending(true);
     echlyLog("SESSION", "end requested");
 
     const finalizeEnd = () => {
@@ -1243,7 +1251,6 @@ export function useCaptureWidget({
       clearSessionWaitTimeout("end");
       logSession("end");
       setPausePending(false);
-      setEndPending(false);
       setPending(null);
       setSessionFeedbackSaving(false);
       onSessionModeEnd?.();
@@ -1252,7 +1259,6 @@ export function useCaptureWidget({
 
     if (pipelineActiveRef.current) {
       clearSessionWaitTimeout("end");
-      setEndPending(true);
       const waitForPipeline = () => {
         if (pipelineActiveRef.current) {
           endWaitTimeoutRef.current = window.setTimeout(
@@ -1290,14 +1296,20 @@ export function useCaptureWidget({
       if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
         setPending(null);
       }
-      setEndPending(false);
+      if (!isEndingRef.current) {
+        setEndPending(false);
+      }
     }
     if (globalSessionPaused === true) {
-      setPausePending(false);
+      if (!isPausingRef.current) {
+        setPausePending(false);
+      }
     }
     if (globalSessionModeActive === false) {
       setPausePending(false);
       setEndPending(false);
+      isEndingRef.current = false;
+      isPausingRef.current = false;
       if (!pipelineActiveRef.current && !recordingActiveRef.current && !sessionFeedbackPendingRef.current) {
         setPending(null);
       }

@@ -126,7 +126,7 @@ export default function GlobalRail() {
     >
       <aside
         className={cn(
-          "relative flex flex-col bg-[var(--surface-subtle)] h-screen shrink-0 min-h-0 overflow-visible py-4",
+          "relative flex flex-col bg-[var(--surface)] h-screen shrink-0 min-h-0 overflow-visible py-4",
           mounted && "transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
           isCollapsed ? "w-[64px] items-center group/rail" : "w-[270px] items-stretch"
         )}

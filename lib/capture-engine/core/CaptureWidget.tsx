@@ -100,6 +100,7 @@ export default function CaptureWidget({
   const [showModeSelection, setShowModeSelection] = useState(false);
   /** S9: Keep Recording pill — shown once per session on first processing trigger. */
   const [keepRecordingVisible, setKeepRecordingVisible] = useState(false);
+  const [keepRecordingFading, setKeepRecordingFading] = useState(false);
   const keepRecordingShownRef = useRef(false);
 
   const {
@@ -173,6 +174,7 @@ export default function CaptureWidget({
   /** Bumps when the scroll list DOM mounts so the scroll listener effect reattaches after tray minimize/reopen or conditional remount. */
   const [scrollListMountEpoch, setScrollListMountEpoch] = useState(0);
   const isFetchingRef = useRef(false);
+  const dataReceivedRef = useRef(false);
 
   const listScrollRefCallback = useCallback((node: HTMLDivElement | null) => {
     listScrollRef.current = node;
@@ -197,6 +199,7 @@ export default function CaptureWidget({
   /** Home screen only when not in a session. */
   const showHomeScreen = !sessionModeActive;
   const isStartingSession = state.sessionStatus === "starting";
+  const showSessionLoading = sessionLoading || isStartingSession || (sessionModeActive && !hasTickets && !dataReceivedRef.current);
 
   const openTicketsCount = typeof openCount === "number" ? openCount : 0;
   const resolvedTicketsCount = typeof resolvedCount === "number" ? resolvedCount : 0;
@@ -205,6 +208,8 @@ export default function CaptureWidget({
       ? totalCount
       : openTicketsCount;
 
+  const displayTitle = sessionTitleProp ?? sessionTitle ?? "Untitled Session";
+
   const summary = extensionMode
     ? `${typeof totalCount === "number" ? totalCount : 0} total · ${openTicketsCount} open · ${resolvedTicketsCount} resolved`
     : openTicketsCount > 0 &&
@@ -212,6 +217,15 @@ export default function CaptureWidget({
         highPriorityOpenCount > 0
       ? `${highPriorityOpenCount} need attention`
       : null;
+
+  useEffect(() => {
+    if (!sessionLoading && sessionModeActive) {
+      dataReceivedRef.current = true;
+    }
+    if (!sessionModeActive) {
+      dataReceivedRef.current = false;
+    }
+  }, [sessionLoading, sessionModeActive]);
 
   useEffect(() => {
     if (state.highlightTicketId && listScrollRef.current) {
@@ -307,18 +321,25 @@ export default function CaptureWidget({
     }
   }, [isProcessingFeedback, feedbackJobs, sessionModeActive]);
 
-  /** S9: Auto-dismiss KeepRecordingPill after 8 seconds. */
+  /** S9: Auto-dismiss KeepRecordingPill after 20 seconds with fade-out. */
   useEffect(() => {
-    if (!keepRecordingVisible) return;
-    const t = setTimeout(() => setKeepRecordingVisible(false), 8000);
+    if (!keepRecordingVisible || keepRecordingFading) return;
+    const t = setTimeout(() => {
+      setKeepRecordingFading(true);
+      setTimeout(() => {
+        setKeepRecordingVisible(false);
+        setKeepRecordingFading(false);
+      }, 500);
+    }, 20000);
     return () => clearTimeout(t);
-  }, [keepRecordingVisible]);
+  }, [keepRecordingVisible, keepRecordingFading]);
 
   /** S9: Reset KeepRecordingPill state when session ends. */
   useEffect(() => {
     if (!sessionModeActive) {
       keepRecordingShownRef.current = false;
       setKeepRecordingVisible(false);
+      setKeepRecordingFading(false);
     }
   }, [sessionModeActive]);
 
@@ -739,44 +760,65 @@ export default function CaptureWidget({
               ) : extensionMode && sessionModeActive ? (
                 /* ── Case 3a: Extension V2 session view (Phase 4) ── */
                 <div className="echly-v2">
+                  {keepRecordingVisible && (
+                    <KeepRecordingPill
+                      fading={keepRecordingFading}
+                      onDismiss={() => {
+                        setKeepRecordingFading(true);
+                        setTimeout(() => {
+                          setKeepRecordingVisible(false);
+                          setKeepRecordingFading(false);
+                        }, 500);
+                      }}
+                    />
+                  )}
                   <div className="pill pill-tickets">
 
                     {/* ── Session header ── */}
                     <div className="tl-head">
                       <span className="pill-mark">E</span>
-                      <div className="tl-title-block">
-                        <div className="tl-eyebrow">
-                          <span className="live-dot" aria-hidden />
-                          {globalSessionPaused ? "Paused" : "Active session"}
-                        </div>
-                        <div className="tl-title">
-                          {sessionTitleProp ?? sessionTitle ?? "Feedback Session"}
-                        </div>
-                      </div>
-                      <span className="tl-count">
-                        {sessionHeaderCount > 0
-                          ? `${sessionHeaderCount} ${sessionHeaderCount === 1 ? "ticket" : "tickets"}`
-                          : "0"}
-                      </span>
-                      <button
-                        type="button"
-                        className="pill-icon-btn"
-                        onClick={() => setMode(captureMode === "voice" ? "text" : "voice")}
-                        aria-label="Toggle mode"
-                        title={captureMode === "voice" ? "Switch to text mode" : "Switch to speak mode"}
-                      >
-                        {captureMode === "voice" ? (
-                          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                            <rect x="6" y="2" width="4" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
-                            <path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                          </svg>
-                        ) : (
-                          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                            <path d="M2.5 12.5l1-3 7-7 2 2-7 7-3 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-                            <path d="M9.5 4l2 2" stroke="currentColor" strokeWidth="1.5" />
-                          </svg>
-                        )}
-                      </button>
+                      {!showSessionLoading && (
+                        <>
+                          <div className="tl-title-block">
+                            <div className="tl-eyebrow">
+                              <span className="live-dot" aria-hidden />
+                              {globalSessionPaused ? "Paused" : "Active session"}
+                            </div>
+                            {displayTitle === "Untitled Session" ? (
+                              <span className="tl-title-skeleton" />
+                            ) : (
+                              <div className="tl-title">{displayTitle}</div>
+                            )}
+                          </div>
+                          {sessionHeaderCount > 0 && (
+                            <span className="tl-count">
+                              {sessionHeaderCount} {sessionHeaderCount === 1 ? "ticket" : "tickets"}
+                            </span>
+                          )}
+                        </>
+                      )}
+                      {!showSessionLoading && (
+                        <button
+                          type="button"
+                          className="pill-icon-btn"
+                          onClick={() => setMode(captureMode === "voice" ? "text" : "voice")}
+                          aria-label="Toggle mode"
+                          title={captureMode === "voice" ? "Switch to text mode" : "Switch to speak mode"}
+                        >
+                          {captureMode === "voice" ? (
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                              <rect x="6" y="2" width="4" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
+                              <path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                            </svg>
+                          ) : (
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                              <path d="M2.5 12.5l1-3 7-7 2 2-7 7-3 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                              <path d="M9.5 4l2 2" stroke="currentColor" strokeWidth="1.5" />
+                            </svg>
+                          )}
+                        </button>
+                      )}
+                      {showSessionLoading && <span style={{ flex: 1 }} />}
                       <button
                         type="button"
                         className="pill-icon-btn"
@@ -791,14 +833,6 @@ export default function CaptureWidget({
                     </div>
 
                     <div className="pill-rule" />
-
-                    {/* ── Session starting ── */}
-                    {isStartingSession && (
-                      <div className="tl-session-starting" aria-live="polite" aria-busy="true">
-                        <span className="echly-spinner" aria-hidden />
-                        <span>Starting session...</span>
-                      </div>
-                    )}
 
                     {/* ── Recovery / failed banners ── */}
                     {sessionModeActive && !sessionLoading && feedbackRecovering && (
@@ -823,21 +857,25 @@ export default function CaptureWidget({
                       onWheel={(e) => e.stopPropagation()}
                     >
                       {/* Loading state */}
-                      {sessionLoading && (
+                      {showSessionLoading && (
                         <div className="tl-loading-state" aria-live="polite" aria-busy="true">
-                          <div className="tl-loading-icon" aria-hidden>
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                              <path d="M4 4h10l4 4v12H4V4z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-                              <path d="M14 4v4h4" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-                              <path d="M8 11h8M8 14h6M8 17h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                          <div className="loading-icon-wrap" aria-hidden>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                              <polyline points="14 2 14 8 20 8"/>
+                              <line x1="9" y1="13" x2="15" y2="13"/>
+                              <line x1="9" y1="17" x2="12" y2="17"/>
                             </svg>
                           </div>
-                          <span className="tl-loading-text">Loading session...</span>
+                          <span className="loading-sub">Loading your feedback tickets and getting everything ready</span>
+                          <div className="loading-dots">
+                            <span /><span /><span />
+                          </div>
                         </div>
                       )}
 
                       {/* Processing skeleton card */}
-                      {!sessionLoading && (
+                      {!showSessionLoading && (
                         feedbackJobs?.some((j) => j.status === "processing") ||
                         (!feedbackJobs?.length && isProcessingFeedback)
                       ) && (
@@ -859,14 +897,14 @@ export default function CaptureWidget({
                       )}
 
                       {/* Failed job cards */}
-                      {!sessionLoading && feedbackJobs?.filter((j) => j.status === "failed").map((job) => (
+                      {!showSessionLoading && feedbackJobs?.filter((j) => j.status === "failed").map((job) => (
                         <div key={job.id} className="tl-failed-card" role="alert">
                           {job.errorMessage ?? "AI processing failed."}
                         </div>
                       ))}
 
                       {/* Ticket cards */}
-                      {!sessionLoading && hasTickets && state.pointers.map((p) => (
+                      {!showSessionLoading && hasTickets && state.pointers.map((p) => (
                         <FeedbackItem
                           key={p.id}
                           item={p}
@@ -877,7 +915,7 @@ export default function CaptureWidget({
                       ))}
 
                       {/* Empty state */}
-                      {!sessionLoading &&
+                      {!showSessionLoading &&
                         !hasTickets &&
                         !isProcessingFeedback &&
                         !(feedbackJobs && feedbackJobs.length > 0) && (
@@ -904,7 +942,7 @@ export default function CaptureWidget({
                     <div className="tl-foot">
                       <span className="tl-foot-left">
                         <span className="ai-dot" aria-hidden />
-                        AI · {hasTickets ? "auto-structured" : "ready"}
+                        AI · {showSessionLoading ? "preparing" : hasTickets ? "auto-structured" : "ready"}
                       </span>
                       <button type="button" className="tl-foot-home" onClick={handleSessionEnd}>← Back to home</button>
                     </div>
@@ -1041,11 +1079,6 @@ export default function CaptureWidget({
         </>
       )}
 
-      {/* S9: Keep Recording hint pill — portaled into capture root so it floats above the page */}
-      {keepRecordingVisible && captureRootEl && createPortal(
-        <KeepRecordingPill onDismiss={() => setKeepRecordingVisible(false)} />,
-        captureRootEl
-      )}
 
       {/* Ticket editor overlay — centered modal portaled into capture root */}
       {editingTicketId && captureRootEl && (() => {

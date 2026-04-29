@@ -52,6 +52,32 @@ if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
   });
 }
 
+let keepalivePort: chrome.runtime.Port | null = null;
+let keepaliveSessionActive = false;
+
+function ensureKeepalivePort() {
+  if (!keepalivePort) {
+    try {
+      keepalivePort = chrome.runtime.connect({ name: "echly-keepalive" });
+      keepalivePort.onDisconnect.addListener(() => {
+        keepalivePort = null;
+        if (keepaliveSessionActive) {
+          setTimeout(ensureKeepalivePort, 1000);
+        }
+      });
+    } catch {
+      keepalivePort = null;
+    }
+  }
+}
+
+function disconnectKeepalivePort() {
+  if (keepalivePort) {
+    try { keepalivePort.disconnect(); } catch {}
+    keepalivePort = null;
+  }
+}
+
 const ROOT_ID = "echly-root";
 const SHADOW_HOST_ID = "echly-shadow-host";
 const THEME_STORAGE_KEY = "widget-theme";
@@ -172,6 +198,64 @@ function createUniqueId(): string {
   return typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
     : `job-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
+function generateSessionTitle(): string {
+  const raw = document.title?.trim() || "";
+  const hostname = window.location.hostname.replace(/^www\./, "");
+  const domainName = hostname.split(".")[0] || "";
+
+  const now = new Date();
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const dateStr = `${months[now.getMonth()]} ${now.getDate()}`;
+
+  function capitalizeWords(str: string): string {
+    return str.replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  const cleanDomain = capitalizeWords(domainName);
+
+  if (!raw || raw === hostname || raw === window.location.href || raw.toLowerCase() === "localhost") {
+    return `${cleanDomain} · ${dateStr}`;
+  }
+
+  const separators = /\s*[|–—·:\-]\s*/;
+  const segments = raw.split(separators).map(s => s.trim()).filter(Boolean);
+
+  let pageTitle = "";
+
+  if (segments.length === 1) {
+    pageTitle = segments[0];
+  } else {
+    const firstLower = segments[0].toLowerCase().replace(/\s+/g, "");
+    const domainLower = domainName.toLowerCase();
+
+    if (firstLower === domainLower || firstLower.includes(domainLower) || domainLower.includes(firstLower)) {
+      pageTitle = segments[1] || segments[0];
+    } else {
+      const lastLower = segments[segments.length - 1].toLowerCase().replace(/\s+/g, "");
+      if (lastLower === domainLower || lastLower.includes(domainLower) || domainLower.includes(lastLower)) {
+        pageTitle = segments[0];
+      } else {
+        pageTitle = segments[0];
+      }
+    }
+  }
+
+  pageTitle = pageTitle.trim();
+  if (pageTitle.length > 50) {
+    pageTitle = pageTitle.substring(0, 47) + "…";
+  }
+
+  pageTitle = capitalizeWords(pageTitle);
+
+  const pageLower = pageTitle.toLowerCase().replace(/\s+/g, "");
+  const domainLower = domainName.toLowerCase();
+  if (pageLower === domainLower || (pageLower.includes(domainLower) && pageLower.length < domainLower.length + 3)) {
+    return `${cleanDomain} · ${dateStr}`;
+  }
+
+  return `${cleanDomain} · ${pageTitle} · ${dateStr}`;
 }
 
 /**
@@ -1142,7 +1226,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     const res = await apiFetch("/api/sessions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: "{}",
+      body: JSON.stringify({ title: generateSessionTitle() }),
     });
     const data = (await res.json()) as {
       success?: boolean;
@@ -1248,10 +1332,17 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   if (authState === "loading" && !user) {
     return (
       <div className="echly-v2">
-        <div className="pill pill-sm">
-          <div className="auth-loading-card">
-            <span className="echly-spinner" style={{ width: 20, height: 20 }} aria-hidden />
-            <span className="auth-loading-text">Checking sign-in…</span>
+        <div className="pill auth-check-pill">
+          <div className="auth-check-body">
+            <div className="auth-check-logo">
+              <svg viewBox="0 0 18 18" fill="none">
+                <text x="4" y="13.5" fontSize="12" fontWeight="700" fill="#fff" fontFamily="DM Sans, sans-serif">E</text>
+              </svg>
+            </div>
+            <div className="auth-check-bar-wrap">
+              <div className="auth-check-bar" />
+            </div>
+            <span className="auth-check-text">Connecting to Echly…</span>
           </div>
         </div>
       </div>
@@ -1392,11 +1483,12 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           onTriggerLogin={onTriggerLogin}
           globalSessionModeActive={uiGlobal.session.status !== "idle"}
           globalSessionPaused={uiGlobal.session.status === "paused"}
-          onSessionModeStart={() =>
+          onSessionModeStart={() => {
+            ensureKeepalivePort();
             chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch((err) =>
               logSendMessageRejection("ECHLY_SESSION_MODE_START", err)
-            )
-          }
+            );
+          }}
           onSessionModePause={() =>
             chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_PAUSE" }).catch((err) =>
               logSendMessageRejection("ECHLY_SESSION_MODE_PAUSE", err)
@@ -1414,6 +1506,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           }
           onSessionModeEnd={() => {
             const sessionId = uiGlobal.session.id;
+            keepaliveSessionActive = false;
+            disconnectKeepalivePort();
             void (async () => {
               await new Promise<void>((resolve, reject) => {
                 chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_END" }, () => {
@@ -1646,6 +1740,12 @@ function ensureMessageListener(): void {
       (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (s: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__?.(normalized);
       echlyLog("CONTENT", "dispatch event", { type: "ECHLY_GLOBAL_STATE" });
       window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state: normalized } }));
+      keepaliveSessionActive = normalized.session.status !== "idle";
+      if (keepaliveSessionActive) {
+        ensureKeepalivePort();
+      } else {
+        disconnectKeepalivePort();
+      }
     }
     if (msg.type === "ECHLY_TOGGLE") {
       echlyLog("CONTENT", "dispatch event", { type: "ECHLY_TOGGLE_WIDGET" });

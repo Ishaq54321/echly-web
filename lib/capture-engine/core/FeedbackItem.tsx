@@ -163,6 +163,7 @@ export function TicketEditorOverlay({
   const [newTagText, setNewTagText] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [screenshotExpanded, setScreenshotExpanded] = useState(false);
+  const [screenshotLoaded, setScreenshotLoaded] = useState(false);
   const stepsListRef = useRef<HTMLDivElement>(null);
   const isFirstRenderRef = useRef(true);
   const focusStepIndexRef = useRef<number | null>(null);
@@ -170,6 +171,10 @@ export function TicketEditorOverlay({
   const IconComponent = getTicketIcon(ticket.title);
   const screenshotUrl =
     ticket.screenshotId ? tryBuildScreenshotUrl(sessionId, ticket.screenshotId) : null;
+
+  useEffect(() => {
+    setScreenshotLoaded(false);
+  }, [screenshotUrl]);
 
   // Escape closes overlay
   useEffect(() => {
@@ -289,7 +294,13 @@ export function TicketEditorOverlay({
           {/* Screenshot (only when URL can be built) */}
           {screenshotUrl && (
             <div className="editor-screenshot">
-              <img src={screenshotUrl} alt="Screenshot" />
+              <img
+                src={screenshotUrl}
+                alt=""
+                loading="lazy"
+                className={screenshotLoaded ? "loaded" : ""}
+                onLoad={() => setScreenshotLoaded(true)}
+              />
               <div className="editor-screenshot-actions">
                 <button
                   type="button"

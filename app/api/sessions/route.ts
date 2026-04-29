@@ -192,7 +192,17 @@ export async function POST(req: NextRequest) {
   try {
     const workspaceId = await getUserWorkspaceIdRepo(user.uid);
 
-    const id = await createSessionRepo(workspaceId, user.uid);
+    let title: string | undefined;
+    try {
+      const body = await req.json();
+      if (typeof body.title === "string" && body.title.trim()) {
+        title = body.title.trim().substring(0, 100);
+      }
+    } catch {
+      // empty body is fine — fallback to default
+    }
+
+    const id = await createSessionRepo(workspaceId, user.uid, title);
 
     const actor = await resolveActorForActivityEvent(user.uid);
     await createActivityEvent({
@@ -202,7 +212,7 @@ export async function POST(req: NextRequest) {
       actorId: user.uid,
       actorName: actor.actorName,
       actorPhotoURL: actor.actorPhotoURL,
-      metadata: { sessionTitle: "Untitled Session" },
+      metadata: { sessionTitle: title ?? "Untitled Session" },
     });
 
     return apiSuccess({ session: { id } }, null, { headers: corsHeaders(req) });
