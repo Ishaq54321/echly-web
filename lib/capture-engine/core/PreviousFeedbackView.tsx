@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { ECHLY_DEBUG } from "@/lib/utils/logger";
 import type { SessionOption } from "./ResumeSessionModal";
 
-type FilterKey = "today" | "7days" | "30days" | "all";
+type FilterKey = "all" | "week" | "month";
 
 function sessionUpdatedAtToMs(value: SessionOption["updatedAt"]): number {
   if (value == null) return 0;
@@ -19,7 +19,7 @@ function sessionUpdatedAtToMs(value: SessionOption["updatedAt"]): number {
 function filterSessions(sessions: SessionOption[], filter: FilterKey): SessionOption[] {
   if (filter === "all") return sessions;
   const now = Date.now();
-  const ms = { today: 24 * 60 * 60 * 1000, "7days": 7 * 24 * 60 * 60 * 1000, "30days": 30 * 24 * 60 * 60 * 1000 };
+  const ms = { week: 7 * 24 * 60 * 60 * 1000, month: 30 * 24 * 60 * 60 * 1000 };
   const cutoff = now - ms[filter];
   return sessions.filter((s) => sessionUpdatedAtToMs(s.updatedAt) >= cutoff);
 }
@@ -39,12 +39,11 @@ function formatLastUpdated(value?: SessionOption["updatedAt"]): string {
   return d.toLocaleDateString();
 }
 
-const FILTER_ORDER: readonly FilterKey[] = ["all", "today", "7days", "30days"] as const;
+const FILTER_ORDER: readonly FilterKey[] = ["all", "week", "month"] as const;
 const FILTER_LABELS: Record<FilterKey, string> = {
   all: "All sessions",
-  today: "Today",
-  "7days": "Last 7 days",
-  "30days": "Last 30 days",
+  week: "This week",
+  month: "This month",
 };
 
 type PreviousFeedbackViewProps = {
@@ -53,6 +52,10 @@ type PreviousFeedbackViewProps = {
   onResumeSession: (sessionId: string) => void;
   fetchSessions?: () => Promise<SessionOption[]>;
   onOpenLogin?: () => void;
+  captureMode?: "voice" | "text";
+  onModeChange?: (mode: "voice" | "text") => void;
+  theme?: "light" | "dark";
+  onThemeToggle?: () => void;
 };
 
 export default function PreviousFeedbackView({
@@ -60,6 +63,8 @@ export default function PreviousFeedbackView({
   onClose,
   onResumeSession,
   fetchSessions,
+  captureMode = "voice",
+  onModeChange,
 }: PreviousFeedbackViewProps) {
   const [sessions, setSessions] = useState<SessionOption[]>([]);
   const [loading, setLoading] = useState(false);
@@ -117,12 +122,31 @@ export default function PreviousFeedbackView({
         <div className="pill-ws">
           <span className="pill-ws-name">Previous Feedback</span>
         </div>
-        <button type="button" className="pill-icon-btn" onClick={onBack} aria-label="Back">
+        <button
+          type="button"
+          className="pill-icon-btn"
+          onClick={() => onModeChange?.(captureMode === "voice" ? "text" : "voice")}
+          aria-label="Toggle mode"
+          title={captureMode === "voice" ? "Switch to text mode" : "Switch to speak mode"}
+        >
+          {captureMode === "voice" ? (
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+              <rect x="6" y="2" width="4" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          ) : (
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+              <path d="M2.5 12.5l1-3 7-7 2 2-7 7-3 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+              <path d="M9.5 4l2 2" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
+          )}
+        </button>
+        <button type="button" className="pill-icon-btn" onClick={onBack} aria-label="Back" title="Back">
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
             <path d="M9.5 4L5.5 8l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
-        <button type="button" className="pill-icon-btn" onClick={onClose} aria-label="Close">
+        <button type="button" className="pill-icon-btn" onClick={onClose} aria-label="Close" title="Minimize">
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
             <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
@@ -139,12 +163,11 @@ export default function PreviousFeedbackView({
               <path d="M10.5 10.5l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
             <input
-              placeholder="Search sessions, tickets, pages…"
+              placeholder="Search sessions by title..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               aria-label="Search sessions"
             />
-            <span className="ps-search-shortcut">⌘ K</span>
           </div>
 
           {/* Filter chips */}
@@ -160,6 +183,7 @@ export default function PreviousFeedbackView({
               </button>
             ))}
           </div>
+          <div className="ps-chips-divider" />
 
           {/* Loading */}
           {loading && (
@@ -215,9 +239,7 @@ export default function PreviousFeedbackView({
                   <div className="ps-row-main">
                     <div className="ps-row-title">{s.title?.trim() || "Untitled Session"}</div>
                     <div className="ps-row-meta">
-                      <span><b style={{ color: "var(--ink)", fontWeight: 600 }}>{feedbackCount(s)}</b> feedback items</span>
-                      <span className="pip" />
-                      <span>{formatLastUpdated(s.updatedAt)}</span>
+                      <span>{feedbackCount(s)} {feedbackCount(s) === 1 ? "Feedback Ticket" : "Feedback Tickets"}</span>
                     </div>
                   </div>
                   <span className="ps-row-time">{formatLastUpdated(s.updatedAt)}</span>

@@ -23,7 +23,7 @@ function FeedbackList({
         <FeedbackItem
           key={p.id}
           item={p}
-          onUpdate={onUpdate}
+          onEditRequest={() => {}}
           onDelete={onDelete}
           highlightTicketId={highlightTicketId}
         />

@@ -196,7 +196,7 @@ function ensureAuthenticated(): Promise<boolean> {
 
 /** Notify background when content creates a ticket via apiFetch so globalUIState stays in sync. */
 function notifyFeedbackCreated(
-  ticket: { id: string; title: string; actionSteps?: string[]; type?: string },
+  ticket: { id: string; title: string; actionSteps?: string[]; type?: string; screenshotId?: string | null; suggestedTags?: string[] },
   sessionId?: string | null
 ): void {
   chrome.runtime.sendMessage({
@@ -207,6 +207,8 @@ function notifyFeedbackCreated(
       title: ticket.title,
       actionSteps: ticket.actionSteps ?? [],
       type: ticket.type ?? "Feedback",
+      screenshotId: ticket.screenshotId ?? null,
+      suggestedTags: ticket.suggestedTags ?? [],
     },
   }).catch((err) => logSendMessageRejection("ECHLY_FEEDBACK_CREATED", err));
 }
@@ -232,7 +234,17 @@ function mergeGlobalFeedbackIntoLocal(
 ): StructuredFeedback[] {
   const filteredServer = serverItems.filter((p) => !pendingDeletes.has(p.id));
   const serverIds = new Set(serverItems.map((i) => i.id));
-  const merged = [...filteredServer];
+  const merged = filteredServer.map(serverItem => {
+    const localItem = prev?.find(p => p.id === serverItem.id);
+    if (localItem) {
+      return {
+        ...serverItem,
+        screenshotId: serverItem.screenshotId ?? localItem.screenshotId ?? null,
+        suggestedTags: serverItem.suggestedTags?.length ? serverItem.suggestedTags : (localItem.suggestedTags ?? []),
+      };
+    }
+    return serverItem;
+  });
   for (const p of prev ?? []) {
     if (pendingDeletes.has(p.id)) continue;
     if (!serverIds.has(p.id)) merged.push(p);
@@ -846,6 +858,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           description?: string;
           type?: string;
           actionSteps?: string[];
+          screenshotId?: string | null;
+          suggestedTags?: string[];
         };
         const feedbackJson = feedbackResponse?.data;
         const text =
@@ -870,6 +884,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 ? tick.description.split(/\n\s*\n/)
                 : []),
           type: tick.type ?? "Feedback",
+          screenshotId: finalScreenshotId,
+          suggestedTags: normalized.suggestedTags ?? [],
         };
         notifyFeedbackCreated(created, effectiveSessionId);
         return created;
@@ -991,7 +1007,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   );
 
   const handleUpdate = React.useCallback(
-    async (id: string, payload: { title: string; actionSteps: string[] }) => {
+    async (id: string, payload: { title: string; actionSteps: string[]; suggestedTags?: string[] }) => {
       let typeForMessage = "Feedback";
       setLocalFeedbackItems((prev) => {
         const list = prev ?? [];
@@ -1029,6 +1045,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             title: payload.title,
             instruction: payload.actionSteps?.join("\n") ?? "",
             actionSteps: payload.actionSteps ?? [],
+            suggestedTags: payload.suggestedTags,
           }),
         });
         throwIfHttpError(res, "PATCH ticket");

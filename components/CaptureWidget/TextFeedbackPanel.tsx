@@ -57,10 +57,14 @@ export function TextFeedbackPanel({
   return (
     <div className="echly-v2 echly-v2-overlay-anchor" data-echly-ui="true">
       <div className="center-card" data-echly-ui="true">
-        <div className="esc-hint">
-          Press <kbd>Esc</kbd> to cancel
+        <div className="ovl-top-bar">
+          {onSwitchToVoice && (
+            <button type="button" className="ovl-top-pill" onClick={onSwitchToVoice}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="6" y="2" width="4" height="8" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              <span className="ovl-top-pill-label">Switch to Voice mode</span>
+            </button>
+          )}
         </div>
-
         {screenshot && (
           <div className="ovl-shot">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -68,11 +72,6 @@ export function TextFeedbackPanel({
             {shotBadge}
           </div>
         )}
-
-        <div className="ovl-title">Write feedback</div>
-        <div className="ovl-sub" style={{ marginBottom: "16px" }}>
-          Type a note—Echly structures it for your team.
-        </div>
 
         <div className="ovl-textarea-wrap">
           <textarea
@@ -94,37 +93,17 @@ export function TextFeedbackPanel({
           </div>
         </div>
 
-        {onSwitchToVoice && (
-          <button
-            type="button"
-            className="mic-row"
-            onClick={onSwitchToVoice}
-          >
-            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-              <rect x="6" y="2" width="4" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-            <span className="mic-name">Switch to voice mode</span>
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-              <path d="M5 6l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+        <div className="ovl-actions">
+          <button type="button" className="rec-cancel" onClick={onCancel}>
+            Cancel
           </button>
-        )}
-
-        <div className="ovl-actions ovl-actions--text">
-          <span />
-          {onCancel && (
-            <button type="button" className="ti-cancel" onClick={onCancel}>
-              Cancel
-            </button>
-          )}
           <button
             type="button"
-            className={`save-btn${!text.trim() ? " disabled" : ""}`}
+            className={`finish-btn${!text.trim() ? " disabled" : ""}`}
             onClick={handleSubmit}
             disabled={!text.trim()}
           >
-            Save Feedback
+            Done
           </button>
         </div>
       </div>

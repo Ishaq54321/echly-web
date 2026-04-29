@@ -122,7 +122,7 @@ chrome.action.onClicked.addListener(() => {
 });
 
 type StoredUser = { uid: string; name: string | null; email: string | null; photoURL: string | null };
-type FeedbackApiItem = { id: string; title?: string; actionSteps?: string[]; type?: string };
+type FeedbackApiItem = { id: string; title?: string; actionSteps?: string[]; type?: string; screenshotId?: string | null; suggestedTags?: string[] };
 type FeedbackListResponse = {
   feedback?: FeedbackApiItem[];
   nextCursor?: string | null;
@@ -188,7 +188,7 @@ let cachedSessionUser: StoredUser | null = null;
 let trayOpen = false;
 
 /** Minimal ticket shape for global tray; matches StructuredFeedback. */
-type StructuredFeedback = { id: string; title: string; actionSteps: string[]; type?: string };
+type StructuredFeedback = { id: string; title: string; actionSteps: string[]; type?: string; screenshotId?: string | null; suggestedTags?: string[] };
 type CanonicalGlobalState = {
   visible: boolean;
   expanded: boolean;
@@ -268,6 +268,8 @@ function mapFeedbackToPointers(feedback: FeedbackApiItem[]): StructuredFeedback[
     title: item.title ?? "",
     actionSteps: item.actionSteps ?? [],
     type: item.type ?? "Feedback",
+    screenshotId: item.screenshotId ?? null,
+    suggestedTags: item.suggestedTags ?? [],
   }));
 }
 
@@ -1262,13 +1264,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "ECHLY_FEEDBACK_CREATED") {
-    const ticket = (request as { ticket?: { id: string; title: string; actionSteps?: string[]; type?: string } }).ticket;
+    const ticket = (request as { ticket?: { id: string; title: string; actionSteps?: string[]; type?: string; screenshotId?: string | null; suggestedTags?: string[] } }).ticket;
     if (ticket?.id && ticket?.title) {
       const pointer: StructuredFeedback = {
         id: ticket.id,
         title: ticket.title,
         actionSteps: ticket.actionSteps ?? [],
         type: ticket.type ?? "Feedback",
+        screenshotId: ticket.screenshotId ?? null,
+        suggestedTags: ticket.suggestedTags ?? [],
       };
       globalUIState.pointers = [pointer, ...globalUIState.pointers];
       resetSessionIdleTimer();

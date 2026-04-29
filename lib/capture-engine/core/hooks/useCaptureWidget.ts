@@ -190,6 +190,7 @@ export function useCaptureWidget({
   const rafRef = useRef<number | null>(null);
   const pauseWaitTimeoutRef = useRef<number | null>(null);
   const endWaitTimeoutRef = useRef<number | null>(null);
+  const micDeviceOverrideRef = useRef<string | null>(null);
   /** [VOICE] Diagnostic: timestamp when UI recording started (startListening called). */
   const voiceStartTimeRef = useRef<number | null>(null);
   /** True while in voice_listening (or equivalent) so overlay/effects do not tear down during recording. */
@@ -202,6 +203,10 @@ export function useCaptureWidget({
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  useEffect(() => {
+    micDeviceOverrideRef.current = micDeviceOverride;
+  }, [micDeviceOverride]);
 
   useEffect(() => {
     sessionFeedbackPendingRef.current = sessionFeedbackPending != null;
@@ -508,7 +513,7 @@ export function useCaptureWidget({
         label: d.label || `Microphone ${inputs.indexOf(d) + 1}`,
       }));
       onDevicesEnumerated?.(deviceList);
-      const effectiveMicId = micDeviceOverride ?? selectedMicrophoneId ?? undefined;
+      const effectiveMicId = micDeviceOverrideRef.current ?? selectedMicrophoneId ?? undefined;
       const stream = await navigator.mediaDevices.getUserMedia({
         audio:
           effectiveMicId && effectiveMicId.length > 0
@@ -553,7 +558,7 @@ export function useCaptureWidget({
       removeCaptureRoot();
       restoreWidget();
     }
-  }, [selectedMicrophoneId, micDeviceOverride, onDevicesEnumerated, removeCaptureRoot, restoreWidget]);
+  }, [selectedMicrophoneId, onDevicesEnumerated, removeCaptureRoot, restoreWidget]);
 
   const retryVoiceCapture = useCallback(() => {
     setVoiceError(null);
@@ -562,12 +567,31 @@ export function useCaptureWidget({
   }, [startListening]);
 
   const selectVoiceMicrophone = useCallback(
-    (deviceId: string) => {
+    async (deviceId: string) => {
       if (!deviceId) return;
       onVoiceMicrophoneSelect?.(deviceId);
+      micDeviceOverrideRef.current = deviceId;
       setMicDeviceOverride(deviceId);
+
+      if (stateRef.current === "voice_listening") {
+        try {
+          const recorder = mediaRecorderRef.current;
+          if (recorder && recorder.state !== "inactive") {
+            recorder.ondataavailable = null;
+            recorder.onstop = null;
+            recorder.stop();
+          }
+          mediaRecorderRef.current = null;
+          audioChunksRef.current = [];
+          stopListeningAudio();
+          await new Promise<void>((resolve) => setTimeout(resolve, 150));
+          await startListening();
+        } catch (err) {
+          console.error("[ECHLY] Failed to switch microphone mid-recording:", err);
+        }
+      }
     },
-    [onVoiceMicrophoneSelect]
+    [onVoiceMicrophoneSelect, stopListeningAudio, startListening]
   );
 
   const finishListening = useCallback(async () => {
@@ -954,7 +978,7 @@ export function useCaptureWidget({
   }, [editedTitle, editedSteps, environment, guardWorkspaceMutation]);
 
   const updatePointer = useCallback(
-    async (id: string, payload: { title: string; actionSteps: string[] }) => {
+    async (id: string, payload: { title: string; actionSteps: string[]; suggestedTags?: string[] }) => {
       try {
         if (onUpdate) {
           await onUpdate(id, payload);
@@ -971,6 +995,7 @@ export function useCaptureWidget({
           body: JSON.stringify({
             title: payload.title,
             actionSteps: payload.actionSteps,
+            suggestedTags: payload.suggestedTags,
           }),
         });
         const raw = await res.json();

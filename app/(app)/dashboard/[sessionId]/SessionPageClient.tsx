@@ -205,6 +205,7 @@ export default function SessionPageClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const ticketIdFromUrl = searchParams.get("ticket");
+  const editFromUrl = searchParams.get("edit") === "true";
 
   const [session, setSession] = useState<Session | null>(null);
   /** General-access gate (restricted mode + anonymous): server returned access with canView false. */
@@ -1158,12 +1159,14 @@ export default function SessionPageClient({
 
   // Deep link: when ?ticket= is present, select that ticket and open detail panel.
   const hasAppliedTicketParam = useRef(false);
+  const hasAppliedEditParam = useRef(false);
   const deepLinkHydrateAttempted = useRef<string | null>(null);
   const deepLinkSidebarExpansionDone = useRef<string | null>(null);
 
   useEffect(() => {
     deepLinkHydrateAttempted.current = null;
     hasAppliedTicketParam.current = false;
+    hasAppliedEditParam.current = false;
     deepLinkSidebarExpansionDone.current = null;
   }, [sessionId, ticketIdFromUrl]);
 
@@ -1231,7 +1234,14 @@ export default function SessionPageClient({
     if (!deepLinkTicketInList) return;
     hasAppliedTicketParam.current = true;
     setSelectedId(ticketIdFromUrl);
-  }, [ticketIdFromUrl, deepLinkTicketInList]);
+    if (editFromUrl && !hasAppliedEditParam.current) {
+      hasAppliedEditParam.current = true;
+      setTimeout(() => {
+        setIsImageExpanded(true);
+        setOpenImageInEditMode(true);
+      }, 300);
+    }
+  }, [ticketIdFromUrl, deepLinkTicketInList, editFromUrl]);
 
   // Deep link: expand the sidebar section that contains ?ticket= (once per ticket id; controlled sections).
   useEffect(() => {

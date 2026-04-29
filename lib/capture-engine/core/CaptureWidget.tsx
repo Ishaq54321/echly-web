@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useCaptureWidget } from "./hooks/useCaptureWidget";
 import CaptureHeader from "./CaptureHeader";
-import FeedbackItem from "./FeedbackItem";
+import FeedbackItem, { TicketEditorOverlay } from "./FeedbackItem";
 import WidgetFooter from "./WidgetFooter";
 import { CaptureLayer } from "./CaptureLayer";
 import { ResumeSessionModal } from "./ResumeSessionModal";
@@ -88,6 +88,8 @@ export default function CaptureWidget({
   const showResumeModal = resumeModalOpen || (openResumeModalProp ?? false);
   /** V2: when true, show Previous Feedback view instead of home screen. */
   const [showPreviousFeedback, setShowPreviousFeedback] = useState(false);
+  /** Ticket editor overlay: ID of the ticket currently being edited, or null. */
+  const [editingTicketId, setEditingTicketId] = useState<string | null>(null);
   /** Extension: when true, show command screen (mode cards + footer). False when viewing a session (e.g. after Open Previous or when paused). */
   const [showCommandScreen, setShowCommandScreen] = useState(true);
   const [sessionTitle, setSessionTitle] = useState("Untitled Session");
@@ -328,6 +330,25 @@ export default function CaptureWidget({
     };
   }, [handlers, widgetToggleRef]);
 
+  const checkAuthBeforeAction = React.useCallback(async (): Promise<boolean> => {
+    if (extensionMode && chrome?.runtime?.sendMessage) {
+      try {
+        const response = await new Promise<any>((resolve) => {
+          chrome.runtime.sendMessage({ type: "GET_AUTH_STATE" }, resolve);
+        });
+        if (!response?.authenticated) {
+          chrome.runtime.sendMessage({ type: "ECHLY_TRIGGER_LOGIN" });
+          return false;
+        }
+      } catch {
+        // If message fails, let it through — downstream will catch
+      }
+    } else if (ensureAuthenticated && !(await ensureAuthenticated())) {
+      return false;
+    }
+    return true;
+  }, [extensionMode, ensureAuthenticated]);
+
   const handlePreviousSessions = React.useCallback(() => {
     onPreviousSessions?.();
     setShowPreviousFeedback(true);
@@ -342,6 +363,31 @@ export default function CaptureWidget({
   }
 
   const handleClose = () => (onCollapseRequest ? onCollapseRequest() : handlers.setIsOpen(false));
+
+  const handleEditTicket = useCallback((id: string) => {
+    setEditingTicketId(id);
+    handlers.setExpandedId(id);
+  }, [handlers]);
+
+  const handleCloseEditor = useCallback(() => {
+    setEditingTicketId(null);
+    handlers.setExpandedId(null);
+  }, [handlers]);
+
+  const handleSessionEnd = () => {
+    const saving = Boolean(__extensionSavingState);
+    if (
+      saving &&
+      typeof window !== "undefined" &&
+      !window.confirm("Changes are still saving. Are you sure you want to end the session?")
+    ) {
+      return;
+    }
+    handlers.endSession(() => {
+      setShowCommandScreen(true);
+      onSessionEndCallback?.();
+    });
+  };
 
   return (
     <>
@@ -398,26 +444,14 @@ export default function CaptureWidget({
           onSessionResume={() => {
             handlers.resumeSession();
           }}
-          onSessionEnd={() => {
-            const saving = Boolean(__extensionSavingState);
-            if (
-              saving &&
-              typeof window !== "undefined" &&
-              !window.confirm("Changes are still saving. Are you sure you want to end the session?")
-            ) {
-              return;
-            }
-            handlers.endSession(() => {
-              setShowCommandScreen(true);
-              onSessionEndCallback?.();
-            });
-          }}
+          onSessionEnd={handleSessionEnd}
           __extensionSavingState={__extensionSavingState}
           onSessionRecordVoice={handlers.handleSessionStartVoice}
           onSessionDoneVoice={handlers.finishListening}
           onSessionSaveText={handlers.handleSessionFeedbackSubmit}
           onSessionFeedbackCancel={handlers.handleSessionFeedbackCancel}
           theme={theme}
+          onModeChange={(mode) => setMode(mode)}
         />
       )}
 
@@ -516,6 +550,10 @@ export default function CaptureWidget({
                       }}
                       fetchSessions={fetchSessions}
                       onOpenLogin={onTriggerLogin}
+                      captureMode={captureMode}
+                      onModeChange={(mode) => setMode(mode)}
+                      theme={theme}
+                      onThemeToggle={onThemeToggle}
                     />
                   ) : showModeSelection ? (
                     <ModeSelectionView
@@ -527,6 +565,8 @@ export default function CaptureWidget({
                       }}
                       onBack={() => setShowModeSelection(false)}
                       onClose={handleClose}
+                      theme={theme}
+                      onThemeToggle={onThemeToggle}
                     />
                   ) : (
                     /* V2 Home Screen */
@@ -574,18 +614,45 @@ export default function CaptureWidget({
                           type="button"
                           className="pill-icon-btn"
                           onClick={onThemeToggle}
-                          aria-label="Settings"
+                          aria-label="Toggle theme"
+                          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
                         >
-                          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                            <circle cx="8" cy="8" r="1.6" stroke="currentColor" strokeWidth="1.4" />
-                            <path d="M8 1.7v1.4M8 12.9v1.4M14.3 8h-1.4M3.1 8H1.7M12.5 3.5l-1 1M4.5 11.5l-1 1M12.5 12.5l-1-1M4.5 4.5l-1-1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                          </svg>
+                          {theme === "dark" ? (
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                              <circle cx="8" cy="8" r="1.6" stroke="currentColor" strokeWidth="1.4" />
+                              <path d="M8 1.7v1.4M8 12.9v1.4M14.3 8h-1.4M3.1 8H1.7M12.5 3.5l-1 1M4.5 11.5l-1 1M12.5 12.5l-1-1M4.5 4.5l-1-1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                            </svg>
+                          ) : (
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                              <path d="M13.5 10.5A6 6 0 0 1 5.5 2.5a6 6 0 1 0 8 8z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          className="pill-icon-btn"
+                          onClick={() => setMode(captureMode === "voice" ? "text" : "voice")}
+                          aria-label="Toggle mode"
+                          title={captureMode === "voice" ? "Switch to text mode" : "Switch to speak mode"}
+                        >
+                          {captureMode === "voice" ? (
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                              <rect x="6" y="2" width="4" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
+                              <path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                            </svg>
+                          ) : (
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                              <path d="M2.5 12.5l1-3 7-7 2 2-7 7-3 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                              <path d="M9.5 4l2 2" stroke="currentColor" strokeWidth="1.5" />
+                            </svg>
+                          )}
                         </button>
                         <button
                           type="button"
                           className="pill-icon-btn"
                           onClick={handleClose}
                           aria-label="Close"
+                          title="Minimize"
                         >
                           <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                             <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -603,21 +670,7 @@ export default function CaptureWidget({
                           style={{ backgroundColor: "#1775E0" }}
                           onClick={async () => {
                             if (isStartingSession) return;
-
-                            if (extensionMode && typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
-                              try {
-                                const authState = await chrome.runtime.sendMessage({ type: "GET_AUTH_STATE" });
-                                if (!authState?.authenticated) {
-                                  chrome.runtime.sendMessage({ type: "ECHLY_TRIGGER_LOGIN" });
-                                  return;
-                                }
-                              } catch {
-                                // If message fails, let it through — startSession will catch it
-                              }
-                            } else if (ensureAuthenticated && !(await ensureAuthenticated())) {
-                              return;
-                            }
-
+                            if (!(await checkAuthBeforeAction())) return;
                             setShowModeSelection(true);
                           }}
                           disabled={isStartingSession}
@@ -640,40 +693,34 @@ export default function CaptureWidget({
                           <button
                             type="button"
                             className="ghost-btn"
-                            onClick={handlePreviousSessions}
+                            onClick={async () => {
+                              if (!(await checkAuthBeforeAction())) return;
+                              setShowPreviousFeedback(true);
+                            }}
                           >
                             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                               <path d="M3 4.5h10M3 8h10M3 11.5h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                             </svg>
                             Previous Feedback
-                            <span className="count">14</span>
                           </button>
                           <div className="mode-seg-mini" role="tablist" aria-label="Feedback mode">
                             <button
                               type="button"
                               className={captureMode === "voice" ? "active" : ""}
-                              onClick={() => setMode("voice")}
                               aria-label="Voice mode"
-                              role="tab"
-                              aria-selected={captureMode === "voice"}
+                              title={captureMode === "voice" ? "Speak mode active" : "Switch to speak mode"}
+                              onClick={() => setMode("voice")}
                             >
-                              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                                <rect x="6" y="2" width="4" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
-                                <path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                              </svg>
+                              <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="6" y="2" width="4" height="8" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
                             </button>
                             <button
                               type="button"
                               className={captureMode === "text" ? "active" : ""}
-                              onClick={() => setMode("text")}
                               aria-label="Write mode"
-                              role="tab"
-                              aria-selected={captureMode === "text"}
+                              title={captureMode === "text" ? "Text mode active" : "Switch to text mode"}
+                              onClick={() => setMode("text")}
                             >
-                              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                                <path d="M2.5 12.5l1-3 7-7 2 2-7 7-3 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-                                <path d="M9.5 4l2 2" stroke="currentColor" strokeWidth="1.5" />
-                              </svg>
+                              <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2.5 12.5l1-3 7-7 2 2-7 7-3 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M9.5 4l2 2" stroke="currentColor" strokeWidth="1.5"/></svg>
                             </button>
                           </div>
                         </div>
@@ -683,9 +730,8 @@ export default function CaptureWidget({
                       <div className="pill-foot">
                         <span className="pill-foot-left">
                           <span className="ai-dot" aria-hidden />
-                          AI ready · {captureMode === "voice" ? "Voice" : "Write"} mode
+                          AI ready
                         </span>
-                        <span className="pill-foot-right">v1.4.2</span>
                       </div>
                     </div>
                   )}
@@ -715,8 +761,28 @@ export default function CaptureWidget({
                       <button
                         type="button"
                         className="pill-icon-btn"
+                        onClick={() => setMode(captureMode === "voice" ? "text" : "voice")}
+                        aria-label="Toggle mode"
+                        title={captureMode === "voice" ? "Switch to text mode" : "Switch to speak mode"}
+                      >
+                        {captureMode === "voice" ? (
+                          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                            <rect x="6" y="2" width="4" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
+                            <path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                          </svg>
+                        ) : (
+                          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                            <path d="M2.5 12.5l1-3 7-7 2 2-7 7-3 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                            <path d="M9.5 4l2 2" stroke="currentColor" strokeWidth="1.5" />
+                          </svg>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        className="pill-icon-btn"
                         onClick={handleClose}
                         aria-label="Close"
+                        title="Minimize"
                       >
                         <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                           <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -804,10 +870,9 @@ export default function CaptureWidget({
                         <FeedbackItem
                           key={p.id}
                           item={p}
-                          onUpdate={onUpdate ?? handlers.updatePointer}
+                          onEditRequest={handleEditTicket}
                           onDelete={handlers.deletePointer}
                           highlightTicketId={state.highlightTicketId}
-                          onExpandChange={handlers.setExpandedId}
                         />
                       ))}
 
@@ -841,7 +906,7 @@ export default function CaptureWidget({
                         <span className="ai-dot" aria-hidden />
                         AI · {hasTickets ? "auto-structured" : "ready"}
                       </span>
-                      <span className="tl-foot-kbd">⌘⇧E to capture</span>
+                      <button type="button" className="tl-foot-home" onClick={handleSessionEnd}>← Back to home</button>
                     </div>
 
                   </div>
@@ -932,10 +997,9 @@ export default function CaptureWidget({
                               <FeedbackItem
                                 key={p.id}
                                 item={p}
-                                onUpdate={onUpdate ?? handlers.updatePointer}
+                                onEditRequest={handleEditTicket}
                                 onDelete={handlers.deletePointer}
                                 highlightTicketId={state.highlightTicketId}
-                                onExpandChange={handlers.setExpandedId}
                               />
                             ))}
                         </div>
@@ -982,6 +1046,21 @@ export default function CaptureWidget({
         <KeepRecordingPill onDismiss={() => setKeepRecordingVisible(false)} />,
         captureRootEl
       )}
+
+      {/* Ticket editor overlay — centered modal portaled into capture root */}
+      {editingTicketId && captureRootEl && (() => {
+        const editingTicket = state.pointers.find((p) => p.id === editingTicketId);
+        if (!editingTicket) return null;
+        return createPortal(
+          <TicketEditorOverlay
+            ticket={editingTicket}
+            sessionId={sessionId}
+            onUpdate={onUpdate ?? handlers.updatePointer}
+            onClose={handleCloseEditor}
+          />,
+          captureRootEl
+        );
+      })()}
     </>
   );
 }

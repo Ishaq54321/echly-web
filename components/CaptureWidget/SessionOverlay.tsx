@@ -59,6 +59,7 @@ export type SessionOverlayProps = {
   voiceMicDeviceId?: string;
   theme?: "light" | "dark";
   __extensionSavingState?: boolean;
+  onModeChange?: (mode: "voice" | "text") => void;
 };
 
 /**
@@ -92,6 +93,7 @@ export function SessionOverlay({
   voiceMicDeviceId = "",
   theme = "dark",
   __extensionSavingState,
+  onModeChange,
 }: SessionOverlayProps) {
   const cleanupRef = useRef<(() => void)[]>([]);
   const voiceStartedForPendingRef = useRef(false);
@@ -113,11 +115,18 @@ export function SessionOverlay({
   /** Switch from text panel to voice panel while keeping the same pending feedback. */
   const handleSwitchToVoice = useCallback(() => {
     setOverrideCaptureMode("voice");
+    onModeChange?.("voice");
     if (!voiceStartedForPendingRef.current) {
       voiceStartedForPendingRef.current = true;
       onRecordVoice();
     }
-  }, [onRecordVoice]);
+  }, [onRecordVoice, onModeChange]);
+
+  /** Switch from voice panel to text panel while keeping the same pending feedback. */
+  const handleSwitchToText = useCallback(() => {
+    setOverrideCaptureMode("text");
+    onModeChange?.("text");
+  }, [onModeChange]);
 
   useEffect(() => {
     if (!sessionMode || !captureRoot) return;
@@ -231,6 +240,7 @@ export function SessionOverlay({
           elementSelector={elemSelector}
           elementWidth={elemWidth}
           elementHeight={elemHeight}
+          onSwitchToText={handleSwitchToText}
         />
       )}
       {sessionFeedbackPending && effectiveCaptureMode === "text" && (

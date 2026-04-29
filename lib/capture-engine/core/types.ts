@@ -7,6 +7,8 @@ export type StructuredFeedback = {
   instruction?: string;
   actionSteps: string[];
   type?: string;
+  screenshotId?: string | null;
+  suggestedTags?: string[];
 };
 
 /** Element bounding rect (viewport coordinates) for anchoring capture card. */

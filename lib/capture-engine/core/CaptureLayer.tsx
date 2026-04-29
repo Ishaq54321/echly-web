@@ -60,6 +60,8 @@ export type CaptureLayerProps = {
   theme?: "light" | "dark";
   /** Extension: derived saving indicator for session chrome. */
   __extensionSavingState?: boolean;
+  /** Called when user switches mode from within an overlay — syncs the header toggle. */
+  onModeChange?: (mode: "voice" | "text") => void;
 };
 
 /**
@@ -101,6 +103,7 @@ export function CaptureLayer({
   voiceMicDeviceId = "",
   theme = "dark",
   __extensionSavingState,
+  onModeChange,
 }: CaptureLayerProps) {
   if (extensionMode && (!sessionMode || (!sessionIdProp && !optimisticSessionStarting))) return null;
   const showSessionOverlay =
@@ -144,6 +147,7 @@ export function CaptureLayer({
           onCancel={onSessionFeedbackCancel}
           theme={theme}
           __extensionSavingState={__extensionSavingState}
+          onModeChange={onModeChange}
         />
       )}
       {showDimOverlay && (

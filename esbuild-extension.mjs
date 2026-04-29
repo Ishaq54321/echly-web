@@ -68,6 +68,7 @@ const define = {
   "process.env.NODE_ENV": JSON.stringify(nodeEnv),
   "process.env.ECHLY_WEB_APP_URL": JSON.stringify(webAppUrl),
   "process.env.ECHLY_API_BASE": JSON.stringify(apiBase),
+  "process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET": JSON.stringify(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || ""),
 };
 
 await esbuild.build({

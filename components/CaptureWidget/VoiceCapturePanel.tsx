@@ -14,24 +14,45 @@ const RMS_TO_BYTE = 3;
 function formatMicLabel(label: string): string {
   if (!label?.trim()) return "Unknown device";
   let s = label.trim();
+  // Remove device IDs like "(352f:0104)" or "(0c45:6362)"
+  s = s.replace(/\s*\([0-9a-fA-F]{4}:[0-9a-fA-F]{4}\)\s*/g, "").trim();
+  // Remove trailing device ID patterns like "352f:0104"
+  s = s.replace(/\s+[0-9a-fA-F]{4}:[0-9a-fA-F]{4}\s*$/, "").trim();
+  // "Default - Microphone (2- PD200X Podcast Mi...)" → "PD200X Podcast Microphone"
+  const defaultWrapped = /^Default\s*[-–]\s*Microphone\s*\(\s*\d+[-–]\s*(.+?)\s*\)\s*$/i.exec(s);
+  if (defaultWrapped) return defaultWrapped[1].trim() || "Default Microphone";
+  // "Microphone (Realtek Audio)" → "Realtek Audio"
   const wrapped = /^Microphone\s*\(\s*(.+?)\s*\)\s*$/i.exec(s);
-  if (wrapped) {
-    const inner = wrapped[1].trim();
-    return inner || "Unknown device";
-  }
+  if (wrapped) return wrapped[1].trim() || "Microphone";
+  // "2- PD200X Podcast Microphone)" → "PD200X Podcast Microphone"
+  s = s.replace(/^\d+[-–]\s*/, "").trim();
+  // Remove trailing ")" if unmatched
+  s = s.replace(/\)+$/, "").trim();
+  // "Microphone 2" → "Input 2"
   const numbered = /^Microphone\s+(\d+)$/i.exec(s);
-  if (numbered) {
-    return `Input ${numbered[1]}`;
-  }
+  if (numbered) return `Input ${numbered[1]}`;
+  // "Microphone USB Headset" → "USB Headset"
   s = s.replace(/^Microphone\s+/i, "").trim();
+  // "Communications - Headset Microphone (HyperX...)" → "HyperX Headset"
+  const commWrapped = /^Communications\s*[-–]\s*(?:Headset\s+)?Microphone\s*\(\s*(.+?)\s*\)\s*$/i.exec(s);
+  if (commWrapped) return commWrapped[1].trim();
+  // "Headset Microphone (HyperX Virtual Surround...)" → "HyperX Virtual Surround"
+  const headsetWrapped = /^Headset\s+Microphone\s*\(\s*(.+?)\s*\)\s*$/i.exec(s);
+  if (headsetWrapped) return headsetWrapped[1].trim();
   return s || "Unknown device";
 }
 
 function getMicType(label: string): string {
-  const lower = label.toLowerCase();
-  if (lower.includes("default")) return "System Default";
-  if (lower.includes("webcam")) return "Webcam Mic";
-  if (lower.includes("headset")) return "Headset";
+  const l = (label || "").toLowerCase();
+  if (l.includes("default")) return "System Default";
+  if (l.includes("communications")) return "Communications";
+  if (l.includes("webcam") || l.includes("camera")) return "Webcam";
+  if (l.includes("headset") || l.includes("headphone")) return "Headset";
+  if (l.includes("bluetooth") || l.includes("airpod") || l.includes("bt ")) return "Bluetooth";
+  if (l.includes("usb") || l.includes("podcast") || l.includes("yeti") || l.includes("rode") || l.includes("shure") || l.includes("maono") || l.includes("fifine")) return "USB Microphone";
+  if (l.includes("built-in") || l.includes("macbook") || l.includes("internal") || l.includes("realtek")) return "Built-in";
+  if (l.includes("virtual") || l.includes("droidcam") || l.includes("obs") || l.includes("voicemod") || l.includes("krisp")) return "Virtual";
+  if (l.includes("iriun")) return "Virtual Webcam";
   return "Microphone";
 }
 
@@ -63,6 +84,8 @@ export type VoiceCapturePanelProps = {
   elementWidth?: number;
   /** Element height in px for badge */
   elementHeight?: number;
+  /** When provided, renders a "Switch to text mode" link below the action buttons. */
+  onSwitchToText?: () => void;
 };
 
 export function VoiceCapturePanel({
@@ -81,6 +104,7 @@ export function VoiceCapturePanel({
   elementSelector,
   elementWidth,
   elementHeight,
+  onSwitchToText,
 }: VoiceCapturePanelProps) {
   const [recordingStarted, setRecordingStarted] = useState(false);
   const [micPickerOpen, setMicPickerOpen] = useState(false);
@@ -428,17 +452,18 @@ export function VoiceCapturePanel({
                     micClosingRef.current = false;
                     setMicSelecting(false);
                     setMicPickerOpen(false);
-                  }, 2000);
+                  }, 500);
                 }}
               >
+                <span className="echly-mic-item-icon">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="6" y="2" width="4" height="8" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                </span>
                 <div className="echly-mic-text">
                   <div className="echly-mic-title">{cleanLabel}</div>
                   <div className="echly-mic-sub">{micType}</div>
                 </div>
                 {isActive && (
-                  <div className="echly-mic-check" aria-hidden>
-                    ✓
-                  </div>
+                  <div className="echly-mic-check" aria-hidden><svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg></div>
                 )}
               </button>
             );
@@ -532,10 +557,19 @@ export function VoiceCapturePanel({
   const normalCard = (
     <div className="echly-v2 echly-v2-overlay-anchor" data-echly-ui="true">
       <div className="center-card" data-echly-ui="true">
-        <div className="esc-hint">
-          Press <kbd>Esc</kbd> to cancel
+        <div className="ovl-top-bar">
+          <button type="button" className="ovl-top-pill" onClick={() => void openMicPicker()} ref={micTriggerRef} aria-expanded={micPickerOpen} aria-haspopup="listbox">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="6" y="2" width="4" height="8" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            <span className="ovl-top-pill-label">{currentMicLabel}</span>
+            <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+          {onSwitchToText && (
+            <button type="button" className="ovl-top-pill ovl-top-pill--switch" onClick={onSwitchToText}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2.5 12.5l1-3 7-7 2 2-7 7-3 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M9.5 4l2 2" stroke="currentColor" strokeWidth="1.5"/></svg>
+              <span className="ovl-top-pill-label">Switch to Text mode</span>
+            </button>
+          )}
         </div>
-
         {screenshot && (
           <div className="ovl-shot">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -553,11 +587,6 @@ export function VoiceCapturePanel({
             {isFinishing ? "Wrapping up…" : "Capturing feedback…"}
           </span>
           <span className="ovl-time">{timeDisplay}</span>
-        </div>
-
-        <div className="ovl-title">Voice feedback</div>
-        <div className="ovl-sub">
-          Describe what you noticed—Echly structures it for your team.
         </div>
 
         <div className="ovl-wave" aria-hidden>
@@ -579,34 +608,9 @@ export function VoiceCapturePanel({
           </div>
         </div>
 
-        <button
-          ref={micTriggerRef}
-          type="button"
-          className="mic-row"
-          onClick={() => void openMicPicker()}
-          aria-expanded={micPickerOpen}
-          aria-haspopup="listbox"
-        >
-          <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-            <rect x="6" y="2" width="4" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
-            <path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          <span className="mic-name">
-            {currentMicLabel}
-            <span className="mic-level" aria-hidden>
-              <span /><span /><span />
-            </span>
-          </span>
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-            <path d="M5 6l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-
         <div className="ovl-actions">
-          <button type="button" className="rec-pause" aria-label="Pause" disabled>
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <path d="M6 4v8M10 4v8" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-            </svg>
+          <button type="button" className="rec-cancel" aria-label="Cancel" onClick={onCancel}>
+            Cancel
           </button>
           <button
             type="button"
@@ -614,7 +618,6 @@ export function VoiceCapturePanel({
             onClick={onFinish}
             disabled={isFinishing}
           >
-            <span className="stop-square" aria-hidden />
             {isFinishing ? "Finishing..." : "Finish"}
           </button>
         </div>
