@@ -1358,6 +1358,9 @@ body {
   .my-2 {
     margin-block: calc(var(--spacing) * 2);
   }
+  .my-4 {
+    margin-block: calc(var(--spacing) * 4);
+  }
   .my-6 {
     margin-block: calc(var(--spacing) * 6);
   }
@@ -2592,6 +2595,9 @@ body {
   .rounded-3xl {
     border-radius: var(--radius-3xl);
   }
+  .rounded-\[6px\] {
+    border-radius: 6px;
+  }
   .rounded-\[7px\] {
     border-radius: 7px;
   }
@@ -2603,6 +2609,9 @@ body {
   }
   .rounded-\[14px\] {
     border-radius: 14px;
+  }
+  .rounded-\[16px\] {
+    border-radius: 16px;
   }
   .rounded-\[50\%\] {
     border-radius: 50%;
@@ -4833,7 +4842,7 @@ body {
       }
     }
   }
-  .hover\:translate-y-\[-1px\] {
+  .hover\:-translate-y-px {
     &:hover {
       @media (hover: hover) {
         --tw-translate-y: -1px;
@@ -5738,6 +5747,12 @@ body {
       --tw-ring-inset: inset;
     }
   }
+  .active\:translate-y-0 {
+    &:active {
+      --tw-translate-y: calc(var(--spacing) * 0);
+      translate: var(--tw-translate-x) var(--tw-translate-y);
+    }
+  }
   .active\:scale-\[0\.97\] {
     &:active {
       scale: 0.97;
@@ -6037,6 +6052,10 @@ body {
   }
 }
 :root {
+  --color-amber: #F59E0B;
+  --color-amber-soft: #FEF3C7;
+  --color-amber-ink: #92400E;
+  --color-amber-mid: #D97706;
   --env-base: var(--surface-page);
   --env-gradient-top: rgba(226, 232, 240, 0.045);
   --env-gradient-bottom: rgba(209, 250, 229, 0.04);

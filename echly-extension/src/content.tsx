@@ -1,21 +1,23 @@
 /**
- * Content script: ultra-thin UI layer. Injected on demand when user clicks extension icon (Loom-style).
- * Single mount, visibility controlled by background (ECHLY_VISIBILITY). No blocking overlays.
- * Auth is resolved silently by background session checks; login opens only on explicit user action.
+ * Widget script: lazy-loaded by bootstrap.ts via <script src="widget.js"> when the user opens
+ * the widget (or when a session is already active on page load). Owns React mount, shadow DOM,
+ * session/feedback flows. All incoming chrome.runtime messages arrive via window CustomEvents
+ * dispatched by bootstrap; outgoing chrome.runtime.sendMessage calls remain direct.
  */
 declare global {
   interface Window {
     __ECHLY_WIDGET_LOADED__?: boolean;
+    __ECHLY_BOOTSTRAP_LOADED__?: boolean;
+    __ECHLY_ENSURE_KEEPALIVE__?: () => void;
+    __ECHLY_DISCONNECT_KEEPALIVE__?: () => void;
   }
 }
 
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { apiFetch, API_BASE, throwIfHttpError } from "./api";
-import "./sessionRelay";
 import { getSessionsCached, invalidateSessionsCache } from "./cachedSessions";
 import { uploadScreenshot, generateFeedbackId } from "./contentScreenshot";
-import { getVisibleTextFromScreenshot } from "./ocr";
 import CaptureWidget from "@/lib/capture-engine/core/CaptureWidget";
 import type { StructuredFeedback, CaptureContext, FeedbackJob } from "@/lib/capture-engine/core/types";
 import { ExtensionCaptureEnvironment } from "@/lib/capture-engine/ExtensionCaptureEnvironment";
@@ -36,45 +38,6 @@ function logRuntimeLastError(context: string): void {
   const err = chrome.runtime.lastError;
   if (err) {
     console.error(`[ECHLY] ${context}`, err.message ?? String(err));
-  }
-}
-
-let echlyEventDispatcher: ((type: string) => void) | null = null;
-
-if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
-  chrome.runtime.onMessage.addListener((msg: { type?: string }) => {
-    if (msg.type === "ECHLY_OPEN_PREVIOUS_SESSIONS") {
-      logger.debug("extension", "open_previous_sessions_requested");
-      if (echlyEventDispatcher) {
-        echlyEventDispatcher("ECHLY_OPEN_PREVIOUS_SESSIONS");
-      }
-    }
-  });
-}
-
-let keepalivePort: chrome.runtime.Port | null = null;
-let keepaliveSessionActive = false;
-
-function ensureKeepalivePort() {
-  if (!keepalivePort) {
-    try {
-      keepalivePort = chrome.runtime.connect({ name: "echly-keepalive" });
-      keepalivePort.onDisconnect.addListener(() => {
-        keepalivePort = null;
-        if (keepaliveSessionActive) {
-          setTimeout(ensureKeepalivePort, 1000);
-        }
-      });
-    } catch {
-      keepalivePort = null;
-    }
-  }
-}
-
-function disconnectKeepalivePort() {
-  if (keepalivePort) {
-    try { keepalivePort.disconnect(); } catch {}
-    keepalivePort = null;
   }
 }
 
@@ -143,26 +106,6 @@ function applyThemeToRoot(root: HTMLElement, theme: "dark" | "light"): void {
   } catch (e) {
     console.error("[ECHLY] applyThemeToRoot persistence failed", e);
   }
-}
-
-function setHostVisibility(visible: boolean): void {
-  logger.debug("extension", "tray_visibility_changed", { visible });
-  const host = document.getElementById(SHADOW_HOST_ID) as HTMLDivElement | null;
-  if (host) {
-    host.style.display = visible ? "block" : "none";
-    host.style.pointerEvents = visible ? "auto" : "none";
-    host.style.visibility = visible ? "visible" : "hidden";
-  }
-}
-
-/** Apply tray visibility from global state. Visibility follows global extension state on all tabs. */
-function setHostVisibilityFromState(state: GlobalUIState): void {
-  setHostVisibility(getShouldShowTray(state));
-}
-
-/** Tray remains visible when session is active or paused; hide only when session ends. */
-function getShouldShowTray(state: GlobalUIState): boolean {
-  return state.visible === true || state.session.status !== "idle";
 }
 
 type AuthUser = { uid: string; name: string | null; email: string | null; photoURL: string | null };
@@ -513,18 +456,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   }, [hasPreviousSessions]);
 
   React.useEffect(() => {
-    echlyEventDispatcher = (type) => {
-      if (type === "ECHLY_OPEN_PREVIOUS_SESSIONS") {
-        setOpenResumeModalFromMessage(true);
-      }
-    };
-
-    return () => {
-      echlyEventDispatcher = null;
-    };
-  }, []);
-
-  React.useEffect(() => {
     const toggleHandler = () => {
       widgetToggleRef.current?.();
     };
@@ -544,12 +475,11 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     return () => window.removeEventListener("ECHLY_RESET_WIDGET", handler as EventListener);
   }, []);
 
-  /* Global UI state: derived only from background (ECHLY_GLOBAL_STATE). No local source of truth. */
+  /* Global UI state: bootstrap pushes state via __ECHLY_APPLY_GLOBAL_STATE__ and ECHLY_GLOBAL_STATE event. */
   React.useEffect(() => {
     const applyGlobalState = (state: GlobalUIState) => {
       const normalized = normalizeGlobalState(state);
       if (!normalized) return;
-      setHostVisibilityFromState(normalized);
       setGlobalState(normalized);
     };
     (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (state: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__ = applyGlobalState;
@@ -558,7 +488,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     };
   }, []);
 
-  /* Global UI state: always overwrite from background (full replacement model). */
+  /* Global UI state: always overwrite from background (full replacement model). Bootstrap dispatches with detail.state. */
   React.useEffect(() => {
     const handler = (e: CustomEvent<{ state: GlobalUIState }>) => {
       const s = e.detail?.state;
@@ -566,7 +496,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       echlyLog("CONTENT", "global state received", s);
       const normalized = normalizeGlobalState(s);
       if (!normalized) return;
-      setHostVisibilityFromState(normalized);
       setGlobalState(normalized);
       if (normalized.feedbackLimitReached) {
         setFeedbackLimitReached({
@@ -579,54 +508,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     };
     window.addEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
     return () => window.removeEventListener("ECHLY_GLOBAL_STATE", handler as EventListener);
-  }, []);
-
-  /* Hydrate from background on mount so already-open tabs join active sessions; visibility is applied when state is received. */
-  React.useEffect(() => {
-    chrome.runtime.sendMessage(
-      { type: "ECHLY_GET_GLOBAL_STATE" },
-      (response: GlobalStateResponse) => {
-        logRuntimeLastError("ECHLY_GET_GLOBAL_STATE (mount)");
-        const state = response?.state;
-        if (!state) {
-          console.error("[ECHLY] ECHLY_GET_GLOBAL_STATE returned no state");
-          return;
-        }
-        const normalized = normalizeGlobalState(state);
-        if (!normalized) {
-          console.error("[ECHLY] ECHLY_GET_GLOBAL_STATE returned invalid state");
-          return;
-        }
-        setHostVisibilityFromState(normalized);
-        setGlobalState(normalized);
-      }
-    );
-  }, []);
-
-  /* Hard resync when tab becomes visible so session end is never missed (background push is unreliable). */
-  React.useEffect(() => {
-    const handler = () => {
-      if (document.hidden) return;
-      chrome.runtime.sendMessage(
-        { type: "ECHLY_GET_GLOBAL_STATE" },
-        (response: GlobalStateResponse) => {
-          logRuntimeLastError("ECHLY_GET_GLOBAL_STATE (visibilitychange)");
-          if (!response?.state) {
-            console.error("[ECHLY] ECHLY_GET_GLOBAL_STATE (visibilitychange) returned no state");
-            return;
-          }
-          const normalized = normalizeGlobalState(response.state);
-          if (!normalized) {
-            console.error("[ECHLY] ECHLY_GET_GLOBAL_STATE (visibilitychange) invalid state");
-            return;
-          }
-          setHostVisibilityFromState(normalized);
-          setGlobalState(normalized);
-        }
-      );
-    };
-    document.addEventListener("visibilitychange", handler);
-    return () => document.removeEventListener("visibilitychange", handler);
   }, []);
 
   /* On widget open, use shared sessions cache so we don't duplicate GET /api/sessions with preload. */
@@ -797,19 +678,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         throw new Error("Missing session or user");
       }
 
-      const ctx = context as CaptureContext | null | undefined;
-      const imageForOcr = ctx?.ocrImageDataUrl ?? screenshot ?? null;
-      let extractedVisibleText = "";
-      try {
-        const result = await Promise.race([
-          getVisibleTextFromScreenshot(imageForOcr),
-          new Promise<string>((resolve) => setTimeout(() => resolve(""), 500)),
-        ]);
-        extractedVisibleText = result ?? "";
-      } catch (e) {
-        console.error("[ECHLY] OCR failed", e);
-        extractedVisibleText = "";
-      }
+      const extractedVisibleText = "";
 
       const currentUrl = typeof window !== "undefined" ? window.location.href : "";
       let selectedElement: HTMLElement | null = null;
@@ -1073,8 +942,11 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 : err.message
               : "AI processing failed.";
           setFeedbackJobs((prev) =>
-            prev.map((j) => (j.id === jobId ? { ...j, status: "failed" as const, errorMessage: failMsg } : j))
+            prev.map((j) => (j.id === jobId ? { ...j, status: "failed" as const, errorMessage: failMsg, screenshot: null } : j))
           );
+          setTimeout(() => {
+            setFeedbackJobs((prev) => prev.filter((j) => j.id !== jobId || j.status !== "failed"));
+          }, 60_000);
         }
         callbacks?.onError?.();
         throw err;
@@ -1247,11 +1119,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     if (ECHLY_DEBUG) logger.debug("extension", "sessions_returned", { count: sessions.length });
     return sessions;
   }, []);
-
-  /* Optional preload: warm cache so Previous Sessions modal feels faster when opened. */
-  React.useEffect(() => {
-    fetchSessions?.();
-  }, [fetchSessions]);
 
   async function createSession(): Promise<
     { id: string } | { limitReached: true; message: string; upgradePlan: unknown } | null
@@ -1518,7 +1385,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           globalSessionModeActive={uiGlobal.session.status !== "idle"}
           globalSessionPaused={uiGlobal.session.status === "paused"}
           onSessionModeStart={() => {
-            ensureKeepalivePort();
+            window.__ECHLY_ENSURE_KEEPALIVE__?.();
             chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch((err) =>
               logSendMessageRejection("ECHLY_SESSION_MODE_START", err)
             );
@@ -1540,8 +1407,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           }
           onSessionModeEnd={() => {
             const sessionId = uiGlobal.session.id;
-            keepaliveSessionActive = false;
-            disconnectKeepalivePort();
+            window.__ECHLY_DISCONNECT_KEEPALIVE__?.();
             void (async () => {
               await new Promise<void>((resolve, reject) => {
                 chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_END" }, () => {
@@ -1659,10 +1525,6 @@ function mountReactApp(host: HTMLDivElement): void {
   reactRoot.render(<ContentApp widgetRoot={container} initialTheme={initialTheme} />);
 }
 
-type GlobalStateResponse = {
-  state?: GlobalUIState;
-} | undefined;
-
 function normalizeGlobalState(state: GlobalUIState | undefined): GlobalUIState | null {
   if (!state) return null;
   return {
@@ -1698,142 +1560,6 @@ function normalizeGlobalState(state: GlobalUIState | undefined): GlobalUIState |
   };
 }
 
-function dispatchGlobalState(state: GlobalUIState): void {
-  echlyLog("CONTENT", "dispatch event", { type: "ECHLY_GLOBAL_STATE" });
-  window.dispatchEvent(
-    new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state } })
-  );
-}
-
-/** Request initial global state from background; visibility is applied via setHostVisibilityFromState when state is received. */
-function syncInitialGlobalState(): void {
-  chrome.runtime.sendMessage(
-    { type: "ECHLY_GET_GLOBAL_STATE" },
-    (response: GlobalStateResponse) => {
-      logRuntimeLastError("ECHLY_GET_GLOBAL_STATE (syncInitialGlobalState)");
-      const normalized = normalizeGlobalState(response?.state);
-      if (!normalized) {
-        console.error("[ECHLY] syncInitialGlobalState: no valid state");
-        return;
-      }
-      dispatchGlobalState(normalized);
-    }
-  );
-}
-
-/** When tab becomes visible, refresh global state from background so we never rely on a missed broadcast. */
-let visibilityStateRefreshAttached = false;
-let visibilityStateRefreshHandler: (() => void) | null = null;
-function ensureVisibilityStateRefresh(): void {
-  if (visibilityStateRefreshAttached) return;
-  visibilityStateRefreshHandler = () => {
-    if (document.hidden) return;
-    chrome.runtime.sendMessage(
-      { type: "ECHLY_GET_GLOBAL_STATE" },
-      (response: GlobalStateResponse) => {
-        logRuntimeLastError("ECHLY_GET_GLOBAL_STATE (ensureVisibilityStateRefresh)");
-        const normalized = normalizeGlobalState(response?.state);
-        if (!normalized) {
-          console.error("[ECHLY] ensureVisibilityStateRefresh: no valid state");
-          return;
-        }
-        setHostVisibilityFromState(normalized);
-        dispatchGlobalState(normalized);
-      }
-    );
-  };
-  document.addEventListener("visibilitychange", visibilityStateRefreshHandler);
-  visibilityStateRefreshAttached = true;
-}
-
-/** Listen for global state; single listener. Background is source of truth. */
-function ensureMessageListener(): void {
-  const win = window as Window & { __ECHLY_MESSAGE_LISTENER__?: boolean };
-  if (win.__ECHLY_MESSAGE_LISTENER__) return;
-  win.__ECHLY_MESSAGE_LISTENER__ = true;
-  chrome.runtime.onMessage.addListener((msg: { type?: string; state?: GlobalUIState; ticket?: { id: string; title: string; instruction?: string; description?: string; type?: string }; sessionId?: string }) => {
-    logger.debug("extension", "runtime_message_received", { type: msg.type });
-    if (msg.type === "ECHLY_FEEDBACK_CREATED" && msg.ticket && msg.sessionId) {
-      echlyLog("CONTENT", "dispatch event", { type: "ECHLY_FEEDBACK_CREATED" });
-      window.dispatchEvent(new CustomEvent("ECHLY_FEEDBACK_CREATED", { detail: { ticket: msg.ticket, sessionId: msg.sessionId } }));
-      return;
-    }
-    if (msg.type === "ECHLY_OPEN_WIDGET") {
-      logger.debug("extension", "open_widget_event_dispatching");
-      setHostVisibility(true);
-      window.dispatchEvent(new CustomEvent("ECHLY_OPEN_WIDGET"));
-      return;
-    }
-    if (msg.type === "ECHLY_CLOSE_WIDGET") {
-      setHostVisibility(false);
-      return;
-    }
-    const h = document.getElementById(SHADOW_HOST_ID);
-    if (!h) return;
-    if (msg.type === "ECHLY_GLOBAL_STATE" && msg.state) {
-      const normalized = normalizeGlobalState(msg.state);
-      if (!normalized) {
-        console.error("[ECHLY] ECHLY_GLOBAL_STATE runtime message had invalid state");
-        return;
-      }
-      setHostVisibilityFromState(normalized);
-      (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (s: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__?.(normalized);
-      echlyLog("CONTENT", "dispatch event", { type: "ECHLY_GLOBAL_STATE" });
-      window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state: normalized } }));
-      keepaliveSessionActive = normalized.session.status !== "idle";
-      if (keepaliveSessionActive) {
-        ensureKeepalivePort();
-      } else {
-        disconnectKeepalivePort();
-      }
-    }
-    if (msg.type === "ECHLY_TOGGLE") {
-      echlyLog("CONTENT", "dispatch event", { type: "ECHLY_TOGGLE_WIDGET" });
-      window.dispatchEvent(new CustomEvent("ECHLY_TOGGLE_WIDGET"));
-    }
-    if (msg.type === "ECHLY_RESET_WIDGET") {
-      echlyLog("CONTENT", "dispatch event", { type: "ECHLY_RESET_WIDGET" });
-      window.dispatchEvent(new CustomEvent("ECHLY_RESET_WIDGET"));
-    }
-    if (msg.type === "ECHLY_START_SESSION") {
-      echlyLog("CONTENT", "dispatch event", { type: "ECHLY_START_SESSION" });
-      window.dispatchEvent(new CustomEvent("ECHLY_START_SESSION_REQUEST"));
-    }
-    if (msg.type === "ECHLY_OPEN_PREVIOUS_SESSIONS") {
-      chrome.runtime.sendMessage(
-        { type: "GET_AUTH_STATE" },
-        (r: { authenticated?: boolean; user?: { uid: string } } | undefined) => {
-          logRuntimeLastError("GET_AUTH_STATE (ECHLY_OPEN_PREVIOUS_SESSIONS)");
-          if (!r?.authenticated || !r?.user?.uid) {
-            return;
-          }
-          echlyLog("CONTENT", "dispatch event", { type: "ECHLY_OPEN_PREVIOUS_SESSIONS" });
-          window.dispatchEvent(new CustomEvent("ECHLY_OPEN_PREVIOUS_SESSIONS"));
-        }
-      );
-      return;
-    }
-    /* Tab activation resync: always fetch and apply state; never debounce or skip. */
-    if (msg.type === "ECHLY_SESSION_STATE_SYNC") {
-      chrome.runtime.sendMessage({ type: "ECHLY_GET_GLOBAL_STATE" }, (response: GlobalStateResponse) => {
-        logRuntimeLastError("ECHLY_GET_GLOBAL_STATE (ECHLY_SESSION_STATE_SYNC)");
-        if (!response?.state) {
-          console.error("[ECHLY] ECHLY_SESSION_STATE_SYNC: GET_GLOBAL_STATE returned no state");
-          return;
-        }
-        const normalized = normalizeGlobalState(response.state);
-        if (!normalized) {
-          console.error("[ECHLY] ECHLY_SESSION_STATE_SYNC: invalid global state");
-          return;
-        }
-        setHostVisibilityFromState(normalized);
-        (window as Window & { __ECHLY_APPLY_GLOBAL_STATE__?: (s: GlobalUIState) => void }).__ECHLY_APPLY_GLOBAL_STATE__?.(normalized);
-        window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state: normalized } }));
-      });
-    }
-  });
-}
-
 /** Debug: passive wheel + scroll listeners to verify events reach the page (never block scroll). */
 function ensureScrollDebugListeners(): void {
   const win = window as Window & { __ECHLY_SCROLL_DEBUG__?: boolean };
@@ -1841,16 +1567,8 @@ function ensureScrollDebugListeners(): void {
   win.__ECHLY_SCROLL_DEBUG__ = true;
   const wheelHandler = () => ECHLY_DEBUG && console.debug("ECHLY wheel event reached page");
   const scrollHandler = () => ECHLY_DEBUG && console.debug("ECHLY scroll event detected");
-  window.addEventListener(
-    "wheel",
-    wheelHandler,
-    { passive: true }
-  );
-  document.addEventListener(
-    "scroll",
-    scrollHandler,
-    { passive: true }
-  );
+  window.addEventListener("wheel", wheelHandler, { passive: true });
+  document.addEventListener("scroll", scrollHandler, { passive: true });
 }
 
 function waitForBody(cb: () => void) {
@@ -1858,27 +1576,22 @@ function waitForBody(cb: () => void) {
     cb();
     return;
   }
-
   const observer = new MutationObserver(() => {
     if (document.body) {
       observer.disconnect();
       cb();
     }
   });
-
   observer.observe(document.documentElement, { childList: true });
 }
 
 /**
- * Single mount: create host once, mount React once, default hidden.
- * Visibility via ECHLY_VISIBILITY from background. No re-mount, no injection logic.
- * Host is mounted only after document.body exists so the tray stays visible on all tabs.
+ * Mount the widget (host element + shadow DOM + React).
+ * Bootstrap loads this script via <script> tag and then dispatches buffered events; React effects
+ * subscribed to those events catch up the UI. Host visibility is owned by bootstrap.
  */
 function injectWidgetUI(): void {
   logger.debug("extension", "ui_injected");
-  if (window.__ECHLY_WIDGET_LOADED__) return;
-  window.__ECHLY_WIDGET_LOADED__ = true;
-
   let host = document.getElementById(SHADOW_HOST_ID) as HTMLDivElement | null;
   if (!host) {
     host = document.createElement("div");
@@ -1890,56 +1603,23 @@ function injectWidgetUI(): void {
     host.style.width = "auto";
     host.style.height = "auto";
     host.style.zIndex = "2147483647";
-    host.style.display = "none";
-    host.style.pointerEvents = "none";
-    host.style.visibility = "hidden";
+    /* Default visible: bootstrap only loads widget when shouldShowTray() OR user opened it,
+       so by the time we mount, the tray is meant to be on screen. */
+    host.style.display = "block";
+    host.style.pointerEvents = "auto";
+    host.style.visibility = "visible";
 
     waitForBody(() => {
       document.body.appendChild(host!);
       mountReactApp(host!);
-      ensureMessageListener();
-      /* Force state sync after mount so tray appears on every page when global state is visible. */
-      chrome.runtime.sendMessage(
-        { type: "ECHLY_GET_GLOBAL_STATE" },
-        (response: GlobalStateResponse) => {
-          logRuntimeLastError("ECHLY_GET_GLOBAL_STATE (injectWidgetUI)");
-          const state = response?.state;
-          if (!state) {
-            console.error("[ECHLY] injectWidgetUI: GET_GLOBAL_STATE returned no state");
-            return;
-          }
-          const normalized = normalizeGlobalState(state);
-          if (!normalized) {
-            console.error("[ECHLY] injectWidgetUI: invalid global state");
-            return;
-          }
-          setHostVisibilityFromState(normalized);
-          window.dispatchEvent(
-            new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state: normalized } })
-          );
-        }
-      );
     });
-  } else {
-    ensureMessageListener();
-    syncInitialGlobalState();
   }
-  ensureVisibilityStateRefresh();
   ensureScrollDebugListeners();
 }
 
-function safeAutoInject() {
-  if (document.readyState === "complete") {
-    injectWidgetUI();
-  } else {
-    const onLoad = () => {
-      setTimeout(() => {
-        injectWidgetUI();
-      }, 50); // small delay to allow hydration
-      window.removeEventListener("load", onLoad);
-    };
-    window.addEventListener("load", onLoad);
-  }
-}
-
-safeAutoInject();
+/** Widget entry point: invoked when bootstrap appends widget.js. Idempotent. */
+(function widgetEntry() {
+  if (window.__ECHLY_WIDGET_LOADED__) return;
+  window.__ECHLY_WIDGET_LOADED__ = true;
+  injectWidgetUI();
+})();

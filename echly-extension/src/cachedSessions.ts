@@ -9,6 +9,10 @@ import type { SessionOption } from "@/lib/capture-engine/core/ResumeSessionModal
 /** Session row for picker UI; `counts.total` comes from session document fields on `/api/sessions`. */
 export type SessionListItem = SessionOption & { counts: { total: number } };
 
+let cachedData: SessionListItem[] | null = null;
+let cachedAt = 0;
+const CACHE_TTL_MS = 30_000;
+
 function totalTicketsFromSession(session: {
   totalCount?: number;
   feedbackCount?: number;
@@ -21,6 +25,9 @@ function totalTicketsFromSession(session: {
 export async function getSessionsCached(
   fetchFn: (url: string, init?: RequestInit) => Promise<Response>
 ): Promise<SessionListItem[]> {
+  if (cachedData && Date.now() - cachedAt < CACHE_TTL_MS) {
+    return cachedData;
+  }
   const res = await fetchFn("/api/sessions");
   if (!res.ok) {
     console.error("[ECHLY] getSessionsCached /api/sessions failed", res.status);
@@ -28,12 +35,16 @@ export async function getSessionsCached(
   }
   const data: unknown = await res.json();
   const baseSessions = sessionsArrayFromApiPayload(data);
-  return baseSessions.map((session) => ({
+  const result = baseSessions.map((session) => ({
     ...session,
     counts: { total: totalTicketsFromSession(session) },
   }));
+  cachedData = result;
+  cachedAt = Date.now();
+  return result;
 }
 
 export function invalidateSessionsCache(): void {
-  // No-op: extension session cache removed.
+  cachedData = null;
+  cachedAt = 0;
 }

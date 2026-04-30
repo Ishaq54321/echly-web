@@ -8,51 +8,12 @@ import { echlyLog } from "../../lib/debug/echlyLogger";
 import { setExtensionToken, apiFetch } from "../utils/apiFetch";
 import { API_BASE, WEB_APP_URL } from "../config";
 import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
-import { sessionsArrayFromApiPayload } from "@/lib/domain/session";
 import { buildFeedbackPayload } from "@/utils/buildFeedbackPayload";
 import { ECHLY_STRICT_MODE } from "@/lib/guardrails";
 
 const LOGIN_URL = `${WEB_APP_URL}/login`;
 /** Extension token TTL from backend is 15m; treat as valid for 14 min to avoid edge expiry. */
 const EXTENSION_TOKEN_TTL_MS = 14 * 60 * 1000;
-const MAX_VISIBLE_TEXT_LENGTH = 2000;
-
-type OcrWorkerLike = {
-  recognize: (
-    image: string
-  ) => Promise<{
-    data?: { text?: string };
-  }>;
-  /** tesseract.js returns ConfigResult; callers may ignore it. */
-  terminate: () => Promise<unknown>;
-};
-
-let ocrWorkerPromise: Promise<OcrWorkerLike> | null = null;
-
-async function getOrCreateOcrWorker(): Promise<OcrWorkerLike> {
-  if (ocrWorkerPromise) return ocrWorkerPromise;
-  ocrWorkerPromise = (async () => {
-    const Tesseract = await import("tesseract.js");
-    return Tesseract.createWorker("eng", undefined, {
-      logger: () => {},
-    }) as Promise<OcrWorkerLike>;
-  })();
-  return ocrWorkerPromise;
-}
-
-async function recognizeVisibleTextFromImage(imageDataUrl: string): Promise<string> {
-  if (!imageDataUrl || typeof imageDataUrl !== "string") return "";
-  try {
-    const worker = await getOrCreateOcrWorker();
-    const result = await worker.recognize(imageDataUrl);
-    const text = result?.data?.text;
-    if (!text || typeof text !== "string") return "";
-    return text.replace(/\s+/g, " ").trim().slice(0, MAX_VISIBLE_TEXT_LENGTH);
-  } catch (error) {
-    console.error("[ECHLY] OCR in background failed", error);
-    return "";
-  }
-}
 
 async function openOrFocusLoginTab(): Promise<void> {
   const tabs = await chrome.tabs.query({});
@@ -78,6 +39,35 @@ function clearAuthState(): void {
 
 function logMessageDeliveryError(context: string, error: unknown): void {
   console.error(`[ECHLY MESSAGE] ${context} failed`, error);
+}
+
+/* In-memory mirror of chrome.storage.local.echlyActive — avoids 10-50ms async I/O
+   on every tab switch / page load. Kept in sync with every storage write below. */
+let cachedEchlyActive = false;
+
+/* Tabs known to have the content script loaded. Lets us skip the executeScript probe
+   (50-150ms) on subsequent activations of the same tab. Cleared on navigation/removal. */
+const injectedTabs = new Set<number>();
+
+/** Send a runtime message with bounded retries to handle the brief window
+ *  where the content script's listener isn't registered yet. Silent on final failure
+ *  (tab may have navigated away). */
+async function sendMessageWithRetry(
+  tabId: number,
+  message: unknown,
+  maxRetries = 3,
+  delayMs = 100
+): Promise<void> {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      await chrome.tabs.sendMessage(tabId, message);
+      return;
+    } catch {
+      if (i < maxRetries - 1) {
+        await new Promise((r) => setTimeout(r, delayMs * (i + 1)));
+      }
+    }
+  }
 }
 
 if (ECHLY_DEBUG) console.log("[EXTENSION] background ready", API_BASE);
@@ -107,6 +97,7 @@ chrome.action.onClicked.addListener(() => {
       globalUIState.visible = false;
       globalUIState.expanded = false;
       trayOpen = false;
+      cachedEchlyActive = false;
       await chrome.storage.local.set({ echlyActive: false });
       broadcastUIState();
       if (tab?.id) {
@@ -183,6 +174,14 @@ let extensionToken: string | null = null;
 let extensionTokenExpiresAt: number | null = null;
 /** Cached user from last successful session response; used for ECHLY_GET_AUTH_STATE. */
 let cachedSessionUser: StoredUser | null = null;
+
+let cachedBillingUsage: {
+  feedbackTicketsUsed?: number;
+  feedbackTicketsLimit?: number | null;
+  canCreateFeedback?: boolean;
+} | null = null;
+let billingUsageCachedAt = 0;
+const BILLING_USAGE_CACHE_TTL = 5 * 60 * 1000;
 
 /** Tray toggle state: icon click opens when false, closes when true (Loom-style). */
 let trayOpen = false;
@@ -384,6 +383,9 @@ async function rehydrateSession(sessionId: string, mode: RehydrateMode = "cold")
       globalUIState.totalCount = counts.total;
       globalUIState.openCount = counts.open;
       globalUIState.resolvedCount = counts.resolved;
+      if (counts.title != null) {
+        globalUIState.sessionTitle = counts.title;
+      }
       const now = Date.now();
       globalUIState.lastSyncedAt = now;
       globalUIState.lastPaginationAt = null;
@@ -422,11 +424,15 @@ async function rehydrateSession(sessionId: string, mode: RehydrateMode = "cold")
   }
 
   if (globalUIState.sessionId === sessionId && globalUIState.hasMore && globalUIState.nextCursor) {
-    await drainAllFeedbackPages(sessionId);
+    setTimeout(() => {
+      if (activeSessionId === sessionId && globalUIState.sessionId === sessionId) {
+        void drainAllFeedbackPages(sessionId);
+      }
+    }, 5000);
   }
 }
 
-async function fetchFeedbackCountFresh(sessionId: string): Promise<SessionCounts> {
+async function fetchFeedbackCountFresh(sessionId: string): Promise<SessionCounts & { title: string | null }> {
   const res = await apiFetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}`);
   if (!res.ok) {
     throw new Error("session_meta_failed_" + res.status);
@@ -445,7 +451,8 @@ async function fetchFeedbackCountFresh(sessionId: string): Promise<SessionCounts
       : typeof s.feedbackCount === "number"
         ? s.feedbackCount
         : 0;
-  return { total, open, resolved };
+  const title = typeof s.title === "string" ? s.title : null;
+  return { total, open, resolved, title };
 }
 
 async function loadMore(): Promise<void> {
@@ -592,13 +599,14 @@ function endSessionFromIdle(): void {
   resetPaginationState();
   globalUIState.lastSyncedAt = null;
   globalUIState.lastPaginationAt = null;
+  cachedEchlyActive = false;
   chrome.storage.local.set({
     activeSessionId: null,
     sessionModeActive: false,
     sessionPaused: false,
     echlyActive: false,
   });
-  broadcastUIState();
+  broadcastUIState(true);
   setTimeout(() => {
     chrome.tabs.query({}, (tabs) => {
       tabs.forEach((tab) => {
@@ -670,20 +678,6 @@ self.addEventListener("activate", () => {
   if (ECHLY_DEBUG) console.log("[ECHLY] service worker activated");
 });
 
-chrome.runtime.onSuspend.addListener(() => {
-  if (!ocrWorkerPromise) return;
-  void (async () => {
-    try {
-      const worker = await ocrWorkerPromise!;
-      await worker.terminate();
-    } catch {
-      // ignore worker teardown errors on suspend
-    } finally {
-      ocrWorkerPromise = null;
-    }
-  })();
-});
-
 // Keep SW alive while sessions are active via port connection
 const keepalivePorts = new Set<chrome.runtime.Port>();
 
@@ -710,6 +704,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
       "sessionModeActive",
     ]);
 
+    cachedEchlyActive = !!stored?.echlyActive;
     if (stored?.echlyActive) {
       trayOpen = true;
       globalUIState.visible = true;
@@ -839,6 +834,7 @@ type JsonObject = { [key: string]: JsonValue };
 const STATE_BROADCAST_DEBOUNCE_MS = 120;
 let pendingBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingBroadcastState: CanonicalGlobalState | null = null;
+let pendingBroadcastToAllTabs = false;
 let lastBroadcastState: CanonicalGlobalState | null = null;
 
 function isPlainObject(value: unknown): value is JsonObject {
@@ -895,17 +891,26 @@ async function getActiveTabIdForBroadcast(): Promise<number | null> {
 async function flushBroadcastUIState(): Promise<void> {
   pendingBroadcastTimer = null;
   const state = pendingBroadcastState ?? getCanonicalGlobalState();
+  const toAllTabs = pendingBroadcastToAllTabs;
   pendingBroadcastState = null;
+  pendingBroadcastToAllTabs = false;
 
   const patch = buildStatePatch(lastBroadcastState, state);
   if (Object.keys(patch).length === 0) return;
 
-  echlyLog("BACKGROUND", "broadcast global state", { patch });
+  echlyLog("BACKGROUND", "broadcast global state", { patch, toAllTabs });
   try {
-    const tabs = await chrome.tabs.query({});
-    for (const tab of tabs) {
-      if (tab.id) {
-        chrome.tabs.sendMessage(tab.id, { type: "ECHLY_GLOBAL_STATE", state, patch }).catch(() => {});
+    if (toAllTabs) {
+      const tabs = await chrome.tabs.query({});
+      for (const tab of tabs) {
+        if (tab.id) {
+          chrome.tabs.sendMessage(tab.id, { type: "ECHLY_GLOBAL_STATE", state, patch }).catch(() => {});
+        }
+      }
+    } else {
+      const activeTabId = await getActiveTabIdForBroadcast();
+      if (typeof activeTabId === "number") {
+        chrome.tabs.sendMessage(activeTabId, { type: "ECHLY_GLOBAL_STATE", state, patch }).catch(() => {});
       }
     }
   } catch {}
@@ -913,8 +918,9 @@ async function flushBroadcastUIState(): Promise<void> {
   lastBroadcastState = state;
 }
 
-function broadcastUIState(): void {
+function broadcastUIState(toAllTabs = false): void {
   pendingBroadcastState = getCanonicalGlobalState();
+  if (toAllTabs) pendingBroadcastToAllTabs = true;
   if (pendingBroadcastTimer != null) return;
   pendingBroadcastTimer = setTimeout(() => {
     void flushBroadcastUIState();
@@ -960,34 +966,42 @@ function getCanonicalGlobalState(): CanonicalGlobalState {
 }
 
 /**
- * Ensure content script is loaded in the given tab (inject via scripting API if not).
- * Prevents duplicate injection by checking window.__ECHLY_WIDGET_LOADED__ in the tab.
- * Returns true if content script is present (or was just injected), false if injection failed (e.g. restricted URL).
+ * Ensure the bootstrap content script is loaded in the given tab.
+ * Bootstrap is registered statically via manifest content_scripts (runs at document_start on every page),
+ * so this should normally be a no-op. The fallback executeScript handles edge cases where the static
+ * registration didn't fire (extension just installed, race conditions). Bootstrap then lazy-loads
+ * widget.js on demand — background only needs bootstrap to be present.
  */
 async function ensureContentScriptInjected(tabId: number): Promise<boolean> {
+  if (injectedTabs.has(tabId)) return true;
   try {
     const results = await chrome.scripting.executeScript({
       target: { tabId },
-      func: () => (window as Window & { __ECHLY_WIDGET_LOADED__?: boolean }).__ECHLY_WIDGET_LOADED__ === true,
+      func: () => (window as Window & { __ECHLY_BOOTSTRAP_LOADED__?: boolean }).__ECHLY_BOOTSTRAP_LOADED__ === true,
     });
-    if (results?.[0]?.result === true) return true;
+    if (results?.[0]?.result === true) {
+      injectedTabs.add(tabId);
+      return true;
+    }
   } catch (error) {
     console.warn("[ECHLY] Pre-injection probe failed", { tabId, error });
-    // Page may not allow script execution (e.g. chrome://) or script not loaded yet.
+    // Page may not allow script execution (e.g. chrome://) or bootstrap not yet running.
   }
   try {
     await chrome.scripting.executeScript({
       target: { tabId },
-      files: ["content.js"],
+      files: ["bootstrap.js"],
     });
+    injectedTabs.add(tabId);
     return true;
   } catch (e) {
-    console.warn("[ECHLY] Failed to inject content script", e);
+    console.warn("[ECHLY] Failed to inject bootstrap", e);
     return false;
   }
 }
 
 async function openWidgetInActiveTab(): Promise<void> {
+  cachedEchlyActive = true;
   await chrome.storage.local.set({ echlyActive: true });
 
   globalUIState.visible = true;
@@ -1014,11 +1028,7 @@ async function openWidgetInActiveTab(): Promise<void> {
     return;
   }
 
-  chrome.tabs
-    .sendMessage(tabId, {
-      type: "ECHLY_OPEN_WIDGET",
-    })
-    .catch((error) => logMessageDeliveryError("ECHLY_OPEN_WIDGET", error));
+  await sendMessageWithRetry(tabId, { type: "ECHLY_OPEN_WIDGET" });
 }
 
 async function openRecorderUI(tabId?: number): Promise<boolean> {
@@ -1031,6 +1041,7 @@ async function openRecorderUI(tabId?: number): Promise<boolean> {
     trayOpen = false;
     globalUIState.visible = false;
     globalUIState.expanded = false;
+    cachedEchlyActive = false;
     await chrome.storage.local.set({ echlyActive: false });
     broadcastUIState();
     return false;
@@ -1043,8 +1054,8 @@ async function openRecorderUI(tabId?: number): Promise<boolean> {
 
 /** Loom-style: when user switches tabs and Echly is active, inject content script so widget appears on every tab. */
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
-  const { echlyActive } = await chrome.storage.local.get("echlyActive");
-  if (!echlyActive) return;
+  activeOwnerTabId = activeInfo.tabId;
+  if (!cachedEchlyActive) return;
   const sessionIdForRehydrate = activeSessionId ?? globalUIState.sessionId;
   if (sessionIdForRehydrate && shouldForceRehydrate(sessionIdForRehydrate)) {
     globalUIState.sessionLoading = true;
@@ -1054,37 +1065,32 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
   }
   try {
     await ensureContentScriptInjected(activeInfo.tabId);
-    chrome.tabs
-      .sendMessage(activeInfo.tabId, { type: "ECHLY_GLOBAL_STATE", state: getCanonicalGlobalState() })
-      .catch((e) => {
-        if (ECHLY_DEBUG) console.debug("ECHLY tab activation sync failed", e);
-      });
-    chrome.tabs
-      .sendMessage(activeInfo.tabId, { type: "ECHLY_SESSION_STATE_SYNC" })
-      .catch((e) => {
-        if (ECHLY_DEBUG) console.debug("ECHLY session state sync failed for tab", activeInfo.tabId, e);
-      });
+    await sendMessageWithRetry(activeInfo.tabId, {
+      type: "ECHLY_GLOBAL_STATE",
+      state: getCanonicalGlobalState(),
+    });
   } catch (e) {
     if (ECHLY_DEBUG) console.debug("ECHLY onActivated inject/sync failed", e);
   }
-});
-
-chrome.tabs.onActivated.addListener(async ({ tabId }) => {
-  activeOwnerTabId = tabId;
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   if (activeOwnerTabId === tabId) {
     activeOwnerTabId = null;
   }
+  injectedTabs.delete(tabId);
 });
 
 /** Loom-style: only sync global state to the active tab after load completes. */
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  /* Page navigation destroys the content script — clear our injected-cache entry
+     so the next activation re-injects rather than trusting a stale flag. */
+  if (changeInfo.status === "loading") {
+    injectedTabs.delete(tabId);
+  }
   if (changeInfo.status !== "complete") return;
   if (!tab.active) return;
-  const { echlyActive } = await chrome.storage.local.get("echlyActive");
-  if (!echlyActive) return;
+  if (!cachedEchlyActive) return;
   try {
     await ensureContentScriptInjected(tabId);
     const activeSessionForRehydrate = activeSessionId ?? globalUIState.sessionId;
@@ -1092,9 +1098,10 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       globalUIState.sessionLoading = true;
       void rehydrateSession(activeSessionForRehydrate);
     }
-    chrome.tabs
-      .sendMessage(tabId, { type: "ECHLY_GLOBAL_STATE", state: getCanonicalGlobalState() })
-      .catch((error) => logMessageDeliveryError("ECHLY_GLOBAL_STATE", error));
+    await sendMessageWithRetry(tabId, {
+      type: "ECHLY_GLOBAL_STATE",
+      state: getCanonicalGlobalState(),
+    });
   } catch (e) {
     if (ECHLY_DEBUG) console.debug("ECHLY onUpdated inject failed", tabId, e);
   }
@@ -1104,16 +1111,21 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 chrome.tabs.onCreated.addListener((tab) => {
   if (!tab.active) return;
   if (!tab.id) return;
+  const tabId = tab.id;
   const activeSessionForRehydrate = activeSessionId ?? globalUIState.sessionId;
   if (activeSessionForRehydrate && globalUIState.sessionModeActive && globalUIState.pointers.length === 0) {
     globalUIState.sessionLoading = true;
     void rehydrateSession(activeSessionForRehydrate);
   }
-  chrome.tabs
-    .sendMessage(tab.id, { type: "ECHLY_GLOBAL_STATE", state: getCanonicalGlobalState() })
-    .catch((e) => {
-      console.error("[ECHLY] ECHLY_GLOBAL_STATE to new tab failed", tab.id, e);
-    });
+  void (async () => {
+    const injected = await ensureContentScriptInjected(tabId);
+    if (!injected) return;
+    chrome.tabs
+      .sendMessage(tabId, { type: "ECHLY_GLOBAL_STATE", state: getCanonicalGlobalState() })
+      .catch((e) => {
+        console.error("[ECHLY] ECHLY_GLOBAL_STATE to new tab failed", tabId, e);
+      });
+  })();
 });
 
 async function createFeedbackInternal({
@@ -1158,6 +1170,24 @@ async function createFeedbackInternal({
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (ECHLY_DEBUG) echlyLog("MESSAGE", "received", request.type);
 
+  if (request.type === "ECHLY_LOAD_WIDGET") {
+    const tabId = sender.tab?.id;
+    if (!tabId) {
+      sendResponse({ success: false, error: "No tab ID" });
+      return;
+    }
+    chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["widget.js"],
+    }).then(() => {
+      sendResponse({ success: true });
+    }).catch((err) => {
+      console.error("[Echly] Failed to inject widget.js:", err);
+      sendResponse({ success: false, error: err?.message });
+    });
+    return true;
+  }
+
   if (request.type === "ECHLY_EXTENSION_TOKEN") {
     const token = (request as { token?: string; user?: { uid: string; email?: string | null } }).token;
     const user = (request as { token?: string; user?: { uid: string; email?: string | null } }).user;
@@ -1190,25 +1220,31 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "ECHLY_START_SESSION") {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.id) {
-        chrome.tabs
-          .sendMessage(tabs[0].id, { type: "ECHLY_START_SESSION" })
-          .catch((error) => logMessageDeliveryError("ECHLY_START_SESSION", error));
-      }
-    });
+    void (async () => {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tabId = tabs[0]?.id;
+      if (!tabId) return;
+      const injected = await ensureContentScriptInjected(tabId);
+      if (!injected) return;
+      chrome.tabs
+        .sendMessage(tabId, { type: "ECHLY_START_SESSION" })
+        .catch((error) => logMessageDeliveryError("ECHLY_START_SESSION", error));
+    })();
     sendResponse({ ok: true });
     return false;
   }
 
   if (request.type === "ECHLY_OPEN_PREVIOUS_SESSIONS") {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.id) {
-        chrome.tabs
-          .sendMessage(tabs[0].id, { type: "ECHLY_OPEN_PREVIOUS_SESSIONS" })
-          .catch((error) => logMessageDeliveryError("ECHLY_OPEN_PREVIOUS_SESSIONS", error));
-      }
-    });
+    void (async () => {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tabId = tabs[0]?.id;
+      if (!tabId) return;
+      const injected = await ensureContentScriptInjected(tabId);
+      if (!injected) return;
+      chrome.tabs
+        .sendMessage(tabId, { type: "ECHLY_OPEN_PREVIOUS_SESSIONS" })
+        .catch((error) => logMessageDeliveryError("ECHLY_OPEN_PREVIOUS_SESSIONS", error));
+    })();
     sendResponse({ ok: true });
     return false;
   }
@@ -1246,13 +1282,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "ECHLY_EXPAND_WIDGET") {
     globalUIState.expanded = true;
     broadcastUIState();
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.id) {
-        chrome.tabs
-          .sendMessage(tabs[0].id, { type: "ECHLY_WIDGET_EXPAND" })
-          .catch((error) => logMessageDeliveryError("ECHLY_WIDGET_EXPAND", error));
-      }
-    });
+    void (async () => {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tabId = tabs[0]?.id;
+      if (!tabId) return;
+      const injected = await ensureContentScriptInjected(tabId);
+      if (!injected) return;
+      chrome.tabs
+        .sendMessage(tabId, { type: "ECHLY_WIDGET_EXPAND" })
+        .catch((error) => logMessageDeliveryError("ECHLY_WIDGET_EXPAND", error));
+    })();
     sendResponse({ ok: true });
     return false;
   }
@@ -1260,13 +1299,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "ECHLY_COLLAPSE_WIDGET") {
     globalUIState.expanded = false;
     broadcastUIState();
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.id) {
-        chrome.tabs
-          .sendMessage(tabs[0].id, { type: "ECHLY_WIDGET_COLLAPSE" })
-          .catch((error) => logMessageDeliveryError("ECHLY_WIDGET_COLLAPSE", error));
-      }
-    });
+    void (async () => {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tabId = tabs[0]?.id;
+      if (!tabId) return;
+      const injected = await ensureContentScriptInjected(tabId);
+      if (!injected) return;
+      chrome.tabs
+        .sendMessage(tabId, { type: "ECHLY_WIDGET_COLLAPSE" })
+        .catch((error) => logMessageDeliveryError("ECHLY_WIDGET_COLLAPSE", error));
+    })();
     sendResponse({ ok: true });
     return false;
   }
@@ -1297,6 +1339,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     (async () => {
       trayOpen = false;
       globalUIState.visible = false;
+      cachedEchlyActive = false;
 
       await chrome.storage.local.set({
         echlyActive: false,
@@ -1484,13 +1527,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
       try {
         await rehydrateSession(sessionId);
-        const sessionsRes = await apiFetch(`${API_BASE}/api/sessions`);
-        const sessionsPayload: unknown = await sessionsRes.json();
-        if (sessionsRes.ok) {
-          const sessionsList = sessionsArrayFromApiPayload(sessionsPayload);
-          const match = sessionsList.find((s) => s.id === sessionId);
-          globalUIState.sessionTitle = match?.title ?? null;
-        }
       } catch (error) {
         console.error("[ECHLY] set active session rehydrate failed", { sessionId, error });
         globalUIState.pointers = [];
@@ -1545,7 +1581,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     globalUIState.sessionId = activeSessionId;
     globalUIState.expanded = true;
     persistSessionLifecycleState();
-    broadcastUIState();
+    broadcastUIState(true);
     resetSessionIdleTimer();
     chrome.alarms.create("echly-keepalive", { periodInMinutes: 0.4 });
     sendResponse({ ok: true });
@@ -1564,7 +1600,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     globalUIState.sessionPaused = true;
     globalUIState.sessionId = activeSessionId;
     persistSessionLifecycleState();
-    broadcastUIState();
+    broadcastUIState(true);
     resetSessionIdleTimer();
     sendResponse({ ok: true });
     return false;
@@ -1576,7 +1612,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     globalUIState.sessionPaused = false;
     globalUIState.sessionId = activeSessionId;
     persistSessionLifecycleState();
-    broadcastUIState();
+    broadcastUIState(true);
     resetSessionIdleTimer();
     sendResponse({ ok: true });
     return false;
@@ -1599,6 +1635,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     resetPaginationState();
     globalUIState.lastSyncedAt = null;
     globalUIState.lastPaginationAt = null;
+    cachedEchlyActive = false;
     chrome.storage.local.set({
       activeSessionId: null,
       sessionModeActive: false,
@@ -1608,7 +1645,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     trayOpen = false;
     globalUIState.visible = false;
     globalUIState.expanded = false;
-    broadcastUIState();
+    broadcastUIState(true);
     setTimeout(() => {
       chrome.tabs.query({}, (tabs) => {
         tabs.forEach((tab) => {
@@ -1681,23 +1718,35 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       let feedbackUsage: number | null = null;
       let feedbackLimit: number | null = null;
       if (authState.authenticated) {
-        try {
-          const usageRes = await apiFetch(`${API_BASE}/api/billing/usage`, {});
-          if (usageRes.ok) {
-            const usageJson = (await usageRes.json()) as {
-              data?: { feedbackTicketsUsed?: number; feedbackTicketsLimit?: number | null; canCreateFeedback?: boolean };
-            };
-            feedbackUsage = usageJson.data?.feedbackTicketsUsed ?? null;
-            feedbackLimit = usageJson.data?.feedbackTicketsLimit ?? null;
-            if (usageJson.data?.canCreateFeedback === false) {
-              globalUIState.feedbackLimitReached = true;
-              globalUIState.feedbackLimitMessage = "Monthly ticket limit reached";
-              globalUIState.feedbackUpgradePlan = globalUIState.feedbackUpgradePlan ?? "business";
-              broadcastUIState();
+        let usageData = cachedBillingUsage && Date.now() - billingUsageCachedAt < BILLING_USAGE_CACHE_TTL
+          ? cachedBillingUsage
+          : null;
+        if (!usageData) {
+          try {
+            const usageRes = await apiFetch(`${API_BASE}/api/billing/usage`, {});
+            if (usageRes.ok) {
+              const usageJson = (await usageRes.json()) as {
+                data?: { feedbackTicketsUsed?: number; feedbackTicketsLimit?: number | null; canCreateFeedback?: boolean };
+              };
+              usageData = usageJson.data ?? null;
+              if (usageData) {
+                cachedBillingUsage = usageData;
+                billingUsageCachedAt = Date.now();
+              }
             }
+          } catch {
+            // Usage fetch is best-effort; degrade gracefully
           }
-        } catch {
-          // Usage fetch is best-effort; degrade gracefully
+        }
+        if (usageData) {
+          feedbackUsage = usageData.feedbackTicketsUsed ?? null;
+          feedbackLimit = usageData.feedbackTicketsLimit ?? null;
+          if (usageData.canCreateFeedback === false) {
+            globalUIState.feedbackLimitReached = true;
+            globalUIState.feedbackLimitMessage = "Monthly ticket limit reached";
+            globalUIState.feedbackUpgradePlan = globalUIState.feedbackUpgradePlan ?? "business";
+            broadcastUIState();
+          }
         }
       }
       sendResponse({ ...authState, feedbackUsage, feedbackLimit });
@@ -1774,20 +1823,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: true, screenshot: dataUrl });
       } catch (error) {
         sendResponse({ success: false });
-      }
-    })();
-    return true;
-  }
-
-  if (request.type === "ECHLY_OCR_VISIBLE_TEXT") {
-    (async () => {
-      try {
-        const imageDataUrl = (request as { imageDataUrl?: string }).imageDataUrl ?? "";
-        const text = await recognizeVisibleTextFromImage(imageDataUrl);
-        sendResponse({ success: true, text });
-      } catch (error) {
-        console.error("[ECHLY] ECHLY_OCR_VISIBLE_TEXT failed", error);
-        sendResponse({ success: false, text: "" });
       }
     })();
     return true;
@@ -1942,6 +1977,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
 
         await markFeedbackCompleted(feedbackId);
+        cachedBillingUsage = null;
+        billingUsageCachedAt = 0;
         sendResponse({ success: true, data });
       } catch (err) {
         console.error("[ECHLY ERROR] background create failed", err);

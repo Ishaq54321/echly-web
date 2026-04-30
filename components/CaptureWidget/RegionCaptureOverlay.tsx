@@ -214,10 +214,8 @@ export function RegionCaptureOverlay({
       if (ECHLY_DEBUG) console.log("ECHLY CONTAINER RECT", safeRect);
 
       let containerCrop: string;
-      let selectionCrop: string;
       try {
         containerCrop = await cropImageToRegion(fullImage, safeRect, dpr);
-        selectionCrop = await cropImageToRegion(fullImage, clampRect(targetRect), dpr);
       } catch {
         setConfirming(false);
         onCancel();
@@ -230,7 +228,6 @@ export function RegionCaptureOverlay({
           : null;
 
       if (context) {
-        context.ocrImageDataUrl = selectionCrop;
         const xPercent =
           ((targetRect.x + targetRect.w / 2 - safeRect.x) / safeRect.w) * 100;
         const yPercent =

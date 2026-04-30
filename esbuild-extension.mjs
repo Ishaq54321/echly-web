@@ -71,11 +71,34 @@ const define = {
   "process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET": JSON.stringify(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || ""),
 };
 
+// Bootstrap: tiny static content script (registered via manifest content_scripts).
+// Always minified; lazy-loads widget.js on demand. Must stay small (~5KB target).
+await esbuild.build({
+  entryPoints: [path.join(extDir, "src", "bootstrap.ts")],
+  bundle: true,
+  format: "iife",
+  outfile: path.join(extDir, "bootstrap.js"),
+  platform: "browser",
+  target: "chrome110",
+  minify: true,
+  treeShaking: true,
+  sourcemap: false,
+  loader: {
+    ".ts": "ts",
+    ".tsx": "tsx",
+    ".css": "empty",
+  },
+  plugins: [makeAliasPlugin(false)],
+  define,
+  absWorkingDir: root,
+});
+
+// Widget: heavy React UI, lazy-loaded via <script src="widget.js"> by bootstrap.
 await esbuild.build({
   entryPoints: [path.join(extDir, "src", "content.tsx")],
   bundle: true,
   format: "iife",
-  outfile: path.join(extDir, "content.js"),
+  outfile: path.join(extDir, "widget.js"),
   platform: "browser",
   target: "chrome110",
   minify: isProd,

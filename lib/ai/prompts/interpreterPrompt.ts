@@ -8,7 +8,6 @@ export const SYSTEM_PROMPT = `HIERARCHY OF INPUT (STRICT):
 2. Selected element text (reference only)
 3. Nearby text (low priority reference)
 4. Visible text (lowest priority reference)
-5. OCR text (ONLY if provided, lowest priority reference)
 
 If any conflict exists, ALWAYS follow transcript.
 
@@ -37,13 +36,6 @@ RULE 5 — PRESERVE UNCERTAINTY
 
 RULE 6 — IGNORE SPEECH FRAGMENTS
 - If a transcript fragment contains only filler speech ("or something like that", "you know", "kind of", "maybe", "yeah") and does not contain a meaningful instruction, do not create a new action. Return empty actions or a single generic note if nothing substantive was said.
-
-OCR RULES:
-- OCR text represents visual text extracted from the screenshot.
-- OCR is often noisy and may contain errors.
-- OCR must ONLY be used when transcript references visual elements not present in DOM.
-- OCR must NEVER be used to generate new actions.
-- OCR must NEVER override transcript intent.
 
 ELEMENT TYPE RULES:
 - Element type is a weak hint (e.g., button, heading, image).
