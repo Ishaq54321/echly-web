@@ -137,6 +137,7 @@ type GlobalUIState = {
   feedbackLimitReached?: boolean;
   feedbackLimitMessage?: string | null;
   feedbackUpgradePlan?: string | null;
+  feedbackJobs?: Array<{ id: string; status: string; createdAt: number; errorMessage?: string }>;
 };
 
 /** Generate a unique id for a feedback job (used for concurrent job queue). */
@@ -301,6 +302,7 @@ const BOOTSTRAP_GLOBAL_UI: GlobalUIState = {
   openCount: 0,
   resolvedCount: 0,
   captureMode: "voice",
+  feedbackJobs: [],
 };
 
 type ContentAppProps = {
@@ -432,6 +434,25 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     }, 5000);
     return () => clearTimeout(timeoutId);
   }, [isProcessingFeedback]);
+
+  const globalFeedbackJobs = globalState?.feedbackJobs ?? null;
+  const mergedFeedbackJobs = React.useMemo<FeedbackJob[]>(() => {
+    const merged = new Map<string, FeedbackJob>();
+    for (const g of globalFeedbackJobs ?? []) {
+      merged.set(g.id, {
+        id: g.id,
+        status: g.status === "failed" ? "failed" : "processing",
+        transcript: "",
+        screenshot: null,
+        createdAt: g.createdAt,
+        errorMessage: g.errorMessage,
+      });
+    }
+    for (const j of feedbackJobs) {
+      merged.set(j.id, j);
+    }
+    return Array.from(merged.values()).sort((a, b) => b.createdAt - a.createdAt);
+  }, [globalFeedbackJobs, feedbackJobs]);
 
   const getAssetUrl = React.useCallback((path: string) => {
     if (typeof chrome !== "undefined" && chrome.runtime?.getURL) {
@@ -664,6 +685,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       context,
       callbacks,
       sessionMode: _sessionMode,
+      feedbackId: providedFeedbackId,
     }: {
       transcript: string;
       screenshot: string | null;
@@ -673,6 +695,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         onError: () => void;
       };
       sessionMode?: boolean;
+      feedbackId?: string;
     }): Promise<StructuredFeedback> => {
       if (!effectiveSessionId || !user) {
         throw new Error("Missing session or user");
@@ -768,7 +791,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           throw new Error("No extension token available");
         }
 
-        const feedbackId = generateFeedbackId();
+        const feedbackId = providedFeedbackId ?? generateFeedbackId();
         if (inFlightFeedbackIds.has(feedbackId)) {
           throw new Error(`Duplicate feedback prevented (in-flight): ${feedbackId}`);
         }
@@ -900,7 +923,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       } | null,
       options?: { sessionMode?: boolean }
     ): Promise<StructuredFeedback> => {
-      const jobId = callbacks ? createUniqueId() : null;
+      const feedbackId = generateFeedbackId();
+      const jobId = callbacks ? feedbackId : null;
       if (jobId) {
         const job: FeedbackJob = {
           id: jobId,
@@ -910,6 +934,9 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           createdAt: Date.now(),
         };
         setFeedbackJobs((prev) => [job, ...prev]);
+        chrome.runtime
+          .sendMessage({ type: "ECHLY_FEEDBACK_JOB_STARTED", id: jobId, createdAt: job.createdAt })
+          .catch((err) => logSendMessageRejection("ECHLY_FEEDBACK_JOB_STARTED", err));
       }
 
       startLocalOp();
@@ -921,6 +948,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           context: (context as CaptureContext | null | undefined) ?? null,
           callbacks,
           sessionMode: options?.sessionMode,
+          feedbackId,
         });
         if (jobId) setFeedbackJobs((prev) => prev.filter((j) => j.id !== jobId));
         callbacks?.onSuccess?.(ticket);
@@ -942,11 +970,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 : err.message
               : "AI processing failed.";
           setFeedbackJobs((prev) =>
-            prev.map((j) => (j.id === jobId ? { ...j, status: "failed" as const, errorMessage: failMsg, screenshot: null } : j))
+            prev.map((j) => (j.id === jobId ? { ...j, status: "failed" as const, errorMessage: failMsg } : j))
           );
-          setTimeout(() => {
-            setFeedbackJobs((prev) => prev.filter((j) => j.id !== jobId || j.status !== "failed"));
-          }, 60_000);
         }
         callbacks?.onError?.();
         throw err;
@@ -1375,7 +1400,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           sessionTitleProp={displaySessionTitle}
           onSessionTitleChange={onSessionTitleChange}
           isProcessingFeedback={isProcessingFeedback}
-          feedbackJobs={feedbackJobs}
+          feedbackJobs={mergedFeedbackJobs}
           onSessionEnd={() => {}}
           onCreateSession={createSession}
           onActiveSessionChange={onActiveSessionChange}
@@ -1557,6 +1582,7 @@ function normalizeGlobalState(state: GlobalUIState | undefined): GlobalUIState |
     feedbackLimitReached: state.feedbackLimitReached === true,
     feedbackLimitMessage: typeof state.feedbackLimitMessage === "string" ? state.feedbackLimitMessage : null,
     feedbackUpgradePlan: typeof state.feedbackUpgradePlan === "string" ? state.feedbackUpgradePlan : null,
+    feedbackJobs: Array.isArray(state.feedbackJobs) ? state.feedbackJobs : [],
   };
 }
 

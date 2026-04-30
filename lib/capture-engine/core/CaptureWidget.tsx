@@ -947,11 +947,27 @@ export default function CaptureWidget({
                         </div>
                       )}
 
-                      {/* Processing skeleton card */}
-                      {!showSessionLoading && (
-                        feedbackJobs?.some((j) => j.status === "processing") ||
-                        (!feedbackJobs?.length && isProcessingFeedback)
-                      ) && (
+                      {/* Per-job processing skeleton cards */}
+                      {!showSessionLoading && feedbackJobs?.filter((j) => j.status === "processing").map((job) => (
+                        <div key={job.id} className="ticket processing" aria-live="polite">
+                          <span className="ticket-thumb" aria-hidden />
+                          <div className="ticket-main">
+                            <div className="skel-line w-70" aria-hidden />
+                            <div className="skel-line w-45" aria-hidden />
+                          </div>
+                          <span className="ticket-process-status">
+                            Processing
+                            <span className="dots">
+                              <span />
+                              <span />
+                              <span />
+                            </span>
+                          </span>
+                        </div>
+                      ))}
+
+                      {/* Legacy fallback — single skeleton when no jobs array exists */}
+                      {!showSessionLoading && !feedbackJobs?.length && isProcessingFeedback && (
                         <div className="ticket processing" aria-live="polite">
                           <span className="ticket-thumb" aria-hidden />
                           <div className="ticket-main">

@@ -42,6 +42,7 @@ type GlobalUIState = {
   feedbackLimitReached?: boolean;
   feedbackLimitMessage?: string | null;
   feedbackUpgradePlan?: string | null;
+  feedbackJobs?: Array<{ id: string; status: string; createdAt: number; errorMessage?: string }>;
 };
 
 type RuntimeMessage = {
@@ -148,6 +149,7 @@ if (window.__ECHLY_BOOTSTRAP_LOADED__) {
       feedbackLimitReached: state.feedbackLimitReached === true,
       feedbackLimitMessage: typeof state.feedbackLimitMessage === "string" ? state.feedbackLimitMessage : null,
       feedbackUpgradePlan: typeof state.feedbackUpgradePlan === "string" ? state.feedbackUpgradePlan : null,
+      feedbackJobs: Array.isArray(state.feedbackJobs) ? state.feedbackJobs : [],
     };
   }
 
@@ -252,6 +254,8 @@ if (window.__ECHLY_BOOTSTRAP_LOADED__) {
           console.error("[ECHLY] apply state (msg) failed", e);
         }
         window.dispatchEvent(new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state: normalized } }));
+      } else if (getShouldShowTray(normalized) && !widgetLoading) {
+        loadWidget().catch(() => { /* logged in onerror */ });
       }
       return false;
     }

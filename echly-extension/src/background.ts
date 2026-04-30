@@ -218,6 +218,7 @@ type CanonicalGlobalState = {
   feedbackLimitReached: boolean;
   feedbackLimitMessage: string | null;
   feedbackUpgradePlan: string | null;
+  feedbackJobs: Array<{ id: string; status: string; createdAt: number; errorMessage?: string }>;
 };
 
 const globalUIState: {
@@ -244,6 +245,7 @@ const globalUIState: {
   feedbackLimitReached: boolean;
   feedbackLimitMessage: string | null;
   feedbackUpgradePlan: string | null;
+  feedbackJobs: Array<{ id: string; status: string; createdAt: number; errorMessage?: string }>;
 } = {
   visible: false,
   expanded: false,
@@ -268,6 +270,7 @@ const globalUIState: {
   feedbackLimitReached: false,
   feedbackLimitMessage: null,
   feedbackUpgradePlan: null,
+  feedbackJobs: [],
 };
 
 function mapFeedbackToPointers(feedback: FeedbackApiItem[]): StructuredFeedback[] {
@@ -599,6 +602,7 @@ function endSessionFromIdle(): void {
   resetPaginationState();
   globalUIState.lastSyncedAt = null;
   globalUIState.lastPaginationAt = null;
+  globalUIState.feedbackJobs = [];
   cachedEchlyActive = false;
   chrome.storage.local.set({
     activeSessionId: null,
@@ -962,6 +966,7 @@ function getCanonicalGlobalState(): CanonicalGlobalState {
     feedbackLimitReached: globalUIState.feedbackLimitReached,
     feedbackLimitMessage: globalUIState.feedbackLimitMessage,
     feedbackUpgradePlan: globalUIState.feedbackUpgradePlan,
+    feedbackJobs: [...globalUIState.feedbackJobs],
   };
 }
 
@@ -1635,6 +1640,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     resetPaginationState();
     globalUIState.lastSyncedAt = null;
     globalUIState.lastPaginationAt = null;
+    globalUIState.feedbackJobs = [];
     cachedEchlyActive = false;
     chrome.storage.local.set({
       activeSessionId: null,
@@ -1872,6 +1878,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.type === "ECHLY_FEEDBACK_JOB_STARTED") {
+    const { id, createdAt } = request as { id?: string; createdAt?: number };
+    if (typeof id === "string" && id.length > 0) {
+      if (!globalUIState.feedbackJobs.some((j) => j.id === id)) {
+        globalUIState.feedbackJobs = [...globalUIState.feedbackJobs, {
+          id,
+          status: "processing",
+          createdAt: typeof createdAt === "number" ? createdAt : Date.now(),
+        }];
+        broadcastUIState(true);
+      }
+    }
+    sendResponse({ success: true });
+    return false;
+  }
+
   if (request.type === "ECHLY_CREATE_FEEDBACK") {
     (async () => {
       if (ECHLY_STRICT_MODE && request.type !== "ECHLY_CREATE_FEEDBACK") {
@@ -1966,7 +1988,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             globalUIState.feedbackLimitReached = true;
             globalUIState.feedbackLimitMessage = data?.error?.message || data?.message || "Monthly feedback ticket limit reached";
             globalUIState.feedbackUpgradePlan = upgradePlan || "business";
-            broadcastUIState();
+            globalUIState.feedbackJobs = globalUIState.feedbackJobs.filter((j) => j.id !== feedbackId);
+            broadcastUIState(true);
+          } else {
+            const failMsg = data?.error?.message || data?.message || "Failed to create feedback";
+            globalUIState.feedbackJobs = globalUIState.feedbackJobs.map((j) =>
+              j.id === feedbackId ? { ...j, status: "failed", errorMessage: failMsg } : j
+            );
+            broadcastUIState(true);
+            setTimeout(() => {
+              globalUIState.feedbackJobs = globalUIState.feedbackJobs.filter((j) => j.id !== feedbackId);
+              broadcastUIState(true);
+            }, 60_000);
           }
           sendResponse({
             success: false,
@@ -1979,9 +2012,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         await markFeedbackCompleted(feedbackId);
         cachedBillingUsage = null;
         billingUsageCachedAt = 0;
+        globalUIState.feedbackJobs = globalUIState.feedbackJobs.filter((j) => j.id !== feedbackId);
+        broadcastUIState(true);
         sendResponse({ success: true, data });
       } catch (err) {
         console.error("[ECHLY ERROR] background create failed", err);
+        globalUIState.feedbackJobs = globalUIState.feedbackJobs.map((j) =>
+          j.id === feedbackId ? { ...j, status: "failed", errorMessage: "Failed to create feedback" } : j
+        );
+        broadcastUIState(true);
+        setTimeout(() => {
+          globalUIState.feedbackJobs = globalUIState.feedbackJobs.filter((j) => j.id !== feedbackId);
+          broadcastUIState(true);
+        }, 60_000);
         sendResponse({ success: false });
       } finally {
         processingFeedbackIds.delete(feedbackId);
