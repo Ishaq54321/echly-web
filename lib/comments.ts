@@ -68,6 +68,10 @@ function commentFromApiRow(row: unknown): Comment | null {
       r.reactions && typeof r.reactions === "object"
         ? (r.reactions as Comment["reactions"])
         : undefined,
+    mentionedUserIds:
+      Array.isArray(r.mentionedUserIds)
+        ? (r.mentionedUserIds as string[]).filter((id) => typeof id === "string")
+        : undefined,
   };
 }
 
@@ -195,6 +199,7 @@ export interface AddCommentOptions {
   threadId?: string | null;
   attachment?: CommentAttachment;
   attachments?: CommentAttachment[];
+  mentionedUserIds?: string[];
 }
 
 export type OptimisticComment = Comment & {

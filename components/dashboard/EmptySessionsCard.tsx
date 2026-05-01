@@ -55,7 +55,7 @@ export default function EmptySessionsCard() {
         {/* Right column — product preview */}
         <div className="flex-1 min-w-0 flex items-center justify-center">
           <Image
-            src="/illustrations/Welcome_card.png"
+            src="/illustrations/Welcome_Card.png"
             alt="Echly product preview"
             width={408}
             height={306}

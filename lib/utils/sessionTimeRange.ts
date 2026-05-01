@@ -6,14 +6,12 @@ export type SessionsTimeRange =
   | "this_week"
   | "this_month"
   | "this_year"
-  | "last_year"
   | "all_time";
 
 export const FILTER_LABELS: Record<SessionsTimeRange, string> = {
   this_week: "This week",
   this_month: "This month",
   this_year: "This year",
-  last_year: "Last year",
   all_time: "All time",
 };
 
@@ -21,7 +19,6 @@ export const FILTER_OPTIONS_ORDER: readonly SessionsTimeRange[] = [
   "this_week",
   "this_month",
   "this_year",
-  "last_year",
   "all_time",
 ];
 
@@ -63,14 +60,6 @@ export function getStartOfYear(date: Date): Date {
   return new Date(date.getFullYear(), 0, 1);
 }
 
-export function getStartOfLastYear(date: Date): Date {
-  return new Date(date.getFullYear() - 1, 0, 1);
-}
-
-export function getEndOfLastYear(date: Date): Date {
-  return new Date(date.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
-}
-
 export function sessionPassesTimeRange(
   session: Session,
   range: SessionsTimeRange,
@@ -90,11 +79,6 @@ export function sessionPassesTimeRange(
       return itemDate >= getStartOfMonth(now);
     case "this_year":
       return itemDate >= getStartOfYear(now);
-    case "last_year":
-      return (
-        itemDate >= getStartOfLastYear(now) &&
-        itemDate <= getEndOfLastYear(now)
-      );
     default:
       return true;
   }

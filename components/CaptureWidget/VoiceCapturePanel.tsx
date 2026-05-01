@@ -2,13 +2,9 @@
 
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { RotateCcw } from "lucide-react";
+import ChatGPTWaveform from "@/components/ChatGPTWaveform";
 import type { VoiceCaptureError } from "@/lib/capture-engine/core/types";
-
-const BAR_WIDTH = 2;
-/** Min interval between buffer samples (ms) — pairs with bar transition; avoids excessive re-renders */
-const WAVEFORM_SAMPLE_MS = 50;
-/** Linear RMS → 0–255 before normalize (tune if levels feel off) */
-const RMS_TO_BYTE = 3;
 
 /** Strip OS/browser noise from enumerateDevices labels; never show raw system strings in UI. */
 function formatMicLabel(label: string): string {
@@ -74,6 +70,8 @@ export type VoiceCapturePanelProps = {
   voiceError?: VoiceCaptureError;
   /** Retry after failure (restarts recording / MediaRecorder) */
   onRetryVoice?: () => void;
+  /** Reset mid-recording: discard current audio buffer and restart fresh on the same mic. */
+  onResetVoice?: () => void;
   /** User picked a microphone from the failure UI */
   onSelectMicrophone?: (deviceId: string) => void;
   /** Currently selected input device (for picker highlight) */
@@ -99,6 +97,7 @@ export function VoiceCapturePanel({
   captureRoot = null,
   voiceError = null,
   onRetryVoice,
+  onResetVoice,
   onSelectMicrophone,
   voiceMicDeviceId = "",
   elementSelector,
@@ -120,39 +119,6 @@ export function VoiceCapturePanel({
   const micTriggerRef = useRef<HTMLButtonElement>(null);
   const micClosingRef = useRef(false);
   const micCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const [bars, setBars] = useState<number[]>([]);
-  const [barCount, setBarCount] = useState(48);
-  const waveformRef = useRef<HTMLDivElement>(null);
-  const barCountRef = useRef(48);
-  const waveformRafRef = useRef<number>(0);
-  const lastWaveformSampleRef = useRef(0);
-
-  /** Recording elapsed time (seconds) */
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  useEffect(() => {
-    barCountRef.current = barCount;
-  }, [barCount]);
-
-  useLayoutEffect(() => {
-    const el = waveformRef.current;
-    if (!el) return;
-
-    const updateBarCount = () => {
-      const w = el.clientWidth;
-      if (w <= 0) return;
-      const n = Math.max(1, Math.floor(w / BAR_WIDTH));
-      setBarCount((prev) => (prev === n ? prev : n));
-    };
-
-    updateBarCount();
-    const ro = new ResizeObserver(() => {
-      updateBarCount();
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [isListening, isFinishing]);
 
   const clearMicCloseTimer = useCallback(() => {
     if (micCloseTimerRef.current != null) {
@@ -198,18 +164,6 @@ export function VoiceCapturePanel({
       cancelled = true;
     };
   }, []);
-
-  /** Recording timer — increments every second while listening. */
-  useEffect(() => {
-    if (!isListening || isFinishing) {
-      setElapsedSeconds(0);
-      return;
-    }
-    const id = setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
-    return () => clearInterval(id);
-  }, [isListening, isFinishing]);
-
-  const timeDisplay = `${String(Math.floor(elapsedSeconds / 60)).padStart(2, "0")}:${String(elapsedSeconds % 60).padStart(2, "0")}`;
 
   /** Current mic label derived from devices list + selected deviceId. */
   const currentMicLabel = useMemo(() => {
@@ -320,62 +274,6 @@ export function VoiceCapturePanel({
   }, [micPickerOpen, clearMicCloseTimer]);
 
   useEffect(() => () => clearMicCloseTimer(), [clearMicCloseTimer]);
-
-  /** Keep buffer length === barCount (newest at index 0; oldest at end — paired with row-reverse so new appears on the right). */
-  useEffect(() => {
-    setBars((prev) => {
-      const cap = barCount;
-      if (cap <= 0) return [];
-      if (prev.length === cap) return prev;
-      if (prev.length < cap) {
-        return [...prev, ...Array(cap - prev.length).fill(0)];
-      }
-      return prev.slice(0, cap);
-    });
-  }, [barCount]);
-
-  useEffect(() => {
-    if (!analyser || !isListening || isFinishing) {
-      setBars([]);
-      lastWaveformSampleRef.current = 0;
-      return;
-    }
-
-    const bufferLen = analyser.fftSize;
-    const dataArray = new Uint8Array(bufferLen);
-
-    const tick = (t: number) => {
-      waveformRafRef.current = requestAnimationFrame(tick);
-      if (t - lastWaveformSampleRef.current < WAVEFORM_SAMPLE_MS) return;
-      lastWaveformSampleRef.current = t;
-
-      analyser.getByteTimeDomainData(dataArray);
-      let sum = 0;
-      for (let i = 0; i < bufferLen; i++) {
-        const v = (dataArray[i]! - 128) / 128;
-        sum += v * v;
-      }
-      const rms = Math.sqrt(sum / bufferLen);
-      const value = Math.min(255, Math.max(0, rms * 255 * RMS_TO_BYTE));
-      const normalized = value / 255;
-      const finalAmplitude = Math.min(normalized * 1.25, 1);
-
-      const cap = barCountRef.current;
-      if (cap < 1) return;
-
-      setBars((prev) => {
-        const next = [finalAmplitude, ...prev];
-        while (next.length > cap) next.pop();
-        while (next.length < cap) next.push(0);
-        return next;
-      });
-    };
-
-    waveformRafRef.current = requestAnimationFrame(tick);
-    return () => {
-      cancelAnimationFrame(waveformRafRef.current);
-    };
-  }, [analyser, isListening, isFinishing]);
 
   const openMicPicker = useCallback(async () => {
     clearMicCloseTimer();
@@ -554,72 +452,95 @@ export function VoiceCapturePanel({
     </div>
   );
 
+  const recordingActive = isListening && !isFinishing;
+
   const normalCard = (
     <div className="echly-v2 echly-v2-overlay-anchor" data-echly-ui="true">
-      <div className="center-card" data-echly-ui="true">
-        <div className="ovl-top-bar">
-          <button type="button" className="ovl-top-pill" onClick={() => void openMicPicker()} ref={micTriggerRef} aria-expanded={micPickerOpen} aria-haspopup="listbox">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="6" y="2" width="4" height="8" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-            <span className="ovl-top-pill-label">{currentMicLabel}</span>
-            <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          </button>
-          {onSwitchToText && (
-            <button type="button" className="ovl-top-pill ovl-top-pill--switch" onClick={onSwitchToText}>
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2.5 12.5l1-3 7-7 2 2-7 7-3 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M9.5 4l2 2" stroke="currentColor" strokeWidth="1.5"/></svg>
-              <span className="ovl-top-pill-label">Switch to Text mode</span>
-            </button>
-          )}
-        </div>
+      <div className="vc-card" data-echly-ui="true">
         {screenshot && (
-          <div className="ovl-shot">
+          <div className="vc-screenshot">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={screenshot} alt="Capture" />
-            {shotBadge}
+            <div className="vc-top-controls">
+              <button
+                type="button"
+                className="vc-glass-pill"
+                onClick={() => void openMicPicker()}
+                ref={micTriggerRef}
+                aria-expanded={micPickerOpen}
+                aria-haspopup="listbox"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                </svg>
+                <span className="pill-label">{currentMicLabel}</span>
+                <svg className="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              {onSwitchToText && (
+                <button type="button" className="vc-glass-pill" onClick={onSwitchToText}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                  </svg>
+                  <span>Text mode</span>
+                </button>
+              )}
+            </div>
+            {elementSelector && (
+              <span className="vc-selector">
+                {elementSelector}
+                {elementWidth && elementHeight ? ` · ${elementWidth} × ${elementHeight}` : ""}
+              </span>
+            )}
           </div>
         )}
 
-        <div className="ovl-status-row">
-          <span
-            className={`rec-dot${!isListening || isFinishing ? " rec-dot--idle" : ""}`}
-            aria-hidden
-          />
-          <span className="ovl-status-text">
-            {isFinishing ? "Wrapping up…" : "Capturing feedback…"}
-          </span>
-          <span className="ovl-time">{timeDisplay}</span>
-        </div>
-
-        <div className="ovl-wave" aria-hidden>
-          <div ref={waveformRef} className="echly-waveform">
-            {bars.map((value, i) => {
-              const n = bars.length;
-              const fade = n <= 1 ? 1 : 0.4 + 0.6 * (1 - i / (n - 1));
-              return (
-                <div
-                  key={i}
-                  className="echly-bar"
-                  style={{
-                    height: `${value * 100}%`,
-                    opacity: fade,
-                  }}
-                />
-              );
-            })}
+        <div className="vc-body">
+          <div className="vc-helper">
+            <div className="vc-helper-main">
+              {isFinishing ? "Wrapping up…" : "Speak naturally about what you'd change"}
+            </div>
+            <div className="vc-helper-sub">
+              We&apos;ll break it down into clear, actionable steps.
+            </div>
           </div>
-        </div>
 
-        <div className="ovl-actions">
-          <button type="button" className="rec-cancel" aria-label="Cancel" onClick={onCancel}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="finish-btn"
-            onClick={onFinish}
-            disabled={isFinishing}
-          >
-            {isFinishing ? "Finishing..." : "Finish"}
-          </button>
+          <div className="vc-visualizer">
+            <div className={`vc-rec-orb${recordingActive ? "" : " vc-rec-orb--idle"}`} aria-hidden>
+              <div className="vc-rec-dot-inner" />
+            </div>
+
+            <div className="vc-wave-track" aria-hidden>
+              <ChatGPTWaveform analyser={analyser ?? null} />
+            </div>
+
+            <button
+              type="button"
+              className="vc-reset-btn"
+              aria-label="Reset recording"
+              onClick={() => onResetVoice?.()}
+              disabled={!onResetVoice || isFinishing}
+            >
+              <RotateCcw size={16} strokeWidth={1.75} />
+              <span className="echly-tooltip">Reset</span>
+            </button>
+          </div>
+
+          <div className="vc-actions">
+            <button type="button" className="vc-cancel-btn" onClick={onCancel}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="vc-done-btn"
+              onClick={onFinish}
+              disabled={isFinishing}
+            >
+              {isFinishing ? "Finishing…" : "Done"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

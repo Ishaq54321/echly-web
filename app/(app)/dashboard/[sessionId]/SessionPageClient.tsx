@@ -1,9 +1,7 @@
 "use client";
 
 import { authFetch, type AuthFetchInit } from "@/lib/authFetch";
-import Image from "next/image";
-import Link from "next/link";
-import { PanelLeftClose, Home, MessageSquare, Activity, Settings, Share2 } from "lucide-react";
+import GlobalRail from "@/components/layout/GlobalRail";
 import { clearShareToken, getActiveShareToken, setShareToken } from "@/lib/client/shareToken";
 import {
   useEffect,
@@ -51,6 +49,7 @@ import {
   CommentPanel,
 } from "@/components/layout/operating-system";
 import { TopControlBar } from "@/components/ui/TopControlBar";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { useToast } from "@/components/dashboard/context/ToastContext";
 import { ImageViewer } from "@/components/ImageViewer";
 import { ResolveToast, type ResolveToastState } from "@/components/ui/ResolveToast";
@@ -174,23 +173,6 @@ type SessionLoadedInfo = {
   createdAt: string | null;
 };
 
-function NavOverlayItem({ href, label, onClick, active, children }: { href: string; label: string; onClick: () => void; active: boolean; children: React.ReactNode }) {
-  return (
-    <Link
-      href={href}
-      onClick={onClick}
-      className={`flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-sm)] text-[14px] font-medium transition-colors mb-0.5 ${
-        active
-          ? "bg-[var(--surface-hover)] text-[var(--text-heading)]"
-          : "text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)]"
-      }`}
-    >
-      <span className="text-[var(--text-secondary)] shrink-0">{children}</span>
-      {label}
-    </Link>
-  );
-}
-
 export default function SessionPageClient({
   sessionId,
   isPublicRoute = false,
@@ -206,6 +188,7 @@ export default function SessionPageClient({
   const searchParams = useSearchParams();
   const ticketIdFromUrl = searchParams.get("ticket");
   const editFromUrl = searchParams.get("edit") === "true";
+  const commentIdFromUrl = searchParams.get("comment");
 
   const [session, setSession] = useState<Session | null>(null);
   /** General-access gate (restricted mode + anonymous): server returned access with canView false. */
@@ -412,6 +395,7 @@ export default function SessionPageClient({
     setSearchLoading(false);
     setAccessBlocked(false);
     setBundledFirstFeedbackPage(null);
+    setIsWorkspaceMember(false);
   }, [sessionId]);
 
   useEffect(() => {
@@ -826,6 +810,24 @@ export default function SessionPageClient({
       return;
     }
 
+    // Cache short-circuit BEFORE identity gate. Cached data was already fetched
+    // with valid credentials on a prior visit, so it's safe to render while
+    // identity re-resolves (e.g. token refresh during rapid back/forward nav).
+    // Mutations remain gated on isIdentityResolved independently.
+    if (USE_BUNDLE) {
+      const cached = getSessionDetailCache(sessionId.trim());
+      if (cached) {
+        setSession(cached.session);
+        setSessionAccess(cached.sessionAccess);
+        setIsWorkspaceMember(cached.isWorkspaceMember);
+        setPendingResolveRequest(cached.pendingResolveRequest);
+        setBundledFirstFeedbackPage(cached.bundledFirstFeedbackPage);
+        setSessionFetchError(null);
+        setAccessBlocked(false);
+        return;
+      }
+    }
+
     const effectNonce = ++sessionLoadEffectNonceRef.current;
     let cancelled = false;
     void (async () => {
@@ -846,21 +848,14 @@ export default function SessionPageClient({
       const qs = tok !== "" ? `?token=${encodeURIComponent(tok)}` : "";
 
       if (USE_BUNDLE) {
-        // PERF R-006: check in-memory cache before issuing a network request —
-        // avoids 2 Firestore reads on every back-navigation to the same session.
-        const cached = getSessionDetailCache(sessionId.trim());
-        if (cached) {
-          setSession(cached.session);
-          setSessionAccess(cached.sessionAccess);
-          setPendingResolveRequest(cached.pendingResolveRequest);
-          setBundledFirstFeedbackPage(cached.bundledFirstFeedbackPage);
-          setSessionFetchError(null);
-          setAccessBlocked(false);
-          return;
-        }
-
+        // PERF R-006: cache short-circuit happens synchronously above, before
+        // the identity gate. By the time we get here, no cached entry exists.
         const bundleSp = new URLSearchParams({ sessionId: sessionId.trim() });
         if (tok !== "") bundleSp.set("token", tok);
+        if (!authUidRef.current?.trim()) {
+          const anonId = getViewerId(null);
+          if (anonId) bundleSp.set("viewerId", anonId);
+        }
         const bundleUrl = `/api/session-page-bundle?${bundleSp.toString()}`;
         const res = await authFetchOrAnonCookie(bundleUrl);
         if (cancelled || effectNonce !== sessionLoadEffectNonceRef.current) return;
@@ -1010,7 +1005,9 @@ export default function SessionPageClient({
             }
           : null;
         setSessionAccess(assembledAccess);
-        setIsWorkspaceMember(accessRoot.access?.isWorkspaceMember === true || bundleIsWorkspaceMember);
+        const assembledIsWorkspaceMember =
+          accessRoot.access?.isWorkspaceMember === true || bundleIsWorkspaceMember;
+        setIsWorkspaceMember(assembledIsWorkspaceMember);
         const assembledPendingResolve =
           requestPayload !== undefined && requestPayload.pendingResolve === true;
         setPendingResolveRequest(assembledPendingResolve);
@@ -1026,6 +1023,7 @@ export default function SessionPageClient({
           sessionAccess: assembledAccess,
           pendingResolveRequest: assembledPendingResolve,
           bundledFirstFeedbackPage: assembledFeedbackPage,
+          isWorkspaceMember: assembledIsWorkspaceMember,
         });
 
         // Phase 5: pending request count is included in the bundle response
@@ -1141,12 +1139,14 @@ export default function SessionPageClient({
           });
         } else {
           const viewUrl = `/api/sessions/${encodeURIComponent(sessionId)}/view`;
+          const anonId = getViewerId(null);
           void authFetchOrAnonCookie(viewUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               shareToken:
                 shareTokenForApiRef.current !== "" ? shareTokenForApiRef.current : undefined,
+              viewerId: anonId || undefined,
             }),
           }).catch(() => {});
         }
@@ -1160,6 +1160,7 @@ export default function SessionPageClient({
   // Deep link: when ?ticket= is present, select that ticket and open detail panel.
   const hasAppliedTicketParam = useRef(false);
   const hasAppliedEditParam = useRef(false);
+  const hasAppliedCommentParam = useRef(false);
   const deepLinkHydrateAttempted = useRef<string | null>(null);
   const deepLinkSidebarExpansionDone = useRef<string | null>(null);
 
@@ -1167,8 +1168,9 @@ export default function SessionPageClient({
     deepLinkHydrateAttempted.current = null;
     hasAppliedTicketParam.current = false;
     hasAppliedEditParam.current = false;
+    hasAppliedCommentParam.current = false;
     deepLinkSidebarExpansionDone.current = null;
-  }, [sessionId, ticketIdFromUrl]);
+  }, [sessionId, ticketIdFromUrl, commentIdFromUrl]);
 
   useEffect(() => {
     if (!authReady) return;
@@ -1463,6 +1465,23 @@ export default function SessionPageClient({
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   /** Pin whose inline thread popover is open (does not open right panel). */
   const [activePinIdForPopover, setActivePinIdForPopover] = useState<string | null>(null);
+
+  // Deep link: when ?comment= is present, open the comment panel and focus that thread once the
+  // target ticket is selected. Same pattern as the ?ticket= deep link above.
+  useEffect(() => {
+    if (!commentIdFromUrl) return;
+    if (hasAppliedCommentParam.current) return;
+    if (!effectiveSelectedId) return;
+    if (ticketIdFromUrl && effectiveSelectedId !== ticketIdFromUrl) return;
+    hasAppliedCommentParam.current = true;
+    setIsCommentPanelOpen(true);
+    setActiveThreadId(commentIdFromUrl);
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("comment")) {
+      url.searchParams.delete("comment");
+      window.history.replaceState({}, "", url.pathname + url.search);
+    }
+  }, [commentIdFromUrl, effectiveSelectedId, ticketIdFromUrl]);
 
   const triggerPinAnimation = useCallback((commentId: string) => {
     setAnimatingPinId(commentId);
@@ -2268,6 +2287,56 @@ export default function SessionPageClient({
 
   const renderExecutionContent = () => {
     if (stableScopedFeedback.length === 0) {
+      if (feedbackLoading && !bootstrapFirstTicket) {
+        return (
+          <div className="exec-skeleton" aria-busy="true" aria-label="Loading ticket">
+            {/* Eyebrow row: position pill + status pill */}
+            <div className="exec-skel-eyebrow">
+              <div className="exec-skel-status-pos skel-block" />
+              <div className="exec-skel-status-pill skel-block" />
+            </div>
+            {/* Title */}
+            <div className="exec-skel-title skel-block" />
+            {/* Action buttons row */}
+            <div className="exec-skel-actions">
+              <div className="exec-skel-btn exec-skel-btn-1 skel-block" />
+              <div className="exec-skel-btn exec-skel-btn-2 skel-block" />
+              <div className="exec-skel-btn exec-skel-btn-3 skel-block" />
+              <div className="exec-skel-btn exec-skel-btn-4 skel-block" />
+              <div className="exec-skel-delete skel-block" />
+            </div>
+            {/* Screenshot */}
+            <div className="exec-skel-screenshot" />
+            {/* Action steps */}
+            <div className="exec-skel-steps-section">
+              <div className="exec-skel-steps-label skel-block" />
+              <div className="exec-skel-step-row">
+                <div className="exec-skel-step-num skel-block" />
+                <div className="exec-skel-step-text exec-skel-step-text-1 skel-block" />
+              </div>
+              <div className="exec-skel-step-row">
+                <div className="exec-skel-step-num skel-block" />
+                <div className="exec-skel-step-text exec-skel-step-text-2 skel-block" />
+              </div>
+              <div className="exec-skel-step-row">
+                <div className="exec-skel-step-num skel-block" />
+                <div className="exec-skel-step-text exec-skel-step-text-3 skel-block" />
+              </div>
+              <div className="exec-skel-step-add skel-block" />
+            </div>
+            {/* Tags */}
+            <div className="exec-skel-tags-section">
+              <div className="exec-skel-tags-label skel-block" />
+              <div className="exec-skel-tags-row">
+                <div className="exec-skel-tag exec-skel-tag-1 skel-block" />
+                <div className="exec-skel-tag exec-skel-tag-2 skel-block" />
+                <div className="exec-skel-tag exec-skel-tag-3 skel-block" />
+                <div className="exec-skel-tag exec-skel-tag-4 skel-block" />
+              </div>
+            </div>
+          </div>
+        );
+      }
       if (feedbackLoading) {
         return (
           <ExecutionView
@@ -2320,6 +2389,7 @@ export default function SessionPageClient({
         }}
         impactScore={(selectedItem as { impactScore?: number } | null)?.impactScore}
         comments={comments}
+        participants={participants}
         sendPinComment={sendPinComment}
         sendReply={sendReply}
         activePinIdForPopover={activePinIdForPopover}
@@ -2408,19 +2478,6 @@ export default function SessionPageClient({
         errorText="Failed to save"
       />
       <div className="flex flex-col h-full min-h-0 overflow-hidden relative bg-[var(--surface-subtle)]">
-        {!isIdentityResolved && !isAnonymousViewer && (
-          <div
-            aria-hidden
-            style={{
-              position: "absolute",
-              inset: 0,
-              zIndex: 9999,
-              pointerEvents: "all",
-              cursor: "default",
-              background: "transparent",
-            }}
-          />
-        )}
         {!isPublicRoute && (
           <TopControlBar
             sessionId={sessionId}
@@ -2493,10 +2550,12 @@ export default function SessionPageClient({
             isSearchMode={isSearchMode}
             searchResults={searchResults}
             searchLoading={searchLoading}
-            sessionTitle={session?.title || "Untitled"}
+            sessionTitle={session?.title}
+            sessionLoaded={session !== null}
             workspaceName={workspaceName || "Workspace"}
             updatedAt={session?.updatedAt}
             viewCount={session?.viewCount ?? 0}
+            recentViewers={session?.recentViewers}
             canRenameTitle={isWorkspaceMember}
             onRenameTitle={handleSidebarRenameTitle}
           />
@@ -2615,7 +2674,10 @@ export default function SessionPageClient({
               isSearchMode={isSearchMode}
               searchResults={searchResults}
               searchLoading={searchLoading}
-              sessionTitle={session?.title || "Untitled"}
+              sessionTitle={session?.title}
+              sessionLoaded={session !== null}
+              viewCount={session?.viewCount ?? 0}
+              recentViewers={session?.recentViewers}
               canRenameTitle={isWorkspaceMember}
               onRenameTitle={handleSidebarRenameTitle}
               />
@@ -2652,61 +2714,12 @@ export default function SessionPageClient({
       {/* Navigation Overlay Panel */}
       {navPanelOpen && (
         <>
-          {/* Backdrop */}
           <div
-            className="fixed inset-0 z-[60] bg-black/15 backdrop-blur-[1px] transition-opacity"
+            className="fixed inset-0 z-[60] bg-black/15 backdrop-blur-[1px]"
             onClick={() => setNavPanelOpen(false)}
           />
-
-          {/* Panel */}
-          <div className="fixed top-0 left-0 bottom-0 z-[61] w-[260px] bg-[var(--surface-card)] shadow-[var(--shadow-xl)] flex flex-col animate-in slide-in-from-left duration-200">
-
-            {/* Header: Logo + Echly + Close */}
-            <div className="flex items-center justify-between px-4 py-4">
-              <Link href="/dashboard" className="flex items-center gap-2.5" onClick={() => setNavPanelOpen(false)}>
-                <div className="relative w-8 h-8 bg-[var(--brand)] rounded-[var(--radius-sm)] flex items-center justify-center overflow-hidden shrink-0">
-                  <Image src="/Echly_logo.svg" alt="" fill sizes="32px" className="object-cover" />
-                </div>
-                <span className="text-[16px] font-bold text-[var(--text-heading)] tracking-[-0.01em]">Echly</span>
-              </Link>
-              <button
-                type="button"
-                onClick={() => setNavPanelOpen(false)}
-                className="inline-flex h-[38px] w-[38px] items-center justify-center rounded-[var(--radius-btn)] text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors cursor-pointer"
-                title="Close navigation"
-              >
-                <PanelLeftClose size={18} strokeWidth={1.5} />
-              </button>
-            </div>
-
-            {/* Navigation */}
-            <nav className="flex-1 overflow-y-auto px-3 py-1">
-              <NavOverlayItem href="/dashboard" label="Dashboard" onClick={() => setNavPanelOpen(false)} active={false}>
-                <Home size={18} strokeWidth={1.5} />
-              </NavOverlayItem>
-              <NavOverlayItem href="/discussion" label="Discussion" onClick={() => setNavPanelOpen(false)} active={false}>
-                <MessageSquare size={18} strokeWidth={1.5} />
-              </NavOverlayItem>
-              <NavOverlayItem href="/activity" label="Activity" onClick={() => setNavPanelOpen(false)} active={false}>
-                <Activity size={18} strokeWidth={1.5} />
-              </NavOverlayItem>
-              <NavOverlayItem href="/shared" label="Shared" onClick={() => setNavPanelOpen(false)} active={false}>
-                <Share2 size={18} strokeWidth={1.5} />
-              </NavOverlayItem>
-              <NavOverlayItem href="/settings" label="Settings" onClick={() => setNavPanelOpen(false)} active={false}>
-                <Settings size={18} strokeWidth={1.5} />
-              </NavOverlayItem>
-            </nav>
-
-            {/* Workspace info at bottom */}
-            <div className="px-4 py-3">
-              <div className="flex items-center gap-2.5 px-2 py-2 rounded-[var(--radius-sm)] text-[13px] text-[var(--text-secondary)]">
-                <div className="w-6 h-6 rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] flex items-center justify-center text-[11px] font-semibold text-[var(--text-body)] overflow-hidden shrink-0">
-                  {workspaceName?.charAt(0)?.toUpperCase() || "W"}
-                </div>
-                <span className="truncate font-medium">{workspaceName || "Workspace"}</span>
-              </div>
-            </div>
+          <div className="fixed top-0 left-0 bottom-0 z-[61] w-[270px] bg-[var(--surface)] animate-in slide-in-from-left duration-200">
+            <GlobalRail forceExpanded />
           </div>
         </>
       )}

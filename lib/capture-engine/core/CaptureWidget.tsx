@@ -13,6 +13,7 @@ import { SessionLimitUpgradeView } from "./SessionLimitUpgradeView";
 import ModeSelectionView from "./ModeSelectionView";
 import PreviousFeedbackView from "./PreviousFeedbackView";
 import { KeepRecordingPill } from "@/components/CaptureWidget/KeepRecordingPill";
+import { PencilLine, Check, Link as LinkIcon, Loader2, X, Mic, Pen, Sun, Moon } from "lucide-react";
 import type { CaptureWidgetProps, CaptureState } from "./types";
 import { ECHLY_DEBUG } from "@/lib/utils/logger";
 
@@ -58,6 +59,7 @@ export default function CaptureWidget({
   onSessionModePause,
   onSessionModeResume,
   onSessionModeEnd,
+  onSessionModeEndSoft,
   onSessionActivity,
   captureMode = "voice",
   onCaptureModeChange,
@@ -107,6 +109,22 @@ export default function CaptureWidget({
   const [keepRecordingVisible, setKeepRecordingVisible] = useState(false);
   const [keepRecordingFading, setKeepRecordingFading] = useState(false);
   const keepRecordingShownRef = useRef(false);
+  const upgradeInlineRef = useRef<HTMLDivElement>(null);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [localEditTitle, setLocalEditTitle] = useState("");
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const [copyState, setCopyState] = useState<"idle" | "copying" | "copied">("idle");
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isPrevFeedbackLoading, setIsPrevFeedbackLoading] = useState(false);
+
+  const triggerUpgradeShake = useCallback(() => {
+    const el = upgradeInlineRef.current;
+    if (!el) return;
+    el.classList.remove("shake");
+    void el.offsetWidth;
+    el.classList.add("shake");
+    setTimeout(() => el.classList.remove("shake"), 500);
+  }, []);
 
   const {
     state,
@@ -155,6 +173,8 @@ export default function CaptureWidget({
     captureRootParent,
     environment,
     assertIdentityBeforeWorkspaceMutations,
+    feedbackLimitReached,
+    triggerUpgradeShake,
   });
 
   /** Session limit: prop (from parent e.g. extension) takes precedence; otherwise use hook state (set when startSession returns limitReached). */
@@ -390,6 +410,69 @@ export default function CaptureWidget({
 
   const handleClose = () => (onCollapseRequest ? onCollapseRequest() : handlers.setIsOpen(false));
 
+  const handleCopySessionLink = useCallback(async () => {
+    if (copyState === "copying") return;
+    if (!sessionId) return;
+    setCopyState("copying");
+
+    const envBase = (typeof process !== "undefined" ? process.env.ECHLY_WEB_APP_URL : "") || "";
+    const fallbackOrigin = extensionMode
+      ? ""
+      : (typeof window !== "undefined" ? window.location.origin : "");
+    const appOrigin = envBase || fallbackOrigin || "http://localhost:3000";
+
+    const finalize = async (url: string) => {
+      await navigator.clipboard.writeText(url);
+      setCopyState("copied");
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = setTimeout(() => {
+        setCopyState("idle");
+      }, 2000);
+    };
+
+    try {
+      let url: string | null = null;
+
+      if (environment?.authenticatedFetch) {
+        const res = await environment.authenticatedFetch(
+          `/api/sessions/${encodeURIComponent(sessionId)}/share-link`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ access: "view" }),
+          }
+        );
+        const data = res?.ok ? await res.json().catch(() => null) : null;
+        url =
+          (data?.data as { url?: string } | undefined)?.url ??
+          (data as { url?: string } | null)?.url ??
+          null;
+        const token = (data?.data as { token?: string } | undefined)?.token;
+        if (!url && token) {
+          url = `${appOrigin}/session/${encodeURIComponent(sessionId)}?token=${encodeURIComponent(token)}`;
+        }
+      }
+
+      if (!url) {
+        url = `${appOrigin}/session/${sessionId}`;
+      }
+
+      await finalize(url);
+    } catch {
+      try {
+        await finalize(`${appOrigin}/session/${sessionId}`);
+      } catch {
+        setCopyState("idle");
+      }
+    }
+  }, [copyState, sessionId, environment, extensionMode]);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
+
   const handleEditTicket = useCallback((id: string) => {
     setEditingTicketId(id);
     handlers.setExpandedId(id);
@@ -400,19 +483,44 @@ export default function CaptureWidget({
     handlers.setExpandedId(null);
   }, [handlers]);
 
-  const handleSessionEnd = () => {
-    const saving = Boolean(__extensionSavingState);
-    if (
-      saving &&
-      typeof window !== "undefined" &&
-      !window.confirm("Changes are still saving. Are you sure you want to end the session?")
-    ) {
-      return;
+  const handleTitleSave = useCallback(() => {
+    const trimmed = localEditTitle.trim() || "Untitled Session";
+    setIsEditingTitle(false);
+    if (trimmed !== displayTitle) {
+      onSessionTitleChangeProp?.(trimmed);
     }
+  }, [localEditTitle, displayTitle, onSessionTitleChangeProp]);
+
+  const handleTitleCancel = useCallback(() => {
+    setIsEditingTitle(false);
+    setLocalEditTitle(displayTitle || "");
+  }, [displayTitle]);
+
+  const handleTitleClick = useCallback(() => {
+    if (displayTitle === "Untitled Session") return;
+    setLocalEditTitle(displayTitle || "");
+    setIsEditingTitle(true);
+  }, [displayTitle]);
+
+  useEffect(() => {
+    if (isEditingTitle && titleInputRef.current) {
+      titleInputRef.current.focus();
+      titleInputRef.current.select();
+    }
+  }, [isEditingTitle]);
+
+  const handleSessionEnd = () => {
     handlers.endSession(() => {
       setShowCommandScreen(true);
       onSessionEndCallback?.();
     });
+  };
+
+  const handleSessionEndSoft = () => {
+    handlers.endSession(() => {
+      setShowCommandScreen(true);
+      onSessionModeEndSoft?.();
+    }, { soft: true });
   };
 
   return (
@@ -460,6 +568,7 @@ export default function CaptureWidget({
           audioAnalyser={state.audioAnalyser ?? null}
           voiceError={state.voiceError}
           onRetryVoice={handlers.retryVoiceCapture}
+          onResetVoice={handlers.resetVoiceRecording}
           onSelectMicrophone={handlers.selectVoiceMicrophone}
           voiceMicDeviceId={state.voiceMicDeviceId}
           onSessionElementClicked={handlers.handleSessionElementClicked}
@@ -570,16 +679,16 @@ export default function CaptureWidget({
                           </svg>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        className="upgrade-full-close"
-                        onClick={() => setShowUpgradeScreen(false)}
-                        title="Close"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                          <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                        </svg>
-                      </button>
+                      <div className="tl-icon-group">
+                        <button
+                          type="button"
+                          className="pill-icon-btn"
+                          onClick={() => setShowUpgradeScreen(false)}
+                        >
+                          <X size={13} strokeWidth={2.25} />
+                          <span className="echly-tooltip">Close</span>
+                        </button>
+                      </div>
                     </div>
                     <div className="upgrade-full-body">
                       <div className="upgrade-icon-wrap">
@@ -648,6 +757,7 @@ export default function CaptureWidget({
                       captureMode={captureMode}
                       onModeChange={setMode}
                       onBegin={() => {
+                        if (isStartingSession) return;
                         handlers.startSession();
                         setShowModeSelection(false);
                       }}
@@ -655,6 +765,7 @@ export default function CaptureWidget({
                       onClose={handleClose}
                       theme={theme}
                       onThemeToggle={onThemeToggle}
+                      isStarting={isStartingSession}
                     />
                   ) : (
                     /* V2 Home Screen */
@@ -698,54 +809,43 @@ export default function CaptureWidget({
                             </>
                           )}
                         </div>
-                        <button
-                          type="button"
-                          className="pill-icon-btn"
-                          onClick={onThemeToggle}
-                          aria-label="Toggle theme"
-                          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-                        >
-                          {theme === "dark" ? (
-                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                              <circle cx="8" cy="8" r="1.6" stroke="currentColor" strokeWidth="1.4" />
-                              <path d="M8 1.7v1.4M8 12.9v1.4M14.3 8h-1.4M3.1 8H1.7M12.5 3.5l-1 1M4.5 11.5l-1 1M12.5 12.5l-1-1M4.5 4.5l-1-1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                            </svg>
-                          ) : (
-                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                              <path d="M13.5 10.5A6 6 0 0 1 5.5 2.5a6 6 0 1 0 8 8z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          className="pill-icon-btn"
-                          onClick={() => setMode(captureMode === "voice" ? "text" : "voice")}
-                          aria-label="Toggle mode"
-                          title={captureMode === "voice" ? "Switch to text mode" : "Switch to speak mode"}
-                        >
-                          {captureMode === "voice" ? (
-                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                              <rect x="6" y="2" width="4" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
-                              <path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                            </svg>
-                          ) : (
-                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                              <path d="M2.5 12.5l1-3 7-7 2 2-7 7-3 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-                              <path d="M9.5 4l2 2" stroke="currentColor" strokeWidth="1.5" />
-                            </svg>
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          className="pill-icon-btn"
-                          onClick={handleClose}
-                          aria-label="Close"
-                          title="Minimize"
-                        >
-                          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                            <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                          </svg>
-                        </button>
+                        <div className="tl-icon-group">
+                          <button
+                            type="button"
+                            className="pill-icon-btn"
+                            onClick={onThemeToggle}
+                            aria-label="Toggle theme"
+                          >
+                            {theme === "dark" ? (
+                              <Sun size={13} strokeWidth={2.25} />
+                            ) : (
+                              <Moon size={13} strokeWidth={2.25} />
+                            )}
+                            <span className="echly-tooltip">{theme === "dark" ? "Light mode" : "Dark mode"}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="pill-icon-btn"
+                            onClick={() => setMode(captureMode === "voice" ? "text" : "voice")}
+                            aria-label="Toggle mode"
+                          >
+                            {captureMode === "voice" ? (
+                              <Mic size={13} strokeWidth={2.25} />
+                            ) : (
+                              <Pen size={13} strokeWidth={2.25} />
+                            )}
+                            <span className="echly-tooltip">{captureMode === "voice" ? "Text mode" : "Voice mode"}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="pill-icon-btn"
+                            onClick={handleClose}
+                            aria-label="Close"
+                          >
+                            <X size={13} strokeWidth={2.25} />
+                            <span className="echly-tooltip">Minimize</span>
+                          </button>
+                        </div>
                       </div>
 
                       <div className="pill-rule" />
@@ -785,36 +885,52 @@ export default function CaptureWidget({
                             type="button"
                             className="ghost-btn"
                             onClick={async () => {
-                              if (!(await checkAuthBeforeAction())) return;
-                              const limitHit = feedbackLimitReached != null ||
-                                (feedbackUsage != null && feedbackLimit != null && feedbackUsage >= feedbackLimit);
-                              if (limitHit) { setShowUpgradeScreen(true); return; }
-                              setShowPreviousFeedback(true);
+                              if (isPrevFeedbackLoading) return;
+                              setIsPrevFeedbackLoading(true);
+                              try {
+                                if (!(await checkAuthBeforeAction())) return;
+                                const limitHit = feedbackLimitReached != null ||
+                                  (feedbackUsage != null && feedbackLimit != null && feedbackUsage >= feedbackLimit);
+                                if (limitHit) { setShowUpgradeScreen(true); return; }
+                                setShowPreviousFeedback(true);
+                              } finally {
+                                setIsPrevFeedbackLoading(false);
+                              }
                             }}
+                            disabled={isPrevFeedbackLoading}
                           >
-                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                              <path d="M3 4.5h10M3 8h10M3 11.5h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                            </svg>
-                            Previous Feedback
+                            {isPrevFeedbackLoading ? (
+                              <>
+                                <Loader2 size={14} strokeWidth={2} className="animate-spin" />
+                                Loading...
+                              </>
+                            ) : (
+                              <>
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                                  <path d="M3 4.5h10M3 8h10M3 11.5h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                                </svg>
+                                Previous Feedback
+                              </>
+                            )}
                           </button>
                           <div className="mode-seg-mini" role="tablist" aria-label="Feedback mode">
                             <button
                               type="button"
                               className={captureMode === "voice" ? "active" : ""}
                               aria-label="Voice mode"
-                              title={captureMode === "voice" ? "Speak mode active" : "Switch to speak mode"}
                               onClick={() => setMode("voice")}
                             >
                               <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="6" y="2" width="4" height="8" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                              <span className="echly-tooltip">Voice mode</span>
                             </button>
                             <button
                               type="button"
                               className={captureMode === "text" ? "active" : ""}
                               aria-label="Write mode"
-                              title={captureMode === "text" ? "Text mode active" : "Switch to text mode"}
                               onClick={() => setMode("text")}
                             >
                               <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2.5 12.5l1-3 7-7 2 2-7 7-3 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M9.5 4l2 2" stroke="currentColor" strokeWidth="1.5"/></svg>
+                              <span className="echly-tooltip">Text mode</span>
                             </button>
                           </div>
                         </div>
@@ -848,61 +964,95 @@ export default function CaptureWidget({
                   <div className="pill pill-tickets">
 
                     {/* ── Session header ── */}
-                    <div className="tl-head">
+                    <div className={`tl-head ${isEditingTitle ? "tl-head--editing" : ""}`}>
                       <span className="pill-mark">E</span>
                       {!showSessionLoading && (
                         <>
-                          <div className="tl-title-block">
+                          <div className={`tl-title-block ${isEditingTitle ? "tl-editing" : ""}`}>
                             <div className="tl-eyebrow">
                               <span className="live-dot" aria-hidden />
                               {globalSessionPaused ? "Paused" : "Active session"}
                             </div>
                             {displayTitle === "Untitled Session" ? (
                               <span className="tl-title-skeleton" />
+                            ) : isEditingTitle ? (
+                              <div className="tl-title-edit-row">
+                                <input
+                                  ref={titleInputRef}
+                                  className="tl-title-input"
+                                  value={localEditTitle}
+                                  onChange={(e) => setLocalEditTitle(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") { e.preventDefault(); handleTitleSave(); }
+                                    if (e.key === "Escape") { e.preventDefault(); handleTitleCancel(); }
+                                  }}
+                                  onBlur={handleTitleSave}
+                                />
+                                <button
+                                  type="button"
+                                  className="tl-save-btn"
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={handleTitleSave}
+                                >
+                                  <Check size={14} strokeWidth={2} />
+                                  <span className="echly-tooltip">Save</span>
+                                </button>
+                              </div>
                             ) : (
-                              <div className="tl-title">{displayTitle}</div>
+                              <div className="tl-title-hover-row" onClick={handleTitleClick}>
+                                <PencilLine size={14} strokeWidth={1.5} className="tl-edit-icon" />
+                                <div className="tl-title">{displayTitle}</div>
+                              </div>
                             )}
                           </div>
-                          {sessionHeaderCount > 0 && (
-                            <span className="tl-count">
-                              {sessionHeaderCount} {sessionHeaderCount === 1 ? "ticket" : "tickets"}
-                            </span>
-                          )}
                         </>
                       )}
-                      {!showSessionLoading && (
+                      {showSessionLoading && <span style={{ flex: 1 }} />}
+                      <div className="tl-icon-group">
+                        {!showSessionLoading && (
+                          <button
+                            type="button"
+                            className="pill-icon-btn tl-share-btn"
+                            onClick={handleCopySessionLink}
+                            aria-label={copyState === "copied" ? "Link copied" : "Copy session link"}
+                          >
+                            {copyState === "copying" ? (
+                              <Loader2 size={13} strokeWidth={2.25} className="tl-share-spinner" />
+                            ) : copyState === "copied" ? (
+                              <Check size={13} strokeWidth={2.25} />
+                            ) : (
+                              <LinkIcon size={13} strokeWidth={2.25} />
+                            )}
+                            <span className={`echly-tooltip ${copyState === "copied" ? "tl-share-tooltip--visible" : ""}`}>
+                              {copyState === "copied" ? "Link copied!" : "Copy link"}
+                            </span>
+                          </button>
+                        )}
+                        {!showSessionLoading && (
+                          <button
+                            type="button"
+                            className="pill-icon-btn"
+                            onClick={() => setMode(captureMode === "voice" ? "text" : "voice")}
+                            aria-label="Toggle mode"
+                          >
+                            {captureMode === "voice" ? (
+                              <Mic size={13} strokeWidth={2.25} />
+                            ) : (
+                              <Pen size={13} strokeWidth={2.25} />
+                            )}
+                            <span className="echly-tooltip">{captureMode === "voice" ? "Text mode" : "Voice mode"}</span>
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="pill-icon-btn"
-                          onClick={() => setMode(captureMode === "voice" ? "text" : "voice")}
-                          aria-label="Toggle mode"
-                          title={captureMode === "voice" ? "Switch to text mode" : "Switch to speak mode"}
+                          onClick={handleClose}
+                          aria-label="Close"
                         >
-                          {captureMode === "voice" ? (
-                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                              <rect x="6" y="2" width="4" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
-                              <path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                            </svg>
-                          ) : (
-                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                              <path d="M2.5 12.5l1-3 7-7 2 2-7 7-3 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-                              <path d="M9.5 4l2 2" stroke="currentColor" strokeWidth="1.5" />
-                            </svg>
-                          )}
+                          <X size={13} strokeWidth={2.25} />
+                          <span className="echly-tooltip">Minimize</span>
                         </button>
-                      )}
-                      {showSessionLoading && <span style={{ flex: 1 }} />}
-                      <button
-                        type="button"
-                        className="pill-icon-btn"
-                        onClick={handleClose}
-                        aria-label="Close"
-                        title="Minimize"
-                      >
-                        <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                          <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                        </svg>
-                      </button>
+                      </div>
                     </div>
 
                     <div className="pill-rule" />
@@ -987,7 +1137,7 @@ export default function CaptureWidget({
 
                       {/* Inline ticket-limit upgrade card (Screen 2) */}
                       {!showSessionLoading && feedbackLimitReached && (
-                        <div className="upgrade-inline" role="alert">
+                        <div ref={upgradeInlineRef} className="upgrade-inline" role="alert">
                           <div className="upgrade-inline-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                               <path d="M2 20h20"/>
@@ -1059,7 +1209,7 @@ export default function CaptureWidget({
                         <span className="ai-dot" aria-hidden />
                         AI · {showSessionLoading ? "preparing" : hasTickets ? "auto-structured" : "ready"}
                       </span>
-                      <button type="button" className="tl-foot-home" onClick={handleSessionEnd}>← Back to home</button>
+                      <button type="button" className="tl-foot-home" onClick={handleSessionEndSoft}>Exit session</button>
                     </div>
 
                   </div>

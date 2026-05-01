@@ -2,13 +2,15 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Pencil, Trash2, Check, Smile } from "lucide-react";
+import { Pencil, Trash2, CircleCheck, SmilePlus } from "lucide-react";
 import EmojiPicker from "emoji-picker-react";
 import type { Comment } from "@/lib/domain/comment";
 import { formatCommentDate } from "@/lib/utils/formatCommentDate";
 import { CommentAttachmentCard } from "@/components/discussion/CommentAttachmentCard";
 import { ImageViewer } from "@/components/ImageViewer";
 import { Modal } from "@/components/ui/Modal";
+import { Tooltip } from "@/components/ui/Tooltip";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import { toggleReaction } from "@/lib/comments";
 
 export interface CommentItemProps {
@@ -33,7 +35,7 @@ export interface CommentItemProps {
 
 function renderMessageWithMentions(message: string) {
   if (!message) return null;
-  const parts = message.split(/(@\S+(?:\s\S+)?)/g);
+  const parts = message.split(/(@\S+)/g);
   return parts.map((part, i) => {
     if (part.startsWith("@") && part.length > 1) {
       return (
@@ -149,36 +151,38 @@ export function CommentItem({
 
   return (
     <div className={`flex gap-2.5 group/item relative ${className} ${(comment.resolved || isThreadResolved) ? "opacity-60" : ""}`}>
-      <div
-        className={`${avatarSize} shrink-0 rounded-full bg-[var(--surface-subtle)] flex items-center justify-center text-xs font-medium text-discussion-supporting overflow-hidden`}
-      >
-        {comment.userAvatar?.trim() ? (
-          <img
-            src={comment.userAvatar}
-            alt=""
-            className="w-full h-full object-cover"
-            loading="lazy"
-          />
-        ) : (
-          comment.userName?.charAt(0) ?? "?"
-        )}
-      </div>
+      <UserAvatar
+        photoURL={comment.userAvatar}
+        name={comment.userName}
+        className={`${avatarSize} text-xs`}
+      />
 
       <div className="flex-1 min-w-0">
         {!editing && (
-          <div className="flex items-center flex-wrap gap-2">
-            <span
-              className={`font-semibold text-discussion-title text-[14px]`}
-            >
-              {comment.userName ?? "User"}
-            </span>
-            <span className={`text-meta ${metaSize}`}>
-              {formatCommentDate(comment.createdAt)}
-            </span>
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center gap-2 min-w-0 group-hover/item:hidden">
+              <span
+                className={`font-semibold text-discussion-title text-[14px] truncate`}
+              >
+                {comment.userName ?? "User"}
+              </span>
+              <span className={`text-meta ${metaSize} whitespace-nowrap flex-shrink-0`}>
+                {formatCommentDate(comment.createdAt)}
+              </span>
+            </div>
+            {!comment.threadId && ticketTitle && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onNavigateToTicket?.(); }}
+                className="hidden group-hover/item:flex items-center min-w-0 flex-1 text-[14px] font-semibold text-[var(--brand)] truncate text-left cursor-pointer"
+              >
+                <span className="truncate">{ticketTitle}</span>
+              </button>
+            )}
             {showActionBar && (
-              <div className="flex items-center gap-1 ml-auto opacity-0 group-hover/item:opacity-100 transition-opacity">
+              <div className="flex items-center gap-1 ml-auto opacity-0 group-hover/item:opacity-100 transition-opacity flex-shrink-0">
                 {onReactionsChanged && (
-                  <div className="relative">
+                  <Tooltip content="React">
                     <button
                       ref={reactionButtonRef}
                       type="button"
@@ -189,61 +193,50 @@ export function CommentItem({
                         }
                         setReactionPickerOpen(v => !v);
                       }}
-                      className="p-1.5 rounded-[var(--radius-btn)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
-                      title="React"
+                      className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors cursor-pointer border-0 bg-transparent"
                     >
-                      <Smile className="h-4 w-4" strokeWidth={1.5} />
+                      <SmilePlus className="h-4 w-4" strokeWidth={1.5} />
                     </button>
-                  </div>
+                  </Tooltip>
                 )}
 
                 {onResolveToggle && (
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); onResolveToggle(); }}
-                    className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
-                    title={comment.resolved ? "Mark as unresolved" : "Mark as resolved"}
-                  >
-                    <Check className="h-4 w-4" strokeWidth={1.5} />
-                  </button>
+                  <Tooltip content={comment.resolved ? "Mark as unresolved" : "Mark as resolved"}>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onResolveToggle(); }}
+                      className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors cursor-pointer border-0 bg-transparent"
+                    >
+                      <CircleCheck className="h-4 w-4" strokeWidth={1.5} />
+                    </button>
+                  </Tooltip>
                 )}
 
                 {canEditDelete && onUpdate && (
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setEditing(true); }}
-                    className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
-                    title="Edit"
-                  >
-                    <Pencil className="h-4 w-4" strokeWidth={1.5} />
-                  </button>
+                  <Tooltip content="Edit">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+                      className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors cursor-pointer border-0 bg-transparent"
+                    >
+                      <Pencil className="h-4 w-4" strokeWidth={1.5} />
+                    </button>
+                  </Tooltip>
                 )}
 
                 {canEditDelete && onDelete && (
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setDeleteModalOpen(true); }}
-                    className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
-                    title="Delete"
-                  >
-                    <Trash2 className="h-4 w-4" strokeWidth={1.5} />
-                  </button>
+                  <Tooltip content="Delete">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setDeleteModalOpen(true); }}
+                      className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors cursor-pointer border-0 bg-transparent"
+                    >
+                      <Trash2 className="h-4 w-4" strokeWidth={1.5} />
+                    </button>
+                  </Tooltip>
                 )}
               </div>
             )}
-          </div>
-        )}
-
-        {!comment.threadId && ticketTitle && !editing && (
-          <div className="max-h-0 overflow-hidden group-hover:max-h-[24px] transition-all duration-200 ease-out">
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onNavigateToTicket?.(); }}
-              className="text-[12px] font-medium text-[var(--brand)] hover:bg-[var(--surface-hover)] pl-0 pr-1.5 py-0.5 rounded-md transition-colors cursor-pointer truncate max-w-[180px]"
-              title={ticketTitle}
-            >
-              {ticketTitle}
-            </button>
           </div>
         )}
 
@@ -317,22 +310,22 @@ export function CommentItem({
                 {Object.entries(comment.reactions).map(([emoji, data]) => {
                   const isMine = currentUserId ? data.userIds.includes(currentUserId) : false;
                   return (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => void handleToggleReaction(emoji)}
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] border transition-colors cursor-pointer ${
-                        isMine
-                          ? "bg-[var(--brand-subtle)] border-[var(--brand-muted)] text-[var(--brand)]"
-                          : "bg-[var(--surface-subtle)] border-[var(--border)] text-[var(--text-body)] hover:bg-[var(--surface-hover)]"
-                      }`}
-                      title={data.userNames.join("\n")}
-                    >
-                      <span className="text-[14px]">{emoji}</span>
-                      {data.userIds.length > 1 && (
-                        <span className="tabular-nums font-medium">{data.userIds.length}</span>
-                      )}
-                    </button>
+                    <Tooltip key={emoji} content={data.userNames.join(", ")}>
+                      <button
+                        type="button"
+                        onClick={() => void handleToggleReaction(emoji)}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] border transition-colors cursor-pointer ${
+                          isMine
+                            ? "bg-[var(--brand-subtle)] border-[var(--brand-muted)] text-[var(--brand)]"
+                            : "bg-[var(--surface-subtle)] border-[var(--border)] text-[var(--text-body)] hover:bg-[var(--surface-hover)]"
+                        }`}
+                      >
+                        <span className="text-[14px]">{emoji}</span>
+                        {data.userIds.length > 1 && (
+                          <span className="tabular-nums font-medium">{data.userIds.length}</span>
+                        )}
+                      </button>
+                    </Tooltip>
                   );
                 })}
               </div>
@@ -366,20 +359,11 @@ export function CommentItem({
             </p>
             <div className="mt-4 p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)]/80">
               <div className="flex gap-3">
-                <div
-                  className={`${avatarSize} shrink-0 rounded-full bg-[var(--surface-subtle)] flex items-center justify-center text-xs font-medium text-discussion-supporting overflow-hidden`}
-                >
-                  {comment.userAvatar?.trim() ? (
-                    <img
-                      src={comment.userAvatar}
-                      alt=""
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
-                  ) : (
-                    comment.userName?.charAt(0) ?? "?"
-                  )}
-                </div>
+                <UserAvatar
+                  photoURL={comment.userAvatar}
+                  name={comment.userName}
+                  className={`${avatarSize} text-xs`}
+                />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium text-[var(--text-heading)]">

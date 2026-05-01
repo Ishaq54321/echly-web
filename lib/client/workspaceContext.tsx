@@ -27,6 +27,15 @@ import {
 } from "@/lib/client/workspaceBootstrap";
 import type { Workspace } from "@/lib/domain/workspace";
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
 export type WorkspaceMembership = {
   workspaceId: string;
   name: string;
@@ -89,6 +98,8 @@ export type WorkspaceContextValue = {
   hintWorkspaceLogoUrl: string | null;
   /** Total member count for the active workspace. */
   memberCount: number;
+  /** Manually re-run identity sync after a failure. Resets retry count and clears error. */
+  retryIdentitySync: () => void;
 };
 
 /** Throws if identity is not ready; use before destructive or workspace-scoped API calls. */
@@ -113,6 +124,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const syncLockUidRef = useRef<string | null>(null);
   const workspaceIdRef = useRef<string | null>(null);
   const membershipsLastFetchedRef = useRef<number | null>(null);
+  const retryCountRef = useRef(0);
+  const authUidRef = useRef<string | null>(null);
+  const mountedRef = useRef(true);
 
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
@@ -141,18 +155,162 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
+    authUidRef.current = authUid;
+  }, [authUid]);
 
-    const commitWorkspaceId = (next: string | null) => {
-      if (workspaceIdRef.current === next) return;
-      workspaceIdRef.current = next;
-      setWorkspaceId(next);
-      if (next) {
-        setWorkspaceHint({ workspaceId: next, workspaceName: null, workspaceLogoUrl: null });
-      } else {
-        clearWorkspaceHint();
+  const commitWorkspaceId = useCallback((next: string | null) => {
+    if (workspaceIdRef.current === next) return;
+    workspaceIdRef.current = next;
+    setWorkspaceId(next);
+    if (next) {
+      setWorkspaceHint({ workspaceId: next, workspaceName: null, workspaceLogoUrl: null });
+    } else {
+      clearWorkspaceHint();
+    }
+  }, []);
+
+  const runIdentitySync = useCallback(async (uid: string, forceRetry = false) => {
+    if (syncLockUidRef.current === uid && !forceRetry) return;
+    syncLockUidRef.current = uid;
+    authSyncGenerationRef.current += 1;
+    const currentGen = authSyncGenerationRef.current;
+
+    if (!mountedRef.current) return;
+    setWorkspaceError(null);
+    setWorkspaceLoading(true);
+    setClaimsReady(false);
+
+    const hint = getWorkspaceHint();
+    if (hint) {
+      commitWorkspaceId(hint.workspaceId);
+      setHintWorkspaceName(hint.workspaceName);
+      setHintWorkspaceLogoUrl(hint.workspaceLogoUrl);
+    }
+
+    try {
+      if (!mountedRef.current) return;
+      if (currentGen !== authSyncGenerationRef.current) return;
+
+      let res: Response | null = null;
+      try {
+        res = await withTimeout(
+          authFetch("/api/users", { method: "POST" }),
+          8000,
+          "POST /api/users"
+        );
+      } catch (err) {
+        console.warn("[WorkspaceContext] Claim sync failed/timed out:", err);
       }
-    };
+
+      if (!mountedRef.current) return;
+      if (currentGen !== authSyncGenerationRef.current) return;
+
+      if (res != null && res.ok) {
+        try {
+          const body = await res.json() as { success?: boolean; data?: { avatarUrl?: string | null } };
+          if (body?.data?.avatarUrl) {
+            setAvatarUrl(body.data.avatarUrl);
+          }
+        } catch { /* non-fatal */ }
+      }
+
+      if (!mountedRef.current) return;
+      if (currentGen !== authSyncGenerationRef.current) return;
+
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        try {
+          await withTimeout(currentUser.getIdToken(false), 5000, "getIdToken");
+        } catch (err) {
+          console.warn("[WorkspaceContext] Token refresh failed/timed out:", err);
+        }
+      }
+
+      if (!mountedRef.current) return;
+      if (currentGen !== authSyncGenerationRef.current) return;
+
+      const resolved = await withTimeout(
+        getUserWorkspaceIdRepo(uid),
+        5000,
+        "getUserWorkspaceIdRepo"
+      );
+      const normalized = normalizeWorkspaceId(resolved);
+
+      if (!mountedRef.current) return;
+      if (currentGen !== authSyncGenerationRef.current) return;
+
+      if (!normalized) {
+        commitWorkspaceId(null);
+        setWorkspaceError(MISSING_USER_WORKSPACE_ERROR);
+        setClaimsReady(false);
+        setWorkspaceLoading(false);
+        if (syncLockUidRef.current === uid) {
+          syncLockUidRef.current = null;
+        }
+        return;
+      }
+
+      commitWorkspaceId(normalized);
+      setWorkspaceError(null);
+      setClaimsReady(true);
+      retryCountRef.current = 0;
+      setWorkspaceLoading(false);
+      if (syncLockUidRef.current === uid) {
+        syncLockUidRef.current = null;
+      }
+    } catch (err) {
+      console.error("IDENTITY SYNC FAILED", err);
+
+      // Always clear the lock on failure so retries are possible.
+      if (syncLockUidRef.current === uid) {
+        syncLockUidRef.current = null;
+      }
+
+      if (!mountedRef.current) return;
+      if (currentGen !== authSyncGenerationRef.current) return;
+
+      const message = err instanceof Error ? err.message : String(err);
+      setWorkspaceError(message);
+
+      const isTimeout = err instanceof Error && err.message.includes("timed out");
+      const isMissing = message.includes("MISSING_USER_WORKSPACE");
+
+      if (isMissing) {
+        commitWorkspaceId(null);
+        setClaimsReady(false);
+        setWorkspaceLoading(false);
+      } else if (isTimeout && retryCountRef.current < 2) {
+        retryCountRef.current += 1;
+        const genAtSchedule = authSyncGenerationRef.current;
+        console.warn(
+          `[WorkspaceContext] Auto-retrying identity sync (attempt ${retryCountRef.current})`
+        );
+        setTimeout(() => {
+          if (!mountedRef.current) return;
+          // Bail if a newer sync started in the meantime.
+          if (authSyncGenerationRef.current !== genAtSchedule) return;
+          if (authUidRef.current !== uid) return;
+          void runIdentitySync(uid, true);
+        }, 1500);
+        // Stay in loading state — don't flip claimsReady here.
+      } else {
+        commitWorkspaceId(null);
+        setClaimsReady(false);
+        setWorkspaceLoading(false);
+      }
+    }
+  }, [commitWorkspaceId]);
+
+  const retryIdentitySync = useCallback(() => {
+    const uid = authUidRef.current;
+    if (!uid) return;
+    retryCountRef.current = 0;
+    setWorkspaceError(null);
+    void runIdentitySync(uid, true);
+  }, [runIdentitySync]);
+
+  useEffect(() => {
+    mountedRef.current = true;
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setAuthReady(true);
@@ -160,11 +318,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       if (!user?.uid) {
         syncLockUidRef.current = null;
         authSyncGenerationRef.current += 1;
+        retryCountRef.current = 0;
         clearAuthTokenCache();
         clearWorkspaceSubscription();
         clearWorkspaceHint();
         clearUidHint();
-        if (!cancelled) {
+        if (mountedRef.current) {
           workspaceIdRef.current = null;
           setAuthUid(null);
           setAuthEmail(null);
@@ -188,105 +347,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setAuthDisplayName(user.displayName ?? null);
       setAuthPhotoUrl(user.photoURL ?? null);
 
-      if (syncLockUidRef.current === uid) {
-        return;
-      }
-      syncLockUidRef.current = uid;
-      authSyncGenerationRef.current += 1;
-      const currentGen = authSyncGenerationRef.current;
-
-      if (cancelled) return;
-      setWorkspaceError(null);
-      setWorkspaceLoading(true);
-
-      setClaimsReady(false);
-      const hint = getWorkspaceHint();
-      if (hint) {
-        commitWorkspaceId(hint.workspaceId);
-        setHintWorkspaceName(hint.workspaceName);
-        setHintWorkspaceLogoUrl(hint.workspaceLogoUrl);
-      }
-
-      void (async () => {
-        try {
-          if (cancelled) return;
-          if (currentGen !== authSyncGenerationRef.current) return;
-
-          const res = await authFetch("/api/users", { method: "POST" });
-
-          if (cancelled) return;
-          if (currentGen !== authSyncGenerationRef.current) return;
-
-          if (res == null || !res.ok) {
-            setClaimsReady(false);
-            commitWorkspaceId(null);
-            setWorkspaceError(
-              res == null
-                ? "Identity sync failed (no session)"
-                : `Identity sync failed (${res.status})`
-            );
-            return;
-          }
-
-          if (cancelled) return;
-          if (currentGen !== authSyncGenerationRef.current) return;
-
-          try {
-            const body = await res.json() as { success?: boolean; data?: { avatarUrl?: string | null } };
-            if (body?.data?.avatarUrl) {
-              setAvatarUrl(body.data.avatarUrl);
-            }
-          } catch { /* non-fatal */ }
-
-          if (cancelled) return;
-          if (currentGen !== authSyncGenerationRef.current) return;
-
-          await user.getIdToken(true);
-
-          if (cancelled) return;
-          if (currentGen !== authSyncGenerationRef.current) return;
-
-          const resolved = await getUserWorkspaceIdRepo(uid);
-          const normalized = normalizeWorkspaceId(resolved);
-
-          if (cancelled) return;
-          if (currentGen !== authSyncGenerationRef.current) return;
-
-          if (!normalized) {
-            commitWorkspaceId(null);
-            setWorkspaceError(MISSING_USER_WORKSPACE_ERROR);
-            setClaimsReady(false);
-            return;
-          }
-
-          commitWorkspaceId(normalized);
-          setWorkspaceError(null);
-          setClaimsReady(true);
-        } catch (err) {
-          console.error("IDENTITY SYNC FAILED", err);
-          if (cancelled) return;
-          if (currentGen !== authSyncGenerationRef.current) return;
-          setClaimsReady(false);
-          commitWorkspaceId(null);
-          setWorkspaceError(
-            err instanceof Error ? err.message : String(err)
-          );
-        } finally {
-          if (syncLockUidRef.current === uid) {
-            syncLockUidRef.current = null;
-          }
-          if (cancelled) return;
-          if (currentGen !== authSyncGenerationRef.current) return;
-          setWorkspaceLoading(false);
-        }
-      })();
+      void runIdentitySync(uid);
     });
 
     return () => {
-      cancelled = true;
+      mountedRef.current = false;
       unsubscribe();
     };
-  }, []);
+  }, [runIdentitySync]);
 
   // Sync localStorage to server state — workspaceId from Firestore IS the active workspace after Prompt 1
   useEffect(() => {
@@ -482,6 +550,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       hintWorkspaceName,
       hintWorkspaceLogoUrl,
       memberCount,
+      retryIdentitySync,
     }),
     [
       workspaceId,
@@ -506,6 +575,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       hintWorkspaceName,
       hintWorkspaceLogoUrl,
       memberCount,
+      retryIdentitySync,
     ]
   );
 

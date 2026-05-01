@@ -197,24 +197,72 @@ export async function updateSessionUpdatedAtRepo(sessionId: string): Promise<voi
   });
 }
 
+interface RecentViewer {
+  id: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  isAnonymous: boolean;
+  viewedAt: number;
+}
+
+const RECENT_VIEWERS_LIMIT = 20;
+
 /**
  * Loom-style view tracking: sessionViews/{sessionId}/views/{viewerId}.
  * If viewer has not viewed this session, creates the viewer doc and atomically
  * increments session.viewCount. Only counts once per viewer per session.
+ *
+ * Skips entirely when the viewer is the session creator (don't count own views).
+ * Also denormalizes the most recent {@link RECENT_VIEWERS_LIMIT} viewers onto
+ * the session doc as `recentViewers` for cheap avatar rendering on list views.
  */
 export async function recordSessionViewIfNewRepo(
   sessionId: string,
-  viewerId: string
+  viewerId: string,
+  viewerProfile?: { displayName?: string | null; avatarUrl?: string | null }
 ): Promise<void> {
   const viewerRef = adminDb.doc(`sessionViews/${sessionId}/views/${viewerId}`);
   const sessionRef = adminDb.doc(`sessions/${sessionId}`);
 
   await adminDb.runTransaction(async (tx) => {
-    const viewerSnap = await tx.get(viewerRef);
-    if (viewerSnap.exists) return;
+    const [viewerSnap, sessionSnap] = await Promise.all([
+      tx.get(viewerRef),
+      tx.get(sessionRef),
+    ]);
+    if (!sessionSnap.exists) return;
+
+    const sessionData = sessionSnap.data() ?? {};
+    if (viewerId === sessionData.createdByUserId) return;
+
+    const isAnonymous = viewerId.startsWith("anon_");
+    const newViewer: RecentViewer = {
+      id: viewerId,
+      displayName: viewerProfile?.displayName ?? null,
+      avatarUrl: viewerProfile?.avatarUrl ?? null,
+      isAnonymous,
+      viewedAt: Date.now(),
+    };
+
+    const currentViewers: RecentViewer[] = Array.isArray(sessionData.recentViewers)
+      ? (sessionData.recentViewers as RecentViewer[])
+      : [];
+    const filtered = currentViewers.filter((v) => v && v.id !== viewerId);
+    filtered.push(newViewer);
+    const trimmed = filtered
+      .sort((a, b) => b.viewedAt - a.viewedAt)
+      .slice(0, RECENT_VIEWERS_LIMIT);
+
+    if (viewerSnap.exists) {
+      // Already counted; only refresh recentViewers ordering / profile.
+      tx.update(sessionRef, { recentViewers: trimmed });
+      return;
+    }
 
     tx.set(viewerRef, { viewedAt: FieldValue.serverTimestamp() });
-    tx.update(sessionRef, { viewCount: FieldValue.increment(1) });
+    tx.update(sessionRef, {
+      viewCount: FieldValue.increment(1),
+      recentViewers: trimmed,
+    });
   });
 }
 

@@ -18,11 +18,11 @@ export function GlobalSearchButton({ onBeforeOpen }: GlobalSearchButtonProps = {
   return (
     <button
       type="button"
-      className="icon-btn"
+      className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-[var(--surface-hover)] transition-colors cursor-pointer border-0 bg-transparent"
       aria-label="Search"
       onClick={openSearch}
     >
-      <Search size={20} strokeWidth={2} className="text-[var(--text-body)]" />
+      <Search size={22} strokeWidth={2.2} className="text-[var(--text-heading)]" />
     </button>
   );
 }

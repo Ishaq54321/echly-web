@@ -192,6 +192,7 @@ if (window.__ECHLY_BOOTSTRAP_LOADED__) {
                 window.dispatchEvent(new CustomEvent(ev.type, { detail: ev.detail }));
               }
               pendingEvents.length = 0;
+              setTimeout(() => fetchAndApplyState(), 50);
               resolve();
             } else if (attempts < 50) {
               setTimeout(() => checkReady(attempts + 1), 50);
@@ -311,6 +312,25 @@ if (window.__ECHLY_BOOTSTRAP_LOADED__) {
           loadWidget()
             .then(() => {
               window.dispatchEvent(new CustomEvent("ECHLY_OPEN_PREVIOUS_SESSIONS"));
+            })
+            .catch(() => { /* noop */ });
+        }
+      );
+      return false;
+    }
+
+    if (type === "ECHLY_RESUME_SESSION" && typeof msg.sessionId === "string" && msg.sessionId.length > 0) {
+      const sessionId: string = msg.sessionId;
+      chrome.runtime.sendMessage(
+        { type: "GET_AUTH_STATE" },
+        (r: { authenticated?: boolean; user?: { uid: string } } | undefined) => {
+          if (chrome.runtime.lastError) return;
+          if (!r?.authenticated || !r?.user?.uid) return;
+          loadWidget()
+            .then(() => {
+              window.dispatchEvent(
+                new CustomEvent("ECHLY_RESUME_SESSION", { detail: { sessionId } })
+              );
             })
             .catch(() => { /* noop */ });
         }

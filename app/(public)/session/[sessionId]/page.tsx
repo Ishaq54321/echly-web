@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import PublicSessionNav, { PUBLIC_NAV_HEIGHT } from "@/components/layout/PublicSessionNav";
 import SessionPageClient from "@/app/(app)/dashboard/[sessionId]/SessionPageClient";
 import PublicViewerBanner from "@/components/session/PublicViewerBanner";
+import BrandLoader from "@/components/ui/BrandLoader";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import { setShareToken } from "@/lib/client/shareToken";
 import { getUidHint } from "@/lib/client/workspaceBootstrap";
@@ -39,6 +40,14 @@ function PublicSessionView({ sessionId }: { sessionId: string }) {
       </main>
     </div>
   );
+
+  if (!showAuthShell && !authReady) {
+    return (
+      <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--canvas, #F3F1EC)" }}>
+        <BrandLoader />
+      </div>
+    );
+  }
 
   if (showAuthShell) {
     return authShell(

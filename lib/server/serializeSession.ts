@@ -54,6 +54,7 @@ export function serializeSession(session: Session, access: AccessContext): Recor
       session.updatedAt === undefined ? null : session.updatedAt
     ),
     viewCount: typeof session.viewCount === "number" ? session.viewCount : null,
+    recentViewers: Array.isArray(session.recentViewers) ? session.recentViewers : [],
     commentCount: typeof session.commentCount === "number" ? session.commentCount : null,
     openCount: typeof session.openCount === "number" ? session.openCount : null,
     resolvedCount: typeof session.resolvedCount === "number" ? session.resolvedCount : null,

@@ -44,6 +44,7 @@ import {
 import { MinimalLoader } from "@/components/ui/MinimalLoader";
 import { authFetch } from "@/lib/authFetch";
 import { useBillingStore } from "@/lib/store/billingStore";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 /* Premium workspace settings: wide layout, strong hierarchy */
 const SETTINGS_CARD =
@@ -671,24 +672,27 @@ function UpgradePlanBadge({ onClick, title }: { onClick?: () => void; title?: st
     "inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] py-1 px-2.5 bg-[var(--color-success-bg)]/90 text-[var(--text-heading)] text-xs font-semibold transition-all duration-200 hover:bg-[var(--color-success-bg)] hover:shadow-sm [&_svg]:text-[var(--text-heading)] [&_svg]:stroke-[2.5]";
   if (onClick)
     return (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onClick();
-        }}
-        title={tooltip}
-        className={`${base} shrink-0`}
-      >
-        <Gem className="w-3.5 h-3.5" aria-hidden />
-        Upgrade Plan
-      </button>
+      <Tooltip content={tooltip}>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick();
+          }}
+          className={`${base} shrink-0`}
+        >
+          <Gem className="w-3.5 h-3.5" aria-hidden />
+          Upgrade Plan
+        </button>
+      </Tooltip>
     );
   return (
-    <span className={base} title={tooltip}>
-      <Gem className="w-3.5 h-3.5" aria-hidden />
-      Upgrade Plan
-    </span>
+    <Tooltip content={tooltip}>
+      <span className={base}>
+        <Gem className="w-3.5 h-3.5" aria-hidden />
+        Upgrade Plan
+      </span>
+    </Tooltip>
   );
 }
 
@@ -1638,34 +1642,37 @@ function MembersTableRow({
     >
       {row.status === "active" && !isOwner && isWorkspaceOwner && (
         confirming ? removeConfirm : (
-          <button
-            type="button"
-            onClick={() => setConfirmingRemoveId(row.id)}
-            title="Remove member"
-            className="w-[30px] h-[30px] flex items-center justify-center rounded-[var(--radius-xs)] text-[var(--text-tertiary)] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors"
-          >
-            <UserMinus size={15} />
-          </button>
+          <Tooltip content="Remove member">
+            <button
+              type="button"
+              onClick={() => setConfirmingRemoveId(row.id)}
+              className="w-[30px] h-[30px] flex items-center justify-center rounded-[var(--radius-xs)] text-[var(--text-tertiary)] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors"
+            >
+              <UserMinus size={15} />
+            </button>
+          </Tooltip>
         )
       )}
       {row.status === "pending" && isWorkspaceOwner && (
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => onResend(row.invitationToken!, row.email)}
-            title="Resend invite"
-            className="w-[30px] h-[30px] flex items-center justify-center rounded-[var(--radius-xs)] text-[var(--text-tertiary)] hover:text-[var(--brand)] hover:bg-[var(--brand-subtle)] transition-colors"
-          >
-            <RotateCcw size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={() => onRevoke(row.invitationToken!, row.email)}
-            title="Revoke invite"
-            className="w-[30px] h-[30px] flex items-center justify-center rounded-[var(--radius-xs)] text-[var(--text-tertiary)] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors"
-          >
-            <X size={14} />
-          </button>
+          <Tooltip content="Resend invite">
+            <button
+              type="button"
+              onClick={() => onResend(row.invitationToken!, row.email)}
+              className="w-[30px] h-[30px] flex items-center justify-center rounded-[var(--radius-xs)] text-[var(--text-tertiary)] hover:text-[var(--brand)] hover:bg-[var(--brand-subtle)] transition-colors"
+            >
+              <RotateCcw size={14} />
+            </button>
+          </Tooltip>
+          <Tooltip content="Revoke invite">
+            <button
+              type="button"
+              onClick={() => onRevoke(row.invitationToken!, row.email)}
+              className="w-[30px] h-[30px] flex items-center justify-center rounded-[var(--radius-xs)] text-[var(--text-tertiary)] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors"
+            >
+              <X size={14} />
+            </button>
+          </Tooltip>
         </div>
       )}
     </div>

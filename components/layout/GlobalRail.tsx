@@ -22,6 +22,7 @@ import {
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import { authFetch } from "@/lib/authFetch";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 function cn(...classes: (string | boolean | undefined | null)[]) {
   return classes.filter(Boolean).join(" ");
@@ -63,7 +64,11 @@ function WorkspaceInitialsAvatar({ name }: { name: string }) {
   );
 }
 
-export default function GlobalRail() {
+interface GlobalRailProps {
+  forceExpanded?: boolean;
+}
+
+export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = {}) {
   const pathname = usePathname();
   const router = useRouter();
   useAuthGuard({ router });
@@ -116,7 +121,9 @@ export default function GlobalRail() {
 
   // ALL hooks are now called above. Safe to bail out.
   const isSessionPage = pathname?.match(/^\/dashboard\/[^/]+/) !== null || pathname?.match(/^\/session\/[^/]+/) !== null;
-  if (isSessionPage) return null;
+  if (isSessionPage && !forceExpanded) return null;
+
+  const effectiveCollapsed = forceExpanded ? false : isCollapsed;
 
   return (
     <>
@@ -128,22 +135,22 @@ export default function GlobalRail() {
         className={cn(
           "relative flex flex-col bg-[var(--surface)] h-screen shrink-0 min-h-0 overflow-visible py-4",
           mounted && "transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
-          isCollapsed ? "w-[64px] items-center group/rail" : "w-[270px] items-stretch"
+          effectiveCollapsed ? "w-[64px] items-stretch group/rail" : "w-[270px] items-stretch"
         )}
         aria-label="Global navigation"
       >
 
-        <div className="flex flex-col flex-1 min-h-0 overflow-x-hidden">
+        <div className="flex flex-col flex-1 w-full min-h-0 overflow-x-hidden">
         {/* Logo */}
         <div
           className={cn(
             "flex shrink-0 w-full",
-            isCollapsed
+            effectiveCollapsed
               ? "flex-col items-center gap-2 px-2 pb-2"
               : "flex-row items-center gap-2 h-16 px-3"
           )}
         >
-          {isCollapsed ? (
+          {effectiveCollapsed ? (
             <div className="relative group/logo flex items-center justify-center h-10 w-10 shrink-0">
               <div
                 className={cn(
@@ -198,20 +205,22 @@ export default function GlobalRail() {
                 </div>
                 <span className="text-[17px] font-semibold text-[var(--text-heading)] tracking-[-0.01em]">Echly</span>
               </Link>
-              <button
-                type="button"
-                onClick={() => setIsCollapsed(true)}
-                aria-label="Collapse sidebar"
-                className="w-9 h-9 flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-heading)] hover:bg-[var(--surface-hover)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0] focus-visible:ring-offset-2"
-              >
-                <PanelLeftClose size={20} strokeWidth={2.2} />
-              </button>
+              {!forceExpanded && (
+                <button
+                  type="button"
+                  onClick={() => setIsCollapsed(true)}
+                  aria-label="Collapse sidebar"
+                  className="w-9 h-9 flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-heading)] hover:bg-[var(--surface-hover)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0] focus-visible:ring-offset-2"
+                >
+                  <PanelLeftClose size={20} strokeWidth={2.2} />
+                </button>
+              )}
             </div>
           )}
         </div>
 
         {/* Collapsed pill — under logo, above nav */}
-        {isCollapsed && (
+        {effectiveCollapsed && (
           <>
             <div
               style={{
@@ -228,40 +237,41 @@ export default function GlobalRail() {
                 flexShrink: 0,
               }}
             >
-              <button
-                type="button"
-                title="Invite teammate"
-                aria-label="Invite teammate"
-                onClick={() => setInviteModalOpen(true)}
-                className="group hover:[background:var(--surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]"
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: "50%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  border: "none",
-                  background: "transparent",
-                  transition: "all 160ms",
-                  flexShrink: 0,
-                }}
-              >
-                <UserPlus
-                  className="h-[22px] w-[22px] shrink-0"
-                  strokeWidth={2.2}
-                  style={{ color: "var(--text-heading)" }}
-                  aria-hidden
-                />
-              </button>
+              <Tooltip content="Invite teammate" position="right">
+                <button
+                  type="button"
+                  aria-label="Invite teammate"
+                  onClick={() => setInviteModalOpen(true)}
+                  className="group hover:[background:var(--surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]"
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    border: "none",
+                    background: "transparent",
+                    transition: "all 160ms",
+                    flexShrink: 0,
+                  }}
+                >
+                  <UserPlus
+                    className="h-[22px] w-[22px] shrink-0"
+                    strokeWidth={2.2}
+                    style={{ color: "var(--text-heading)" }}
+                    aria-hidden
+                  />
+                </button>
+              </Tooltip>
               <div
                 style={{ width: 26, height: 1, background: "var(--border)", margin: "0 auto", flexShrink: 0 }}
                 aria-hidden
               />
+              <Tooltip content={displayName} position="right">
               <button
                 type="button"
-                title={displayName}
                 aria-label={displayName}
                 onClick={() => setWorkspacePopoverOpen((v) => !v)}
                 className="hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]"
@@ -299,6 +309,7 @@ export default function GlobalRail() {
                   displayName.trim().charAt(0).toUpperCase() || "W"
                 )}
               </button>
+              </Tooltip>
             </div>
             <div
               style={{ height: 1, background: "var(--border)", width: "100%", margin: "20px 0 20px" }}
@@ -307,7 +318,7 @@ export default function GlobalRail() {
           </>
         )}
 
-        {!isCollapsed && (
+        {!effectiveCollapsed && (
           <div className="mx-3 mt-4 rounded-[var(--radius-md)] border border-[var(--border)] overflow-hidden shadow-[0_1px_0_rgba(28,25,23,0.02)]">
             <div className="px-3 py-2.5 flex items-center gap-2.5 cursor-pointer hover:bg-[var(--surface-hover)] hover:rounded-t-[var(--radius-md)] transition-colors">
               <div className="flex flex-col flex-1 min-w-0">
@@ -335,8 +346,8 @@ export default function GlobalRail() {
 
         <nav
           className={cn(
-            "flex flex-col gap-1 min-h-0",
-            isCollapsed
+            "flex flex-col gap-3 min-h-0",
+            effectiveCollapsed
               ? "mt-0 items-stretch overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
               : "mt-4 items-stretch px-2 overflow-y-auto flex-1"
           )}
@@ -344,47 +355,48 @@ export default function GlobalRail() {
         >
           {NAV_ITEMS.map(({ href, icon: Icon, label, iconStroke }) => {
             const active = isActive(href, pathname);
+            const linkEl = (
+              <Link
+                href={href}
+                className={cn(
+                  "flex items-center transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0] focus-visible:ring-offset-2",
+                  effectiveCollapsed
+                    ? "mx-auto w-11 h-10 justify-center rounded-[var(--radius-sm)]"
+                    : "w-full gap-3 px-3 py-3 rounded-[var(--radius-sm)]",
+                  active
+                    ? "bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold"
+                    : "text-[var(--text-heading)] hover:bg-[var(--surface-hover)]"
+                )}
+                aria-label={label}
+                aria-current={active ? "page" : undefined}
+              >
+                <Icon
+                  className={RAIL_ICON_CLASS}
+                  strokeWidth={iconStroke ?? RAIL_ICON_STROKE}
+                />
+                <span
+                  className={cn(
+                    "text-[15px] font-semibold text-current whitespace-nowrap",
+                    "transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
+                    effectiveCollapsed
+                      ? "opacity-0 translate-x-[-6px] w-0 overflow-hidden pointer-events-none delay-0"
+                      : "opacity-100 translate-x-0 delay-150"
+                  )}
+                >
+                  {label}
+                </span>
+              </Link>
+            );
             return (
               <div
                 key={label}
-                className="relative group w-full"
+                className={`relative w-full ${effectiveCollapsed ? "flex justify-center" : ""}`}
               >
-                <Link
-                  href={href}
-                  className={cn(
-                    "w-full flex items-center transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0] focus-visible:ring-offset-2",
-                    isCollapsed ? "justify-center p-3 rounded-[var(--radius-sm)]" : "gap-3 px-3 py-3 rounded-[var(--radius-sm)]",
-                    active
-                      ? "bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold"
-                      : "text-[var(--text-heading)] hover:bg-[var(--surface-hover)]"
-                  )}
-                  aria-label={label}
-                  aria-current={active ? "page" : undefined}
-                >
-                  <Icon
-                    className={RAIL_ICON_CLASS}
-                    strokeWidth={iconStroke ?? RAIL_ICON_STROKE}
-                  />
-                  <span
-                    className={cn(
-                      "text-[15px] font-semibold text-current whitespace-nowrap",
-                      "transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
-                      isCollapsed
-                        ? "opacity-0 translate-x-[-6px] w-0 overflow-hidden pointer-events-none delay-0"
-                        : "opacity-100 translate-x-0 delay-150"
-                    )}
-                  >
-                    {label}
-                  </span>
-                </Link>
-                {isCollapsed ? (
-                  <span
-                    className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2 py-1 text-xs text-[var(--text-heading)] rounded-md bg-white border border-[var(--border)] shadow-[var(--shadow-sm)] opacity-0 pointer-events-none z-10 transition-opacity duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:opacity-100 group-focus-within:opacity-100"
-                    role="tooltip"
-                  >
-                    {label}
-                  </span>
-                ) : null}
+                {effectiveCollapsed ? (
+                  <Tooltip content={label} position="right">
+                    {linkEl}
+                  </Tooltip>
+                ) : linkEl}
               </div>
             );
           })}
@@ -398,7 +410,7 @@ export default function GlobalRail() {
         <div
           className={cn(
             "absolute top-[5.5rem] w-64 rounded-xl border bg-white shadow-lg p-4 z-50",
-            isCollapsed ? "left-[64px]" : "left-[270px]"
+            effectiveCollapsed ? "left-[64px]" : "left-[270px]"
           )}
           role="dialog"
           aria-label="Workspace"

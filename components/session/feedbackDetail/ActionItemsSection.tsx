@@ -123,7 +123,7 @@ export function ActionItemsSection({
   return (
     <div className={cardClass}>
       <h2 className={titleClass}>Action steps</h2>
-      <ul className="list-none space-y-0 p-0 m-0 text-base leading-relaxed text-[var(--text-heading)] w-full overflow-hidden">
+      <ul className="list-none space-y-0 p-0 m-0 text-base leading-relaxed text-[var(--text-heading)] w-full">
         {items.map((text, i) => (
           <li key={i} className="group flex items-start gap-3 py-2.5">
             <span className={numberClass}>{i + 1}.</span>
@@ -186,7 +186,7 @@ export function ActionItemsSection({
           </li>
         ))}
         {isAdding && (
-          <li className="flex items-start gap-3 py-2.5 w-full overflow-hidden">
+          <li className="flex items-start gap-3 py-2.5 w-full">
             <span className={numberClass}>{items.length + 1}.</span>
             <input
               type="text"

@@ -8,7 +8,7 @@ export type TextFeedbackPanelProps = {
   onCancel?: () => void;
   /** When set, drives modal light/dark. When omitted, syncs from `#echly-root[data-theme]`. */
   theme?: "light" | "dark";
-  /** When provided, renders a "Switch to Voice Mode" row that calls this on click. */
+  /** When provided, renders a "Voice mode" pill on the screenshot that calls this on click. */
   onSwitchToVoice?: () => void;
   /** Element selector badge (e.g. "#pricing-cta") */
   elementSelector?: string;
@@ -17,6 +17,8 @@ export type TextFeedbackPanelProps = {
   /** Element height in px for badge */
   elementHeight?: number;
 };
+
+const MAX_LEN = 1000;
 
 export function TextFeedbackPanel({
   screenshot,
@@ -46,65 +48,80 @@ export function TextFeedbackPanel({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onCancel]);
 
-  const shotBadge =
-    elementSelector ? (
-      <span className="ovl-shot-tag">
-        {elementSelector}
-        {elementWidth && elementHeight ? ` · ${elementWidth} × ${elementHeight}` : ""}
-      </span>
-    ) : null;
+  const charCountWarn = text.length > 900;
 
   return (
     <div className="echly-v2 echly-v2-overlay-anchor" data-echly-ui="true">
-      <div className="center-card" data-echly-ui="true">
-        <div className="ovl-top-bar">
-          {onSwitchToVoice && (
-            <button type="button" className="ovl-top-pill" onClick={onSwitchToVoice}>
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="6" y="2" width="4" height="8" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-              <span className="ovl-top-pill-label">Switch to Voice mode</span>
-            </button>
-          )}
-        </div>
+      <div className="vc-card" data-echly-ui="true">
         {screenshot && (
-          <div className="ovl-shot">
+          <div className="vc-screenshot">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={screenshot} alt="Capture" />
-            {shotBadge}
+            {onSwitchToVoice && (
+              <div className="vc-top-controls">
+                <button type="button" className="vc-glass-pill" onClick={onSwitchToVoice}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  </svg>
+                  <span>Voice mode</span>
+                </button>
+              </div>
+            )}
+            {elementSelector && (
+              <span className="vc-selector">
+                {elementSelector}
+                {elementWidth && elementHeight ? ` · ${elementWidth} × ${elementHeight}` : ""}
+              </span>
+            )}
           </div>
         )}
 
-        <div className="ovl-textarea-wrap">
-          <textarea
-            className="ovl-textarea"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Describe what you noticed…"
-            aria-label="Feedback text"
-            autoFocus
-          />
-          <div className="ovl-textarea-foot">
-            <span className="hint">
-              <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
-                <path d="M8 2v12M8 2l4 3M8 2L4 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              AI will structure this into a ticket
-            </span>
-            <span className="count">{text.length} / 1000</span>
+        <div className="vc-body">
+          <div className="vc-helper">
+            <div className="vc-helper-main">Describe what you&apos;d change in your own words</div>
+            <div className="vc-helper-sub">
+              We&apos;ll turn it into structured, actionable feedback.
+            </div>
           </div>
-        </div>
 
-        <div className="ovl-actions">
-          <button type="button" className="rec-cancel" onClick={onCancel}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className={`finish-btn${!text.trim() ? " disabled" : ""}`}
-            onClick={handleSubmit}
-            disabled={!text.trim()}
-          >
-            Done
-          </button>
+          <div className="vc-textarea-wrap">
+            <textarea
+              className="vc-textarea"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Type your feedback here..."
+              maxLength={MAX_LEN}
+              aria-label="Feedback text"
+              autoFocus
+            />
+            <div className="vc-textarea-footer">
+              <span className="vc-textarea-hint">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m5 12 7-7 7 7" />
+                  <path d="M12 19V5" />
+                </svg>
+                We&apos;ll structure this into a ticket
+              </span>
+              <span className={`vc-char-count${charCountWarn ? " vc-char-warn" : ""}`}>
+                {text.length} / {MAX_LEN}
+              </span>
+            </div>
+          </div>
+
+          <div className="vc-actions">
+            <button type="button" className="vc-cancel-btn" onClick={onCancel}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="vc-done-btn"
+              onClick={handleSubmit}
+              disabled={!text.trim()}
+            >
+              Done
+            </button>
+          </div>
         </div>
       </div>
     </div>

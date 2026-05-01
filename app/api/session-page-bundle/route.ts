@@ -15,6 +15,55 @@ import { fireAndForget } from "@/lib/server/fireAndForget";
 import { checkRateLimit, clientKeyFromRequest } from "@/lib/server/rateLimit";
 import { tryBuildRequestContext } from "@/lib/server/requestContext";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
+import { adminDb } from "@/lib/server/firebaseAdmin";
+
+async function loadViewerProfileForBundle(
+  uid: string
+): Promise<{ displayName: string | null; avatarUrl: string | null }> {
+  let displayName: string | null = null;
+  let avatarUrl: string | null = null;
+  try {
+    const snap = await adminDb.doc(`users/${uid}`).get();
+    if (snap.exists) {
+      const d = snap.data() ?? {};
+      displayName =
+        typeof d.displayName === "string" && d.displayName.trim()
+          ? d.displayName.trim()
+          : typeof d.name === "string" && d.name.trim()
+            ? d.name.trim()
+            : null;
+      avatarUrl =
+        typeof d.photoURL === "string" && d.photoURL.trim()
+          ? d.photoURL.trim()
+          : typeof d.avatarUrl === "string" && d.avatarUrl.trim()
+            ? d.avatarUrl.trim()
+            : null;
+    }
+  } catch {
+    // Firestore read failed — fall through to Auth lookup
+  }
+
+  if (!displayName || !avatarUrl) {
+    try {
+      const { getAuth } = await import("firebase-admin/auth");
+      const authUser = await getAuth().getUser(uid);
+      if (!displayName) {
+        if (authUser?.displayName?.trim()) {
+          displayName = authUser.displayName.trim();
+        } else if (authUser?.email) {
+          displayName = authUser.email.split("@")[0];
+        }
+      }
+      if (!avatarUrl && authUser?.photoURL) {
+        avatarUrl = authUser.photoURL;
+      }
+    } catch {
+      // Auth lookup failed — continue with whatever we have
+    }
+  }
+
+  return { displayName, avatarUrl };
+}
 
 const BUNDLE_FEEDBACK_LIMIT = 50;
 
@@ -97,13 +146,18 @@ export async function GET(req: NextRequest) {
 
     /** Same semantics as POST /api/sessions/:id/view: Loom-style count once per viewer; no second context build on the client. */
     const uid = ctx.userId;
-    if (uid) {
+    const anonViewerIdRaw = searchParams.get("viewerId")?.trim() ?? "";
+    const anonViewerId =
+      anonViewerIdRaw.startsWith("anon_") ? anonViewerIdRaw : "";
+    if (uid || anonViewerId !== "") {
+      const viewerKey = uid ?? anonViewerId;
       const rateKey = `session-view:${trimmedSid}:${clientKeyFromRequest(req)}`;
       const rate = checkRateLimit({ key: rateKey, max: 60, windowMs: 60_000 });
       if (rate.allowed) {
-        fireAndForget("session-page-bundle recordSessionView", () =>
-          recordSessionViewIfNewRepo(trimmedSid, uid)
-        );
+        fireAndForget("session-page-bundle recordSessionView", async () => {
+          const profile = uid ? await loadViewerProfileForBundle(uid) : undefined;
+          await recordSessionViewIfNewRepo(trimmedSid, viewerKey, profile);
+        });
       }
     }
     const { feedback, nextCursor, hasMore } = pageResult;

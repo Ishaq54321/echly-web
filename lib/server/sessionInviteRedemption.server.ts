@@ -15,6 +15,8 @@ import {
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { assert } from "@/lib/utils/assert";
+import { fireAndForget } from "@/lib/server/fireAndForget";
+import { dispatchNotifications } from "@/lib/server/notificationFanOut.server";
 
 export type RedeemSessionInviteOutcome =
   | "session_not_found"
@@ -132,6 +134,28 @@ export async function redeemSessionInviteForUser(params: {
         actorPhotoURL: actor.actorPhotoURL,
         metadata: { sessionTitle },
       });
+
+      const inviterId =
+        typeof invite.invitedBy === "string" ? invite.invitedBy.trim() : "";
+      if (inviterId && inviterId !== redeemerId) {
+        fireAndForget("notification:invite.accepted", async () => {
+          await dispatchNotifications({
+            recipientIds: [inviterId],
+            workspaceId,
+            sessionId: sid,
+            sessionTitle: sessionTitle || null,
+            type: "invite.accepted",
+            actor: {
+              id: redeemerId,
+              name: actor.actorName,
+              photoURL: actor.actorPhotoURL ?? null,
+            },
+            title: `${actor.actorName} joined "${sessionTitle || "your session"}"`,
+            entityTitle: sessionTitle || null,
+            body: null,
+          });
+        });
+      }
     }
     await getSessionMember(sid, redeemerId);
   }

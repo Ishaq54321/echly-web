@@ -21,7 +21,7 @@ export function ProfileDropdown() {
         type="button"
         aria-label="Profile"
         aria-expanded={open}
-        className="shrink-0 cursor-pointer rounded-full"
+        className="shrink-0 cursor-pointer rounded-full h-9 w-9 overflow-hidden"
         style={{ boxShadow: "none" }}
         onClick={() => setOpen((v) => !v)}
       >

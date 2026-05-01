@@ -18,6 +18,7 @@ export interface SessionDetailCacheData {
     nextCursor?: string | null;
     hasMore?: boolean;
   };
+  isWorkspaceMember: boolean;
 }
 
 interface SessionDetailCacheEntry {

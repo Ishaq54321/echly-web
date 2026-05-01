@@ -9,6 +9,13 @@ import {
 import { getSessionMember } from "@/lib/repositories/sessionMembersRepository.server";
 import { getWorkspaceMembersRepo } from "@/lib/repositories/workspaceMembersRepository.server";
 import { sendAccessRequestNotificationEmail } from "@/lib/email/workspaceEmails";
+import { getUserByIdRepo } from "@/lib/repositories/usersRepository.server";
+import { fireAndForget } from "@/lib/server/fireAndForget";
+import {
+  dispatchNotifications,
+  resolveSessionRecipients,
+} from "@/lib/server/notificationFanOut.server";
+import type { AccessRequest } from "@/lib/domain/accessRequest";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
 
@@ -91,8 +98,9 @@ export async function POST(
   const rawAccess = body?.access;
   const requestedAccess: "view" | "resolve" = rawAccess === "view" ? "view" : "resolve";
 
+  let createdRequest: AccessRequest;
   try {
-    await createAccessRequest({
+    createdRequest = await createAccessRequest({
       sessionId,
       requesterUserId: userId,
       requesterEmail,
@@ -131,6 +139,53 @@ export async function POST(
       // email failure must not fail the route
     }
   })();
+
+  fireAndForget("notification:access_request.pending", async () => {
+    const sess = context.session;
+    if (!sess) return;
+    const workspaceId =
+      typeof sess.workspaceId === "string" ? sess.workspaceId.trim() : "";
+    if (!workspaceId) return;
+
+    const recipients = await resolveSessionRecipients({
+      sessionId,
+      workspaceId,
+      includeWorkspaceOwners: true,
+      excludeUserIds: [userId],
+    });
+    if (recipients.length === 0) return;
+
+    let requesterName: string | null = null;
+    let requesterPhoto: string | null = null;
+    try {
+      const requesterUser = await getUserByIdRepo(userId);
+      requesterName = requesterUser?.name?.trim() || null;
+      requesterPhoto = requesterUser?.photoURL ?? null;
+    } catch {
+      // fall back to email-derived name
+    }
+    const displayName = requesterName || requesterEmail.split("@")[0];
+    const sessionTitle = typeof sess.title === "string" ? sess.title : null;
+
+    await dispatchNotifications({
+      recipientIds: recipients,
+      workspaceId,
+      sessionId,
+      sessionTitle,
+      type: "access_request.pending",
+      actor: {
+        id: userId,
+        name: displayName,
+        photoURL: requesterPhoto,
+      },
+      title: `${displayName} requested ${requestedAccess} access`,
+      entityTitle: sessionTitle,
+      body: null,
+      accessRequestId: createdRequest.id,
+      requestedAccess,
+      actionStatus: "pending",
+    });
+  });
 
   return apiSuccess({
     type: "request_created" as const,

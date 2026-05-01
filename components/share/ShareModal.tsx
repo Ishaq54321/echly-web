@@ -18,6 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 export interface ShareModalProps {
   open: boolean;
@@ -180,22 +181,22 @@ export function ShareModal({
             </div>
             <p className="share-modal-general-access-hint text-[var(--text-heading)]/60">Default access for anyone opening the link</p>
             <div className="share-modal-permissions share-modal-permissions--flush">
-              <div
-                title={!canManageAccess ? "Only the session owner can change general access" : undefined}
-              >
-                <ShareDropdown
-                  variant="general"
-                  value={generalAccess}
-                  options={GENERAL_ACCESS_OPTIONS}
-                  onSelect={(v) => {
-                    if (v === "restricted" || v === "link_view") {
-                      onUpdateGeneralAccess(v);
-                    }
-                  }}
-                  disabled={!canManageAccess || updatingGeneralAccess}
-                  ariaLabel="Default access for the link"
-                />
-              </div>
+              <Tooltip content={!canManageAccess ? "Only the session owner can change general access" : ""}>
+                <div>
+                  <ShareDropdown
+                    variant="general"
+                    value={generalAccess}
+                    options={GENERAL_ACCESS_OPTIONS}
+                    onSelect={(v) => {
+                      if (v === "restricted" || v === "link_view") {
+                        onUpdateGeneralAccess(v);
+                      }
+                    }}
+                    disabled={!canManageAccess || updatingGeneralAccess}
+                    ariaLabel="Default access for the link"
+                  />
+                </div>
+              </Tooltip>
             </div>
           </section>
 

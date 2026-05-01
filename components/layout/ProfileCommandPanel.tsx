@@ -21,6 +21,7 @@ import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import { useBillingStore } from "@/lib/store/billingStore";
+import { clearNotificationStore } from "@/lib/store/notificationStore";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 
 const PANEL_WIDTH = 280;
@@ -246,6 +247,7 @@ export function ProfileCommandPanel({
   const handleSignOut = async () => {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     await signOut(auth);
+    clearNotificationStore();
     onClose();
     router.push("/login");
   };

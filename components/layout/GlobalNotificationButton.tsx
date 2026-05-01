@@ -1,17 +1,12 @@
 "use client";
 
 import { Bell } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { NotificationPanel } from "@/components/ui/NotificationPanel";
 import {
-  type AppNotification,
-  NotificationPanel,
-} from "@/components/ui/NotificationPanel";
-
-const initialNotifications: AppNotification[] = [
-  { id: "n1", kind: "comment", title: "New comment on UI Update", time: "2h ago", read: false },
-  { id: "n2", kind: "share", title: "A new video was shared with your team", time: "5h ago", read: false },
-  { id: "n3", kind: "comment", title: "3 threads need your attention", time: "1d ago", read: true },
-];
+  fetchNotifications,
+  useNotificationStore,
+} from "@/lib/store/notificationStore";
 
 export type GlobalNotificationButtonProps = {
   /** Controlled open state (optional). */
@@ -25,7 +20,7 @@ export function GlobalNotificationButton({
 }: GlobalNotificationButtonProps = {}) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [internalOpen, setInternalOpen] = useState(false);
-  const [notifications, setNotifications] = useState<AppNotification[]>(initialNotifications);
+  const { unreadCount } = useNotificationStore();
 
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : internalOpen;
@@ -38,7 +33,18 @@ export function GlobalNotificationButton({
     [isControlled, onOpenChange]
   );
 
-  const unreadCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
+  const handleToggle = useCallback(() => {
+    const next = !open;
+    setOpen(next);
+    if (next) {
+      // Refresh on open so the list reflects any reads/new arrivals since last view.
+      void fetchNotifications();
+    }
+  }, [open, setOpen]);
+
+  const handleClose = useCallback(() => {
+    setOpen(false);
+  }, [setOpen]);
 
   useEffect(() => {
     if (!open) return;
@@ -55,18 +61,20 @@ export function GlobalNotificationButton({
     <div ref={wrapRef} className="relative">
       <button
         type="button"
-        className="icon-btn notification"
+        className="relative w-9 h-9 flex items-center justify-center rounded-full hover:bg-[var(--surface-hover)] transition-colors cursor-pointer border-0 bg-transparent"
         aria-label="Notifications"
-        onClick={() => setOpen(!open)}
+        onClick={handleToggle}
       >
-        <Bell size={20} strokeWidth={2} className="text-[var(--text-body)]" />
-        {unreadCount > 0 && <span className="badge">{unreadCount > 99 ? "99+" : unreadCount}</span>}
+        <Bell size={22} strokeWidth={2.2} className="text-[var(--text-heading)]" />
+        {unreadCount > 0 && (
+          <span
+            className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full bg-[var(--color-danger)] text-white text-[10px] font-semibold flex items-center justify-center leading-none ring-2 ring-[var(--surface-subtle)]"
+          >
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
+        )}
       </button>
-      <NotificationPanel
-        open={open}
-        notifications={notifications}
-        onNotificationsChange={setNotifications}
-      />
+      <NotificationPanel open={open} onClose={handleClose} />
     </div>
   );
 }

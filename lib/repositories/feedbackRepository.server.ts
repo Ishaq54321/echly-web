@@ -18,6 +18,11 @@ import {
   sessionTitleForActivityEvent,
 } from "@/lib/repositories/activityEventsRepository.server";
 import { listAccessibleSessionsForUser } from "@/lib/server/listAccessibleSessionsForUser";
+import { fireAndForget } from "@/lib/server/fireAndForget";
+import {
+  resolveSessionRecipients,
+  dispatchNotifications,
+} from "@/lib/server/notificationFanOut.server";
 
 type DocumentReference = FirebaseFirestore.DocumentReference;
 type DocumentSnapshot = FirebaseFirestore.DocumentSnapshot;
@@ -257,6 +262,34 @@ export async function addFeedbackWithSessionCountersRepo(
                 sessionTitle,
               },
             });
+
+            try {
+              const recipients = await resolveSessionRecipients({
+                sessionId,
+                workspaceId: resolvedWorkspaceId,
+                excludeUserIds: [resolvedUserId],
+              });
+              if (recipients.length > 0) {
+                await dispatchNotifications({
+                  recipientIds: recipients,
+                  workspaceId: resolvedWorkspaceId,
+                  sessionId,
+                  sessionTitle: sessionTitle || null,
+                  feedbackId: txResult.ref.id,
+                  type: "feedback.created",
+                  actor: {
+                    id: resolvedUserId,
+                    name: actor.actorName,
+                    photoURL: actor.actorPhotoURL ?? null,
+                  },
+                  title: `${actor.actorName} reported "${feedbackTitle || "a ticket"}" in ${sessionTitle || "a session"}`,
+                  entityTitle: feedbackTitle || null,
+                  body: null,
+                });
+              }
+            } catch (err) {
+              console.error("[NOTIFICATION] feedback.created failed:", err);
+            }
           } catch (err) {
             console.error("[ACTIVITY_EVENT] failed:", err);
           }
@@ -617,6 +650,52 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
             feedbackTitle,
             sessionTitle,
           },
+        });
+
+        const notifWorkspaceId = result.resolveDelta.workspaceId;
+        const notifSessionId = sid;
+        const notifActor = {
+          id: actorId,
+          name: actor.actorName,
+          photoURL: actor.actorPhotoURL ?? null,
+        };
+        const notifEventType: "feedback.resolved" | "feedback.reopened" =
+          result.toStatus === "resolved"
+            ? "feedback.resolved"
+            : "feedback.reopened";
+        const notifVerb =
+          notifEventType === "feedback.resolved" ? "resolved" : "reopened";
+        const notifTitleLabel = feedbackTitle || "a ticket";
+        const feedbackCreatorId =
+          typeof fdData.userId === "string" ? fdData.userId : "";
+        const feedbackAssigneeId =
+          typeof fdData.assigneeId === "string" ? fdData.assigneeId : "";
+
+        fireAndForget("notification:feedback.status", async () => {
+          const recipients: string[] = [];
+          if (feedbackCreatorId && feedbackCreatorId !== actorId) {
+            recipients.push(feedbackCreatorId);
+          }
+          if (
+            feedbackAssigneeId &&
+            feedbackAssigneeId !== actorId &&
+            feedbackAssigneeId !== feedbackCreatorId
+          ) {
+            recipients.push(feedbackAssigneeId);
+          }
+          if (recipients.length === 0) return;
+          await dispatchNotifications({
+            recipientIds: recipients,
+            workspaceId: notifWorkspaceId,
+            sessionId: notifSessionId,
+            sessionTitle: sessionTitle || null,
+            feedbackId,
+            type: notifEventType,
+            actor: notifActor,
+            title: `${notifActor.name} ${notifVerb} "${notifTitleLabel}"`,
+            entityTitle: notifTitleLabel || null,
+            body: null,
+          });
         });
       }
     }

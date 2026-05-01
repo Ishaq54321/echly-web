@@ -7,6 +7,7 @@ import { formatDistanceToNow } from "date-fns";
 import type { Feedback } from "@/lib/domain/feedback";
 import { getTicketStatus } from "@/lib/domain/feedback";
 import { TicketItem } from "./TicketItem";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 function formatRelativeTime(timestamp: any): string {
   try {
@@ -59,24 +60,30 @@ export interface TicketListProps {
   /** True while `/api/feedback/search` is in flight. */
   searchLoading?: boolean;
   sessionTitle?: string;
+  /** True once the session document has loaded — gates hero card skeleton vs real content. */
+  sessionLoaded?: boolean;
   workspaceName?: string;
   updatedAt?: any;
   viewCount?: number;
+  recentViewers?: Array<{ id: string; displayName: string | null; avatarUrl: string | null; isAnonymous: boolean; viewedAt: number }>;
   canRenameTitle?: boolean;
   onRenameTitle?: (title: string) => Promise<void>;
 }
 
-/** Skeleton list for Open / Resolved section bodies while loading. */
+/** Skeleton list for Open / Resolved section bodies while loading.
+ *  Mirrors real TicketItem dims (px-3 py-2.5, 30x30 icon, gap 10px, text 14px).
+ *  First row is blue-tinted to mirror the active/selected state. */
+const TICKET_SKEL_WIDTHS = ["70%", "60%", "50%", "65%", "55%", "72%", "48%", "63%"] as const;
 function TicketListSectionLoading() {
   return (
     <div className="flex flex-col gap-0" aria-busy="true">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="flex flex-col gap-0.5 px-6 py-2.5">
+      {TICKET_SKEL_WIDTHS.map((width, i) => (
+        <div key={i} className={`tl-skel-row ${i === 0 ? "tl-skel-row-active" : ""}`}>
+          <div className={`tl-skel-ticket-icon ${i === 0 ? "skel-blue-strong" : "skel-block"}`} />
           <div
-            className="h-3.5 rounded-md bg-[var(--surface-hover)]-foreground/15 animate-pulse"
-            style={{ width: `${55 + (i % 4) * 10}%` }}
+            className={`tl-skel-ticket-text ${i === 0 ? "skel-blue" : "skel-block"}`}
+            style={{ width }}
           />
-          <div className="h-3 w-20 rounded-md bg-[var(--surface-hover)]-foreground/10 animate-pulse" />
         </div>
       ))}
     </div>
@@ -106,9 +113,11 @@ function TicketListInner({
   searchResults = [],
   searchLoading = false,
   sessionTitle,
+  sessionLoaded = false,
   workspaceName,
   updatedAt,
   viewCount,
+  recentViewers,
   canRenameTitle,
   onRenameTitle,
 }: TicketListProps) {
@@ -300,69 +309,110 @@ function TicketListInner({
 
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
 
+  const namedViewers = (recentViewers ?? []).filter((v) => !v.isAnonymous && v.displayName);
+  const anonCount = (recentViewers ?? []).filter((v) => v.isAnonymous).length;
+  const totalTracked = recentViewers?.length ?? 0;
+  const remainingViewers = Math.max((viewCount ?? 0) - totalTracked, 0);
+
+  let viewTooltip: string;
+
+  if ((viewCount ?? 0) === 0 || (namedViewers.length === 0 && anonCount === 0)) {
+    viewTooltip = `${viewCount ?? 0} ${(viewCount ?? 0) === 1 ? "view" : "views"}`;
+  } else {
+    const lines: string[] = [];
+
+    const maxNamed = Math.min(namedViewers.length, 5);
+    for (let i = 0; i < maxNamed; i++) {
+      lines.push(namedViewers[i].displayName!);
+    }
+
+    if (anonCount > 0) {
+      lines.push(anonCount === 1 ? "1 anonymous viewer" : `${anonCount} anonymous viewers`);
+    }
+
+    const namedBeyond5 = Math.max(namedViewers.length - 5, 0);
+    const totalRemaining = namedBeyond5 + remainingViewers;
+    if (totalRemaining > 0) {
+      lines.push(`${totalRemaining} more`);
+    }
+
+    viewTooltip = lines.join("\n");
+  }
+
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden p-4">
       {/* Session / Views row */}
       <div className="flex items-center justify-between px-3 py-2">
         <span className="text-[14px] font-semibold text-[var(--text-heading)] truncate">{workspaceName || 'Workspace'}</span>
-        <button
-          type="button"
-          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-heading)] transition-colors border-0 bg-transparent cursor-pointer"
-        >
-          <Eye size={14} strokeWidth={2} />
-          0 Views
-        </button>
-      </div>
-
-      {/* Hero card */}
-      {sessionTitle && (
-        <div
-          className="mb-4 p-4 pb-3.5 rounded-[12px] relative overflow-hidden shrink-0"
-          style={{
-            background: 'radial-gradient(120% 110% at 100% 0%, rgba(23,117,224,0.10) 0%, rgba(23,117,224,0) 55%), linear-gradient(180deg, var(--brand-subtle) 0%, var(--surface-card) 100%)',
-            border: '1px solid rgba(23,117,224,0.10)',
-          }}
-        >
-          {isEditingTitle ? (
-            <input
-              ref={titleInputRef}
-              type="text"
-              value={titleDraft}
-              onChange={(e) => setTitleDraft(e.target.value)}
-              onBlur={handleTitleSave}
-              onKeyDown={handleTitleKeyDown}
-              className="text-[18px] font-semibold text-[var(--text-heading)] tracking-[-0.012em] leading-[1.35] mb-1 w-full bg-transparent border-0 border-b-2 border-[var(--brand)] outline-none px-0 py-0"
-            />
-          ) : (
-            <div
-              className={`group/title flex items-center gap-2 mb-1 ${canRenameTitle ? 'cursor-pointer' : ''}`}
-              onClick={() => canRenameTitle && setIsEditingTitle(true)}
-            >
-              <h3 className={`text-[18px] font-semibold text-[var(--text-heading)] tracking-[-0.012em] leading-[1.35] transition-colors ${canRenameTitle ? 'group-hover/title:text-[var(--brand)]' : ''}`}>
-                {sessionTitle}
-              </h3>
-              {canRenameTitle && (
-                <PencilLine
-                  size={14}
-                  strokeWidth={1.5}
-                  className="shrink-0 text-[var(--text-tertiary)] opacity-0 group-hover/title:opacity-100 group-hover/title:text-[var(--brand)] transition-all"
-                />
-              )}
-            </div>
-          )}
-          <p className="text-[14px] text-[var(--text-secondary)] leading-[1.5] mb-3 max-w-[80%]">
-            {total} ticket{total !== 1 ? 's' : ''} in this session. Walk through, leave notes, resolve as you go.
-          </p>
+        <Tooltip content={viewTooltip} position="bottom">
           <button
             type="button"
-            onClick={() => setInviteModalOpen(true)}
-            className="inline-flex items-center gap-1.5 h-8 px-4 rounded-[7px] bg-[var(--text-heading)] text-white text-[13px] font-semibold tracking-[-0.005em] border-0 cursor-pointer hover:bg-black transition-colors"
+            className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-heading)] transition-colors border-0 bg-transparent cursor-pointer"
           >
-            <UsersRound size={14} strokeWidth={2} />
-            Invite Team
+            <Eye size={14} strokeWidth={2} />
+            {viewCount ?? 0} {(viewCount ?? 0) === 1 ? "View" : "Views"}
           </button>
-        </div>
-      )}
+        </Tooltip>
+      </div>
+
+      {/* Hero card — always rendered to keep layout stable; shows skeleton while session loads. */}
+      <div
+        className="mb-4 p-4 pb-3.5 rounded-[12px] relative overflow-hidden shrink-0"
+        style={{
+          background: 'radial-gradient(120% 110% at 100% 0%, rgba(23,117,224,0.10) 0%, rgba(23,117,224,0) 55%), linear-gradient(180deg, var(--brand-subtle) 0%, var(--surface-card) 100%)',
+          border: '1px solid rgba(23,117,224,0.10)',
+        }}
+      >
+        {sessionLoaded ? (
+          <>
+            {isEditingTitle ? (
+              <input
+                ref={titleInputRef}
+                type="text"
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onBlur={handleTitleSave}
+                onKeyDown={handleTitleKeyDown}
+                className="text-[18px] font-semibold text-[var(--text-heading)] tracking-[-0.012em] leading-[1.35] mb-1 w-full bg-transparent border-0 border-b-2 border-[var(--brand)] outline-none px-0 py-0"
+              />
+            ) : (
+              <div
+                className={`group/title flex items-center gap-2 mb-1 ${canRenameTitle ? 'cursor-pointer' : ''}`}
+                onClick={() => canRenameTitle && setIsEditingTitle(true)}
+              >
+                <h3 className={`text-[18px] font-semibold text-[var(--text-heading)] tracking-[-0.012em] leading-[1.35] transition-colors ${canRenameTitle ? 'group-hover/title:text-[var(--brand)]' : ''}`}>
+                  {sessionTitle || "Untitled"}
+                </h3>
+                {canRenameTitle && (
+                  <PencilLine
+                    size={14}
+                    strokeWidth={1.5}
+                    className="shrink-0 text-[var(--text-tertiary)] opacity-0 group-hover/title:opacity-100 group-hover/title:text-[var(--brand)] transition-all"
+                  />
+                )}
+              </div>
+            )}
+            <p className="text-[14px] text-[var(--text-secondary)] leading-[1.5] mb-3 max-w-[80%]">
+              {total} ticket{total !== 1 ? 's' : ''} in this session. Walk through, leave notes, resolve as you go.
+            </p>
+            <button
+              type="button"
+              onClick={() => setInviteModalOpen(true)}
+              className="inline-flex items-center gap-1.5 h-8 px-4 rounded-[7px] bg-[var(--text-heading)] text-white text-[13px] font-semibold tracking-[-0.005em] border-0 cursor-pointer hover:bg-black transition-colors"
+            >
+              <UsersRound size={14} strokeWidth={2} />
+              Invite Team
+            </button>
+          </>
+        ) : (
+          <div aria-busy="true" aria-label="Loading session">
+            <div className="tl-skel-title skel-blue" />
+            <div className="tl-skel-desc skel-blue" />
+            <div className="tl-skel-desc-2 skel-blue" />
+            <div className="tl-skel-btn skel-blue" />
+          </div>
+        )}
+      </div>
 
       {/* Status sections: Open → Resolved. Soft pill badges, no hard blocks. */}
       <div
@@ -386,26 +436,35 @@ function TicketListInner({
 
         {/* Open */}
         <section className="mb-4">
-          {!countsLoading && (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  if (openExpandedControlled) onOpenExpandedChange?.();
-                  else setOpenExpandedInternal((x) => !x);
-                }}
-                className="w-full flex items-center gap-2 text-[14px] font-medium text-[var(--text-heading)] px-3 py-2 tracking-[-0.01em] border-0 bg-transparent cursor-pointer hover:bg-[var(--surface-hover)] rounded-[var(--radius-sm)] transition-colors"
-                aria-expanded={openExpanded}
-              >
-                <ChevronRight
-                  size={14}
-                  className={`text-[var(--text-tertiary)] transition-transform duration-200 ${openExpanded ? 'rotate-90' : ''}`}
-                />
-                <span>Open</span>
-                <span className="text-[var(--text-heading)] text-[14px] font-medium">{open}</span>
-              </button>
-              {openExpanded && (
-                <div className="mt-1 space-y-0.5 transition-opacity duration-150 ease-out">
+          <button
+            type="button"
+            onClick={() => {
+              if (countsLoading) return;
+              if (openExpandedControlled) onOpenExpandedChange?.();
+              else setOpenExpandedInternal((x) => !x);
+            }}
+            className="w-full flex items-center gap-2 text-[14px] font-medium text-[var(--text-heading)] px-3 py-2 tracking-[-0.01em] border-0 bg-transparent cursor-pointer hover:bg-[var(--surface-hover)] rounded-[var(--radius-sm)] transition-colors"
+            aria-expanded={openExpanded}
+            aria-busy={countsLoading || undefined}
+            disabled={countsLoading}
+          >
+            <ChevronRight
+              size={14}
+              className={`text-[var(--text-tertiary)] transition-transform duration-200 ${openExpanded ? 'rotate-90' : ''}`}
+            />
+            <span>Open</span>
+            {countsLoading ? (
+              <span className="tl-skel-count skel-block" aria-hidden />
+            ) : (
+              <span className="text-[var(--text-heading)] text-[14px] font-medium">{open}</span>
+            )}
+          </button>
+          {openExpanded && (
+            <div className="mt-1 space-y-0.5 transition-opacity duration-150 ease-out">
+              {countsLoading && openItems.length === 0 ? (
+                <TicketListSectionLoading />
+              ) : (
+                <>
                   {openItems.map((item, idx) => (
                     <TicketItem
                       key={item.id}
@@ -418,7 +477,7 @@ function TicketListInner({
                       isNewTicket={item.id === newTicketId}
                     />
                   ))}
-                  {openItems.length === 0 && !showSearchEmpty && (
+                  {openItems.length === 0 && !showSearchEmpty && !countsLoading && (
                     <>
                       {open === 0 ? (
                         <p className="px-2.5 py-3 text-[12px] text-[var(--text-tertiary)]">
@@ -430,34 +489,43 @@ function TicketListInner({
                     </>
                   )}
                   {isLoadingOpen && <TicketListSectionLoading />}
-                </div>
+                </>
               )}
-            </>
+            </div>
           )}
         </section>
 
         {/* Resolved */}
         <section className="mb-4">
-          {!countsLoading && (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  if (resolvedExpandedControlled) onResolvedExpandedChange?.();
-                  else setResolvedExpandedInternalOnly(!resolvedExpanded);
-                }}
-                className="w-full flex items-center gap-2 text-[14px] font-medium text-[var(--text-heading)] px-3 py-2 tracking-[-0.01em] border-0 bg-transparent cursor-pointer hover:bg-[var(--surface-hover)] rounded-[var(--radius-sm)] transition-colors"
-                aria-expanded={resolvedExpanded}
-              >
-                <ChevronRight
-                  size={14}
-                  className={`text-[var(--text-tertiary)] transition-transform duration-200 ${resolvedExpanded ? 'rotate-90' : ''}`}
-                />
-                <span>Resolved</span>
-                <span className="text-[var(--text-heading)] text-[14px] font-medium">{resolved}</span>
-              </button>
-              {resolvedExpanded && (
-                <div className="mt-1 space-y-0.5 transition-opacity duration-150 ease-out">
+          <button
+            type="button"
+            onClick={() => {
+              if (countsLoading) return;
+              if (resolvedExpandedControlled) onResolvedExpandedChange?.();
+              else setResolvedExpandedInternalOnly(!resolvedExpanded);
+            }}
+            className="w-full flex items-center gap-2 text-[14px] font-medium text-[var(--text-heading)] px-3 py-2 tracking-[-0.01em] border-0 bg-transparent cursor-pointer hover:bg-[var(--surface-hover)] rounded-[var(--radius-sm)] transition-colors"
+            aria-expanded={resolvedExpanded}
+            aria-busy={countsLoading || undefined}
+            disabled={countsLoading}
+          >
+            <ChevronRight
+              size={14}
+              className={`text-[var(--text-tertiary)] transition-transform duration-200 ${resolvedExpanded ? 'rotate-90' : ''}`}
+            />
+            <span>Resolved</span>
+            {countsLoading ? (
+              <span className="tl-skel-count skel-block" aria-hidden />
+            ) : (
+              <span className="text-[var(--text-heading)] text-[14px] font-medium">{resolved}</span>
+            )}
+          </button>
+          {resolvedExpanded && (
+            <div className="mt-1 space-y-0.5 transition-opacity duration-150 ease-out">
+              {countsLoading && resolvedItems.length === 0 ? (
+                <TicketListSectionLoading />
+              ) : (
+                <>
                   {resolvedItems.map((item, idx) => (
                     <TicketItem
                       key={item.id}
@@ -480,9 +548,9 @@ function TicketListInner({
                     </>
                   )}
                   {showResolvedListLoading && <TicketListSectionLoading />}
-                </div>
+                </>
               )}
-            </>
+            </div>
           )}
         </section>
 

@@ -55,6 +55,7 @@ export type SessionOverlayProps = {
   audioAnalyser?: AnalyserNode | null;
   voiceError?: VoiceCaptureError;
   onRetryVoice?: () => void;
+  onResetVoice?: () => void;
   onSelectMicrophone?: (deviceId: string) => void;
   voiceMicDeviceId?: string;
   theme?: "light" | "dark";
@@ -89,6 +90,7 @@ export function SessionOverlay({
   audioAnalyser = null,
   voiceError = null,
   onRetryVoice,
+  onResetVoice,
   onSelectMicrophone,
   voiceMicDeviceId = "",
   theme = "dark",
@@ -235,6 +237,7 @@ export function SessionOverlay({
           analyser={!isFinishing && !voiceError ? (audioAnalyser ?? null) : null}
           voiceError={voiceError}
           onRetryVoice={onRetryVoice}
+          onResetVoice={onResetVoice}
           onSelectMicrophone={onSelectMicrophone}
           voiceMicDeviceId={voiceMicDeviceId}
           elementSelector={elemSelector}

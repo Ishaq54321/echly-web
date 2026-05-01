@@ -15,6 +15,7 @@ import type { OverviewActivityItem } from "./hooks/useSessionOverview";
 import { formatOverviewDate, formatActivityTime } from "@/lib/utils/date";
 import { copySessionLink } from "@/utils/copySessionLink";
 import type { Timestamp } from "firebase/firestore";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 function resolutionLabel(isResolved: boolean): string {
   return isResolved ? "Done" : "Open";
@@ -238,13 +239,12 @@ function RecentActivity({ items }: { items: OverviewActivityItem[] }) {
                   <p className="text-sm font-medium text-[var(--text-primary)]">
                     {item.actorName}
                   </p>
-                  <p
-                    className="text-xs text-[var(--text-secondary)] truncate"
-                    title={targetTrim ? item.targetTitle : undefined}
-                  >
-                    {item.action}
-                    {targetTrim ? ` · ${item.targetTitle}` : ""}
-                  </p>
+                  <Tooltip content={targetTrim ? item.targetTitle : ""}>
+                    <p className="text-xs text-[var(--text-secondary)] truncate">
+                      {item.action}
+                      {targetTrim ? ` · ${item.targetTitle}` : ""}
+                    </p>
+                  </Tooltip>
                 </div>
                 {timeLabel ? (
                   <span className="text-xs text-[var(--text-muted)] shrink-0">

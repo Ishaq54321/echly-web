@@ -601,6 +601,23 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     return () => window.removeEventListener("ECHLY_OPEN_PREVIOUS_SESSIONS", handler);
   }, []);
 
+  /* Extension: when background forwards ECHLY_RESUME_SESSION to this tab, set the active session and enter session mode (skip the picker). */
+  React.useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ sessionId?: string }>).detail;
+      const sessionId = detail?.sessionId;
+      if (typeof sessionId !== "string" || sessionId.length === 0) return;
+      logger.debug("extension", "resume_session_received", { sessionId });
+      onActiveSessionChange(sessionId);
+      chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch((err) =>
+        logSendMessageRejection("ECHLY_SESSION_MODE_START (ECHLY_RESUME_SESSION)", err)
+      );
+      onExpandRequest();
+    };
+    window.addEventListener("ECHLY_RESUME_SESSION", handler);
+    return () => window.removeEventListener("ECHLY_RESUME_SESSION", handler);
+  }, []);
+
   /* Extension: open widget (icon or popup) → request expand so background keeps state in sync. */
   React.useEffect(() => {
     const handler = () => {
@@ -923,6 +940,10 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
       } | null,
       options?: { sessionMode?: boolean }
     ): Promise<StructuredFeedback> => {
+      if (feedbackLimitReached) {
+        callbacks?.onError?.();
+        throw new Error("Feedback limit reached");
+      }
       const feedbackId = generateFeedbackId();
       const jobId = callbacks ? feedbackId : null;
       if (jobId) {
@@ -980,7 +1001,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         endLocalOp();
       }
     },
-    [processFeedbackPipeline, startLocalOp, endLocalOp, setFeedbackLimitReached]
+    [processFeedbackPipeline, startLocalOp, endLocalOp, setFeedbackLimitReached, feedbackLimitReached]
   );
 
   const handleDelete = React.useCallback(
@@ -1448,6 +1469,21 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 );
               }
             })().catch((err) => logSendMessageRejection("ECHLY_SESSION_MODE_END chain", err));
+          }}
+          onSessionModeEndSoft={() => {
+            window.__ECHLY_DISCONNECT_KEEPALIVE__?.();
+            void (async () => {
+              try {
+                await new Promise<void>((resolve, reject) => {
+                  chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_END_SOFT" }, () => {
+                    if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
+                    else resolve();
+                  });
+                });
+              } catch (err) {
+                logSendMessageRejection("ECHLY_SESSION_MODE_END_SOFT", err);
+              }
+            })();
           }}
           captureRootParent={widgetRoot}
           launcherLogoUrl={launcherLogoUrl}

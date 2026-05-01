@@ -168,6 +168,8 @@ export type CaptureWidgetProps = {
   onSessionModeResume?: () => void;
   /** Extension: notify background that session ended (disable overlay in all tabs). */
   onSessionModeEnd?: () => void;
+  /** Extension: soft end — clear session state but keep widget open and stay on home screen (no redirect). */
+  onSessionModeEndSoft?: () => void;
   /** Extension: notify background of user activity (resets 30-min idle timeout). Called on click capture, etc. */
   onSessionActivity?: () => void;
   /** Extension: global capture mode (voice vs text). When "voice", element click opens voice UI; when "text", opens text UI. */
@@ -202,6 +204,8 @@ export type CaptureWidgetProps = {
   sessionLimitReached?: { message: string; upgradePlan: unknown } | null;
   /** Extension: when set (POST /api/feedback returned 403 PLAN_LIMIT_REACHED for tickets), show ticket upgrade screens. */
   feedbackLimitReached?: { message: string; upgradePlan: string } | null;
+  /** Internal: triggers the inline upgrade-card shake animation; wired by CaptureWidget into the hook. */
+  triggerUpgradeShake?: () => void;
   /** Extension: current feedback tickets used this month (from GET_AUTH_STATE usage fetch). */
   feedbackUsage?: number | null;
   /** Extension: max feedback tickets allowed per month for this plan (null = unlimited). */

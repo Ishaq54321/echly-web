@@ -137,7 +137,6 @@ export function PriorityDropdown({
       if (iconOnly) {
         return (
           <div
-            title={`${activePriorityRO.label} Priority`}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -203,24 +202,21 @@ export function PriorityDropdown({
         activePriority ? (
           <button
             type="button"
-            className="inline-flex h-[42px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border text-[var(--text-body)] text-[14px] font-medium transition-all cursor-pointer"
-            style={{ borderColor: `${activePriority.color}30` }}
-            title={`${activePriority.label} Priority`}
+            className="inline-flex h-[42px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] text-[var(--text-heading)] text-[14px] font-medium transition-all cursor-pointer"
             disabled={disabled || isSaving}
             onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
           >
-            <Flag size={18} strokeWidth={1.8} className="shrink-0" fill={activePriority.color} style={{ color: activePriority.color }} />
+            <Flag size={14} strokeWidth={1.7} className="shrink-0" fill={activePriority.color} style={{ color: activePriority.color }} />
             {activePriority.label}
           </button>
         ) : (
           <button
             type="button"
-            className="inline-flex h-[42px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] text-[var(--text-body)] text-[14px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all cursor-pointer"
-            title="Set priority"
+            className="inline-flex h-[42px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] text-[var(--text-heading)] text-[14px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all cursor-pointer"
             disabled={disabled || isSaving}
             onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
           >
-            <Flag size={18} strokeWidth={1.8} className="shrink-0" />
+            <Flag size={14} strokeWidth={1.7} className="shrink-0" />
             Priority
           </button>
         )

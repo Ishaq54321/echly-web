@@ -16,6 +16,10 @@ import {
   truncateActivityCommentPreview,
 } from "@/lib/repositories/activityEventsRepository.server";
 import { fireAndForget } from "@/lib/server/fireAndForget";
+import {
+  resolveSessionRecipients,
+  dispatchNotifications,
+} from "@/lib/server/notificationFanOut.server";
 
 /** Thrown when the feedback doc is missing (e.g. hard-deleted); map to HTTP 404 in API routes. */
 export const ADD_COMMENT_FEEDBACK_MISSING = "ADD_COMMENT_FEEDBACK_MISSING";
@@ -73,6 +77,7 @@ export interface AddCommentData {
   threadId?: string | null;
   attachment?: CommentAttachment;
   attachments?: CommentAttachment[];
+  mentionedUserIds?: string[];
 }
 
 export async function addCommentRepo(
@@ -94,6 +99,9 @@ export async function addCommentRepo(
     throw new Error(ADD_COMMENT_FEEDBACK_MISSING);
   }
   const feedbackData = (feedbackSnap.data() ?? {}) as Record<string, unknown>;
+  const filteredMentionedUserIds = (data.mentionedUserIds ?? []).filter(
+    (id) => typeof id === "string" && id.trim() !== "" && id !== resolvedUserId
+  );
   const payload: Record<string, unknown> = {
     userId: resolvedUserId,
     workspaceId,
@@ -110,6 +118,7 @@ export async function addCommentRepo(
   if (data.threadId != null) payload.threadId = data.threadId;
   if (data.attachment != null) payload.attachment = data.attachment;
   if (data.attachments != null && data.attachments.length > 0) payload.attachments = data.attachments;
+  if (filteredMentionedUserIds.length > 0) payload.mentionedUserIds = filteredMentionedUserIds;
 
   const commentRef = adminDb.collection("comments").doc();
   const sessionRef = adminDb.doc(`sessions/${sessionId}`);
@@ -150,7 +159,88 @@ export async function addCommentRepo(
       feedbackTitle,
       sessionTitle,
       commentPreview,
+      ...(filteredMentionedUserIds.length > 0
+        ? { mentionedUserIds: filteredMentionedUserIds }
+        : {}),
     },
+  });
+
+  fireAndForget("notification:comment", async () => {
+    const notifActor = {
+      id: resolvedUserId,
+      name: actor.actorName,
+      photoURL: actor.actorPhotoURL ?? null,
+    };
+    const titleLabel = feedbackTitle || "a ticket";
+    const previewBody = commentPreview || null;
+
+    const recipients = await resolveSessionRecipients({
+      sessionId,
+      workspaceId,
+      includeWorkspaceOwners: false,
+      excludeUserIds: [resolvedUserId],
+    });
+
+    const feedbackCreatorId =
+      typeof feedbackData.userId === "string" ? feedbackData.userId : "";
+    const feedbackAssigneeId =
+      typeof feedbackData.assigneeId === "string"
+        ? feedbackData.assigneeId
+        : "";
+    if (
+      feedbackCreatorId &&
+      feedbackCreatorId !== resolvedUserId &&
+      !recipients.includes(feedbackCreatorId)
+    ) {
+      recipients.push(feedbackCreatorId);
+    }
+    if (
+      feedbackAssigneeId &&
+      feedbackAssigneeId !== resolvedUserId &&
+      !recipients.includes(feedbackAssigneeId)
+    ) {
+      recipients.push(feedbackAssigneeId);
+    }
+
+    const mentionedIds = filteredMentionedUserIds;
+    const commentRecipients = recipients.filter(
+      (id) => !mentionedIds.includes(id)
+    );
+
+    if (commentRecipients.length > 0) {
+      await dispatchNotifications({
+        recipientIds: commentRecipients,
+        workspaceId,
+        sessionId,
+        sessionTitle: sessionTitle || null,
+        feedbackId,
+        commentId: commentRef.id,
+        type: "comment.added",
+        actor: notifActor,
+        title: `${actor.actorName} commented on "${titleLabel}"`,
+        entityTitle: titleLabel || null,
+        body: previewBody,
+      });
+    }
+
+    const mentionRecipients = mentionedIds.filter(
+      (id) => id !== resolvedUserId
+    );
+    if (mentionRecipients.length > 0) {
+      await dispatchNotifications({
+        recipientIds: mentionRecipients,
+        workspaceId,
+        sessionId,
+        sessionTitle: sessionTitle || null,
+        feedbackId,
+        commentId: commentRef.id,
+        type: "comment.mention",
+        actor: notifActor,
+        title: `${actor.actorName} mentioned you on "${titleLabel}"`,
+        entityTitle: titleLabel || null,
+        body: previewBody,
+      });
+    }
   });
 
   fireAndForget("addCommentRepo-sessionUpdatedAt", () =>

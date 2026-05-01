@@ -1,0 +1,311 @@
+"use client";
+
+import { useSyncExternalStore } from "react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth, db } from "@/lib/firebase";
+import type { NotificationRow } from "@/lib/domain/notification";
+
+type NotificationStoreSnapshot = {
+  notifications: NotificationRow[];
+  unreadCount: number;
+  isLoaded: boolean;
+  isLoading: boolean;
+  error: string | null;
+  hasMore: boolean;
+  nextCursor: string | null;
+  version: number;
+};
+
+const initialSnapshot: NotificationStoreSnapshot = {
+  notifications: [],
+  unreadCount: 0,
+  isLoaded: false,
+  isLoading: false,
+  error: null,
+  hasMore: false,
+  nextCursor: null,
+  version: 0,
+};
+
+let snapshot: NotificationStoreSnapshot = initialSnapshot;
+const listeners = new Set<() => void>();
+
+let unreadUnsubscribe: (() => void) | null = null;
+let authUnsubscribe: (() => void) | null = null;
+let currentUserId: string | null = null;
+let retainCount = 0;
+let inFlightFetchKey: string | null = null;
+
+function emitChange() {
+  listeners.forEach((listener) => listener());
+}
+
+function setSnapshot(next: Partial<NotificationStoreSnapshot>) {
+  snapshot = {
+    ...snapshot,
+    ...next,
+    version: snapshot.version + 1,
+  };
+  emitChange();
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function getSnapshot(): NotificationStoreSnapshot {
+  return snapshot;
+}
+
+function tearDownUnreadListener() {
+  if (unreadUnsubscribe) {
+    unreadUnsubscribe();
+    unreadUnsubscribe = null;
+  }
+  currentUserId = null;
+}
+
+/**
+ * Real-time unread badge: Firestore onSnapshot of unread notifications for the current user.
+ * Only the count is consumed here — full notification data is fetched via REST when the panel opens.
+ */
+function startUnreadListener(userId: string) {
+  if (currentUserId === userId && unreadUnsubscribe) return;
+
+  if (unreadUnsubscribe) {
+    unreadUnsubscribe();
+    unreadUnsubscribe = null;
+  }
+
+  currentUserId = userId;
+
+  const q = query(
+    collection(db, "notifications"),
+    where("userId", "==", userId),
+    where("read", "==", false)
+  );
+
+  unreadUnsubscribe = onSnapshot(
+    q,
+    (snap) => {
+      if (currentUserId !== userId) return;
+      setSnapshot({ unreadCount: snap.size });
+    },
+    (err) => {
+      if (currentUserId !== userId) return;
+      setSnapshot({
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  );
+}
+
+function ensureAuthListener() {
+  if (authUnsubscribe) return;
+  authUnsubscribe = onAuthStateChanged(auth, (user) => {
+    if (!user) {
+      clearNotificationStore();
+      return;
+    }
+    if (retainCount === 0) return;
+    startUnreadListener(user.uid);
+  });
+}
+
+/**
+ * Increment retain count and ensure the unread listener is active for the current user.
+ * Returns a release function — listener is torn down only when retain count returns to zero.
+ */
+export function retainNotificationListener(): () => void {
+  retainCount += 1;
+  ensureAuthListener();
+  const user = auth.currentUser;
+  if (user) {
+    startUnreadListener(user.uid);
+  }
+
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    retainCount = Math.max(0, retainCount - 1);
+    if (retainCount === 0) {
+      tearDownUnreadListener();
+      if (authUnsubscribe) {
+        authUnsubscribe();
+        authUnsubscribe = null;
+      }
+    }
+  };
+}
+
+/** Auth sign-out: drop retain count, tear down listeners, and clear all state. */
+export function clearNotificationStore(): void {
+  retainCount = 0;
+  tearDownUnreadListener();
+  if (authUnsubscribe) {
+    authUnsubscribe();
+    authUnsubscribe = null;
+  }
+  inFlightFetchKey = null;
+  snapshot = { ...initialSnapshot, version: snapshot.version + 1 };
+  emitChange();
+}
+
+export interface FetchNotificationsOptions {
+  cursor?: string | null;
+  append?: boolean;
+}
+
+/**
+ * Fetch a page of notifications via REST. Replaces the list (default) or appends (for "Load more").
+ */
+export async function fetchNotifications(
+  options?: FetchNotificationsOptions
+): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const cursor = options?.cursor ?? null;
+  const append = options?.append === true;
+
+  // Dedupe in-flight requests for the same cursor.
+  const fetchKey = `${cursor ?? ""}:${append ? "append" : "replace"}`;
+  if (inFlightFetchKey === fetchKey) return;
+  inFlightFetchKey = fetchKey;
+
+  setSnapshot({ isLoading: true, error: null });
+
+  try {
+    const params = new URLSearchParams();
+    params.set("limit", "20");
+    if (cursor) params.set("cursor", cursor);
+    const res = await fetch(`/api/notifications?${params.toString()}`, {
+      method: "GET",
+      cache: "no-store",
+    });
+    const json = (await res.json()) as {
+      success?: boolean;
+      data?: {
+        notifications?: NotificationRow[];
+        nextCursor?: string | null;
+        unreadCount?: number;
+      };
+      error?: { message?: string };
+    };
+
+    if (!res.ok || json.success === false) {
+      const message = json.error?.message || `HTTP ${res.status}`;
+      setSnapshot({ isLoading: false, error: message });
+      return;
+    }
+
+    const data = json.data ?? {};
+    const incoming = Array.isArray(data.notifications) ? data.notifications : [];
+    const nextCursor = typeof data.nextCursor === "string" ? data.nextCursor : null;
+    const unreadCount =
+      typeof data.unreadCount === "number" ? data.unreadCount : snapshot.unreadCount;
+
+    let merged: NotificationRow[];
+    if (append) {
+      const seen = new Set(snapshot.notifications.map((n) => n.id));
+      const fresh = incoming.filter((n) => !seen.has(n.id));
+      merged = [...snapshot.notifications, ...fresh];
+    } else {
+      merged = incoming;
+    }
+
+    setSnapshot({
+      notifications: merged,
+      unreadCount,
+      hasMore: nextCursor != null,
+      nextCursor,
+      isLoaded: true,
+      isLoading: false,
+      error: null,
+    });
+  } catch (err) {
+    setSnapshot({
+      isLoading: false,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  } finally {
+    if (inFlightFetchKey === fetchKey) {
+      inFlightFetchKey = null;
+    }
+  }
+}
+
+export async function markRead(notificationId: string): Promise<void> {
+  const id = notificationId?.trim();
+  if (!id) return;
+  const user = auth.currentUser;
+  if (!user) return;
+
+  // Optimistic local update.
+  const prev = snapshot.notifications;
+  const target = prev.find((n) => n.id === id);
+  if (target && !target.read) {
+    setSnapshot({
+      notifications: prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+      unreadCount: Math.max(0, snapshot.unreadCount - 1),
+    });
+  } else if (target?.read) {
+    return;
+  } else {
+    setSnapshot({
+      notifications: prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+    });
+  }
+
+  try {
+    await fetch(`/api/notifications`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notificationId: id }),
+    });
+  } catch (err) {
+    console.error("[notifications] markRead failed", err);
+  }
+}
+
+export function updateNotificationActionStatus(
+  notificationId: string,
+  actionStatus: "pending" | "approved" | "rejected"
+): void {
+  const id = notificationId?.trim();
+  if (!id) return;
+  const prev = snapshot.notifications;
+  if (!prev.some((n) => n.id === id)) return;
+  setSnapshot({
+    notifications: prev.map((n) => (n.id === id ? { ...n, actionStatus } : n)),
+  });
+}
+
+export async function markAllRead(): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  // Optimistic local update.
+  const prev = snapshot.notifications;
+  setSnapshot({
+    notifications: prev.map((n) => (n.read ? n : { ...n, read: true })),
+    unreadCount: 0,
+  });
+
+  try {
+    await fetch(`/api/notifications/read-all`, {
+      method: "POST",
+    });
+  } catch (err) {
+    console.error("[notifications] markAllRead failed", err);
+  }
+}
+
+export function useNotificationStore(): NotificationStoreSnapshot {
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}

@@ -16,6 +16,8 @@ import { GlobalSearchButton } from "@/components/layout/GlobalSearchButton";
 import { GlobalNotificationButton } from "@/components/layout/GlobalNotificationButton";
 import { ProfileDropdown } from "@/components/layout/ProfileDropdown";
 import { SessionActionsDropdown } from "@/components/dashboard/SessionActionsDropdown";
+import { triggerAddMoreTickets } from "@/components/dashboard/hooks/triggerAddMoreTickets";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { copySessionLink } from "@/utils/copySessionLink";
 import {
   assertIdentityResolved,
@@ -153,18 +155,18 @@ export function TopControlBar({
       >
         {/* Left: Panel Toggle + Logo */}
         <div className="flex items-center gap-3.5">
-          <button
-            type="button"
-            onClick={onToggleNavPanel}
-            className="w-10 h-10 rounded-lg grid place-items-center text-[var(--text-body)] hover:bg-black/[0.04] hover:text-[var(--text-heading)] transition-colors cursor-pointer border-0 bg-transparent shrink-0"
-            title="Open navigation"
-          >
-            <PanelLeftOpen size={22} strokeWidth={2} />
-          </button>
+          <Tooltip content="Open navigation">
+            <button
+              type="button"
+              onClick={onToggleNavPanel}
+              className="w-10 h-10 rounded-lg grid place-items-center text-[var(--text-heading)] hover:bg-black/[0.04] transition-colors cursor-pointer border-0 bg-transparent shrink-0"
+            >
+              <PanelLeftOpen size={22} strokeWidth={2.2} />
+            </button>
+          </Tooltip>
           <Link
             href="/dashboard"
             className="flex items-center gap-2.5 font-bold text-[var(--text-heading)] text-[18px] tracking-[-0.02em] no-underline shrink-0"
-            title="Go to dashboard"
           >
             <div className="w-[32px] h-[32px] rounded-[9px] bg-[var(--brand)] flex items-center justify-center overflow-hidden shrink-0">
               <Image src="/Echly_logo.svg" alt="" width={32} height={32} sizes="32px" className="object-cover" />
@@ -181,14 +183,14 @@ export function TopControlBar({
               type="text"
               value={searchQuery ?? ""}
               onChange={(e) => onSearchChange?.(e.target.value)}
-              placeholder="Search tickets, comments, sessions…"
+              placeholder="Search ticket title..."
               className="flex-1 border-0 outline-0 bg-transparent text-[14px] text-[var(--text-heading)] placeholder:text-[var(--text-tertiary)] font-[inherit] min-w-0"
             />
           </div>
         </div>
 
         {/* Right: Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           {/* Share + Copy link merged pill */}
           <div className="relative">
             <div className={`flex items-center bg-[var(--brand)] rounded-[var(--radius-btn)] shadow-[0_1px_0_rgba(255,255,255,0.2)_inset,0_1px_2px_rgba(23,117,224,0.3)] overflow-hidden hover:bg-[var(--brand-hover)] transition-colors${!sessionLoaded ? ' opacity-50 pointer-events-none' : ''}`}>
@@ -201,15 +203,16 @@ export function TopControlBar({
                 Share
               </button>
               <div className="w-[1.5px] self-stretch bg-white/30" />
-              <button
-                type="button"
-                onClick={copyCurrentLink}
-                className="flex items-center justify-center h-[38px] w-[40px] text-white border-0 bg-transparent cursor-pointer hover:bg-white/10 transition-colors"
-                title="Copy link"
-                disabled={linkCopyBusy}
-              >
-                {linkCopied ? <Check size={16} strokeWidth={2} /> : <LinkIcon size={16} strokeWidth={2} />}
-              </button>
+              <Tooltip content="Copy link">
+                <button
+                  type="button"
+                  onClick={copyCurrentLink}
+                  className="flex items-center justify-center h-[38px] w-[40px] text-white border-0 bg-transparent cursor-pointer hover:bg-white/10 transition-colors"
+                  disabled={linkCopyBusy}
+                >
+                  {linkCopied ? <Check size={16} strokeWidth={2} /> : <LinkIcon size={16} strokeWidth={2} />}
+                </button>
+              </Tooltip>
             </div>
             {pendingRequestsCount > 0 && (
               <span
@@ -295,12 +298,14 @@ export function TopControlBar({
                 session={session}
                 variant="list"
                 flipPlacement
-                hideActions={["copyLink"]}
+                hideActions={["share"]}
                 onRenameSuccess={onSessionRenameSuccess}
                 onSetArchived={onSetSessionArchived}
                 onRequestDelete={onRequestDeleteSession}
-                triggerClassName="w-8 h-8 rounded-lg grid place-items-center text-[var(--text-body)] hover:bg-black/[0.04] cursor-pointer border-0 bg-transparent"
-                triggerIconClassName="h-5 w-5"
+                onAddMoreTickets={() => triggerAddMoreTickets(sessionId)}
+                triggerClassName="w-9 h-9 rounded-lg grid place-items-center text-[var(--text-heading)] hover:bg-black/[0.04] cursor-pointer border-0 bg-transparent"
+                triggerIconClassName="h-[22px] w-[22px]"
+                triggerIconStrokeWidth={2.2}
                 triggerAriaLabel="Session actions"
               />
             </div>

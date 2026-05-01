@@ -105,6 +105,7 @@ export async function GET(req: NextRequest) {
         sessionFieldToIso(session.updatedAt) ??
         sessionFieldToIso(session.createdAt) ??
         null;
+      const createdAt = sessionFieldToIso(session.createdAt) ?? null;
       const title =
         typeof session.title === "string" && session.title.trim() !== ""
           ? session.title.trim()
@@ -125,6 +126,12 @@ export async function GET(req: NextRequest) {
             ? session.totalCount
             : 0;
 
+      const viewCount =
+        typeof session.viewCount === "number" ? session.viewCount : 0;
+      const recentViewers = Array.isArray(session.recentViewers)
+        ? session.recentViewers
+        : [];
+
       return {
         id: session.id,
         workspaceId: session.workspaceId,
@@ -134,11 +141,14 @@ export async function GET(req: NextRequest) {
         accessLevel: session.accessLevel,
         generalAccess: session.generalAccess,
         updatedAt,
+        createdAt,
         archived: session.archived === true || session.isArchived === true,
         openCount,
         resolvedCount,
         totalCount,
         feedbackCount,
+        viewCount,
+        recentViewers,
       };
     });
     const nextOffset = offset + sessionsPayload.length;

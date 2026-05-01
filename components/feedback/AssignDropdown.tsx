@@ -262,7 +262,6 @@ export function AssignDropdown({
       if (iconOnly) {
         return (
           <div
-            title={currentAssigneeName ? `Assigned to ${currentAssigneeName}` : "Assigned"}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -283,7 +282,6 @@ export function AssignDropdown({
       }
       return (
         <div
-          title={currentAssigneeName ? `Assigned to ${currentAssigneeName}` : "Assigned"}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -354,23 +352,21 @@ export function AssignDropdown({
           hasAssignee ? (
             <button
               type="button"
-              className="inline-flex h-[42px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] text-[var(--text-body)] text-[14px] font-medium hover:bg-[var(--surface-hover)] transition-all cursor-pointer"
-              title={tooltipText}
+              className="inline-flex h-[42px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] text-[var(--text-heading)] text-[14px] font-medium hover:bg-[var(--surface-hover)] transition-all cursor-pointer"
               disabled={disabled || isSaving}
               onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
             >
-              <Avatar name={displayName} avatarUrl={currentAssigneeAvatarUrl} size={22} />
+              <Avatar name={displayName} avatarUrl={currentAssigneeAvatarUrl} size={20} />
               <span className="truncate max-w-[80px]">{firstName}</span>
             </button>
           ) : (
             <button
               type="button"
-              className="inline-flex h-[42px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] text-[var(--text-body)] text-[14px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all cursor-pointer"
-              title="Assign"
+              className="inline-flex h-[42px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] text-[var(--text-heading)] text-[14px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all cursor-pointer"
               disabled={disabled || isSaving}
               onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
             >
-              <UserPlus size={18} strokeWidth={1.8} className="shrink-0" />
+              <UserPlus size={14} strokeWidth={1.7} className="shrink-0" />
               Assign
             </button>
           )
@@ -380,7 +376,6 @@ export function AssignDropdown({
             style={hasAssignee ? assignedStyle : undefined}
             className={!hasAssignee ? unassignedCls : undefined}
             disabled={disabled || isSaving}
-            title={hasAssignee ? tooltipText : undefined}
             onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
           >
             {hasAssignee ? (
@@ -519,7 +514,25 @@ export function AssignDropdown({
                 </div>
               )}
               {!membersLoaded && (
-                <div style={{ padding: "8px 12px", fontSize: 14, color: "var(--text-tertiary)" }}>Loading…</div>
+                <>
+                  {[55, 65, 45].map((w, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        width: "calc(100% - 8px)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "8px 12px",
+                        margin: "0 4px",
+                        minHeight: 40,
+                      }}
+                    >
+                      <div className="skel-block" style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0 }} />
+                      <div className="skel-block" style={{ width: `${w}%`, height: 14, borderRadius: 6 }} />
+                    </div>
+                  ))}
+                </>
               )}
 
               {membersLoaded && members.length <= 1 && filteredMembers.length <= 1 && !query.trim() && (

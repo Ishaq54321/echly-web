@@ -1284,6 +1284,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.type === "RESUME_SESSION" && typeof request.sessionId === "string") {
+    const sessionId: string = request.sessionId;
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tab = tabs[0];
+      (async () => {
+        const opened = await openRecorderUI(tab?.id);
+        if (opened && tab?.id) {
+          const injected = await ensureContentScriptInjected(tab.id);
+          if (injected) {
+            chrome.tabs
+              .sendMessage(tab.id, { type: "ECHLY_RESUME_SESSION", sessionId })
+              .catch((error) =>
+                logMessageDeliveryError("ECHLY_RESUME_SESSION", error)
+              );
+          }
+        }
+        sendResponse({ ok: opened });
+      })();
+    });
+    return true;
+  }
+
   if (request.type === "ECHLY_EXPAND_WIDGET") {
     globalUIState.expanded = true;
     broadcastUIState();
@@ -1651,6 +1673,45 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     trayOpen = false;
     globalUIState.visible = false;
     globalUIState.expanded = false;
+    broadcastUIState(true);
+    setTimeout(() => {
+      chrome.tabs.query({}, (tabs) => {
+        tabs.forEach((tab) => {
+          if (tab.id) {
+            chrome.tabs.sendMessage(tab.id, { type: "ECHLY_RESET_WIDGET" }).catch(() => {});
+          }
+        });
+      });
+    }, 150);
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (request.type === "ECHLY_SESSION_MODE_END_SOFT") {
+    echlyLog("BACKGROUND", "session soft-end broadcast");
+    clearSessionIdleTimer();
+    chrome.alarms.clear("echly-keepalive");
+    activeSessionId = null;
+    globalUIState.sessionId = null;
+    globalUIState.sessionTitle = null;
+    globalUIState.sessionModeActive = false;
+    globalUIState.sessionPaused = false;
+    globalUIState.sessionLoading = false;
+    globalUIState.totalCount = 0;
+    globalUIState.openCount = 0;
+    globalUIState.resolvedCount = 0;
+    globalUIState.pointers = [];
+    resetPaginationState();
+    globalUIState.lastSyncedAt = null;
+    globalUIState.lastPaginationAt = null;
+    globalUIState.feedbackJobs = [];
+    cachedEchlyActive = true;
+    chrome.storage.local.set({
+      activeSessionId: null,
+      sessionModeActive: false,
+      sessionPaused: false,
+      echlyActive: true,
+    });
     broadcastUIState(true);
     setTimeout(() => {
       chrome.tabs.query({}, (tabs) => {

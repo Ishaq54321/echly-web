@@ -16,6 +16,7 @@ import {
   type FeedbackStatus,
   type FeedbackPriority,
 } from "@/lib/domain/feedback-display";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 export interface CommandPanelItem {
   id: string;
@@ -51,11 +52,12 @@ function StatusDot({ status }: { status: FeedbackStatus }) {
     Resolved: "bg-[var(--color-success)]",
   };
   return (
-    <span
-      className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${colors[status]}`}
-      title={status}
-      aria-hidden
-    />
+    <Tooltip content={status}>
+      <span
+        className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${colors[status]}`}
+        aria-hidden
+      />
+    </Tooltip>
   );
 }
 
@@ -269,14 +271,15 @@ export function FeedbackCommandPanel({
               </div>
             )}
           </div>
-          <button
-            type="button"
-            className="ml-auto flex items-center gap-1 h-7 px-2 rounded-md text-[12px] text-[var(--text-tertiary)] hover:bg-black/[0.04]"
-            title="Save view"
-          >
-            <Save className="h-3 w-3" strokeWidth={1.5} />
-            Save View
-          </button>
+          <Tooltip content="Save view">
+            <button
+              type="button"
+              className="ml-auto flex items-center gap-1 h-7 px-2 rounded-md text-[12px] text-[var(--text-tertiary)] hover:bg-black/[0.04]"
+            >
+              <Save className="h-3 w-3" strokeWidth={1.5} />
+              Save View
+            </button>
+          </Tooltip>
         </div>
       </div>
 

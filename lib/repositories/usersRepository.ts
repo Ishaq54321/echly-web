@@ -1,4 +1,4 @@
-import { doc, getDoc, getDocFromServer } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { MISSING_USER_WORKSPACE_ERROR } from "@/lib/constants/userWorkspace";
 
@@ -12,12 +12,7 @@ export async function getUserWorkspaceIdRepo(uid: string): Promise<string> {
 
   const loadPromise = (async () => {
     const ref = doc(db, "users", uid);
-    let snap;
-    try {
-      snap = await getDocFromServer(ref);
-    } catch {
-      snap = await getDoc(ref);
-    }
+    const snap = await getDoc(ref);
     if (!snap.exists()) {
       console.error("CRITICAL: User without workspaceId", { uid, reason: "missing_user_doc" });
       throw new Error(MISSING_USER_WORKSPACE_ERROR);

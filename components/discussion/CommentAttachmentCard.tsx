@@ -2,6 +2,7 @@
 
 import { FileIcon, Download } from "lucide-react";
 import type { CommentAttachment } from "@/lib/domain/comment";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 const IMAGE_EXTENSIONS = new Set([
   "jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "ico",
@@ -59,9 +60,11 @@ export function CommentAttachmentCard({ attachment, onImageClick }: CommentAttac
           )}
           <div className="flex items-center gap-2 mt-1">
             <FileIcon className="h-4 w-4 text-secondary shrink-0" strokeWidth={1.5} />
-            <span className="text-sm text-[var(--text-body)] truncate min-w-0" title={name}>
-              {name}
-            </span>
+            <Tooltip content={name}>
+              <span className="text-sm text-[var(--text-body)] truncate min-w-0">
+                {name}
+              </span>
+            </Tooltip>
             <a
               href={url}
               target="_blank"
@@ -75,9 +78,11 @@ export function CommentAttachmentCard({ attachment, onImageClick }: CommentAttac
       ) : (
         <div className="flex items-center gap-2">
           <FileIcon className="h-4 w-4 text-secondary shrink-0" strokeWidth={1.5} />
-          <span className="text-sm text-[var(--text-body)] truncate min-w-0" title={name}>
-            {name}
-          </span>
+          <Tooltip content={name}>
+            <span className="text-sm text-[var(--text-body)] truncate min-w-0">
+              {name}
+            </span>
+          </Tooltip>
           <a
             href={url}
             target="_blank"

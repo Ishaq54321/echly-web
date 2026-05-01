@@ -1,7 +1,8 @@
 ﻿"use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Avatar } from "@/components/ui/Avatar";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import {
   Archive,
   Calendar,
@@ -19,12 +20,23 @@ import ProgressPie from "@/components/ui/ProgressPie";
 import { WorkspaceCard } from "@/components/dashboard/WorkspaceCard";
 import { SessionsViewModeToggle } from "@/components/dashboard/SessionsViewModeToggle";
 import { SessionActionsDropdown } from "@/components/dashboard/SessionActionsDropdown";
+import { triggerAddMoreTickets } from "@/components/dashboard/hooks/triggerAddMoreTickets";
 import { Modal } from "@/components/ui/Modal";
 import { copySessionLink } from "@/utils/copySessionLink";
 import {
   assertIdentityResolved,
   useWorkspace,
 } from "@/lib/client/workspaceContext";
+import { Tooltip } from "@/components/ui/Tooltip";
+import {
+  useShareController,
+  type ShareGeneralAccess,
+} from "@/components/share/useShareController";
+
+const ShareModal = dynamic(
+  () => import("@/components/share/ShareModal").then((m) => m.ShareModal),
+  { ssr: false }
+);
 
 export interface SessionWorkspaceSection {
   title: string;
@@ -46,8 +58,8 @@ export interface SessionsWorkspaceProps {
   onViewModeChange?: (mode: "list" | "grid") => void;
 }
 
-function formatSessionUpdatedShort(session: Session): string {
-  const u = session.updatedAt;
+function formatSessionDateShort(session: Session): string {
+  const u = session.createdAt;
   if (u == null) return "";
   let ms: number | null = null;
   if (
@@ -75,21 +87,21 @@ function formatSessionUpdatedShort(session: Session): string {
 
 function SessionWorkspaceRow({
   item,
-  rowIndex,
   onView,
   onRenameSuccess,
   onSetArchived,
   onRequestDelete,
+  onRequestShare,
   isSelectionMode,
   isSelected,
   onToggleSelected,
 }: {
   item: SessionWithCounts;
-  rowIndex: number;
   onView?: (sessionId: string) => void;
   onRenameSuccess?: SessionsWorkspaceProps["onRenameSuccess"];
   onSetArchived?: SessionsWorkspaceProps["onSetArchived"];
   onRequestDelete?: SessionsWorkspaceProps["onRequestDelete"];
+  onRequestShare?: (session: Session) => void;
   isSelectionMode?: boolean;
   isSelected?: boolean;
   onToggleSelected?: (sessionId: string) => void;
@@ -166,25 +178,11 @@ function SessionWorkspaceRow({
   const open = counts.open;
   const resolved = counts.resolved;
   const total = (counts.open ?? 0) + (counts.resolved ?? 0);
-  const updatedShort = formatSessionUpdatedShort(session);
+  const updatedShort = formatSessionDateShort(session);
   const resolvedForPie = resolved ?? 0;
   let progress =
     total == null || total === 0 ? 0 : (resolvedForPie / total) * 100;
   if (progress >= 100) progress = 99.999;
-
-  const mockAssigneeInitials = (() => {
-    // Temp mock per spec (static for now).
-    const rows: string[][] = [
-      ["A", "J", "K"],
-      ["M", "R"],
-      ["S", "T", "D"],
-    ];
-    return rows[rowIndex % rows.length] ?? ["?"];
-  })();
-  const assigneeLabels = useMemo(() => {
-    const baseLabels = mockAssigneeInitials.length > 0 ? mockAssigneeInitials : ["?"];
-    return [...baseLabels, "?", "?", "?"].slice(0, 3);
-  }, [mockAssigneeInitials]);
 
   return (
     <>
@@ -196,7 +194,7 @@ function SessionWorkspaceRow({
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         className={[
-          "group flex w-full items-center justify-between rounded-lg px-4 py-4 transition-all duration-150 hover:bg-[var(--surface-hover)]",
+          "group relative flex w-full items-center justify-between rounded-lg px-4 py-4 transition-all duration-150 hover:bg-[var(--surface-hover)]",
           isSelectionMode ? "hover:bg-[var(--surface-hover)] cursor-pointer" : "",
           isSelected ? "bg-[var(--brand-subtle)] hover:bg-[var(--brand-subtle)]" : "",
           openingId === session.id ? "bg-[var(--surface-subtle)]" : "",
@@ -261,7 +259,48 @@ function SessionWorkspaceRow({
           </div>
         </div>
 
-        <div className="flex min-h-[36px] items-center shrink-0 gap-3.5">
+        <div className="flex min-h-[36px] items-center shrink-0 gap-3.5 transition-[margin] duration-150 group-hover:mr-[86px]">
+          {(() => {
+            const viewers = session.recentViewers ?? [];
+            const viewCount = session.viewCount ?? 0;
+            const maxVisible = 4;
+            const visibleViewers = viewers.slice(0, maxVisible);
+            const remaining = viewCount - visibleViewers.length;
+
+            if (viewCount === 0 || viewers.length === 0) return null;
+
+            return (
+              <div
+                className="flex items-center -space-x-2 group-hover:opacity-0"
+                aria-label="Recent viewers"
+              >
+                {visibleViewers.map((viewer, i) => (
+                  <div
+                    key={viewer.id}
+                    className="rounded-full ring-2 ring-white overflow-hidden"
+                    style={{ zIndex: maxVisible - i + 1, width: 28, height: 28 }}
+                  >
+                    <UserAvatar
+                      avatarUrl={viewer.avatarUrl}
+                      name={viewer.displayName}
+                      size={28}
+                      isAnonymous={viewer.isAnonymous}
+                      initialsClassName="bg-[var(--surface-hover)] text-[var(--text-secondary)] font-semibold"
+                    />
+                  </div>
+                ))}
+                {remaining > 0 && (
+                  <div
+                    className="rounded-full ring-2 ring-white flex items-center justify-center bg-[var(--surface-hover)] text-[var(--text-secondary)] font-semibold"
+                    style={{ width: 28, height: 28, minWidth: 28, fontSize: 11, zIndex: 0 }}
+                    aria-label={`${remaining} more viewers`}
+                  >
+                    +{remaining}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           <>
             {open != null && open > 0 && (
               <div className="rounded-[var(--radius-sm)] bg-white px-3 py-1.5 text-sm text-[var(--text-body)] inline-flex items-center justify-center gap-1.5">
@@ -284,69 +323,51 @@ function SessionWorkspaceRow({
               </span>
             </div>
           ) : null}
+        </div>
 
-          <div className="flex items-center relative">
-            <div
-              className="flex -space-x-2 transition-opacity duration-150 group-hover:opacity-0"
-              aria-label="Assignees"
+        <div
+          className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+          onClick={handleActionsContainerClick}
+          onKeyDown={handleActionsContainerKeyDown}
+        >
+          <Tooltip content={copyLinkBusy ? "Generating link…" : copied ? "Copied" : "Copy link"}>
+            <button
+              type="button"
+              disabled={isOptimistic || copyLinkBusy}
+              onClick={handleCopyLinkClick}
+              className="w-[38px] h-[38px] rounded-[var(--radius-btn)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30 disabled:opacity-50 disabled:pointer-events-none"
+              aria-label={
+                copyLinkBusy ? "Generating link…" : copied ? "Copied" : "Copy link"
+              }
             >
-              {assigneeLabels.map((label, i) => (
-                <div
-                  key={`${session.id}-assignee-${i}-${label}`}
-                  style={{ border: "2px solid white", borderRadius: "50%", boxShadow: "0 1px 2px rgba(0,0,0,0.08)" }}
-                  aria-label={label === "?" ? "Unassigned" : `Assignee ${label}`}
-                >
-                  <Avatar
-                    src={null}
-                    name={label === "?" ? null : label}
-                    size={28}
-                  />
-                </div>
-              ))}
-            </div>
-
-            <div
-              className="absolute right-0 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
-              onClick={handleActionsContainerClick}
-              onKeyDown={handleActionsContainerKeyDown}
-            >
-              <button
-                type="button"
-                disabled={isOptimistic || copyLinkBusy}
-                onClick={handleCopyLinkClick}
-                className="w-[38px] h-[38px] rounded-[var(--radius-btn)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30 disabled:opacity-50 disabled:pointer-events-none"
-                aria-label={
-                  copyLinkBusy ? "Generating link…" : copied ? "Copied" : "Copy link"
-                }
-                title={copyLinkBusy ? "Generating link…" : copied ? "Copied" : "Copy link"}
-              >
-                {copyLinkBusy ? (
-                  <Loader2 className="h-5 w-5 animate-spin text-[var(--text-secondary)]" aria-hidden />
-                ) : copied ? (
-                  <Check className="h-5 w-5" strokeWidth={2.5} aria-hidden />
-                ) : (
-                  <Link className="h-5 w-5" strokeWidth={2.5} aria-hidden />
-                )}
-              </button>
-              <div
-                className="relative"
-                onClick={handleActionsContainerClick}
-                onKeyDown={handleActionsContainerKeyDown}
-              >
-                <SessionActionsDropdown
-                  session={session}
-                  onRenameSuccess={onRenameSuccess}
-                  onSetArchived={onSetArchived}
-                  onRequestDelete={onRequestDelete}
-                  variant="list"
-                  flipPlacement
-                  disabled={isOptimistic}
-                  triggerClassName="w-8 h-8 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30"
-                  triggerIconClassName="h-5 w-5"
-                  triggerAriaLabel="Session actions"
-                />
-              </div>
-            </div>
+              {copyLinkBusy ? (
+                <Loader2 className="h-5 w-5 animate-spin text-[var(--text-secondary)]" aria-hidden />
+              ) : copied ? (
+                <Check className="h-5 w-5" strokeWidth={2.5} aria-hidden />
+              ) : (
+                <Link className="h-5 w-5" strokeWidth={2.5} aria-hidden />
+              )}
+            </button>
+          </Tooltip>
+          <div
+            className="relative"
+            onClick={handleActionsContainerClick}
+            onKeyDown={handleActionsContainerKeyDown}
+          >
+            <SessionActionsDropdown
+              session={session}
+              onRenameSuccess={onRenameSuccess}
+              onSetArchived={onSetArchived}
+              onRequestDelete={onRequestDelete}
+              onShareClick={() => onRequestShare?.(session)}
+              onAddMoreTickets={() => triggerAddMoreTickets(session.id)}
+              variant="list"
+              flipPlacement
+              disabled={isOptimistic}
+              triggerClassName="w-8 h-8 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30"
+              triggerIconClassName="h-5 w-5"
+              triggerAriaLabel="Session actions"
+            />
           </div>
         </div>
       </div>
@@ -364,8 +385,30 @@ export function SessionsWorkspace({
   viewMode: viewModeProp,
   onViewModeChange,
 }: SessionsWorkspaceProps) {
-  const { isIdentityResolved } = useWorkspace();
+  const { authUid, isIdentityResolved } = useWorkspace();
   const [internalViewMode, setInternalViewMode] = useState<"list" | "grid">("list");
+  const [shareSession, setShareSession] = useState<Session | null>(null);
+  const share = useShareController(shareSession?.id ?? "", {
+    initialGeneralAccess: shareSession?.generalAccess as ShareGeneralAccess | undefined,
+  });
+
+  const handleRequestShare = useCallback(
+    (session: Session) => {
+      setShareSession(session);
+      share.setOpen(true);
+    },
+    [share]
+  );
+
+  const handleCloseShare = useCallback(() => {
+    share.setOpen(false);
+    setShareSession(null);
+  }, [share]);
+
+  useEffect(() => {
+    if (!share.open) return;
+    void share.load().catch(() => {});
+  }, [share.open, share.load]);
   const isControlled = viewModeProp !== undefined && typeof onViewModeChange === "function";
   const viewMode = isControlled ? viewModeProp! : internalViewMode;
   const setViewMode = isControlled ? onViewModeChange! : setInternalViewMode;
@@ -519,15 +562,15 @@ export function SessionsWorkspace({
 
               {viewMode === "list" ? (
                 <div className={`${listWrap} mt-0 space-y-3`}>
-                  {section.items.map((rowItem, rowIndex) => (
+                  {section.items.map((rowItem) => (
                     <SessionWorkspaceRow
                       key={rowItem.session.id}
                       item={rowItem}
-                      rowIndex={rowIndex}
                       onView={onView}
                       onRenameSuccess={onRenameSuccess}
                       onSetArchived={onSetArchived}
                       onRequestDelete={onRequestDelete}
+                      onRequestShare={handleRequestShare}
                       isSelectionMode={isSelectionMode}
                       isSelected={selectedSessions.includes(rowItem.session.id)}
                       onToggleSelected={toggleSelected}
@@ -546,6 +589,7 @@ export function SessionsWorkspace({
                         onRenameSuccess={onRenameSuccess}
                         onSetArchived={onSetArchived}
                         onRequestDelete={onRequestDelete}
+                        onRequestShare={handleRequestShare}
                       />
                     ))}
                   </div>
@@ -661,6 +705,62 @@ export function SessionsWorkspace({
             </div>
           </div>
         </Modal>
+      ) : null}
+
+      {share.open && shareSession ? (
+        <ShareModal
+          open
+          onClose={handleCloseShare}
+          canManageShare
+          canManageAccess
+          isWorkspaceMember
+          sessionId={shareSession.id}
+          sessionName={shareSession.title ?? null}
+          inviteEmail={share.inviteEmail}
+          setInviteEmail={share.setInviteEmail}
+          inviteAccess={share.inviteAccess}
+          setInviteAccess={share.setInviteAccess}
+          generalAccess={share.generalAccess}
+          updatingGeneralAccess={share.updatingGeneralAccess}
+          items={share.items}
+          initialLoading={share.initialLoading}
+          inviting={share.inviting}
+          updatingId={share.updatingId}
+          removingId={share.removingId}
+          inviteError={share.inviteError}
+          listError={share.listError}
+          onInvite={() => {
+            void share.invite().catch(() => {});
+          }}
+          onUpdateGeneralAccess={(value) => {
+            void share.updateGeneralAccess(value).catch(() => {});
+          }}
+          onUpdateRole={(item, access) => {
+            void share.updateRole(item, access).catch(() => {});
+          }}
+          onRemove={(item) => {
+            void share.removeAccess(item).catch(() => {});
+          }}
+          accessRequests={share.accessRequests}
+          pendingRequestsCount={0}
+          patchingAccessRequestId={share.patchingAccessRequestId}
+          onApproveAccessRequest={(id, access) => {
+            void share.patchAccessRequest(id, "approve", access).catch(() => {});
+          }}
+          onRejectAccessRequest={(id) => {
+            void share.patchAccessRequest(id, "reject").catch(() => {});
+          }}
+          canResolve
+          linkAccessLevel={share.linkAccessLevel}
+          setLinkAccessLevel={share.setLinkAccessLevel}
+          copyingLink={share.copyingLink}
+          linkCopied={share.linkCopied}
+          onCopyShareLink={() => void share.copyShareLink().catch(() => {})}
+          refetchingAfterApproval={share.refetchingAfterApproval}
+          workspaceMembers={share.workspaceMembers}
+          loadingWorkspaceMembers={share.loadingWorkspaceMembers}
+          currentUserUid={authUid ?? undefined}
+        />
       ) : null}
     </div>
   );

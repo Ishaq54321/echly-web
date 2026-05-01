@@ -15,6 +15,7 @@ import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { ProfileCommandPanel } from "@/components/layout/ProfileCommandPanel";
 import { useWorkspace } from "@/lib/client/workspaceContext";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 const NAV_GROUPS = [
   {
@@ -102,46 +103,46 @@ export function SystemNavigationRail({ onOpenCommandPalette }: SystemNavigationR
 
             if (isCommand && onOpenCommandPalette) {
               return (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={onOpenCommandPalette}
-                  className="w-[38px] h-[38px] rounded-[var(--radius-btn)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
-                  aria-label={title}
-                  title={title}
-                >
-                  {content}
-                </button>
+                <Tooltip key={item.label} content={title} position="right">
+                  <button
+                    type="button"
+                    onClick={onOpenCommandPalette}
+                    className="w-[38px] h-[38px] rounded-[var(--radius-btn)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
+                    aria-label={title}
+                  >
+                    {content}
+                  </button>
+                </Tooltip>
               );
             }
 
             if (item.href === "#") {
               return (
-                <span
-                  key={item.label}
-                  className="w-9 h-9 rounded-lg flex items-center justify-center text-[var(--text-secondary)]"
-                  title={title}
-                >
-                  {content}
-                </span>
+                <Tooltip key={item.label} content={title} position="right">
+                  <span
+                    className="w-9 h-9 rounded-lg flex items-center justify-center text-[var(--text-secondary)]"
+                  >
+                    {content}
+                  </span>
+                </Tooltip>
               );
             }
 
             return (
-              <Link
-                key={item.label}
-                href={item.href}
-                className={
-                  active
-                    ? "w-9 h-9 rounded-lg flex items-center justify-center bg-[var(--surface-hover)] text-[var(--text-heading)]"
-                    : "w-9 h-9 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
-                }
-                aria-label={item.label}
-                aria-current={active ? "page" : undefined}
-                title={title}
-              >
-                {content}
-              </Link>
+              <Tooltip key={item.label} content={title} position="right">
+                <Link
+                  href={item.href}
+                  className={
+                    active
+                      ? "w-9 h-9 rounded-lg flex items-center justify-center bg-[var(--surface-hover)] text-[var(--text-heading)]"
+                      : "w-9 h-9 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
+                  }
+                  aria-label={item.label}
+                  aria-current={active ? "page" : undefined}
+                >
+                  {content}
+                </Link>
+              </Tooltip>
             );
           })
         )}

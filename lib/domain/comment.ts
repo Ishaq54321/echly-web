@@ -42,6 +42,8 @@ export interface Comment {
   attachments?: CommentAttachment[];
   /** Emoji reactions — map of emoji → array of user IDs who reacted */
   reactions?: Record<string, { userIds: string[]; userNames: string[] }>;
+  /** User IDs @mentioned in this comment (excludes the author). Absent when no mentions. */
+  mentionedUserIds?: string[];
 }
 
 export interface CommentAttachment {

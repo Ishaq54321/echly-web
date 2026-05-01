@@ -54,6 +54,7 @@ export type CaptureLayerProps = {
   audioAnalyser?: AnalyserNode | null;
   voiceError?: VoiceCaptureError;
   onRetryVoice?: () => void;
+  onResetVoice?: () => void;
   onSelectMicrophone?: (deviceId: string) => void;
   voiceMicDeviceId?: string;
   /** Matches widget theme for text feedback modal (light/dark glass). */
@@ -99,6 +100,7 @@ export function CaptureLayer({
   audioAnalyser = null,
   voiceError = null,
   onRetryVoice,
+  onResetVoice,
   onSelectMicrophone,
   voiceMicDeviceId = "",
   theme = "dark",
@@ -135,6 +137,7 @@ export function CaptureLayer({
           audioAnalyser={audioAnalyser ?? null}
           voiceError={voiceError}
           onRetryVoice={onRetryVoice}
+          onResetVoice={onResetVoice}
           onSelectMicrophone={onSelectMicrophone}
           voiceMicDeviceId={voiceMicDeviceId}
           onElementClicked={onSessionElementClicked}

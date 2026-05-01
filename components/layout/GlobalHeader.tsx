@@ -1,14 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { Search } from "lucide-react";
 import { GlobalNotificationButton } from "@/components/layout/GlobalNotificationButton";
 import { ProfileDropdown } from "@/components/layout/ProfileDropdown";
 import { useBillingStore } from "@/lib/store/billingStore";
+import { retainNotificationListener } from "@/lib/store/notificationStore";
 
 export function GlobalHeader() {
   const { plan, isLoaded } = useBillingStore();
   const showUpgrade = isLoaded && plan === "starter";
+
+  useEffect(() => retainNotificationListener(), []);
 
   return (
     <div className="global-header flex h-16 w-full shrink-0 items-center justify-between bg-white px-6">
@@ -20,7 +24,7 @@ export function GlobalHeader() {
         <Search size={16} strokeWidth={2} className="text-[var(--text-secondary)] shrink-0" />
         <span className="truncate">Search by Session Title...</span>
       </button>
-      <div className="actions flex items-center gap-3">
+      <div className="actions flex items-center gap-4">
         {showUpgrade && (
           <Link href="/settings?tab=billing">
             <button

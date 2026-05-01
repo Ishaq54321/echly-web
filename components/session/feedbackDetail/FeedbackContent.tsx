@@ -31,12 +31,13 @@ interface FeedbackContentProps {
   onPinClick?: (commentId: string) => void;
   onOpenThreadPanel?: (commentId: string) => void;
   onCloseInlinePopover?: () => void;
-  sendPinComment?: (position: { xPercent: number; yPercent: number }, message: string) => Promise<string | null>;
+  sendPinComment?: (position: { xPercent: number; yPercent: number }, message: string, mentionedUserIds?: string[]) => Promise<string | null>;
   updateComment?: (commentId: string, data: { message?: string; resolved?: boolean }) => Promise<void>;
   sendTextComment?: (textRange: { startOffset: number; endOffset: number; containerId: string }, message: string) => Promise<string | null>;
   onCommentPlaced?: () => void;
   updatePinPosition?: (commentId: string, position: { xPercent: number; yPercent: number }) => Promise<void>;
   animatingPinId?: string | null;
+  participants?: { uid: string; displayName: string; email: string; avatarUrl?: string | null }[];
 }
 
 export function FeedbackContent({
@@ -64,6 +65,7 @@ export function FeedbackContent({
   onCommentPlaced,
   updatePinPosition,
   animatingPinId,
+  participants,
 }: FeedbackContentProps) {
   const actionSteps = Array.isArray(item.actionSteps) ? item.actionSteps : [];
   const tags = Array.isArray(item.suggestedTags) ? item.suggestedTags : [];
@@ -115,6 +117,7 @@ export function FeedbackContent({
                   canEdit={canEdit}
                   embeddedInCard
                   animatingPinId={animatingPinId}
+                  participants={participants}
                 />
               ) : (
                 <ScreenshotBlock

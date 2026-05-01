@@ -1,16 +1,14 @@
 ﻿"use client";
 
-import React, { useState, useEffect, useRef, useCallback, memo, useMemo, useLayoutEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback, memo } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
-import { X, Check, RotateCcw, RefreshCw, Paperclip, Smile, MessageSquare, AtSign } from "lucide-react";
+import { X, Check, RotateCcw, RefreshCw, Paperclip, Smile, MessageSquare, AtSign, PanelRightClose } from "lucide-react";
 import EmojiPicker from "emoji-picker-react";
-import { useEditor, EditorContent } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import Mention from "@tiptap/extension-mention";
-import Placeholder from "@tiptap/extension-placeholder";
 import type { Comment, CommentAttachment, CommentPosition } from "@/lib/domain/comment";
 import { CommentItem } from "@/components/comments/CommentItem";
+import { TiptapCommentEditor, extractFromDoc } from "@/components/comments/TiptapCommentEditor";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 const AttachmentUploadModal = dynamic(
   () => import("@/components/discussion/AttachmentUploadModal").then((m) => m.AttachmentUploadModal),
@@ -41,8 +39,8 @@ export interface CommentPanelProps {
   onClose: () => void;
   comments: Comment[];
   loading: boolean;
-  sendReply: (threadId: string, message: string, attachment?: CommentAttachment, attachments?: CommentAttachment[]) => Promise<void>;
-  sendComment?: (message: string, attachment?: CommentAttachment, attachments?: CommentAttachment[], position?: CommentPosition) => Promise<string>;
+  sendReply: (threadId: string, message: string, attachment?: CommentAttachment, attachments?: CommentAttachment[], mentionedUserIds?: string[]) => Promise<void>;
+  sendComment?: (message: string, attachment?: CommentAttachment, attachments?: CommentAttachment[], position?: CommentPosition, mentionedUserIds?: string[]) => Promise<string>;
   currentUserInitial?: string;
   currentUserName?: string;
   currentUserAvatarUrl?: string;
@@ -65,262 +63,6 @@ export interface CommentPanelProps {
 }
 
 type Participant = { uid: string; displayName: string; email: string; avatarUrl: string | null };
-
-// ── Extract plain text with @mention labels from a ProseMirror doc node ──
-function extractTextFromDoc(doc: {
-  toJSON: () => {
-    content?: Array<{
-      content?: Array<{ type?: string; text?: string; attrs?: { label?: string; id?: string } }>;
-    }>;
-  };
-}): string {
-  const json = doc.toJSON();
-  const blocks = json.content ?? [];
-  return blocks
-    .map((block) =>
-      (block.content ?? [])
-        .map((node) => {
-          if (node.type === "mention") return `@${node.attrs?.label ?? node.attrs?.id ?? ""}`;
-          return node.text ?? "";
-        })
-        .join("")
-    )
-    .join("\n")
-    .trim();
-}
-
-// ── TiptapCommentEditor ──
-interface TiptapCommentEditorProps {
-  placeholder: string;
-  participants: Participant[];
-  onSubmit: (text: string) => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  editorRef?: React.MutableRefObject<any>;
-  autoFocus?: boolean;
-  onContentChange?: (hasContent: boolean) => void;
-  onEscape?: () => void;
-}
-
-function TiptapCommentEditor({
-  placeholder,
-  participants,
-  onSubmit,
-  editorRef,
-  autoFocus,
-  onContentChange,
-  onEscape,
-}: TiptapCommentEditorProps) {
-  const onSubmitRef = useRef(onSubmit);
-  useLayoutEffect(() => { onSubmitRef.current = onSubmit; }, [onSubmit]);
-
-  const onContentChangeRef = useRef(onContentChange);
-  useLayoutEffect(() => { onContentChangeRef.current = onContentChange; }, [onContentChange]);
-
-  const onEscapeRef = useRef(onEscape);
-  useLayoutEffect(() => { onEscapeRef.current = onEscape; }, [onEscape]);
-
-  const participantsRef = useRef(participants);
-  useLayoutEffect(() => { participantsRef.current = participants; }, [participants]);
-
-  const mentionOpenRef = useRef(false);
-
-  const editor = useEditor({
-    immediatelyRender: false,
-    extensions: [
-      StarterKit.configure({
-        heading: false,
-        bulletList: false,
-        orderedList: false,
-        blockquote: false,
-        codeBlock: false,
-        horizontalRule: false,
-      }),
-      Placeholder.configure({ placeholder }),
-      Mention.configure({
-        HTMLAttributes: { class: "mention-chip" },
-        suggestion: {
-          items: ({ query }: { query: string }) =>
-            participantsRef.current
-              .filter(
-                (p) =>
-                  p.displayName.toLowerCase().includes(query.toLowerCase()) ||
-                  p.email.toLowerCase().includes(query.toLowerCase())
-              )
-              .slice(0, 5),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          render: (): any => {
-            let dropdownEl: HTMLDivElement | null = null;
-            let currentItems: Participant[] = [];
-            let selectedIndex = 0;
-            let savedCommand: ((attrs: { id: string; label: string }) => void) | null = null;
-
-            function renderDropdownItems(
-              items: Participant[],
-              selected: number,
-              command: (attrs: { id: string; label: string }) => void
-            ) {
-              if (!dropdownEl) return;
-              dropdownEl.innerHTML = "";
-              if (items.length === 0) {
-                dropdownEl.style.display = "none";
-                return;
-              }
-              dropdownEl.style.display = "block";
-
-              items.forEach((item, i) => {
-                const btn = document.createElement("button");
-                btn.type = "button";
-                btn.className = `mention-dropdown-item${i === selected ? " active" : ""}`;
-
-                const avatarDiv = document.createElement("div");
-                avatarDiv.className = "mention-dropdown-avatar";
-                if (item.avatarUrl) {
-                  const img = document.createElement("img");
-                  img.src = item.avatarUrl;
-                  img.alt = "";
-                  avatarDiv.appendChild(img);
-                } else {
-                  avatarDiv.textContent = item.displayName.charAt(0).toUpperCase();
-                }
-                btn.appendChild(avatarDiv);
-
-                const infoDiv = document.createElement("div");
-                infoDiv.className = "mention-dropdown-info";
-
-                const nameDiv = document.createElement("div");
-                nameDiv.className = "mention-dropdown-name";
-                nameDiv.textContent = item.displayName;
-                infoDiv.appendChild(nameDiv);
-
-                const emailDiv = document.createElement("div");
-                emailDiv.className = "mention-dropdown-email";
-                emailDiv.textContent = item.email;
-                infoDiv.appendChild(emailDiv);
-
-                btn.appendChild(infoDiv);
-
-                btn.onmousedown = (e) => {
-                  e.preventDefault();
-                  command({ id: item.uid, label: item.displayName });
-                };
-
-                dropdownEl!.appendChild(btn);
-              });
-            }
-
-            return {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              onStart(props: any) {
-                mentionOpenRef.current = true;
-                dropdownEl = document.createElement("div");
-                dropdownEl.className = "mention-dropdown";
-                document.body.appendChild(dropdownEl);
-                currentItems = (props.items as Participant[]) ?? [];
-                selectedIndex = 0;
-                const rect = props.clientRect?.() as DOMRect | null;
-                if (rect && dropdownEl) {
-                  dropdownEl.style.position = "fixed";
-                  dropdownEl.style.left = `${rect.left}px`;
-                  dropdownEl.style.top = `${rect.bottom + 4}px`;
-                  dropdownEl.style.zIndex = "2147480001";
-                }
-                savedCommand = props.command;
-                renderDropdownItems(currentItems, selectedIndex, props.command);
-              },
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              onUpdate(props: any) {
-                currentItems = (props.items as Participant[]) ?? [];
-                selectedIndex = 0;
-                const rect = props.clientRect?.() as DOMRect | null;
-                if (rect && dropdownEl) {
-                  dropdownEl.style.left = `${rect.left}px`;
-                  dropdownEl.style.top = `${rect.bottom + 4}px`;
-                }
-                savedCommand = props.command;
-                renderDropdownItems(currentItems, selectedIndex, props.command);
-              },
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              onKeyDown(props: any) {
-                if ((props.event as KeyboardEvent).key === "ArrowUp") {
-                  selectedIndex = Math.max(selectedIndex - 1, 0);
-                  renderDropdownItems(currentItems, selectedIndex, props.command ?? (() => {}));
-                  return true;
-                }
-                if ((props.event as KeyboardEvent).key === "ArrowDown") {
-                  selectedIndex = Math.min(selectedIndex + 1, currentItems.length - 1);
-                  renderDropdownItems(currentItems, selectedIndex, props.command ?? (() => {}));
-                  return true;
-                }
-                if ((props.event as KeyboardEvent).key === "Enter") {
-                  const item = currentItems[selectedIndex];
-                  if (item && savedCommand) {
-                    savedCommand({ id: item.uid, label: item.displayName });
-                  }
-                  return true;
-                }
-                return false;
-              },
-              onExit() {
-                mentionOpenRef.current = false;
-                dropdownEl?.remove();
-                dropdownEl = null;
-                savedCommand = null;
-              },
-            };
-          },
-        },
-      }),
-    ],
-    autofocus: autoFocus ?? false,
-    onUpdate: ({ editor: ed }) => {
-      const cb = onContentChangeRef.current;
-      if (!cb) return;
-      const json = ed.getJSON();
-      const hasContent = (json.content ?? []).some((block) =>
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (block.content ?? []).some((node: any) => {
-          if (node.type === "mention") return true;
-          if (node.type === "text") return (node.text ?? "").trim().length > 0;
-          return false;
-        })
-      );
-      cb(hasContent);
-    },
-    editorProps: {
-      handleKeyDown: (_view, event) => {
-        if (event.key === "Escape") {
-          onEscapeRef.current?.();
-          return true;
-        }
-        if (event.key === "Enter" && !event.shiftKey) {
-          if (mentionOpenRef.current) return false;
-          const text = extractTextFromDoc(_view.state.doc);
-          if (text.trim()) {
-            event.preventDefault();
-            onSubmitRef.current(text);
-            // Clear via ProseMirror transaction
-            const { tr, schema } = _view.state;
-            const emptyParagraph = schema.nodes.paragraph?.create();
-            if (emptyParagraph) {
-              _view.dispatch(tr.replaceWith(0, tr.doc.content.size, emptyParagraph));
-            }
-            // Notify parent that content is now empty
-            onContentChangeRef.current?.(false);
-            return true;
-          }
-        }
-        return false;
-      },
-      attributes: { class: "tiptap-comment-editor" },
-    },
-  });
-
-  useEffect(() => {
-    if (editorRef) editorRef.current = editor;
-  }, [editor, editorRef]);
-
-  return <EditorContent editor={editor} />;
-}
 
 // ── CommentRow ──
 const CommentRow = memo(function CommentRow({
@@ -409,7 +151,7 @@ const ThreadBlock = memo(function ThreadBlock({
   updateComment?: (id: string, data: { message?: string; resolved?: boolean }) => Promise<void>;
   deleteComment?: (id: string) => Promise<void>;
   onReactionsChanged?: (commentId: string, reactions: Record<string, { userIds: string[]; userNames: string[] }>) => void;
-  sendReply?: (threadId: string, message: string, attachment?: CommentAttachment, attachments?: CommentAttachment[]) => Promise<void>;
+  sendReply?: (threadId: string, message: string, attachment?: CommentAttachment, attachments?: CommentAttachment[], mentionedUserIds?: string[]) => Promise<void>;
   onSelectThread?: (threadId: string) => void;
   replyOpen: boolean;
   onReplyToggle: (open: boolean) => void;
@@ -440,7 +182,7 @@ const ThreadBlock = memo(function ThreadBlock({
   }, [replyFileError]);
 
   const handleSubmitReply = useCallback(
-    async (text?: string) => {
+    async (text?: string, mentionedUserIds?: string[]) => {
       const message = text ?? "";
       const trimmed = message.trim();
       const atts = replyPendingAttachments;
@@ -449,7 +191,7 @@ const ThreadBlock = memo(function ThreadBlock({
       setReplyPendingAttachments([]);
       setReplyHasContent(false);
       onReplyToggle(false);
-      await sendReply(root.id, trimmed, undefined, atts.length > 0 ? atts : undefined);
+      await sendReply(root.id, trimmed, undefined, atts.length > 0 ? atts : undefined, mentionedUserIds);
     },
     [replyPendingAttachments, sendReply, root.id, onReplyToggle]
   );
@@ -568,7 +310,7 @@ const ThreadBlock = memo(function ThreadBlock({
                     <TiptapCommentEditor
                       placeholder="Write a reply..."
                       participants={participants ?? []}
-                      onSubmit={(text) => void handleSubmitReply(text)}
+                      onSubmit={(text, mentionedUserIds) => void handleSubmitReply(text, mentionedUserIds)}
                       editorRef={replyEditorRef}
                       autoFocus
                       onContentChange={setReplyHasContent}
@@ -614,16 +356,17 @@ const ThreadBlock = memo(function ThreadBlock({
                             {att.file_name}
                             {isLoading && <span className="ml-2 text-[12px] text-[var(--text-tertiary)]">Uploading...</span>}
                           </span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setReplyPendingAttachments((prev) => prev.filter((_, idx) => idx !== i))
-                            }
-                            className="p-1 rounded-md text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors shrink-0"
-                            title="Remove"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
+                          <Tooltip content="Remove">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setReplyPendingAttachments((prev) => prev.filter((_, idx) => idx !== i))
+                              }
+                              className="p-1 rounded-md text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors shrink-0"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </Tooltip>
                         </div>
                       );
                     })}
@@ -643,49 +386,52 @@ const ThreadBlock = memo(function ThreadBlock({
                 {/* Row 2: Icon toolbar | Action buttons */}
                 <div className="flex items-center justify-between px-4 py-3">
                   <div className="flex items-center gap-0.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const ed = replyEditorRef.current;
-                        if (ed) ed.chain().focus().insertContent("@").run();
-                      }}
-                      className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
-                      title="Mention someone"
-                    >
-                      <AtSign className="h-[18px] w-[18px]" strokeWidth={1.5} />
-                    </button>
-                    <button
-                      ref={replyEmojiButtonRef}
-                      type="button"
-                      onClick={() => {
-                        if (replyEmojiButtonRef.current) {
-                          setReplyEmojiAnchorRect(replyEmojiButtonRef.current.getBoundingClientRect());
-                        }
-                        setReplyEmojiOpen((v) => !v);
-                      }}
-                      className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
-                      title="Add emoji"
-                    >
-                      <Smile className="h-[18px] w-[18px]" strokeWidth={1.5} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (replyPendingAttachments.length >= MAX_ATTACHMENTS) {
-                          setReplyFileError("Maximum 5 attachments allowed");
-                          return;
-                        }
-                        replyFileInputRef.current?.click();
-                      }}
-                      className={`p-1.5 rounded-lg transition-colors ${
-                        replyPendingAttachments.length >= MAX_ATTACHMENTS
-                          ? "text-[var(--text-tertiary)] opacity-50 cursor-not-allowed"
-                          : "text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)]"
-                      }`}
-                      title={replyPendingAttachments.length >= MAX_ATTACHMENTS ? "Maximum 5 attachments" : "Attach file"}
-                    >
-                      <Paperclip className="h-[18px] w-[18px]" strokeWidth={1.5} />
-                    </button>
+                    <Tooltip content="Mention someone">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const ed = replyEditorRef.current;
+                          if (ed) ed.chain().focus().insertContent("@").run();
+                        }}
+                        className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
+                      >
+                        <AtSign className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                      </button>
+                    </Tooltip>
+                    <Tooltip content="Add emoji">
+                      <button
+                        ref={replyEmojiButtonRef}
+                        type="button"
+                        onClick={() => {
+                          if (replyEmojiButtonRef.current) {
+                            setReplyEmojiAnchorRect(replyEmojiButtonRef.current.getBoundingClientRect());
+                          }
+                          setReplyEmojiOpen((v) => !v);
+                        }}
+                        className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
+                      >
+                        <Smile className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                      </button>
+                    </Tooltip>
+                    <Tooltip content={replyPendingAttachments.length >= MAX_ATTACHMENTS ? "Maximum 5 attachments" : "Attach file"}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (replyPendingAttachments.length >= MAX_ATTACHMENTS) {
+                            setReplyFileError("Maximum 5 attachments allowed");
+                            return;
+                          }
+                          replyFileInputRef.current?.click();
+                        }}
+                        className={`p-1.5 rounded-lg transition-colors ${
+                          replyPendingAttachments.length >= MAX_ATTACHMENTS
+                            ? "text-[var(--text-tertiary)] opacity-50 cursor-not-allowed"
+                            : "text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)]"
+                        }`}
+                      >
+                        <Paperclip className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                      </button>
+                    </Tooltip>
                     <input
                       ref={replyFileInputRef}
                       type="file"
@@ -777,8 +523,8 @@ const ThreadBlock = memo(function ThreadBlock({
                       onClick={() => {
                         const ed = replyEditorRef.current;
                         if (ed) {
-                          const text = extractTextFromDoc(ed.state.doc);
-                          void handleSubmitReply(text);
+                          const { text, mentionedUserIds } = extractFromDoc(ed.state.doc);
+                          void handleSubmitReply(text, mentionedUserIds);
                         } else {
                           void handleSubmitReply();
                         }
@@ -1085,7 +831,7 @@ export function CommentPanel({
   }, [composeFileError]);
 
   const handleTopLevelComment = useCallback(
-    async (text?: string) => {
+    async (text?: string, mentionedUserIds?: string[]) => {
       const message = text ?? "";
       const trimmed = message.trim();
       const atts = composePendingAttachments;
@@ -1101,7 +847,7 @@ export function CommentPanel({
       setComposeHasContent(false);
       setComposeExpanded(false);
 
-      await sendComment(trimmed, undefined, atts.length > 0 ? atts : undefined, autoPosition);
+      await sendComment(trimmed, undefined, atts.length > 0 ? atts : undefined, autoPosition, mentionedUserIds);
 
       scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     },
@@ -1169,7 +915,7 @@ export function CommentPanel({
                 <TiptapCommentEditor
                   placeholder="Leave a comment..."
                   participants={participants ?? []}
-                  onSubmit={(text) => void handleTopLevelComment(text)}
+                  onSubmit={(text, mentionedUserIds) => void handleTopLevelComment(text, mentionedUserIds)}
                   editorRef={composeEditorRef}
                   autoFocus
                   onContentChange={setComposeHasContent}
@@ -1221,16 +967,17 @@ export function CommentPanel({
                         {att.file_name}
                         {isLoading && <span className="ml-2 text-[12px] text-[var(--text-tertiary)]">Uploading...</span>}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setComposePendingAttachments((prev) => prev.filter((_, idx) => idx !== i))
-                        }
-                        className="p-1 rounded-md text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors shrink-0"
-                        title="Remove"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
+                      <Tooltip content="Remove">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setComposePendingAttachments((prev) => prev.filter((_, idx) => idx !== i))
+                          }
+                          className="p-1 rounded-md text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] transition-colors shrink-0"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </Tooltip>
                     </div>
                   );
                 })}
@@ -1250,53 +997,56 @@ export function CommentPanel({
             {/* Row 2: Icon toolbar | Action buttons */}
             <div className="flex items-center justify-between px-4 py-3">
               <div className="flex items-center gap-0.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const ed = composeEditorRef.current;
-                    if (ed) ed.chain().focus().insertContent("@").run();
-                  }}
-                  className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
-                  title="Mention someone"
-                >
-                  <AtSign className="h-[18px] w-[18px]" strokeWidth={1.5} />
-                </button>
+                <Tooltip content="Mention someone">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const ed = composeEditorRef.current;
+                      if (ed) ed.chain().focus().insertContent("@").run();
+                    }}
+                    className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
+                  >
+                    <AtSign className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                  </button>
+                </Tooltip>
 
-                <button
-                  ref={composeEmojiButtonRef}
-                  type="button"
-                  onClick={() => {
-                    if (composeEmojiButtonRef.current) {
-                      setComposeEmojiAnchorRect(
-                        composeEmojiButtonRef.current.getBoundingClientRect()
-                      );
-                    }
-                    setComposeEmojiOpen((v) => !v);
-                  }}
-                  className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
-                  title="Add emoji"
-                >
-                  <Smile className="h-[18px] w-[18px]" strokeWidth={1.5} />
-                </button>
+                <Tooltip content="Add emoji">
+                  <button
+                    ref={composeEmojiButtonRef}
+                    type="button"
+                    onClick={() => {
+                      if (composeEmojiButtonRef.current) {
+                        setComposeEmojiAnchorRect(
+                          composeEmojiButtonRef.current.getBoundingClientRect()
+                        );
+                      }
+                      setComposeEmojiOpen((v) => !v);
+                    }}
+                    className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
+                  >
+                    <Smile className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                  </button>
+                </Tooltip>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (composePendingAttachments.length >= MAX_ATTACHMENTS) {
-                      setComposeFileError("Maximum 5 attachments allowed");
-                      return;
-                    }
-                    composeFileInputRef.current?.click();
-                  }}
-                  className={`p-1.5 rounded-lg transition-colors ${
-                    composePendingAttachments.length >= MAX_ATTACHMENTS
-                      ? "text-[var(--text-tertiary)] opacity-50 cursor-not-allowed"
-                      : "text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)]"
-                  }`}
-                  title={composePendingAttachments.length >= MAX_ATTACHMENTS ? "Maximum 5 attachments" : "Attach file"}
-                >
-                  <Paperclip className="h-[18px] w-[18px]" strokeWidth={1.5} />
-                </button>
+                <Tooltip content={composePendingAttachments.length >= MAX_ATTACHMENTS ? "Maximum 5 attachments" : "Attach file"}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (composePendingAttachments.length >= MAX_ATTACHMENTS) {
+                        setComposeFileError("Maximum 5 attachments allowed");
+                        return;
+                      }
+                      composeFileInputRef.current?.click();
+                    }}
+                    className={`p-1.5 rounded-lg transition-colors ${
+                      composePendingAttachments.length >= MAX_ATTACHMENTS
+                        ? "text-[var(--text-tertiary)] opacity-50 cursor-not-allowed"
+                        : "text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)]"
+                    }`}
+                  >
+                    <Paperclip className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                  </button>
+                </Tooltip>
                 <input
                   ref={composeFileInputRef}
                   type="file"
@@ -1377,8 +1127,8 @@ export function CommentPanel({
                   onClick={() => {
                     const ed = composeEditorRef.current;
                     if (ed) {
-                      const text = extractTextFromDoc(ed.state.doc);
-                      void handleTopLevelComment(text);
+                      const { text, mentionedUserIds } = extractFromDoc(ed.state.doc);
+                      void handleTopLevelComment(text, mentionedUserIds);
                     } else {
                       void handleTopLevelComment();
                     }
@@ -1426,25 +1176,29 @@ export function CommentPanel({
       <div className="h-px bg-[var(--hair)] mx-5 shrink-0" />
       <div className="shrink-0 px-5 pt-4 pb-2.5 text-[var(--text-secondary)] text-[13px] font-medium">
         <b className="text-[var(--text-heading)] font-semibold">{commentRootCount} Comment{commentRootCount !== 1 ? 's' : ''}</b>
-        <div className="float-right flex items-center gap-0.5">
+        <div className="float-right flex items-center gap-1">
           {onRefreshComments ? (
+            <Tooltip content="Refresh">
+              <button
+                type="button"
+                onClick={onRefreshComments}
+                className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors cursor-pointer border-0 bg-transparent"
+                aria-label="Refresh comments"
+              >
+                <RefreshCw className="h-4 w-4" strokeWidth={1.5} />
+              </button>
+            </Tooltip>
+          ) : null}
+          <Tooltip content="Collapse">
             <button
               type="button"
-              onClick={onRefreshComments}
-              className="p-1.5 rounded-lg text-[var(--text-tertiary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors cursor-pointer border-0 bg-transparent"
-              aria-label="Refresh comments"
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors cursor-pointer border-0 bg-transparent"
+              aria-label="Close comment panel"
             >
-              <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.5} />
+              <PanelRightClose className="h-4 w-4" strokeWidth={1.5} />
             </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-[var(--text-tertiary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors cursor-pointer border-0 bg-transparent"
-            aria-label="Close comment panel"
-          >
-            <X className="h-3.5 w-3.5" strokeWidth={1.5} />
-          </button>
+          </Tooltip>
         </div>
       </div>
 

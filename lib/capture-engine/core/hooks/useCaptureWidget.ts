@@ -104,6 +104,8 @@ export function useCaptureWidget({
   captureRootParent,
   environment,
   assertIdentityBeforeWorkspaceMutations,
+  feedbackLimitReached,
+  triggerUpgradeShake,
 }: CaptureWidgetProps) {
   if (typeof window !== "undefined" && !(window as Window & { __ECHLY_CAPTURE_STATE__?: { pending: SessionFeedbackPending | null } }).__ECHLY_CAPTURE_STATE__) {
     (window as Window & { __ECHLY_CAPTURE_STATE__?: { pending: SessionFeedbackPending | null } }).__ECHLY_CAPTURE_STATE__ = {
@@ -569,6 +571,25 @@ export function useCaptureWidget({
     setErrorMessage(null);
     startListening();
   }, [startListening]);
+
+  /** Reset mid-recording: stop current MediaRecorder, discard buffer, restart fresh on the same mic. */
+  const resetVoiceRecording = useCallback(async () => {
+    const recorder = mediaRecorderRef.current;
+    try {
+      if (recorder && recorder.state !== "inactive") {
+        recorder.ondataavailable = null;
+        recorder.onstop = null;
+        recorder.stop();
+      }
+    } catch (err) {
+      logger.error("error", "voice_reset_stop_failed", err);
+    }
+    mediaRecorderRef.current = null;
+    audioChunksRef.current = [];
+    stopListeningAudio();
+    await new Promise<void>((resolve) => setTimeout(resolve, 120));
+    await startListening();
+  }, [stopListeningAudio, startListening]);
 
   const selectVoiceMicrophone = useCallback(
     async (deviceId: string) => {
@@ -1239,7 +1260,7 @@ export function useCaptureWidget({
     onSessionModeResume?.();
   }, [globalSessionModeActive, onSessionModeResume]);
 
-  const endSession = useCallback((afterEnd?: () => void) => {
+  const endSession = useCallback((afterEnd?: () => void, options?: { soft?: boolean }) => {
     if (isEndingRef.current) return;
     if ((!sessionModeRef.current && !globalSessionModeActive) || endPending) return;
     isEndingRef.current = true;
@@ -1253,7 +1274,9 @@ export function useCaptureWidget({
       setPausePending(false);
       setPending(null);
       setSessionFeedbackSaving(false);
-      onSessionModeEnd?.();
+      if (!options?.soft) {
+        onSessionModeEnd?.();
+      }
       afterEnd?.();
     };
 
@@ -1346,6 +1369,10 @@ export function useCaptureWidget({
 
   const handleSessionElementClicked = useCallback(
     async (element: Element) => {
+      if (feedbackLimitReached) {
+        triggerUpgradeShake?.();
+        return;
+      }
       if (sessionFeedbackPending && !captureRootRef.current) {
         setPending(null);
         return;
@@ -1391,11 +1418,15 @@ export function useCaptureWidget({
       setPending({ screenshot: screenshot || undefined, context, elementRect });
       onSessionActivity?.();
     },
-    [getFullTabImage, sessionFeedbackPending, onSessionActivity]
+    [getFullTabImage, sessionFeedbackPending, onSessionActivity, feedbackLimitReached, triggerUpgradeShake]
   );
 
   const handleSessionFeedbackSubmit = useCallback(
     (transcript: string) => {
+      if (feedbackLimitReached) {
+        triggerUpgradeShake?.();
+        return;
+      }
       const pending = sessionFeedbackPending;
       if (!pending || !transcript || transcript.trim().length === 0) {
         setPending(null);
@@ -1464,7 +1495,7 @@ export function useCaptureWidget({
         setErrorMessage("AI processing failed.");
       }
     },
-    [sessionFeedbackPending, onComplete]
+    [sessionFeedbackPending, onComplete, feedbackLimitReached, triggerUpgradeShake]
   );
 
   const handleSessionFeedbackCancel = useCallback(() => {
@@ -1494,6 +1525,10 @@ export function useCaptureWidget({
   }, [setPending, stopListeningAudio]);
 
   const handleSessionStartVoice = useCallback(() => {
+    if (feedbackLimitReached) {
+      triggerUpgradeShake?.();
+      return;
+    }
     const pending = sessionFeedbackPending;
     if (!pending) return;
     const id = generateRecordingId();
@@ -1508,7 +1543,7 @@ export function useCaptureWidget({
     setRecordings((prev) => [...prev, newRecording]);
     setActiveRecordingId(id);
     startListening();
-  }, [sessionFeedbackPending, startListening]);
+  }, [sessionFeedbackPending, startListening, feedbackLimitReached, triggerUpgradeShake]);
 
   /** Starts capture flow: idle → focus_mode. Used by dashboard "Capture feedback"; region overlay then handles selection. */
   const startCapture = useCallback(() => {
@@ -1612,6 +1647,7 @@ export function useCaptureWidget({
       handleSessionFeedbackCancel,
       handleSessionStartVoice,
       retryVoiceCapture,
+      resetVoiceRecording,
       selectVoiceMicrophone,
     }),
     [
@@ -1647,6 +1683,7 @@ export function useCaptureWidget({
       handleSessionFeedbackCancel,
       handleSessionStartVoice,
       retryVoiceCapture,
+      resetVoiceRecording,
       selectVoiceMicrophone,
     ]
   );

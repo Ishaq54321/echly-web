@@ -25,7 +25,8 @@ export interface ExecutionViewProps {
   resolveSubmitting?: boolean;
   impactScore?: number | null;
   comments?: Comment[];
-  sendPinComment?: (position: { xPercent: number; yPercent: number }, message: string) => Promise<string | null>;
+  sendPinComment?: (position: { xPercent: number; yPercent: number }, message: string, mentionedUserIds?: string[]) => Promise<string | null>;
+  participants?: { uid: string; displayName: string; email: string; avatarUrl?: string | null }[];
   sendReply?: (threadId: string, message: string) => Promise<void>;
   activePinIdForPopover?: string | null;
   activeThreadId?: string | null;
@@ -115,6 +116,7 @@ export function ExecutionView({
   canAssignTicket = false,
   isWorkspaceMember = false,
   animatingPinId,
+  participants,
 }: ExecutionViewProps) {
   const displayItem = item;
 
@@ -196,6 +198,7 @@ export function ExecutionView({
               sendTextComment={sendTextComment}
               onCommentPlaced={onCommentPlaced}
               updatePinPosition={updatePinPosition}
+              participants={participants}
             />
           ) : null}
         </div>

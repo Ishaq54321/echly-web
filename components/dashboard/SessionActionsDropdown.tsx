@@ -14,12 +14,12 @@ import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import {
   Archive,
-  Link2,
-  Loader2,
   MoreHorizontal,
   Pencil,
+  Plus,
   RotateCcw,
   Trash2,
+  UserPlus,
 } from "lucide-react";
 import type { Session } from "@/lib/domain/session";
 
@@ -28,7 +28,6 @@ const RenameSessionModal = dynamic(
     import("@/components/dashboard/RenameSessionModal").then((m) => m.RenameSessionModal),
   { ssr: false }
 );
-import { copySessionLink } from "@/utils/copySessionLink";
 import {
   assertIdentityResolved,
   useWorkspace,
@@ -40,13 +39,15 @@ import {
 } from "@/lib/ui/portalDropdownPosition";
 
 export type SessionActionMenuKey =
-  | "copyLink"
+  | "share"
+  | "addMoreTickets"
   | "rename"
   | "archive"
   | "delete";
 
 const SESSION_ACTION_MENU_ORDER: SessionActionMenuKey[] = [
-  "copyLink",
+  "share",
+  "addMoreTickets",
   "rename",
   "archive",
   "delete",
@@ -70,12 +71,15 @@ export interface SessionActionsDropdownProps {
   disabled?: boolean;
   triggerClassName?: string;
   triggerIconClassName?: string;
+  triggerIconStrokeWidth?: number;
   triggerAriaLabel?: string;
-  /** Called after clipboard copy succeeds (e.g. grid card “Link copied” tooltip). */
-  onCopyLinkSuccess?: () => void;
+  /** Called when the user clicks the "Share" menu item — parent opens the share modal. */
+  onShareClick?: () => void;
+  /** Called when the user clicks the "Add more tickets" menu item — parent opens extension or store. */
+  onAddMoreTickets?: () => void;
   /** For parent UI (e.g. hover tooltip) that must hide while the menu is open. */
   onOpenChange?: (open: boolean) => void;
-  /** Omit menu rows (e.g. when Copy link / Share exist as separate controls). */
+  /** Omit menu rows (e.g. when Share exists as a separate control). */
   hideActions?: SessionActionMenuKey[];
 }
 
@@ -89,12 +93,14 @@ export function SessionActionsDropdown({
   disabled = false,
   triggerClassName = "",
   triggerIconClassName = "h-4 w-4",
+  triggerIconStrokeWidth = 2,
   triggerAriaLabel = "More actions",
-  onCopyLinkSuccess,
+  onShareClick,
+  onAddMoreTickets,
   onOpenChange,
   hideActions,
 }: SessionActionsDropdownProps) {
-  const { authUid, isIdentityResolved } = useWorkspace();
+  const { isIdentityResolved } = useWorkspace();
   const [moreOpen, setMoreOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState<{
     top: number;
@@ -105,7 +111,6 @@ export function SessionActionsDropdown({
   );
   const [renameOpen, setRenameOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
-  const [copyLinkBusy, setCopyLinkBusy] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const firstMenuItemRef = useRef<HTMLButtonElement>(null);
@@ -230,15 +235,20 @@ export function SessionActionsDropdown({
     if (moreOpen) firstMenuItemRef.current?.focus();
   }, [moreOpen]);
 
-  const handleCopyLink = async (e: React.MouseEvent) => {
+  const handleShareClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (copyLinkBusy) return;
+    if (isOptimistic || disabled) return;
     assertIdentityResolved(isIdentityResolved);
-    const ok = await copySessionLink(session.id, authUid, {
-      onBusy: setCopyLinkBusy,
-    });
-    if (ok) onCopyLinkSuccess?.();
+    onShareClick?.();
+    closeMenu();
+  };
+
+  const handleAddMoreTicketsClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isOptimistic || disabled) return;
+    onAddMoreTickets?.();
     closeMenu();
   };
 
@@ -331,7 +341,7 @@ export function SessionActionsDropdown({
     >
       <MoreHorizontal
         className={triggerIconClassName}
-        strokeWidth={2}
+        strokeWidth={triggerIconStrokeWidth}
         aria-hidden
       />
     </button>
@@ -370,23 +380,33 @@ export function SessionActionsDropdown({
             {visibleMenuKeys.map((key, index) => {
               const itemRef = index === 0 ? firstMenuItemRef : undefined;
               switch (key) {
-                case "copyLink":
+                case "share":
                   return (
                     <button
                       key={key}
                       ref={itemRef}
                       type="button"
-                      onClick={handleCopyLink}
-                      disabled={copyLinkBusy}
+                      onClick={handleShareClick}
                       className={menuItemClass}
                       role="menuitem"
                     >
-                      {copyLinkBusy ? (
-                        <Loader2 className="shrink-0 animate-spin" strokeWidth={1.6} aria-hidden />
-                      ) : (
-                        <Link2 className="shrink-0" strokeWidth={1.6} aria-hidden />
-                      )}
-                      {copyLinkBusy ? "Copying…" : "Copy link"}
+                      <UserPlus className="shrink-0" strokeWidth={1.6} aria-hidden />
+                      Share
+                    </button>
+                  );
+                case "addMoreTickets":
+                  return (
+                    <button
+                      key={key}
+                      ref={itemRef}
+                      type="button"
+                      onClick={handleAddMoreTicketsClick}
+                      disabled={!onAddMoreTickets}
+                      className={menuItemClass}
+                      role="menuitem"
+                    >
+                      <Plus className="shrink-0" strokeWidth={1.6} aria-hidden />
+                      Add more tickets
                     </button>
                   );
                 case "rename":

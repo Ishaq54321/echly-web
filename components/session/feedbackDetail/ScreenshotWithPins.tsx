@@ -3,11 +3,14 @@
 import React, { useState, useCallback, useRef, memo, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
-import { Expand, Loader2, Pencil, AtSign, Smile, Paperclip, X } from "lucide-react";
+import { Expand, Loader2, Pencil, Smile, Paperclip, X, AtSign } from "lucide-react";
 import EmojiPicker from "emoji-picker-react";
+import type { Editor } from "@tiptap/react";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import type { Comment } from "@/lib/domain/comment";
 import type { CommentPosition, CommentAttachment } from "@/lib/domain/comment";
+import { Tooltip } from "@/components/ui/Tooltip";
+import { TiptapCommentEditor, extractFromDoc, type TiptapEditorParticipant } from "@/components/comments/TiptapCommentEditor";
 
 function getUploadBoxColor(fileName: string): string {
   const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
@@ -41,7 +44,7 @@ interface ScreenshotWithPinsProps {
   onPinClick?: (commentId: string) => void;
   onOpenThreadPanel?: (commentId: string) => void;
   onCloseInlinePopover?: () => void;
-  onAddPinComment?: (position: CommentPosition, message: string) => Promise<string | null>;
+  onAddPinComment?: (position: CommentPosition, message: string, mentionedUserIds?: string[], attachments?: CommentAttachment[]) => Promise<string | null>;
   /** Resolve this comment (root); updates pin + panel immediately via single source of truth. */
   updateComment?: (commentId: string, data: { message?: string; resolved?: boolean }) => Promise<void>;
   onCommentPlaced?: (newCommentId?: string) => void;
@@ -52,6 +55,7 @@ interface ScreenshotWithPinsProps {
   canEdit?: boolean;
   /** Pin id that should pulse its ring animation (set by comment-click navigation). */
   animatingPinId?: string | null;
+  participants?: TiptapEditorParticipant[];
 }
 
 const PinMarker = memo(function PinMarker({
@@ -191,12 +195,13 @@ const ScreenshotWithPinsInner = ({
   onEdit,
   canEdit,
   animatingPinId,
+  participants,
 }: ScreenshotWithPinsProps) => {
   const { authDisplayName, authEmail, authPhotoUrl } = useWorkspace();
   const containerRef = useRef<HTMLDivElement>(null);
   const draftPopoverRef = useRef<HTMLDivElement>(null);
+  const pinEditorRef = useRef<Editor | null>(null);
   const [draftPosition, setDraftPosition] = useState<CommentPosition | null>(null);
-  const [draftMessage, setDraftMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [imageDecoded, setImageDecoded] = useState(false);
 
@@ -212,6 +217,12 @@ const ScreenshotWithPinsInner = ({
   const [draftPendingAttachments, setDraftPendingAttachments] = useState<CommentAttachment[]>([]);
   const [draftFileError, setDraftFileError] = useState<string | null>(null);
   const MAX_ATTACHMENTS = 5;
+
+  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    if (!isCommentMode) setCursorPos(null);
+  }, [isCommentMode]);
 
   useLayoutEffect(() => {
     setImageDecoded(false);
@@ -239,7 +250,6 @@ const ScreenshotWithPinsInner = ({
         const xPercent = (x / rect.width) * 100;
         const yPercent = (y / rect.height) * 100;
         setDraftPosition({ xPercent, yPercent });
-        setDraftMessage("");
       } else if (!isCommentMode && onCloseInlinePopover) {
         onCloseInlinePopover();
       }
@@ -247,33 +257,39 @@ const ScreenshotWithPinsInner = ({
     [isCommentMode, onAddPinComment, onCloseInlinePopover]
   );
 
-  const handleSubmitDraft = useCallback(async () => {
+  const handleSubmitDraftWithMentions = useCallback(async (text: string, mentionedUserIds: string[]) => {
     if (!draftPosition || !onAddPinComment) return;
-    const trimmed = draftMessage.trim();
+    const trimmed = text.trim();
     if (!trimmed && draftPendingAttachments.length === 0) return;
     setSubmitting(true);
     try {
-      const newCommentId = await onAddPinComment(draftPosition, trimmed);
+      const newCommentId = await onAddPinComment(
+        draftPosition,
+        trimmed,
+        mentionedUserIds,
+        draftPendingAttachments.length > 0 ? draftPendingAttachments : undefined
+      );
       setDraftPosition(null);
-      setDraftMessage("");
       setDraftPendingAttachments([]);
+      pinEditorRef.current?.commands.clearContent();
       onCommentPlaced?.(newCommentId ?? undefined);
     } finally {
       setSubmitting(false);
     }
-  }, [draftPosition, draftMessage, draftPendingAttachments, onAddPinComment, onCommentPlaced]);
+  }, [draftPosition, draftPendingAttachments, onAddPinComment, onCommentPlaced]);
 
   const handleCancelDraft = useCallback(() => {
     setDraftPosition(null);
-    setDraftMessage("");
     setDraftPendingAttachments([]);
     setDraftFileError(null);
+    pinEditorRef.current?.commands.clearContent();
   }, []);
 
   // Click-outside: dismiss draft compose when clicking outside the popover and outside the screenshot
   useEffect(() => {
     if (!draftPosition) return;
     function handleClickOutside(e: MouseEvent) {
+      if ((e.target as HTMLElement)?.closest?.(".mention-dropdown")) return;
       const target = e.target as Node;
       if (draftPopoverRef.current?.contains(target)) return;
       if (containerRef.current?.contains(target)) return;
@@ -348,6 +364,12 @@ const ScreenshotWithPinsInner = ({
         ref={containerRef}
         className={`group relative overflow-visible rounded-lg max-h-[317px] bg-white ${innerBorder} shadow-none ${isCommentMode ? "comment-mode-cursor" : ""}`}
         onClick={handleImageClick}
+        onMouseMove={(e) => {
+          if (!isCommentMode) return;
+          const rect = e.currentTarget.getBoundingClientRect();
+          setCursorPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+        }}
+        onMouseLeave={() => setCursorPos(null)}
         role={isCommentMode ? "button" : undefined}
         aria-label={isCommentMode ? "Click to add comment pin" : undefined}
       >
@@ -382,6 +404,29 @@ const ScreenshotWithPinsInner = ({
             </div>
           )}
         </div>
+
+        {isCommentMode && cursorPos && !draftPosition && (
+          <div
+            className="pointer-events-none absolute"
+            style={{ left: cursorPos.x + 16, top: cursorPos.y - 12, zIndex: 10 }}
+          >
+            <span
+              className="inline-block whitespace-nowrap pointer-events-none"
+              style={{
+                padding: "6px 12px",
+                borderRadius: 8,
+                background: "var(--text-heading)",
+                color: "var(--text-on-dark)",
+                fontSize: "var(--text-xs)",
+                fontWeight: 600,
+                letterSpacing: "-0.005em",
+                fontFamily: "var(--font-sans)",
+              }}
+            >
+              Click to add comment
+            </span>
+          </div>
+        )}
 
         {pinComments.map((c, idx) => (
           <PinMarker
@@ -452,19 +497,16 @@ const ScreenshotWithPinsInner = ({
                     )}
                   </div>
                   <div className="flex-1 min-w-0 py-1.5">
-                    <textarea
-                      value={draftMessage}
-                      onChange={(e) => setDraftMessage(e.target.value)}
+                    <TiptapCommentEditor
                       placeholder="Add a comment..."
-                      className="w-full min-h-[48px] bg-transparent text-[14px] text-[var(--text-body)] placeholder:text-[var(--text-secondary)] border-none outline-none resize-none px-2"
+                      participants={participants ?? []}
+                      editorRef={pinEditorRef}
                       autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === "Escape") handleCancelDraft();
-                        if (e.key === "Enter" && !e.shiftKey && draftMessage.trim()) {
-                          e.preventDefault();
-                          void handleSubmitDraft();
-                        }
+                      onSubmit={(text, mentionedUserIds) => {
+                        void handleSubmitDraftWithMentions(text, mentionedUserIds);
                       }}
+                      onEscape={handleCancelDraft}
+                      className="w-full min-h-[48px] px-2"
                     />
                   </div>
                 </div>
@@ -520,48 +562,43 @@ const ScreenshotWithPinsInner = ({
                 {/* Row 2: Icons + Cancel + Comment button */}
                 <div className="flex items-center justify-between px-4 py-3">
                   <div className="flex items-center gap-0.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDraftMessage(prev => prev + "@");
-                        const textarea = draftPopoverRef.current?.querySelector("textarea");
-                        if (textarea) {
-                          textarea.focus();
-                          setTimeout(() => {
-                            textarea.selectionStart = textarea.value.length;
-                            textarea.selectionEnd = textarea.value.length;
-                          }, 0);
-                        }
-                      }}
-                      className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
-                      title="Mention"
-                    >
-                      <AtSign className="h-[18px] w-[18px]" strokeWidth={1.5} />
-                    </button>
+                    <Tooltip content="Emoji">
+                      <button
+                        ref={draftEmojiButtonRef}
+                        type="button"
+                        onClick={() => {
+                          if (draftEmojiButtonRef.current) {
+                            setDraftEmojiAnchorRect(draftEmojiButtonRef.current.getBoundingClientRect());
+                          }
+                          setDraftEmojiOpen(v => !v);
+                        }}
+                        className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
+                      >
+                        <Smile className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                      </button>
+                    </Tooltip>
                     <span className="w-px h-4 bg-[var(--border)] mx-1" />
-                    <button
-                      ref={draftEmojiButtonRef}
-                      type="button"
-                      onClick={() => {
-                        if (draftEmojiButtonRef.current) {
-                          setDraftEmojiAnchorRect(draftEmojiButtonRef.current.getBoundingClientRect());
-                        }
-                        setDraftEmojiOpen(v => !v);
-                      }}
-                      className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
-                      title="Emoji"
-                    >
-                      <Smile className="h-[18px] w-[18px]" strokeWidth={1.5} />
-                    </button>
+                    <Tooltip content="Mention someone">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          pinEditorRef.current?.chain().focus().insertContent("@").run();
+                        }}
+                        className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
+                      >
+                        <AtSign className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                      </button>
+                    </Tooltip>
                     <span className="w-px h-4 bg-[var(--border)] mx-1" />
-                    <button
-                      type="button"
-                      onClick={() => draftFileInputRef.current?.click()}
-                      className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
-                      title="Attach"
-                    >
-                      <Paperclip className="h-[18px] w-[18px]" strokeWidth={1.5} />
-                    </button>
+                    <Tooltip content="Attach">
+                      <button
+                        type="button"
+                        onClick={() => draftFileInputRef.current?.click()}
+                        className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors"
+                      >
+                        <Paperclip className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                      </button>
+                    </Tooltip>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -573,8 +610,13 @@ const ScreenshotWithPinsInner = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => void handleSubmitDraft()}
-                      disabled={(!draftMessage.trim() && draftPendingAttachments.length === 0) || submitting}
+                      onClick={() => {
+                        const ed = pinEditorRef.current;
+                        if (!ed) return;
+                        const { text, mentionedUserIds } = extractFromDoc(ed.state.doc);
+                        void handleSubmitDraftWithMentions(text, mentionedUserIds);
+                      }}
+                      disabled={submitting}
                       className="inline-flex h-[34px] items-center gap-1.5 px-3 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[13px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
                     >
                       {submitting ? "Sending..." : "Comment"}
@@ -685,7 +727,7 @@ const ScreenshotWithPinsInner = ({
         >
           <EmojiPicker
             onEmojiClick={(emojiData) => {
-              setDraftMessage(prev => prev + emojiData.emoji);
+              pinEditorRef.current?.chain().focus().insertContent(emojiData.emoji).run();
               setDraftEmojiOpen(false);
             }}
             width={300}

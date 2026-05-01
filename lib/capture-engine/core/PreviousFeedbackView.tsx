@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { X, Mic, Pen, ChevronLeft } from "lucide-react";
 import { ECHLY_DEBUG } from "@/lib/utils/logger";
 import type { SessionOption } from "./ResumeSessionModal";
 
@@ -122,35 +123,29 @@ export default function PreviousFeedbackView({
         <div className="pill-ws">
           <span className="pill-ws-name">Previous Feedback</span>
         </div>
-        <button
-          type="button"
-          className="pill-icon-btn"
-          onClick={() => onModeChange?.(captureMode === "voice" ? "text" : "voice")}
-          aria-label="Toggle mode"
-          title={captureMode === "voice" ? "Switch to text mode" : "Switch to speak mode"}
-        >
-          {captureMode === "voice" ? (
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-              <rect x="6" y="2" width="4" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          ) : (
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-              <path d="M2.5 12.5l1-3 7-7 2 2-7 7-3 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-              <path d="M9.5 4l2 2" stroke="currentColor" strokeWidth="1.5" />
-            </svg>
-          )}
-        </button>
-        <button type="button" className="pill-icon-btn" onClick={onBack} aria-label="Back" title="Back">
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-            <path d="M9.5 4L5.5 8l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-        <button type="button" className="pill-icon-btn" onClick={onClose} aria-label="Close" title="Minimize">
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-            <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-        </button>
+        <div className="tl-icon-group">
+          <button
+            type="button"
+            className="pill-icon-btn"
+            onClick={() => onModeChange?.(captureMode === "voice" ? "text" : "voice")}
+            aria-label="Toggle mode"
+          >
+            {captureMode === "voice" ? (
+              <Mic size={13} strokeWidth={2.25} />
+            ) : (
+              <Pen size={13} strokeWidth={2.25} />
+            )}
+            <span className="echly-tooltip">{captureMode === "voice" ? "Text mode" : "Voice mode"}</span>
+          </button>
+          <button type="button" className="pill-icon-btn" onClick={onBack} aria-label="Back">
+            <ChevronLeft size={13} strokeWidth={2.25} />
+            <span className="echly-tooltip">Back</span>
+          </button>
+          <button type="button" className="pill-icon-btn" onClick={onClose} aria-label="Close">
+            <X size={13} strokeWidth={2.25} />
+            <span className="echly-tooltip">Minimize</span>
+          </button>
+        </div>
       </div>
 
       <div className="pill-rule" />

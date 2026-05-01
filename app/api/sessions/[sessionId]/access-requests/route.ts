@@ -14,6 +14,8 @@ import {
 } from "@/lib/repositories/activityEventsRepository.server";
 import { sendAccessRequestResultEmail } from "@/lib/email/workspaceEmails";
 import { getUserByIdRepo } from "@/lib/repositories/usersRepository.server";
+import { fireAndForget } from "@/lib/server/fireAndForget";
+import { dispatchNotifications } from "@/lib/server/notificationFanOut.server";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
 
@@ -192,6 +194,30 @@ export async function PATCH(
           requesterName: rejectedRequesterName ?? null,
         },
       });
+
+      const rejectedRequesterId =
+        typeof accessRequest.requesterUserId === "string"
+          ? accessRequest.requesterUserId.trim()
+          : "";
+      if (rejectedRequesterId && rejectedRequesterId !== approverId) {
+        fireAndForget("notification:access_request.rejected", async () => {
+          await dispatchNotifications({
+            recipientIds: [rejectedRequesterId],
+            workspaceId,
+            sessionId,
+            sessionTitle: sessionTitle || null,
+            type: "access_request.rejected",
+            actor: {
+              id: approverId,
+              name: actor.actorName,
+              photoURL: actor.actorPhotoURL ?? null,
+            },
+            title: `Your access request for "${sessionTitle || "a session"}" was declined`,
+            entityTitle: sessionTitle || null,
+            body: null,
+          });
+        });
+      }
       void sendAccessRequestResultEmail({
         to: accessRequest.requesterEmail,
         approved: false,
@@ -261,6 +287,30 @@ export async function PATCH(
         accessLevel: accessLevel ?? null,
       },
     });
+
+    const approvedRequesterId =
+      typeof accessRequest.requesterUserId === "string"
+        ? accessRequest.requesterUserId.trim()
+        : "";
+    if (approvedRequesterId && approvedRequesterId !== approverId) {
+      fireAndForget("notification:access_request.approved", async () => {
+        await dispatchNotifications({
+          recipientIds: [approvedRequesterId],
+          workspaceId,
+          sessionId,
+          sessionTitle: sessionTitle || null,
+          type: "access_request.approved",
+          actor: {
+            id: approverId,
+            name: actor.actorName,
+            photoURL: actor.actorPhotoURL ?? null,
+          },
+          title: `Your access to "${sessionTitle || "a session"}" was approved`,
+          entityTitle: sessionTitle || null,
+          body: null,
+        });
+      });
+    }
     void sendAccessRequestResultEmail({
       to: accessRequest.requesterEmail,
       approved: true,

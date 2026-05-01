@@ -2,6 +2,55 @@ import { recordSessionViewIfNewRepo } from "@/lib/repositories/sessionsRepositor
 import { checkRateLimit, clientKeyFromRequest } from "@/lib/server/rateLimit";
 import { tryBuildRequestContext } from "@/lib/server/requestContext";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
+import { adminDb } from "@/lib/server/firebaseAdmin";
+
+async function loadViewerProfile(
+  uid: string
+): Promise<{ displayName: string | null; avatarUrl: string | null }> {
+  let displayName: string | null = null;
+  let avatarUrl: string | null = null;
+  try {
+    const snap = await adminDb.doc(`users/${uid}`).get();
+    if (snap.exists) {
+      const d = snap.data() ?? {};
+      displayName =
+        typeof d.displayName === "string" && d.displayName.trim()
+          ? d.displayName.trim()
+          : typeof d.name === "string" && d.name.trim()
+            ? d.name.trim()
+            : null;
+      avatarUrl =
+        typeof d.photoURL === "string" && d.photoURL.trim()
+          ? d.photoURL.trim()
+          : typeof d.avatarUrl === "string" && d.avatarUrl.trim()
+            ? d.avatarUrl.trim()
+            : null;
+    }
+  } catch {
+    // Firestore read failed — fall through to Auth lookup
+  }
+
+  if (!displayName || !avatarUrl) {
+    try {
+      const { getAuth } = await import("firebase-admin/auth");
+      const authUser = await getAuth().getUser(uid);
+      if (!displayName) {
+        if (authUser?.displayName?.trim()) {
+          displayName = authUser.displayName.trim();
+        } else if (authUser?.email) {
+          displayName = authUser.email.split("@")[0];
+        }
+      }
+      if (!avatarUrl && authUser?.photoURL) {
+        avatarUrl = authUser.photoURL;
+      }
+    } catch {
+      // Auth lookup failed — continue with whatever we have
+    }
+  }
+
+  return { displayName, avatarUrl };
+}
 
 export async function POST(
   req: Request,
@@ -21,9 +70,13 @@ export async function POST(
     });
   }
 
-  let body: { token?: unknown; shareToken?: unknown } = {};
+  let body: { token?: unknown; shareToken?: unknown; viewerId?: unknown } = {};
   try {
-    body = (await req.json()) as { token?: unknown; shareToken?: unknown };
+    body = (await req.json()) as {
+      token?: unknown;
+      shareToken?: unknown;
+      viewerId?: unknown;
+    };
   } catch {
     body = {};
   }
@@ -31,6 +84,11 @@ export async function POST(
   const tokenFromBody =
     (typeof body.token === "string" ? body.token.trim() : "") ||
     (typeof body.shareToken === "string" ? body.shareToken.trim() : "");
+
+  const anonViewerIdFromBody =
+    typeof body.viewerId === "string" && body.viewerId.startsWith("anon_")
+      ? body.viewerId.trim()
+      : "";
 
   const built = await tryBuildRequestContext({
     req,
@@ -49,7 +107,10 @@ export async function POST(
 
   try {
     if (context.userId) {
-      await recordSessionViewIfNewRepo(sessionId, context.userId);
+      const profile = await loadViewerProfile(context.userId);
+      await recordSessionViewIfNewRepo(sessionId, context.userId, profile);
+    } else if (anonViewerIdFromBody !== "") {
+      await recordSessionViewIfNewRepo(sessionId, anonViewerIdFromBody);
     }
     return apiSuccess({});
   } catch (err) {

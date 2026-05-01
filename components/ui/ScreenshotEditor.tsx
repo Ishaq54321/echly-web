@@ -139,7 +139,7 @@ function hexWithAlpha(hex: string, alpha: number): string {
 export function ScreenshotEditor({
   imageUrl,
   sessionId,
-  hasPins,
+  hasPins: _hasPins,
   onSave,
   onClose,
   embedded,
@@ -365,7 +365,7 @@ export function ScreenshotEditor({
       setInProgress({ kind: "ellipse", id: makeId(), x: clampedPos.x, y: clampedPos.y, rx: 0, ry: 0, color: hexWithAlpha(outlineColor, 1), stroke: hexWithAlpha(outlineColor, 1), fill: hexWithAlpha(fillColor, fillOpacity), width: outlineWidth });
     } else if (activeTool === "line") {
       setInProgress({ kind: "lineStraight", id: makeId(), points: [clampedPos.x, clampedPos.y, clampedPos.x, clampedPos.y], color: hexWithAlpha(outlineColor, 1), width: outlineWidth });
-    } else if (activeTool === "arrow" && !hasPins) {
+    } else if (activeTool === "arrow") {
       setInProgress({
         kind: "arrow",
         id: makeId(),
@@ -373,7 +373,7 @@ export function ScreenshotEditor({
         color: hexWithAlpha(outlineColor, 1),
         width: outlineWidth,
       });
-    } else if (activeTool === "crop" && !hasPins) {
+    } else if (activeTool === "crop") {
       const clickedOnStage = e.target === e.target.getStage() || e.target.name() === "bgImage";
       if (clickedOnStage) {
         setCropRect({ x: clampedPos.x, y: clampedPos.y, w: 0, h: 0 });
@@ -429,7 +429,7 @@ export function ScreenshotEditor({
         ...inProgress,
         points: [inProgress.points[0], inProgress.points[1], clampedPos.x, clampedPos.y],
       });
-    } else if (activeTool === "crop" && !hasPins && isDrawingCropRef.current) {
+    } else if (activeTool === "crop" && isDrawingCropRef.current) {
       setCropRect({
         x: Math.min(start.x, clampedPos.x),
         y: Math.min(start.y, clampedPos.y),
@@ -471,6 +471,16 @@ export function ScreenshotEditor({
         const dx = inProgress.points[2] - inProgress.points[0];
         const dy = inProgress.points[3] - inProgress.points[1];
         if (Math.sqrt(dx * dx + dy * dy) < 3) valid = false;
+      }
+      if (inProgress.kind === "arrow") {
+        const pts = inProgress.points;
+        if (pts.length < 4) {
+          valid = false;
+        } else {
+          const dx = pts[2] - pts[0];
+          const dy = pts[3] - pts[1];
+          if (Math.sqrt(dx * dx + dy * dy) < 5) valid = false;
+        }
       }
       if (valid) pushHistory([...annotationsRef.current, inProgress]);
       setInProgress(null);
@@ -538,6 +548,11 @@ export function ScreenshotEditor({
     const ctx = offscreen.getContext("2d")!;
     ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
 
+    // TODO: when crop is applied, pin xPercent/yPercent on existing comments
+    // are still relative to the original image and will be misplaced after crop.
+    // Pipeline to add: surface an onCropApplied({ cropX, cropY, cropW, cropH,
+    // originalW, originalH }) callback, wire through ImageViewer/parent, and
+    // PATCH each pin comment's position via /api/comments/[id].
     setImageSrc(offscreen.toDataURL("image/png"));
     setAnnotations([]);
     annotationsRef.current = [];
@@ -821,7 +836,6 @@ export function ScreenshotEditor({
         canRedo={canRedo}
         onUndo={undo}
         onRedo={redo}
-        hasPins={hasPins}
         onClose={onClose}
         onSave={handleSave}
         saving={saving}

@@ -32,6 +32,14 @@ export interface Session {
   updatedAt?: Timestamp | Date | string | null;
   /** Loom-style unique view count (one per viewer per session). */
   viewCount?: number;
+  /** Denormalized: most recent up to 5 viewers (for cheap avatar rendering on lists). */
+  recentViewers?: Array<{
+    id: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+    isAnonymous: boolean;
+    viewedAt: number;
+  }>;
   /** Total comment count across all feedback in this session. */
   commentCount?: number;
   /** Denormalized: total open feedback (WAVE 1 structural). */
@@ -168,6 +176,15 @@ export function sessionFromApiItem(item: unknown): Session {
     session.updatedAt = updatedAt;
   }
 
+  const createdAt = Reflect.get(item, "createdAt");
+  if (
+    typeof createdAt === "string" ||
+    createdAt instanceof Date ||
+    createdAt === null
+  ) {
+    session.createdAt = createdAt;
+  }
+
   const hcs = Reflect.get(item, "hasConfiguredShare");
   if (typeof hcs === "boolean") session.hasConfiguredShare = hcs;
 
@@ -183,6 +200,30 @@ export function sessionFromApiItem(item: unknown): Session {
   if (tc !== undefined) session.totalCount = tc;
   const fc = readCount("feedbackCount");
   if (fc !== undefined) session.feedbackCount = fc;
+  const vc = readCount("viewCount");
+  if (vc !== undefined) session.viewCount = vc;
+
+  const rvRaw = Reflect.get(item, "recentViewers");
+  if (Array.isArray(rvRaw)) {
+    const parsed: NonNullable<Session["recentViewers"]> = [];
+    for (const entry of rvRaw) {
+      if (typeof entry !== "object" || entry === null) continue;
+      const id = Reflect.get(entry, "id");
+      if (typeof id !== "string" || id.trim() === "") continue;
+      const displayName = Reflect.get(entry, "displayName");
+      const avatarUrl = Reflect.get(entry, "avatarUrl");
+      const isAnonymous = Reflect.get(entry, "isAnonymous");
+      const viewedAt = Reflect.get(entry, "viewedAt");
+      parsed.push({
+        id,
+        displayName: typeof displayName === "string" ? displayName : null,
+        avatarUrl: typeof avatarUrl === "string" ? avatarUrl : null,
+        isAnonymous: isAnonymous === true,
+        viewedAt: typeof viewedAt === "number" ? viewedAt : 0,
+      });
+    }
+    session.recentViewers = parsed;
+  }
 
   return session;
 }

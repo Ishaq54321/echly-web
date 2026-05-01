@@ -20,6 +20,7 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import type { Tool } from "./ScreenshotEditor";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 function cn(...classes: (string | false | undefined | null)[]): string {
   return classes.filter(Boolean).join(" ");
@@ -112,7 +113,6 @@ interface EditorToolbarProps {
   onClose: () => void;
   onSave: () => void;
   saving: boolean;
-  hasPins: boolean;
   cropPending: boolean;
   onApplyCrop: () => void;
   onCancelCrop: () => void;
@@ -128,19 +128,20 @@ interface ToolButtonProps {
 
 function ToolButton({ tool, activeTool, setActiveTool, icon, label }: ToolButtonProps) {
   return (
-    <button
-      type="button"
-      title={label}
-      onClick={() => setActiveTool(tool)}
-      className={cn(
-        "w-12 h-12 rounded-xl flex items-center justify-center transition-all",
-        activeTool === tool
-          ? "bg-white text-[#1C1C1E]"
-          : "text-white/70 hover:text-white hover:bg-white/10"
-      )}
-    >
-      {icon}
-    </button>
+    <Tooltip content={label}>
+      <button
+        type="button"
+        onClick={() => setActiveTool(tool)}
+        className={cn(
+          "w-12 h-12 rounded-xl flex items-center justify-center transition-all",
+          activeTool === tool
+            ? "bg-white text-[#1C1C1E]"
+            : "text-white/70 hover:text-white hover:bg-white/10"
+        )}
+      >
+        {icon}
+      </button>
+    </Tooltip>
   );
 }
 
@@ -207,7 +208,6 @@ export function EditorToolbar({
   canRedo,
   onUndo,
   onRedo,
-  hasPins,
   onClose,
   onSave,
   saving,
@@ -499,61 +499,47 @@ export function EditorToolbar({
         <ToolButton tool="eraser" activeTool={activeTool} setActiveTool={setActiveTool} label="Eraser" icon={<Eraser {...iconProps} />} />
 
         {/* Shapes trigger */}
-        <button
-          type="button"
-          title="Shapes"
-          onClick={() => setShapesMenuOpen(v => !v)}
-          className={cn(
-            "w-12 h-12 rounded-xl flex items-center justify-center transition-all",
-            isShapeActive || shapesMenuOpen
-              ? "bg-white text-[#1C1C1E]"
-              : "text-white/70 hover:text-white hover:bg-white/10"
-          )}
-        >
-          {activeShapeIcon}
-        </button>
+        <Tooltip content="Shapes">
+          <button
+            type="button"
+            onClick={() => setShapesMenuOpen(v => !v)}
+            className={cn(
+              "w-12 h-12 rounded-xl flex items-center justify-center transition-all",
+              isShapeActive || shapesMenuOpen
+                ? "bg-white text-[#1C1C1E]"
+                : "text-white/70 hover:text-white hover:bg-white/10"
+            )}
+          >
+            {activeShapeIcon}
+          </button>
+        </Tooltip>
 
-        {/* Crop — disabled when hasPins */}
-        {hasPins ? (
-          <div className="relative group">
-            <button
-              type="button"
-              disabled
-              className="w-12 h-12 rounded-xl flex items-center justify-center text-white/25 cursor-not-allowed"
-            >
-              <Crop {...iconProps} />
-            </button>
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block pointer-events-none whitespace-nowrap">
-              <div className="bg-[var(--text-heading)] text-white text-[12px] px-2.5 py-1.5 rounded-lg">
-                Crop unavailable — screenshot has feedback pins
-              </div>
-            </div>
-          </div>
-        ) : (
-          <ToolButton tool="crop" activeTool={activeTool} setActiveTool={setActiveTool} label="Crop" icon={<Crop {...iconProps} />} />
-        )}
+        {/* Crop */}
+        <ToolButton tool="crop" activeTool={activeTool} setActiveTool={setActiveTool} label="Crop" icon={<Crop {...iconProps} />} />
 
         <Divider />
 
         {/* Undo / Redo */}
-        <button
-          type="button"
-          title="Undo (Ctrl+Z)"
-          onClick={onUndo}
-          disabled={!canUndo}
-          className="w-12 h-12 rounded-xl flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-        >
-          <Undo2 {...iconProps} />
-        </button>
-        <button
-          type="button"
-          title="Redo (Ctrl+Shift+Z)"
-          onClick={onRedo}
-          disabled={!canRedo}
-          className="w-12 h-12 rounded-xl flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-        >
-          <Redo2 {...iconProps} />
-        </button>
+        <Tooltip content="Undo (Ctrl+Z)">
+          <button
+            type="button"
+            onClick={onUndo}
+            disabled={!canUndo}
+            className="w-12 h-12 rounded-xl flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <Undo2 {...iconProps} />
+          </button>
+        </Tooltip>
+        <Tooltip content="Redo (Ctrl+Shift+Z)">
+          <button
+            type="button"
+            onClick={onRedo}
+            disabled={!canRedo}
+            className="w-12 h-12 rounded-xl flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <Redo2 {...iconProps} />
+          </button>
+        </Tooltip>
 
         <Divider />
 
@@ -573,14 +559,15 @@ export function EditorToolbar({
         )}
 
         {/* Close */}
-        <button
-          type="button"
-          title="Close editor"
-          onClick={onClose}
-          className="w-12 h-12 rounded-xl flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-all"
-        >
-          <X {...iconProps} />
-        </button>
+        <Tooltip content="Close editor">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-12 h-12 rounded-xl flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-all"
+          >
+            <X {...iconProps} />
+          </button>
+        </Tooltip>
 
         {/* Save */}
         <button

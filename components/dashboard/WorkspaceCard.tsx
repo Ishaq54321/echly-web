@@ -8,9 +8,9 @@ import type { Timestamp } from "firebase/firestore";
 import { formatDistanceToNowStrict } from "date-fns/formatDistanceToNowStrict";
 import { toDate } from "@/lib/utils/date";
 import { SessionActionsDropdown } from "@/components/dashboard/SessionActionsDropdown";
+import { triggerAddMoreTickets } from "@/components/dashboard/hooks/triggerAddMoreTickets";
 
 const TOOLTIP_HOVER_DELAY_MS = 300;
-const COPIED_TOOLTIP_MS = 2000;
 
 function sessionUpdatedToDate(updatedAt: Session["updatedAt"]): Date | null {
   if (updatedAt == null) return null;
@@ -28,6 +28,7 @@ export interface WorkspaceCardProps {
   onRenameSuccess?: (session: { id: string; title: string; updatedAt?: unknown }) => void;
   onSetArchived?: (sessionId: string, archived: boolean) => Promise<void> | void;
   onRequestDelete?: (session: Session) => void;
+  onRequestShare?: (session: Session) => void;
 }
 
 export function WorkspaceCard({
@@ -37,6 +38,7 @@ export function WorkspaceCard({
   onRenameSuccess,
   onSetArchived,
   onRequestDelete,
+  onRequestShare,
 }: WorkspaceCardProps) {
   const { session, counts } = item;
   const isOptimistic = Boolean(session.isOptimistic);
@@ -48,7 +50,6 @@ export function WorkspaceCard({
   const viewCount = session.viewCount ?? 0;
   const commentCount = session.commentCount ?? 0;
 
-  const [copyTooltip, setCopyTooltip] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
   const [pendingOpen, setPendingOpen] = useState<boolean | null>(null);
@@ -168,10 +169,10 @@ export function WorkspaceCard({
               onOpenChange={(open) => {
                 setPendingOpen(open);
               }}
-              onCopyLinkSuccess={() => {
-                setCopyTooltip(true);
-                setTimeout(() => setCopyTooltip(false), COPIED_TOOLTIP_MS);
+              onShareClick={() => {
+                onRequestShare?.(session);
               }}
+              onAddMoreTickets={() => triggerAddMoreTickets(session.id)}
               triggerClassName="flex items-center justify-center h-10 w-10 rounded-xl text-[var(--text-tertiary)] transition-colors duration-[var(--motion-duration)] hover:bg-[var(--layer-2-hover-bg)] hover:text-[var(--text-primary-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] cursor-pointer"
               triggerIconClassName="h-[16px] w-[16px] relative top-[1px] pointer-events-none"
             />
@@ -184,15 +185,6 @@ export function WorkspaceCard({
               </span>
             )}
           </div>
-          {copyTooltip && (
-            <span
-              className="workspace-card-tooltip absolute right-12 top-0 mt-2 px-3 py-1.5 text-xs rounded-xl bg-[var(--text-primary-strong)] text-white shadow-[var(--shadow-level-4)] whitespace-nowrap z-[100] pointer-events-none"
-              role="status"
-              aria-live="polite"
-            >
-              Link copied
-            </span>
-          )}
         </div>
       </div>
 

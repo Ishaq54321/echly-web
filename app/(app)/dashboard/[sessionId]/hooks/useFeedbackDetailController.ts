@@ -183,7 +183,13 @@ export function useFeedbackDetailController(args: {
     },
   });
 
-  const sendComment = async (message: string, attachment?: CommentAttachment, attachments?: CommentAttachment[], position?: CommentPosition): Promise<string> => {
+  const sendComment = async (
+    message: string,
+    attachment?: CommentAttachment,
+    attachments?: CommentAttachment[],
+    position?: CommentPosition,
+    mentionedUserIds?: string[]
+  ): Promise<string> => {
     if (!authUid || !feedbackId) return "";
     if (!isIdentityResolved) return "";
     const trimmed = message.trim();
@@ -196,6 +202,7 @@ export function useFeedbackDetailController(args: {
       ...(attachments && attachments.length > 0 ? { attachments } : {}),
       ...(attachment ? { attachment } : {}),
       ...(position ? { type: "pin" as const, position } : {}),
+      ...(mentionedUserIds && mentionedUserIds.length > 0 ? { mentionedUserIds } : {}),
     };
     const optimistic = createOptimisticComment({
       sessionId,
@@ -216,7 +223,13 @@ export function useFeedbackDetailController(args: {
     return optimistic.id;
   };
 
-  const sendReply = async (threadId: string, message: string, attachment?: CommentAttachment, attachments?: CommentAttachment[]): Promise<void> => {
+  const sendReply = async (
+    threadId: string,
+    message: string,
+    attachment?: CommentAttachment,
+    attachments?: CommentAttachment[],
+    mentionedUserIds?: string[]
+  ): Promise<void> => {
     if (!authUid || !feedbackId) return;
     if (!isIdentityResolved) return;
     const trimmed = message.trim();
@@ -229,6 +242,7 @@ export function useFeedbackDetailController(args: {
       threadId,
       ...(attachments && attachments.length > 0 ? { attachments } : {}),
       ...(attachment ? { attachment } : {}),
+      ...(mentionedUserIds && mentionedUserIds.length > 0 ? { mentionedUserIds } : {}),
     };
     const optimistic = createOptimisticComment({
       sessionId,
@@ -250,7 +264,8 @@ export function useFeedbackDetailController(args: {
 
   const sendPinComment = async (
     position: CommentPosition,
-    message: string
+    message: string,
+    mentionedUserIds?: string[]
   ): Promise<string | null> => {
     if (!authUid || !feedbackId) return null;
     if (!isIdentityResolved) return null;
@@ -263,6 +278,7 @@ export function useFeedbackDetailController(args: {
       message: trimmed,
       type: "pin",
       position,
+      ...(mentionedUserIds && mentionedUserIds.length > 0 ? { mentionedUserIds } : {}),
     };
     const optimistic = createOptimisticComment({
       sessionId,

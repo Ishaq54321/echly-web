@@ -16,15 +16,17 @@ import {
   Lock,
   Flag,
   Trash2,
+  RotateCcw,
 } from "lucide-react";
 import { AssignDropdown } from "@/components/feedback/AssignDropdown";
 import { PriorityDropdown } from "@/components/feedback/PriorityDropdown";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 const actionBtn =
   "inline-flex h-[34px] items-center gap-2 px-3.5 rounded-[7px] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[13px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
 
 const actionBtnBlack =
-  "inline-flex h-[34px] items-center gap-2 px-3.5 rounded-[7px] bg-[var(--brand)] text-white text-[13px] font-medium border border-transparent cursor-pointer hover:bg-[var(--brand-hover)] transition-colors disabled:opacity-50 disabled:pointer-events-none";
+  "inline-flex h-[34px] items-center gap-2 px-3.5 rounded-[7px] bg-[var(--brand)] text-white text-[13px] font-medium border border-[var(--brand)] cursor-pointer hover:bg-[var(--brand-hover)] transition-colors disabled:opacity-50 disabled:pointer-events-none";
 
 const actionBtnActive =
   "inline-flex h-[34px] items-center gap-2 px-3.5 rounded-[7px] border border-[var(--border)] bg-[var(--surface-hover)] text-[var(--text-heading)] text-[13px] font-medium transition-all cursor-pointer";
@@ -398,59 +400,57 @@ export function SessionFeedbackHeader({
                       Request Access
                     </button>
                   )
+                ) : isResolved ? (
+                  <button
+                    type="button"
+                    onClick={() => onResolvedChange(false)}
+                    disabled={resolveSubmitting}
+                    className="inline-flex h-[34px] items-center gap-2 px-3.5 rounded-[7px] text-[13px] font-medium border border-[var(--border)] bg-transparent text-[var(--text-heading)] hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+                  >
+                    <RotateCcw size={14} strokeWidth={1.7} />
+                    Reopen
+                  </button>
                 ) : (
                   <button
                     type="button"
-                    onClick={() => !isResolved && onResolvedChange(true)}
+                    onClick={() => onResolvedChange(true)}
                     disabled={resolveSubmitting}
-                    className={isResolved ? actionBtnActive : actionBtnBlack}
+                    className={actionBtnBlack}
                   >
                     <Check size={14} strokeWidth={1.7} />
-                    {isResolved ? "Resolved" : "Resolve"}
+                    Resolve
                   </button>
                 )
               ) : null}
-              {/* Assign */}
-              {item && (() => {
-                const canManage = !!(canAssignTicket && isWorkspaceMember && onAssigned);
-                if (isAnonymousViewer) return null;
-                return (
-                  <div className={dropdownBtnOverride}>
-                    <AssignDropdown
-                      key={`assign-${item.id}`}
-                      feedbackId={item.id}
-                      sessionId={""}
-                      currentAssigneeId={assigneeId ?? null}
-                      currentAssigneeName={assigneeName ?? null}
-                      currentAssigneeAvatarUrl={assigneeAvatarUrl ?? null}
-                      onAssigned={onAssigned ?? (() => {})}
-                      onSaveStateChange={canManage ? onSaveStateChange : undefined}
-                      disabled={!canManage}
-                      readOnly={!canManage}
-                      iconOnly
-                    />
-                  </div>
-                );
-              })()}
-              {/* Priority */}
-              {item && (() => {
-                const canManage = !!(isWorkspaceMember && onPriorityChanged);
-                if (isAnonymousViewer) return null;
-                return (
-                  <div className={dropdownBtnOverride}>
-                    <PriorityDropdown
-                      key={`priority-${item.id}`}
-                      feedbackId={item.id}
-                      currentPriority={priority ?? null}
-                      onPriorityChanged={onPriorityChanged ?? (() => {})}
-                      onSaveStateChange={canManage ? onSaveStateChange : undefined}
-                      disabled={!canManage}
-                      readOnly={!canManage}
-                      iconOnly
-                    />
-                  </div>
-                );
-              })()}
+              {/* Assign — only render if the user can actually manage it */}
+              {item && !isAnonymousViewer && canAssignTicket && isWorkspaceMember && onAssigned ? (
+                <div className={dropdownBtnOverride}>
+                  <AssignDropdown
+                    key={`assign-${item.id}`}
+                    feedbackId={item.id}
+                    sessionId={""}
+                    currentAssigneeId={assigneeId ?? null}
+                    currentAssigneeName={assigneeName ?? null}
+                    currentAssigneeAvatarUrl={assigneeAvatarUrl ?? null}
+                    onAssigned={onAssigned}
+                    onSaveStateChange={onSaveStateChange}
+                    iconOnly
+                  />
+                </div>
+              ) : null}
+              {/* Priority — only render if the user can actually manage it */}
+              {item && !isAnonymousViewer && isWorkspaceMember && onPriorityChanged ? (
+                <div className={dropdownBtnOverride}>
+                  <PriorityDropdown
+                    key={`priority-${item.id}`}
+                    feedbackId={item.id}
+                    currentPriority={priority ?? null}
+                    onPriorityChanged={onPriorityChanged}
+                    onSaveStateChange={onSaveStateChange}
+                    iconOnly
+                  />
+                </div>
+              ) : null}
               {/* Comment */}
               {onOpenComment ? (
                 <button
@@ -466,14 +466,15 @@ export function SessionFeedbackHeader({
               <div className="flex-1" />
               {/* Delete */}
               {onDelete ? (
-                <button
-                  type="button"
-                  onClick={onDelete}
-                  className={actionBtnDelete}
-                  title="Delete"
-                >
-                  <Trash2 size={14} strokeWidth={1.5} />
-                </button>
+                <Tooltip content="Delete">
+                  <button
+                    type="button"
+                    onClick={onDelete}
+                    className={actionBtnDelete}
+                  >
+                    <Trash2 size={14} strokeWidth={1.5} />
+                  </button>
+                </Tooltip>
               ) : null}
             </>
           ) : null}

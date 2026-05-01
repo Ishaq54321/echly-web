@@ -16,6 +16,7 @@ import {
   useWorkspace,
 } from "@/lib/client/workspaceContext";
 import { getSessionLink } from "@/utils/getSessionLink";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 function sessionIdFromBoardPath(pathname: string | null): string | null {
   if (!pathname) return null;
@@ -76,36 +77,37 @@ export function GlobalNavBar() {
         >
           Share
         </button>
-        <button
-          type="button"
-          onClick={handleCopyLink}
-          disabled={!sessionId || copyBusy}
-          className={iconButtonClass}
-          title={
-            !sessionId
-              ? "Open a session to copy a public link"
-              : copyBusy
-                ? "Generating link…"
-                : copied
-                  ? "Copied"
-                  : "Copy link"
-          }
-          aria-label={
-            !sessionId
-              ? "Copy link unavailable outside a session"
-              : copyBusy
-                ? "Generating link…"
-                : copied
-                  ? "Copied"
-                  : "Copy link"
-          }
-        >
-          {copyBusy ? (
-            <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} aria-hidden />
-          ) : (
-            <Link2 className="h-4 w-4" strokeWidth={1.5} />
-          )}
-        </button>
+        <Tooltip content={
+          !sessionId
+            ? "Open a session to copy a public link"
+            : copyBusy
+              ? "Generating link…"
+              : copied
+                ? "Copied"
+                : "Copy link"
+        }>
+          <button
+            type="button"
+            onClick={handleCopyLink}
+            disabled={!sessionId || copyBusy}
+            className={iconButtonClass}
+            aria-label={
+              !sessionId
+                ? "Copy link unavailable outside a session"
+                : copyBusy
+                  ? "Generating link…"
+                  : copied
+                    ? "Copied"
+                    : "Copy link"
+            }
+          >
+            {copyBusy ? (
+              <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} aria-hidden />
+            ) : (
+              <Link2 className="h-4 w-4" strokeWidth={1.5} />
+            )}
+          </button>
+        </Tooltip>
         <button
           type="button"
           className={iconButtonClass}
