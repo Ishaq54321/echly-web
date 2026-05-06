@@ -1,19 +1,16 @@
 "use client";
 
-import { Archive } from "lucide-react";
-import { EmptyState } from "@/components/empty/EmptyState";
+import { CanvasEmptyState } from "@/components/empty/CanvasEmptyState";
+import { ArchivedEmptyIllu } from "@/components/empty/canvasIllustrations";
 
 export function ArchiveEmptyState() {
   return (
-    <EmptyState
-      className="mt-16"
-      density="compact"
-      surface="minimal"
-      icon={Archive}
-      iconClassName="h-16 w-16 text-[var(--text-tertiary)]"
-      emphasis="muted"
-      title="Nothing to see here"
-      description="Archived sessions will appear here once you archive them."
-    />
+    <div className="w-full pt-16 pb-12">
+      <CanvasEmptyState
+        illustration={<ArchivedEmptyIllu />}
+        title="No archived sessions"
+        description="Sessions you archive will appear here for reference."
+      />
+    </div>
   );
 }

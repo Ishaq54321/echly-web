@@ -3,12 +3,14 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
-import { X, Check, RotateCcw, RefreshCw, Paperclip, Smile, MessageSquare, AtSign, PanelRightClose } from "lucide-react";
+import { X, Check, RotateCcw, RefreshCw, Paperclip, Smile, AtSign, PanelRightClose } from "lucide-react";
 import EmojiPicker from "emoji-picker-react";
 import type { Comment, CommentAttachment, CommentPosition } from "@/lib/domain/comment";
 import { CommentItem } from "@/components/comments/CommentItem";
 import { TiptapCommentEditor, extractFromDoc } from "@/components/comments/TiptapCommentEditor";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { CanvasEmptyState } from "@/components/empty/CanvasEmptyState";
+import { NoCommentsIllu } from "@/components/empty/canvasIllustrations";
 
 const AttachmentUploadModal = dynamic(
   () => import("@/components/discussion/AttachmentUploadModal").then((m) => m.AttachmentUploadModal),
@@ -659,12 +661,12 @@ const CommentThreadList = memo(function CommentThreadList({
 
   if (roots.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-        <MessageSquare className="h-10 w-10 text-[var(--text-tertiary)] mb-3" strokeWidth={1} />
-        <p className="text-[15px] font-medium text-[var(--text-heading)]">No comments yet</p>
-        <p className="mt-1 text-[14px] text-[var(--text-secondary)]">
-          Leave a comment above to start a conversation.
-        </p>
+      <div className="py-10">
+        <CanvasEmptyState
+          illustration={<NoCommentsIllu />}
+          title="No comments yet"
+          description="Start the conversation — leave a comment on this ticket."
+        />
       </div>
     );
   }

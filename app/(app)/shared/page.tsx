@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/authFetch";
-import { Building2, Calendar, Check, CircleDashed, Inbox, RotateCcw, WifiOff } from "lucide-react";
+import { Building2, Calendar, Check, CircleDashed, RotateCcw, WifiOff } from "lucide-react";
 import type { SharedSessionMembership } from "@/lib/domain/session";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import ProgressPie from "@/components/ui/ProgressPie";
@@ -120,45 +120,52 @@ function EmptyState() {
         padding: "40px 24px",
       }}
     >
-      <div
-        style={{
-          width: "64px",
-          height: "64px",
-          borderRadius: "18px",
-          background: "var(--surface-hover)",
-          border: "1px solid var(--border)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          marginBottom: "20px",
-        }}
-      >
-        <Inbox size={28} color="var(--text-tertiary)" />
+      <div style={{ width: 160, height: 140, marginBottom: 20 }}>
+        <svg viewBox="0 0 200 160" width="100%" height="100%" style={{ overflow: "visible" }}>
+          <g transform="translate(100 82) rotate(-9) translate(-50 -30)">
+            <rect width="100" height="60" rx="12" fill="#F3F4F6" stroke="#D1D5DB" strokeWidth="1.5" />
+            <rect x="14" y="16" width="44" height="5" rx="2.5" fill="#E5E7EB" />
+            <rect x="14" y="30" width="60" height="4" rx="2" fill="#E5E7EB" />
+          </g>
+          <g transform="translate(100 82) rotate(6) translate(-50 -28)">
+            <rect width="100" height="56" rx="12" fill="#FFFFFF" stroke="#D1D5DB" strokeWidth="1.5" />
+            <rect x="14" y="14" width="38" height="5" rx="2.5" fill="#D1D5DB" />
+            <rect x="14" y="26" width="56" height="4" rx="2" fill="#E5E7EB" />
+            <rect x="14" y="36" width="42" height="4" rx="2" fill="#E5E7EB" />
+          </g>
+          <g transform="translate(146 112)">
+            <circle cx="17" cy="17" r="14" fill="#6B7280" />
+            <circle cx="12" cy="17" r="2.5" fill="#fff" />
+            <circle cx="22" cy="12" r="2.5" fill="#fff" />
+            <circle cx="22" cy="22" r="2.5" fill="#fff" />
+            <line x1="12" y1="17" x2="22" y2="12" stroke="#fff" strokeWidth="1.5" />
+            <line x1="12" y1="17" x2="22" y2="22" stroke="#fff" strokeWidth="1.5" />
+          </g>
+        </svg>
       </div>
 
       <h2
         style={{
-          fontSize: "18px",
-          fontWeight: "600",
+          fontSize: "16px",
+          fontWeight: 600,
           color: "var(--text-heading)",
-          letterSpacing: "-0.2px",
-          margin: "0 0 8px 0",
+          letterSpacing: "-0.005em",
+          margin: "0 0 6px 0",
         }}
       >
-        Nothing shared yet
+        Nothing shared with you yet
       </h2>
 
       <p
         style={{
-          fontSize: "14px",
+          fontSize: "13px",
           color: "var(--text-secondary)",
-          lineHeight: "1.6",
-          maxWidth: "300px",
-          margin: "0",
+          lineHeight: "1.5",
+          maxWidth: "260px",
+          margin: 0,
         }}
       >
-        Sessions shared with you from outside your workspace will appear here
-        once someone invites you.
+        When someone shares a session with you, it will appear here.
       </p>
     </div>
   );
@@ -396,7 +403,6 @@ export default function SharedPage() {
         style={{
           flex: 1,
           minHeight: 0,
-          background: "#FFFFFF",
           overflowY: "auto",
         }}
       >

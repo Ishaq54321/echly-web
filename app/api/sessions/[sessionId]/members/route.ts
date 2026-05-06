@@ -1,14 +1,13 @@
 import { NextRequest } from "next/server";
 import { apiSuccess, apiError } from "@/lib/server/apiResponse";
 import { tryBuildRequestContext } from "@/lib/server/requestContext";
-import { listSessionMembers } from "@/lib/repositories/sessionMembersRepository.server";
 import {
-  createActivityEvent,
-  resolveActorForActivityEvent,
-  sessionTitleFromSessionRow,
-} from "@/lib/repositories/activityEventsRepository.server";
+  listSessionMembers,
+  updateSessionMemberAccessRepo,
+  removeSessionMemberRepo,
+} from "@/lib/repositories/sessionMembersRepository.server";
+import { sessionTitleFromSessionRow } from "@/lib/repositories/activityEventsRepository.server";
 import { adminDb } from "@/lib/server/firebaseAdmin";
-import { getUserByIdRepo } from "@/lib/repositories/usersRepository.server";
 
 export const dynamic = "force-dynamic";
 
@@ -201,62 +200,27 @@ export async function PATCH(
       });
     }
 
-    const ref = adminDb.doc(`sessions/${sessionId}/members/${id}`);
-
-    const snap = await ref.get();
-
-    if (!snap.exists) {
-      return apiError({
-        code: "NOT_FOUND",
-        message: "Member not found",
-        status: 404,
-      });
-    }
-
-    const previousAccess =
-      snap.data()?.access === "resolve" || snap.data()?.access === "view"
-        ? snap.data()!.access
-        : "view";
-
-    await ref.update({
-      access,
-    });
-
     const workspaceId =
       typeof context.session.workspaceId === "string"
         ? context.session.workspaceId.trim()
         : "";
     const actorId = context.userId?.trim() ?? "";
-    if (workspaceId && actorId) {
-      const targetEmail = typeof snap.data()?.email === "string" ? snap.data()!.email : null;
-      let targetName: string | null = null;
-      try {
-        const targetUser = await getUserByIdRepo(id);
-        targetName =
-          targetUser?.name?.trim() ||
-          (targetEmail as string | null | undefined)?.split("@")[0]?.trim() ||
-          null;
-      } catch {
-        targetName = (targetEmail as string | null | undefined)?.split("@")[0] ?? null;
-      }
 
-      const actor = await resolveActorForActivityEvent(actorId);
-      const sessionTitle = sessionTitleFromSessionRow(context.session);
-      await createActivityEvent({
-        workspaceId,
-        sessionId,
-        eventType: "session.member.role_changed",
-        actorId,
-        actorName: actor.actorName,
-        actorPhotoURL: actor.actorPhotoURL,
-        metadata: {
-          sessionTitle,
-          previousAccess,
-          newAccess: access,
-          targetUserId: id ?? null,
-          targetEmail: targetEmail ?? null,
-          targetName,
-        },
+    const result = await updateSessionMemberAccessRepo({
+      sessionId,
+      userId: id,
+      newAccess: access,
+      actorId,
+      workspaceId,
+      sessionTitle: sessionTitleFromSessionRow(context.session),
+      source: "access_change_api",
+    });
+
+    if (!result.ok) {
+      return apiError({
+        code: "NOT_FOUND",
+        message: "Member not found",
+        status: 404,
       });
     }
 
@@ -369,54 +333,26 @@ export async function DELETE(
       });
     }
 
-    const ref = adminDb.doc(`sessions/${sessionId}/members/${id}`);
-
-    const snap = await ref.get();
-
-    if (!snap.exists) {
-      return apiError({
-        code: "NOT_FOUND",
-        message: "Member not found",
-        status: 404,
-      });
-    }
-
-    const removedEmail = typeof snap.data()?.email === "string" ? snap.data()!.email as string : null;
-
-    await ref.delete();
-
     const workspaceId =
       typeof context.session.workspaceId === "string"
         ? context.session.workspaceId.trim()
         : "";
     const actorId = context.userId?.trim() ?? "";
-    if (workspaceId && actorId) {
-      let removedTargetName: string | null = null;
-      try {
-        const targetUser = await getUserByIdRepo(id);
-        removedTargetName =
-          targetUser?.name?.trim() ||
-          removedEmail?.split("@")[0]?.trim() ||
-          null;
-      } catch {
-        removedTargetName = removedEmail?.split("@")[0] ?? null;
-      }
 
-      const actor = await resolveActorForActivityEvent(actorId);
-      const sessionTitle = sessionTitleFromSessionRow(context.session);
-      await createActivityEvent({
-        workspaceId,
-        sessionId,
-        eventType: "session.member.removed",
-        actorId,
-        actorName: actor.actorName,
-        actorPhotoURL: actor.actorPhotoURL,
-        metadata: {
-          sessionTitle,
-          targetUserId: id ?? null,
-          targetEmail: removedEmail ?? null,
-          targetName: removedTargetName ?? null,
-        },
+    const result = await removeSessionMemberRepo({
+      sessionId,
+      userId: id,
+      actorId,
+      workspaceId,
+      sessionTitle: sessionTitleFromSessionRow(context.session),
+      source: "remove_api",
+    });
+
+    if (!result.ok) {
+      return apiError({
+        code: "NOT_FOUND",
+        message: "Member not found",
+        status: 404,
       });
     }
 

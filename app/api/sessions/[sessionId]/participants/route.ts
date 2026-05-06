@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { apiSuccess, apiError } from "@/lib/server/apiResponse";
 import { tryGetAuthUser } from "@/lib/server/auth/authorize";
+import { composeFullName } from "@/lib/utils/nameSplit";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +51,11 @@ export async function GET(
         const data = doc.data();
         participants.push({
           uid: doc.id,
-          displayName: data?.displayName || data?.name || data?.email?.split("@")[0] || "User",
+          displayName:
+            composeFullName(
+              typeof data?.firstName === "string" ? data.firstName : null,
+              typeof data?.lastName === "string" ? data.lastName : null
+            ) || (typeof data?.email === "string" ? data.email.split("@")[0] : "") || "User",
           email: data?.email || "",
           avatarUrl: data?.photoURL || data?.avatarUrl || null,
         });

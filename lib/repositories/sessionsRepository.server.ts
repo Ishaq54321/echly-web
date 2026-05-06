@@ -12,6 +12,7 @@ import { requireAccessLevel } from "@/lib/domain/accessLevel";
 import type { Workspace } from "@/lib/domain/workspace";
 import { deleteAllCommentsForSessionRepo } from "@/lib/repositories/commentsRepository.server";
 import { deleteAllFeedbackForSessionRepo } from "@/lib/repositories/feedbackRepository.server";
+import { deleteAllSessionAccessForSessionRepo } from "@/lib/repositories/sessionAccessRepository.server";
 
 type SessionDoc = Omit<Session, "id"> & {
   createdAt?: FirebaseFirestore.Timestamp | Date | null;
@@ -279,15 +280,17 @@ export async function deleteSessionRepo(sessionId: string): Promise<void> {
     "deleteSessionRepo"
   );
 
-  const [feedbackDeleted, commentsDeleted] = await Promise.all([
+  const [feedbackDeleted, commentsDeleted, _sessionAccessDeleted] = await Promise.all([
     deleteAllFeedbackForSessionRepo(sessionId),
     deleteAllCommentsForSessionRepo(workspaceId, sessionId),
+    deleteAllSessionAccessForSessionRepo(sessionId),
   ]);
 
   const viewsSnap = await adminDb.collection(`sessionViews/${sessionId}/views`).get();
   await Promise.all(viewsSnap.docs.map((d) => d.ref.delete()));
 
-  // Delete all member docs to prevent ghost entries in "Shared with me" lists
+  // Cascade delete: bypasses removeSessionMemberRepo for batch efficiency and to
+  // avoid emitting per-member activity events during whole-session deletion.
   const membersSnap = await adminDb
     .collection("sessions")
     .doc(sessionId)

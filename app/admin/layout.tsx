@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { authFetch } from "@/lib/authFetch";
 import AdminLayout from "@/components/admin/AdminLayout";
-import { WorkspaceProvider, useWorkspace } from "@/lib/client/workspaceContext";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -89,9 +89,5 @@ export default function AdminRootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <WorkspaceProvider>
-      <AdminLayoutInner>{children}</AdminLayoutInner>
-    </WorkspaceProvider>
-  );
+  return <AdminLayoutInner>{children}</AdminLayoutInner>;
 }

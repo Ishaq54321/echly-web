@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { requireAuth, toAuthorizationResponse } from "@/lib/server/auth/authorize";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { adminDb } from "@/lib/server/firebaseAdmin";
+import { addWorkspaceMembershipRepo } from "@/lib/repositories/userMembershipsRepository.server";
 import type { WorkspacePlan } from "@/lib/domain/workspace";
 
 export const dynamic = "force-dynamic";
@@ -30,11 +31,17 @@ export async function GET(req: NextRequest) {
     const membershipIds: string[] = Array.isArray(rawMemberships)
       ? (rawMemberships as unknown[]).filter((v): v is string => typeof v === "string" && v.trim() !== "")
       : [];
+    const wasInArray = new Set(membershipIds);
 
     // Also include their own workspaceId if not already present
     const ownWid = typeof userData.workspaceId === "string" ? userData.workspaceId.trim() : "";
-    if (ownWid && !membershipIds.includes(ownWid)) {
+    if (ownWid && !wasInArray.has(ownWid)) {
       membershipIds.push(ownWid);
+      // Self-heal: persist the missing entry so future reads don't need this fallback.
+      // Idempotent (arrayUnion). Fire-and-forget — does not block the response.
+      addWorkspaceMembershipRepo(user.uid, ownWid).catch((err) => {
+        console.warn("[memberships] self-heal failed", { uid: user.uid, wid: ownWid, err });
+      });
     }
 
     if (membershipIds.length === 0) {

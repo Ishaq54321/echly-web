@@ -5,6 +5,8 @@ import { FeedbackHeader } from "./FeedbackHeader";
 import { FeedbackContent } from "./FeedbackContent";
 import type { FeedbackItemShape } from "./types";
 import { useScreenshotUrl } from "@/lib/client/useScreenshotUrl";
+import { CanvasEmptyState } from "@/components/empty/CanvasEmptyState";
+import { NoTicketSelectedIllu } from "@/components/empty/canvasIllustrations";
 
 export interface FeedbackDetailProps {
   sessionId: string;
@@ -45,10 +47,12 @@ function FeedbackDetailInner({
 
   if (!selectedItem) {
     return (
-      <div className="flex flex-1 min-h-0 items-start py-12 font-sans">
-        <p className="text-[15px] text-[var(--text-tertiary)]">
-          Select a feedback item
-        </p>
+      <div className="flex flex-1 min-h-0 items-center justify-center py-16 font-sans">
+        <CanvasEmptyState
+          illustration={<NoTicketSelectedIllu />}
+          title="Select a ticket"
+          description="Choose a ticket from the list to view details and comments."
+        />
       </div>
     );
   }

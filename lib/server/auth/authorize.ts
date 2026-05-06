@@ -51,7 +51,12 @@ async function userFromBearerToken(token: string): Promise<AuthorizedRequestUser
       typeof decoded.email === "string" && decoded.email.trim() !== ""
         ? decoded.email.trim()
         : undefined;
-    return { uid, email };
+    const decodedName = (decoded as unknown as { name?: unknown }).name;
+    const displayName =
+      typeof decodedName === "string" && decodedName.trim() !== ""
+        ? decodedName.trim()
+        : null;
+    return { uid, email, displayName };
   } catch {
     const payload = peekJwtPayload(token);
     if (payload?.type === "extension") {
@@ -68,7 +73,12 @@ async function userFromBearerToken(token: string): Promise<AuthorizedRequestUser
       if (!uid) return null;
       const email =
         typeof d.email === "string" && d.email.trim() !== "" ? d.email.trim() : undefined;
-      return { uid, email };
+      const dName = (d as unknown as { name?: unknown }).name;
+      const displayName =
+        typeof dName === "string" && dName.trim() !== ""
+          ? dName.trim()
+          : null;
+      return { uid, email, displayName };
     } catch {
       return null;
     }

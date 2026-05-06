@@ -5,12 +5,33 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ChevronDown, ExternalLink, RotateCcw } from "lucide-react";
 import { UserAvatar } from "@/components/ui/UserAvatar";
+import { getInitials } from "@/lib/utils/getInitials";
 import {
   groupPreviewEvents,
   type ActivityEvent,
   type GroupedActivity,
 } from "@/lib/activity/groupEvents";
 import { getTier, eventIconMap } from "@/components/activity/eventIcons";
+
+// ─── Activity-page-only fallback avatar palette ──────────────────────────────
+
+const ACTIVITY_AVATAR_COLORS = [
+  "var(--avatar-warm-orange)",
+  "var(--avatar-blue)",
+  "var(--avatar-purple)",
+  "var(--avatar-green)",
+  "var(--avatar-pink)",
+  "var(--avatar-gold)",
+  "var(--avatar-teal)",
+];
+
+function getActivityAvatarColor(userId: string): string {
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    hash = ((hash << 5) - hash + userId.charCodeAt(i)) | 0;
+  }
+  return ACTIVITY_AVATAR_COLORS[Math.abs(hash) % ACTIVITY_AVATAR_COLORS.length]!;
+}
 
 // ─── Metadata helpers ────────────────────────────────────────────────────────
 
@@ -594,32 +615,30 @@ function ActivityItemBase(props: ActivityItemProps) {
     : entityLabel;
   const hasStatePill = tier !== 3 && eventType in PILL_STYLES;
 
-  const badgeEntry = eventIconMap[eventType];
-  const BadgeIcon = badgeEntry?.icon;
-  const badgeColorClass = badgeEntry?.badgeClass ?? "bg-[var(--text-tertiary)]";
-
   /** Rows with preview or group chrome stack below the headline; keep cross-axis alignment sensible. */
   const isTallRow = hasCommentPreview || props.kind === "group";
 
   return (
     <div
-      className={`flex w-full gap-3 py-3 transition-colors hover:bg-[var(--surface-hover)]/50 ${isTallRow ? "items-start" : "items-center"}`}
+      className={`flex w-full gap-3 py-4 ${isTallRow ? "items-start" : "items-center"}`}
     >
       {/* Fixed-width avatar column — w-[52px] keeps the timeline spine centred */}
       <div className="relative z-10 flex w-[52px] shrink-0 justify-center">
         <div className="relative">
-          <UserAvatar
-            photoURL={photoURL}
-            name={actorName}
-            className="h-9 w-9"
-          />
-          {BadgeIcon && (
-            <div
-              className={`absolute -bottom-0.5 -right-0.5 rounded-full border-2 border-background flex items-center justify-center w-[17px] h-[17px] ${badgeColorClass}`}
+          {photoURL ? (
+            <UserAvatar
+              photoURL={photoURL}
+              name={actorName}
+              className="h-9 w-9"
+            />
+          ) : (
+            <span
+              className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-white font-semibold text-[14px]"
+              style={{ backgroundColor: getActivityAvatarColor(actor.id || actorName) }}
               aria-hidden
             >
-              <BadgeIcon className="h-2.5 w-2.5 text-white" />
-            </div>
+              {getInitials(actorName)}
+            </span>
           )}
         </div>
       </div>
@@ -764,7 +783,7 @@ function ActivityItemBase(props: ActivityItemProps) {
                 <div
                   key={ev.id}
                   role="listitem"
-                  className={`flex w-full min-w-0 justify-between gap-3 py-3 transition-colors hover:bg-[var(--surface-hover)]/50 ${subTallRow ? "items-start" : "items-center"}`}
+                  className={`flex w-full min-w-0 justify-between gap-3 py-4 ${subTallRow ? "items-start" : "items-center"}`}
                 >
                   <div
                     className={`flex min-w-0 flex-1 gap-3 ${subTallRow ? "items-start" : "items-center"}`}

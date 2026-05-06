@@ -17,18 +17,15 @@ import {
   toAuthorizationResponse,
   UnauthorizedError,
 } from "@/lib/server/auth/authorize";
-import { extractShareToken } from "@/lib/server/shareTokenFromRequest";
 import type { IdentityType, SystemContext } from "@/lib/server/systemContext";
 
 export type ResolvedAccessIdentity =
-  | { type: "SHARE"; shareToken: string }
   | { type: "USER"; user: AuthorizedRequestUser }
   | { type: "NONE" };
 
 /**
  * Single identity model:
  * - USER when authenticated
- * - SHARE when anonymous with share token
  * - NONE otherwise
  */
 export async function resolveAccessIdentity(
@@ -36,28 +33,8 @@ export async function resolveAccessIdentity(
   options?: {
     /** When set (e.g. after `withAuthorization`), skips {@link tryGetAuthUser}. Use `null` to force no user. */
     authenticatedUser?: AuthorizedRequestUser | null;
-    bodyShareToken?: string | null;
-    /** Path-param share token (e.g. `GET /api/share/:token`) when not present in query/body/Bearer. */
-    pathShareToken?: string | null;
   }
 ): Promise<ResolvedAccessIdentity> {
-  const fromPath =
-    typeof options?.pathShareToken === "string"
-      ? options.pathShareToken.trim()
-      : "";
-  const bodyTok =
-    options?.bodyShareToken === undefined || options?.bodyShareToken === null
-      ? undefined
-      : options.bodyShareToken;
-  const fromRequest = extractShareToken(req, bodyTok);
-  let shareToken: string | null;
-  if (fromRequest != null) {
-    shareToken = fromRequest;
-  } else if (fromPath !== "") {
-    shareToken = fromPath;
-  } else {
-    shareToken = null;
-  }
   const authUser =
     options?.authenticatedUser !== undefined
       ? options.authenticatedUser
@@ -65,30 +42,20 @@ export async function resolveAccessIdentity(
   if (authUser) {
     return { type: "USER", user: authUser };
   }
-  if (shareToken) {
-    return { type: "SHARE", shareToken };
-  }
   return { type: "NONE" };
 }
 
 /** For optional-auth session routes: never throws; viewer may be absent (session baseline / public). */
 export async function resolveOptionalSessionViewer(
-  req: Request,
-  options?: { bodyShareToken?: string | null }
+  req: Request
 ): Promise<{
   viewerUser: AuthorizedRequestUser | null;
-  tokenString: string | undefined;
 }> {
-  const id = await resolveAccessIdentity(req, {
-    bodyShareToken: options?.bodyShareToken,
-  });
-  if (id.type === "SHARE") {
-    return { viewerUser: null, tokenString: id.shareToken };
-  }
+  const id = await resolveAccessIdentity(req);
   if (id.type === "USER") {
-    return { viewerUser: id.user, tokenString: undefined };
+    return { viewerUser: id.user };
   }
-  return { viewerUser: null, tokenString: undefined };
+  return { viewerUser: null };
 }
 
 export interface RequestContext extends SystemContext {
@@ -119,10 +86,6 @@ export async function buildRequestContext(params: {
   feedback?: Feedback | null;
   /** When provided (including null), skips session reads for the resolved path */
   session?: Session | null;
-  /** POST body field `token` or `shareToken` (merged with query/Bearer in {@link extractShareToken}). */
-  bodyShareToken?: string | null;
-  /** Same as {@link resolveAccessIdentity} `pathShareToken`. */
-  pathShareToken?: string | null;
   /** Pre-fetched user profile from withAuthorization; when present, skips the users/{uid} Firestore read. */
   preloadedUserProfile?: { email: string | null; workspaceId: string } | null;
   /**
@@ -135,8 +98,6 @@ export async function buildRequestContext(params: {
 
   const identityRes = await resolveAccessIdentity(params.req, {
     authenticatedUser: params.authenticatedUser,
-    bodyShareToken: params.bodyShareToken,
-    pathShareToken: params.pathShareToken,
   });
 
   if (identityRes.type === "NONE") {
@@ -146,15 +107,7 @@ export async function buildRequestContext(params: {
   }
 
   const identityType: IdentityType =
-    identityRes.type === "SHARE"
-      ? "SHARE"
-      : identityRes.type === "USER"
-        ? "USER"
-        : "NONE";
-
-  const extractedShare = extractShareToken(params.req, params.bodyShareToken);
-  const shareTokenForContext: string | null =
-    identityRes.type === "SHARE" ? identityRes.shareToken : extractedShare;
+    identityRes.type === "USER" ? "USER" : "NONE";
 
   const viewerUser: AuthorizedRequestUser | null =
     identityRes.type === "USER" ? identityRes.user : null;
@@ -238,7 +191,6 @@ export async function buildRequestContext(params: {
       userId,
       workspaceId,
       identityType,
-      shareToken: shareTokenForContext,
     };
     const resolved = await getAccessContext({
       sessionId: sidForAccess,
@@ -260,7 +212,6 @@ export async function buildRequestContext(params: {
     userId,
     workspaceId,
     identityType,
-    shareToken: shareTokenForContext,
     feedback,
     session: sessionOut,
     sessionWorkspaceId,

@@ -197,7 +197,7 @@ const ScreenshotWithPinsInner = ({
   animatingPinId,
   participants,
 }: ScreenshotWithPinsProps) => {
-  const { authDisplayName, authEmail, authPhotoUrl } = useWorkspace();
+  const { displayName, authEmail, authPhotoUrl } = useWorkspace();
   const containerRef = useRef<HTMLDivElement>(null);
   const draftPopoverRef = useRef<HTMLDivElement>(null);
   const pinEditorRef = useRef<Editor | null>(null);
@@ -351,7 +351,7 @@ const ScreenshotWithPinsInner = ({
   }, [computePlacements]);
 
   const userAvatar = authPhotoUrl ?? "";
-  const userName = authDisplayName || authEmail || "You";
+  const userName = displayName || authEmail || "You";
 
   const outerCard = embeddedInCard
     ? "block"

@@ -16,28 +16,32 @@ import { checkRateLimit, clientKeyFromRequest } from "@/lib/server/rateLimit";
 import { tryBuildRequestContext } from "@/lib/server/requestContext";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { adminDb } from "@/lib/server/firebaseAdmin";
+import { composeFullName } from "@/lib/utils/nameSplit";
 
 async function loadViewerProfileForBundle(
   uid: string
 ): Promise<{ displayName: string | null; avatarUrl: string | null }> {
   let displayName: string | null = null;
   let avatarUrl: string | null = null;
+  let email: string | null = null;
   try {
     const snap = await adminDb.doc(`users/${uid}`).get();
     if (snap.exists) {
       const d = snap.data() ?? {};
-      displayName =
-        typeof d.displayName === "string" && d.displayName.trim()
-          ? d.displayName.trim()
-          : typeof d.name === "string" && d.name.trim()
-            ? d.name.trim()
-            : null;
+      const composed = composeFullName(
+        typeof d.firstName === "string" ? d.firstName : null,
+        typeof d.lastName === "string" ? d.lastName : null
+      );
+      displayName = composed || null;
       avatarUrl =
         typeof d.photoURL === "string" && d.photoURL.trim()
           ? d.photoURL.trim()
           : typeof d.avatarUrl === "string" && d.avatarUrl.trim()
             ? d.avatarUrl.trim()
             : null;
+      if (typeof d.email === "string" && d.email.trim()) {
+        email = d.email.trim();
+      }
     }
   } catch {
     // Firestore read failed — fall through to Auth lookup
@@ -48,10 +52,9 @@ async function loadViewerProfileForBundle(
       const { getAuth } = await import("firebase-admin/auth");
       const authUser = await getAuth().getUser(uid);
       if (!displayName) {
-        if (authUser?.displayName?.trim()) {
-          displayName = authUser.displayName.trim();
-        } else if (authUser?.email) {
-          displayName = authUser.email.split("@")[0];
+        const fallbackEmail = email ?? authUser?.email ?? null;
+        if (fallbackEmail) {
+          displayName = fallbackEmail.split("@")[0] ?? null;
         }
       }
       if (!avatarUrl && authUser?.photoURL) {
@@ -77,8 +80,12 @@ export async function OPTIONS(req: NextRequest) {
 /**
  * GET /api/session-page-bundle?sessionId=...&token=...|shareToken=...
  *
- * Single {@link tryBuildRequestContext} (share token via query/Bearer same as /api/feedback),
- * then first page of session feedback (limit 50).
+ * Auth-aware bundle. Viewers with a direct session grant (workspace members and
+ * cross-workspace session-invited users via Phase 6b's sessionAccess rules) get
+ * session metadata only — their feedback listener streams the ticket list.
+ * Viewers without a direct grant (anonymous share-link viewers, and authed
+ * link_view viewers whose listener attach would be denied) also receive the
+ * first page of feedback (limit 50).
  */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -97,19 +104,12 @@ export async function GET(req: NextRequest) {
   try {
     const sessionRow = await getSessionByIdRepo(trimmedSid);
 
-    const [built, pageResult] = await Promise.all([
-      tryBuildRequestContext({
-        req,
-        sessionId: trimmedSid,
-        optionalAuth: true,
-        session: sessionRow,
-      }),
-      getSessionFeedbackPageForUserWithStringCursorRepo({
-        sessionId: trimmedSid,
-        limit: BUNDLE_FEEDBACK_LIMIT,
-        cursor: undefined,
-      }),
-    ]);
+    const built = await tryBuildRequestContext({
+      req,
+      sessionId: trimmedSid,
+      optionalAuth: true,
+      session: sessionRow,
+    });
 
     if (!built.ok) {
       return new Response(built.response.body, {
@@ -160,11 +160,28 @@ export async function GET(req: NextRequest) {
         });
       }
     }
-    const { feedback, nextCursor, hasMore } = pageResult;
-
     const sessionJson = serializeSession(session, access);
-    const feedbackPayload = feedback.map((f) => serializeFeedback(f, access));
     const requestPayload = ctx.accessRequest ?? ({ pendingResolve: false } as const);
+
+    // Bundle includes feedback whenever the viewer cannot use Firestore listeners:
+    //   - anonymous viewers (no auth)
+    //   - authed link_view viewers (no member doc, no sessionAccess mirror — rules
+    //     would deny their listener attach, so they need bundle feedback)
+    // Workspace members and explicit session-members skip — they use realtime listeners.
+    const needsBundleFeedback = !access.hasDirectSessionGrant;
+    let feedbackPayload: Record<string, unknown>[] | undefined;
+    let nextCursor: string | null | undefined;
+    let hasMore: boolean | undefined;
+    if (needsBundleFeedback) {
+      const pageResult = await getSessionFeedbackPageForUserWithStringCursorRepo({
+        sessionId: trimmedSid,
+        limit: BUNDLE_FEEDBACK_LIMIT,
+        cursor: undefined,
+      });
+      feedbackPayload = pageResult.feedback.map((f) => serializeFeedback(f, access));
+      nextCursor = pageResult.nextCursor;
+      hasMore = pageResult.hasMore;
+    }
 
     let pendingAccessRequestsCount = 0;
     if (access?.capabilities.canResolve) {
@@ -175,9 +192,9 @@ export async function GET(req: NextRequest) {
     return apiSuccess(
       {
         session: sessionJson,
-        feedback: feedbackPayload,
-        nextCursor,
-        hasMore,
+        ...(feedbackPayload !== undefined
+          ? { feedback: feedbackPayload, nextCursor, hasMore }
+          : {}),
         request: requestPayload,
         access: ctx.access,
         pendingAccessRequestsCount,

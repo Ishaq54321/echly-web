@@ -215,7 +215,7 @@ export default function PreviousFeedbackView({
 
           {/* Populated list */}
           {!loading && !error && filtered.length > 0 && (
-            <div className="ps-list">
+            <div className="ps-list" onWheel={(e) => e.stopPropagation()}>
               {filtered.map((s) => (
                 <div
                   key={s.id}

@@ -14,10 +14,20 @@ import {
 } from "@/lib/repositories/workspaceMembersRepository.server";
 import { sendWorkspaceInviteEmail } from "@/lib/email/workspaceEmails";
 import { adminDb } from "@/lib/server/firebaseAdmin";
+import { createNotification } from "@/lib/repositories/notificationsRepository.server";
 import type { WorkspaceMemberRole } from "@/lib/domain/workspaceMember";
 import { checkPlanLimit } from "@/lib/billing/checkPlanLimit";
 import type { PlanLimitError } from "@/lib/billing/checkPlanLimit";
 import { planLimitReachedApiError } from "@/lib/billing/planLimitResponse";
+import { composeFullName } from "@/lib/utils/nameSplit";
+
+function composeUserName(data: Record<string, unknown> | null | undefined): string {
+  if (!data) return "";
+  return composeFullName(
+    typeof data.firstName === "string" ? data.firstName : null,
+    typeof data.lastName === "string" ? data.lastName : null
+  );
+}
 
 export const dynamic = "force-dynamic";
 
@@ -78,11 +88,7 @@ export async function POST(req: NextRequest) {
         await addWorkspaceMemberRepo(workspaceId, {
           uid: user.uid,
           email: user.email ?? "",
-          displayName:
-            typeof healData.displayName === "string" && healData.displayName.trim()
-              ? healData.displayName.trim() :
-            typeof healData.name === "string" && healData.name.trim()
-              ? healData.name.trim() : null,
+          displayName: composeUserName(healData) || null,
           avatarUrl: healAvatarUrl,
           role: "OWNER",
           joinedAt: Timestamp.now(),
@@ -100,9 +106,10 @@ export async function POST(req: NextRequest) {
       .where("email", "==", email)
       .limit(1)
       .get();
+    let existingInviteeUid: string | null = null;
     if (!existingUserSnap.empty) {
-      const existingUid = existingUserSnap.docs[0].id;
-      const existingMember = await getWorkspaceMemberRepo(workspaceId, existingUid);
+      existingInviteeUid = existingUserSnap.docs[0].id;
+      const existingMember = await getWorkspaceMemberRepo(workspaceId, existingInviteeUid);
       if (existingMember) {
         return apiError({ code: "INVALID_INPUT", message: "ALREADY_MEMBER", status: 409 });
       }
@@ -131,9 +138,8 @@ export async function POST(req: NextRequest) {
 
     const callerProfile = await getUserByIdRepo(user.uid);
     const inviterName =
-      callerProfile?.displayName ??
-      (callerProfile as Record<string, unknown> | null)?.name as string | null ??
-      user.email ??
+      composeUserName(callerProfile as Record<string, unknown> | null) ||
+      user.email ||
       "Someone";
 
     const invitation = {
@@ -153,6 +159,32 @@ export async function POST(req: NextRequest) {
     };
 
     await createWorkspaceInvitationRepo(invitation);
+
+    if (existingInviteeUid) {
+      try {
+        const inviterPhotoURL =
+          typeof (callerProfile as Record<string, unknown> | null)?.avatarUrl === "string"
+            ? ((callerProfile as Record<string, unknown>).avatarUrl as string)
+            : typeof (callerProfile as Record<string, unknown> | null)?.photoURL === "string"
+              ? ((callerProfile as Record<string, unknown>).photoURL as string)
+              : null;
+        await createNotification({
+          userId: existingInviteeUid,
+          workspaceId,
+          sessionId: "",
+          type: "invite.sent",
+          actor: {
+            id: user.uid,
+            name: String(inviterName),
+            photoURL: inviterPhotoURL,
+          },
+          title: "Workspace invitation",
+          entityTitle: workspace.name,
+        });
+      } catch (notifErr) {
+        console.error("POST /api/workspace/members/invite: notification create failed", notifErr);
+      }
+    }
 
     try {
       await sendWorkspaceInviteEmail({

@@ -22,7 +22,8 @@
   --text-on-dark:       #F3F4F6;
 
   /* ─── SURFACES ───────────────────────────── */
-  --surface-page:       #FFFFFF;
+  --surface:            #FFFFFF;
+  --surface-page:       #F8F8F8;
   --surface-card:       #FFFFFF;
   --surface-subtle:     #F8F8F8;
   --surface-hover:      #F0F1F3;
@@ -57,6 +58,15 @@
   --color-insight-bg:     #F0F1FF;
   --color-insight-border: #C4B5FD;
   --color-insight-dot:    #6049E7;
+
+  /* Activity avatar fallback palette */
+  --avatar-warm-orange: #E8835D;
+  --avatar-blue:        #5B7BD3;
+  --avatar-purple:      #6049E7;
+  --avatar-green:       #4A8B6F;
+  --avatar-pink:        #B47BC7;
+  --avatar-gold:        #D4A843;
+  --avatar-teal:        #5EA3C8;
 
   /* ─── RADIUS ─────────────────────────────── */
   --radius-xs:    6px;
@@ -116,6 +126,7 @@
   --rail-width: 220px;
   --rail-collapsed: 64px;
   --rail-expanded:  220px;
+  --content-card-radius: 14px;
   --topbar-height: 60px;
   --content-max-width: 1280px;
 
@@ -576,7 +587,23 @@ body {
 
 /* ─── App shell ──────────────────────────── */
 .main-layout    { background: var(--surface-page); }
-.content-divider { background: var(--border); width: 1px; flex-shrink: 0; }
+.content-card   {
+  background: var(--surface-card);
+  border-radius: var(--content-card-radius);
+  box-shadow: var(--shadow-card);
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.content-card:has(.session-page-shell) {
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+}
 
 .page-header {
   height: var(--topbar-height) !important;

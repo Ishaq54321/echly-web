@@ -8,6 +8,13 @@ import type { Feedback } from "@/lib/domain/feedback";
 import { getTicketStatus } from "@/lib/domain/feedback";
 import { TicketItem } from "./TicketItem";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { CanvasEmptyState } from "@/components/empty/CanvasEmptyState";
+import {
+  NoTicketsIllu,
+  TicketSearchEmptyIllu,
+  NoOpenTicketsIllu,
+  NoResolvedTicketsIllu,
+} from "@/components/empty/canvasIllustrations";
 
 function formatRelativeTime(timestamp: any): string {
   try {
@@ -68,6 +75,8 @@ export interface TicketListProps {
   recentViewers?: Array<{ id: string; displayName: string | null; avatarUrl: string | null; isAnonymous: boolean; viewedAt: number }>;
   canRenameTitle?: boolean;
   onRenameTitle?: (title: string) => Promise<void>;
+  /** True for workspace owners and members; false for cross-workspace invitees and anonymous viewers. */
+  isWorkspaceMember?: boolean;
 }
 
 /** Skeleton list for Open / Resolved section bodies while loading.
@@ -120,6 +129,7 @@ function TicketListInner({
   recentViewers,
   canRenameTitle,
   onRenameTitle,
+  isWorkspaceMember = false,
 }: TicketListProps) {
   const scrollToIdApplied = useRef(false);
   const [openExpandedInternal, setOpenExpandedInternal] = useState(true);
@@ -395,14 +405,16 @@ function TicketListInner({
             <p className="text-[14px] text-[var(--text-secondary)] leading-[1.5] mb-3 max-w-[80%]">
               {total} ticket{total !== 1 ? 's' : ''} in this session. Walk through, leave notes, resolve as you go.
             </p>
-            <button
-              type="button"
-              onClick={() => setInviteModalOpen(true)}
-              className="inline-flex items-center gap-1.5 h-8 px-4 rounded-[7px] bg-[var(--text-heading)] text-white text-[13px] font-semibold tracking-[-0.005em] border-0 cursor-pointer hover:bg-black transition-colors"
-            >
-              <UsersRound size={14} strokeWidth={2} />
-              Invite Team
-            </button>
+            {isWorkspaceMember && (
+              <button
+                type="button"
+                onClick={() => setInviteModalOpen(true)}
+                className="inline-flex items-center gap-1.5 h-8 px-4 rounded-[7px] bg-[var(--text-heading)] text-white text-[13px] font-semibold tracking-[-0.005em] border-0 cursor-pointer hover:bg-black transition-colors"
+              >
+                <UsersRound size={14} strokeWidth={2} />
+                Invite Team
+              </button>
+            )}
           </>
         ) : (
           <div aria-busy="true" aria-label="Loading session">
@@ -429,8 +441,24 @@ function TicketListInner({
         className="h-full overflow-y-auto flex-1 min-h-0 pb-2 -mx-4 px-4"
       >
         {showSearchEmpty && (
-          <div className="px-3 py-4 mt-3 text-[12px] font-normal text-[var(--text-tertiary)]">
-            No tickets found
+          <div className="px-3 py-8 mt-2">
+            <CanvasEmptyState
+              density="compact"
+              illustration={<TicketSearchEmptyIllu />}
+              title="No tickets match your search"
+              description="Try a different keyword or clear the search."
+            />
+          </div>
+        )}
+
+        {!isSearchMode && !countsLoading && total === 0 && (
+          <div className="px-3 py-8 mt-2">
+            <CanvasEmptyState
+              density="compact"
+              illustration={<NoTicketsIllu />}
+              title="No tickets yet"
+              description="Capture your first screenshot or recording to create a ticket."
+            />
           </div>
         )}
 
@@ -479,11 +507,16 @@ function TicketListInner({
                   ))}
                   {openItems.length === 0 && !showSearchEmpty && !countsLoading && (
                     <>
-                      {open === 0 ? (
-                        <p className="px-2.5 py-3 text-[12px] text-[var(--text-tertiary)]">
-                          No open tickets
-                        </p>
-                      ) : isSearchMode && searchLoading ? null : (
+                      {open === 0 && total > 0 ? (
+                        <div className="px-2 py-4">
+                          <CanvasEmptyState
+                            density="compact"
+                            illustration={<NoOpenTicketsIllu />}
+                            title="All tickets resolved"
+                            description="Nice work! All tickets in this session have been resolved."
+                          />
+                        </div>
+                      ) : open === 0 ? null : isSearchMode && searchLoading ? null : (
                         <TicketListSectionLoading />
                       )}
                     </>
@@ -540,10 +573,15 @@ function TicketListInner({
                   ))}
                   {resolvedItems.length === 0 && !showSearchEmpty && !(isSearchMode && searchLoading) && (
                     <>
-                      {resolved === 0 ? (
-                        <p className="px-2.5 py-3 text-[12px] text-[var(--text-tertiary)]">
-                          No resolved tickets
-                        </p>
+                      {resolved === 0 && total > 0 ? (
+                        <div className="px-2 py-4">
+                          <CanvasEmptyState
+                            density="compact"
+                            illustration={<NoResolvedTicketsIllu />}
+                            title="No resolved tickets yet"
+                            description="Resolved tickets will appear here as your team works through feedback."
+                          />
+                        </div>
                       ) : null}
                     </>
                   )}
@@ -556,7 +594,7 @@ function TicketListInner({
 
         {loadMoreRef && (
           <>
-            {/* Sentinel used by IntersectionObserver in `useSessionFeedbackPaginated`. Must be measurable. */}
+            {/* Optional pagination sentinel. Self-disables when `loadMoreRef` is unset. */}
             <div ref={loadMoreRef} aria-hidden style={{ height: "1px" }} />
           </>
         )}

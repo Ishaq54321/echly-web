@@ -18,6 +18,19 @@ import {
   sessionTitleForActivityEvent,
 } from "@/lib/repositories/activityEventsRepository.server";
 import { getUserByIdRepo } from "@/lib/repositories/usersRepository.server";
+import {
+  writeSessionAccessDoc,
+  deleteSessionAccessDoc,
+} from "@/lib/repositories/sessionAccessRepository.server";
+import { composeFullName } from "@/lib/utils/nameSplit";
+
+function userComposedName(u: { firstName?: unknown; lastName?: unknown } | null | undefined): string {
+  if (!u) return "";
+  return composeFullName(
+    typeof u.firstName === "string" ? u.firstName : null,
+    typeof u.lastName === "string" ? u.lastName : null
+  );
+}
 
 export async function getSessionMember(
   sessionId: string,
@@ -63,6 +76,9 @@ export type AddSessionMemberSource =
   | "access_request"
   | "invite_redemption";
 
+export type UpdateSessionMemberAccessSource = "access_change_api";
+export type RemoveSessionMemberSource = "remove_api";
+
 export async function addSessionMember(params: {
   sessionId: string;
   workspaceId: string;
@@ -90,6 +106,15 @@ export async function addSessionMember(params: {
         updatedAt: FieldValue.serverTimestamp(),
       });
     }
+    // Always re-assert the sessionAccess mirror so a previously-failed dual-write
+    // is recovered on the next member add. Idempotent via get-then-set.
+    await writeSessionAccessDoc({
+      userId: params.userId,
+      sessionId: params.sessionId,
+      workspaceId: params.workspaceId,
+      accessLevel: params.access,
+      addedBy: actorId,
+    });
     return;
   }
 
@@ -101,6 +126,14 @@ export async function addSessionMember(params: {
     createdAt: Timestamp.now(),
   });
 
+  await writeSessionAccessDoc({
+    userId: params.userId,
+    sessionId: params.sessionId,
+    workspaceId: params.workspaceId,
+    accessLevel: params.access,
+    addedBy: actorId,
+  });
+
   const workspaceId = params.workspaceId.trim();
   if (workspaceId) {
     let targetName: string | null = null;
@@ -108,7 +141,7 @@ export async function addSessionMember(params: {
       try {
         const targetUser = await getUserByIdRepo(params.userId);
         targetName =
-          targetUser?.name?.trim() ||
+          userComposedName(targetUser) ||
           targetUser?.email?.split("@")[0]?.trim() ||
           null;
       } catch {
@@ -135,6 +168,133 @@ export async function addSessionMember(params: {
       },
     });
   }
+}
+
+export async function updateSessionMemberAccessRepo(params: {
+  sessionId: string;
+  userId: string;
+  newAccess: "view" | "resolve";
+  actorId: string;
+  workspaceId: string;
+  sessionTitle: string;
+  source: UpdateSessionMemberAccessSource;
+}): Promise<
+  | { ok: true; previousAccess: "view" | "resolve"; targetEmail: string | null }
+  | { ok: false; reason: "not_found" }
+> {
+  const ref = adminDb.doc(
+    sessionMemberDocPath(params.sessionId, params.userId)
+  );
+  const snap = await ref.get();
+  if (!snap.exists) return { ok: false, reason: "not_found" };
+
+  const data = snap.data()!;
+  const previousAccess: "view" | "resolve" =
+    data.access === "resolve" || data.access === "view" ? data.access : "view";
+  const targetEmail = typeof data.email === "string" ? data.email : null;
+
+  await ref.update({ access: params.newAccess });
+
+  await writeSessionAccessDoc({
+    userId: params.userId,
+    sessionId: params.sessionId,
+    workspaceId: params.workspaceId,
+    accessLevel: params.newAccess,
+    addedBy: params.actorId,
+  });
+
+  const workspaceId = params.workspaceId.trim();
+  const actorId = params.actorId.trim();
+  if (workspaceId && actorId) {
+    let targetName: string | null = null;
+    try {
+      const targetUser = await getUserByIdRepo(params.userId);
+      targetName =
+        userComposedName(targetUser) ||
+        targetEmail?.split("@")[0]?.trim() ||
+        null;
+    } catch {
+      targetName = targetEmail?.split("@")[0] ?? null;
+    }
+    const actor = await resolveActorForActivityEvent(actorId);
+    await createActivityEvent({
+      workspaceId,
+      sessionId: params.sessionId,
+      eventType: "session.member.role_changed",
+      actorId,
+      actorName: actor.actorName,
+      actorPhotoURL: actor.actorPhotoURL,
+      metadata: {
+        sessionTitle: params.sessionTitle,
+        previousAccess,
+        newAccess: params.newAccess,
+        targetUserId: params.userId ?? null,
+        targetEmail: targetEmail ?? null,
+        targetName,
+      },
+    });
+  }
+  return { ok: true, previousAccess, targetEmail };
+}
+
+export async function removeSessionMemberRepo(params: {
+  sessionId: string;
+  userId: string;
+  actorId: string;
+  workspaceId: string;
+  sessionTitle: string;
+  source: RemoveSessionMemberSource;
+}): Promise<
+  | { ok: true; removedEmail: string | null }
+  | { ok: false; reason: "not_found" }
+> {
+  const ref = adminDb.doc(
+    sessionMemberDocPath(params.sessionId, params.userId)
+  );
+  const snap = await ref.get();
+  if (!snap.exists) return { ok: false, reason: "not_found" };
+
+  const removedEmail =
+    typeof snap.data()?.email === "string"
+      ? (snap.data()!.email as string)
+      : null;
+  await ref.delete();
+
+  await deleteSessionAccessDoc({
+    userId: params.userId,
+    sessionId: params.sessionId,
+  });
+
+  const workspaceId = params.workspaceId.trim();
+  const actorId = params.actorId.trim();
+  if (workspaceId && actorId) {
+    let removedTargetName: string | null = null;
+    try {
+      const targetUser = await getUserByIdRepo(params.userId);
+      removedTargetName =
+        userComposedName(targetUser) ||
+        removedEmail?.split("@")[0]?.trim() ||
+        null;
+    } catch {
+      removedTargetName = removedEmail?.split("@")[0] ?? null;
+    }
+    const actor = await resolveActorForActivityEvent(actorId);
+    await createActivityEvent({
+      workspaceId,
+      sessionId: params.sessionId,
+      eventType: "session.member.removed",
+      actorId,
+      actorName: actor.actorName,
+      actorPhotoURL: actor.actorPhotoURL,
+      metadata: {
+        sessionTitle: params.sessionTitle,
+        targetUserId: params.userId ?? null,
+        targetEmail: removedEmail ?? null,
+        targetName: removedTargetName ?? null,
+      },
+    });
+  }
+  return { ok: true, removedEmail };
 }
 
 export async function getInviteByEmail(
@@ -198,49 +358,32 @@ export async function activateInvite(params: {
   });
 }
 
-// IMPORTANT: This query requires a Firestore
-// collectionGroup index on the 'members' subcollection.
-// Index is defined in firestore.indexes.json.
-// If you see "requires an index" error, run:
-// firebase deploy --only firestore:indexes
-// OR click the link in the Firebase console error.
+// Reads the flat sessionAccess mirror collection (Phase 6b) to find sessions
+// the user has been invited to. The legacy collection-group `members.userId`
+// query path is retired here; the corresponding fieldOverride in
+// firestore.indexes.json is intentionally kept one release cycle for rollback.
 //
-// REQUIRES Firestore index:
-// Collection group: members
-// Fields: userId ASC, __name__ ASC
-// Deploy with: firebase deploy --only firestore:indexes
+// Same-workspace memberships are filtered out — this endpoint only surfaces
+// CROSS-workspace shares (the Shared with me page).
 export async function getSharedSessionMembershipsRepo(
   userId: string,
   userWorkspaceIds: string[]
 ): Promise<SharedSessionMembership[]> {
-  let snap: FirebaseFirestore.QuerySnapshot;
-  try {
-    snap = await adminDb
-      .collectionGroup("members")
-      .where("userId", "==", userId)
-      .get();
-  } catch (err: unknown) {
-    const error = err as { message?: string; details?: string };
-    console.error("=== FIRESTORE INDEX URL ===");
-    console.error("Message:", error?.message);
-    console.error("Details:", error?.details);
-    console.error(JSON.stringify(err, null, 2));
-    console.error("===========================");
-    throw err;
-  }
+  const snap = await adminDb
+    .collection("sessionAccess")
+    .where("userId", "==", userId)
+    .get();
 
   if (snap.empty) return [];
 
-  // Extract sessionIds from paths: sessions/{sessionId}/members/{userId}
-  const memberDocsBySessionId = new Map<string, FirebaseFirestore.DocumentData>();
+  const accessDocsBySessionId = new Map<string, FirebaseFirestore.DocumentData>();
   for (const doc of snap.docs) {
-    const sessionId = doc.ref.parent.parent?.id;
-    if (sessionId) {
-      memberDocsBySessionId.set(sessionId, doc.data());
-    }
+    const data = doc.data();
+    const sid = typeof data.sessionId === "string" ? data.sessionId.trim() : "";
+    if (sid) accessDocsBySessionId.set(sid, data);
   }
 
-  const sessionIds = Array.from(memberDocsBySessionId.keys());
+  const sessionIds = Array.from(accessDocsBySessionId.keys());
 
   const sessionSnaps = await Promise.all(
     sessionIds.map((id) => adminDb.collection("sessions").doc(id).get())
@@ -249,7 +392,7 @@ export async function getSharedSessionMembershipsRepo(
   type IncludedSession = {
     sessionId: string;
     sessionDoc: FirebaseFirestore.DocumentData;
-    memberData: FirebaseFirestore.DocumentData;
+    accessData: FirebaseFirestore.DocumentData;
   };
 
   const included: IncludedSession[] = [];
@@ -259,9 +402,9 @@ export async function getSharedSessionMembershipsRepo(
     const workspaceId =
       typeof data.workspaceId === "string" ? data.workspaceId.trim() : "";
     if (userWorkspaceIds.includes(workspaceId)) continue;
-    const memberData = memberDocsBySessionId.get(sessionSnap.id);
-    if (!memberData) continue;
-    included.push({ sessionId: sessionSnap.id, sessionDoc: data, memberData });
+    const accessData = accessDocsBySessionId.get(sessionSnap.id);
+    if (!accessData) continue;
+    included.push({ sessionId: sessionSnap.id, sessionDoc: data, accessData });
   }
 
   if (included.length === 0) return [];
@@ -275,8 +418,8 @@ export async function getSharedSessionMembershipsRepo(
         : "";
     if (wid) workspaceIdSet.add(wid);
     const addedBy =
-      typeof item.memberData.addedBy === "string"
-        ? item.memberData.addedBy.trim()
+      typeof item.accessData.addedBy === "string"
+        ? item.accessData.addedBy.trim()
         : "";
     if (addedBy) addedBySet.add(addedBy);
   }
@@ -322,16 +465,16 @@ export async function getSharedSessionMembershipsRepo(
   }
 
   const results: SharedSessionMembership[] = included.map(
-    ({ sessionId, sessionDoc, memberData }) => {
+    ({ sessionId, sessionDoc, accessData }) => {
       const workspaceId =
         typeof sessionDoc.workspaceId === "string"
           ? sessionDoc.workspaceId.trim()
           : "";
       const addedBy =
-        typeof memberData.addedBy === "string"
-          ? memberData.addedBy.trim()
+        typeof accessData.addedBy === "string"
+          ? accessData.addedBy.trim()
           : null;
-      const rawTs = memberData.createdAt as
+      const rawTs = accessData.createdAt as
         | { seconds: number; nanoseconds: number }
         | null
         | undefined;
@@ -350,7 +493,7 @@ export async function getSharedSessionMembershipsRepo(
             : "Untitled Session",
         workspaceId,
         workspaceName: workspaceNameMap.get(workspaceId) ?? null,
-        access: memberData.access === "resolve" ? "resolve" : "view",
+        access: accessData.accessLevel === "resolve" ? "resolve" : "view",
         addedBy: addedBy || null,
         addedByName: addedBy ? (userNameMap.get(addedBy) ?? null) : null,
         addedAt,

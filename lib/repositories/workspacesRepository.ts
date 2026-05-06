@@ -62,33 +62,6 @@ export function listenToWorkspace(
   };
 }
 
-/**
- * Ensures a workspace exists. Idempotent: if already present, no-op.
- * Defaults are applied only on first creation.
- */
-export async function ensureWorkspaceRepo(params: {
-  userId: string;
-  ownerId: string;
-  name?: string | null;
-  logoUrl?: string | null;
-}): Promise<void> {
-  const legacyIdKey = "workspace" + "Id";
-  const res = await authFetch("/api/workspaces", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      [legacyIdKey]: params.userId,
-      name: params.name ?? "My Workspace",
-      logoUrl: params.logoUrl ?? null,
-    }),
-  });
-  if (!res || !res.ok) {
-    const msg = res ? await res.text() : "Not authenticated";
-    throw new Error(`Failed to ensure workspace: ${msg}`);
-  }
-  invalidateWorkspaceDocCache(params.userId);
-}
-
 export async function updateWorkspaceName(
   userId: string,
   name: string

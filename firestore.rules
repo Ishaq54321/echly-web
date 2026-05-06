@@ -11,6 +11,14 @@ service cloud.firestore {
         && request.auth.token.workspaceId == wid;
     }
 
+    // Phase 6b helper — checks the flat sessionAccess mirror collection.
+    // exists() is cheap and rule-eval-safe. The composite key avoids needing
+    // a sub-collection traversal from rules.
+    function hasSessionAccess(uid, sid) {
+      return isAuthed()
+        && exists(/databases/$(database)/documents/sessionAccess/$(uid + "_" + sid));
+    }
+
     match /users/{uid} {
       allow read: if isAuthed() && request.auth.uid == uid;
       allow write: if false;
@@ -27,31 +35,79 @@ service cloud.firestore {
     }
 
     match /sessions/{sessionId} {
-      allow read: if isWorkspaceMember(resource.data.workspaceId);
+      allow read: if isWorkspaceMember(resource.data.workspaceId)
+                  || hasSessionAccess(request.auth.uid, sessionId);
       allow write: if false;
 
       match /members/{memberId} {
         // Server (Admin SDK) bypasses these rules.
-        // These rules protect against direct client SDK access.
-        allow read: if request.auth != null
-                    && request.auth.uid == memberId;
+        // Read: any authenticated workspace member of the parent session, OR a
+        // session-invited user (Phase 6b loosening — for the future members listener).
+        allow read: if isAuthed()
+                    && (
+                         isWorkspaceMember(
+                           get(/databases/$(database)/documents/sessions/$(sessionId)).data.workspaceId
+                         )
+                         || hasSessionAccess(request.auth.uid, sessionId)
+                       );
+        allow write: if false;
+      }
+
+      match /presence/{userId} {
+        // Read: workspace members OR session-invited users (Phase 6b).
+        // Anonymous share-link viewers still cannot read presence — they have no auth.
+        allow read: if isAuthed()
+                    && (
+                         isWorkspaceMember(
+                           get(/databases/$(database)/documents/sessions/$(sessionId)).data.workspaceId
+                         )
+                         || hasSessionAccess(request.auth.uid, sessionId)
+                       );
+        // Write: a user may only create/update/delete their own heartbeat doc.
+        allow write: if isAuthed() && request.auth.uid == userId;
+      }
+
+      match /accessRequests/{reqId} {
+        allow read: if isAuthed()
+                    && (
+                         isWorkspaceMember(
+                           get(/databases/$(database)/documents/sessions/$(sessionId)).data.workspaceId
+                         )
+                         || hasSessionAccess(request.auth.uid, sessionId)
+                       );
         allow write: if false;
       }
     }
 
     match /feedback/{id} {
-      allow read: if isWorkspaceMember(resource.data.workspaceId);
+      allow read: if isWorkspaceMember(resource.data.workspaceId)
+                  || hasSessionAccess(request.auth.uid, resource.data.sessionId);
       allow write: if false;
     }
 
     match /comments/{id} {
-      allow read: if isWorkspaceMember(resource.data.workspaceId);
+      allow read: if isWorkspaceMember(resource.data.workspaceId)
+                  || hasSessionAccess(request.auth.uid, resource.data.sessionId);
       allow write: if false;
     }
 
-    // ✅ ADD THIS BLOCK (CRITICAL FIX)
     match /screenshots/{id} {
-      allow read: if isWorkspaceMember(resource.data.workspaceId);
+      allow read: if isWorkspaceMember(resource.data.workspaceId)
+                  || hasSessionAccess(request.auth.uid, resource.data.sessionId);
+      allow write: if false;
+    }
+
+    // Phase 6b: flat mirror of session memberships, written by Admin SDK whenever
+    // sessions/{sid}/members/{uid} changes. Composite docId = `${uid}_${sid}` lets
+    // rules verify membership via exists() without a get(), unlocking listener
+    // access for cross-workspace session-invited users.
+    match /sessionAccess/{docId} {
+      // Self-read only. The matches() guard rejects malformed docIds before
+      // split() runs (defense in depth — dual-write helper always produces
+      // well-formed ids, but rules should be robust to bad data).
+      allow read: if isAuthed()
+                  && docId.matches(".+_.+")
+                  && docId.split("_")[0] == request.auth.uid;
       allow write: if false;
     }
 

@@ -174,7 +174,8 @@ export function TiptapCommentEditor({
                 if (rect && dropdownEl) {
                   dropdownEl.style.position = "fixed";
                   dropdownEl.style.left = `${rect.left}px`;
-                  dropdownEl.style.top = `${rect.bottom + 4}px`;
+                  dropdownEl.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+                  dropdownEl.style.top = "auto";
                   dropdownEl.style.zIndex = "2147480001";
                 }
                 savedCommand = props.command;
@@ -187,7 +188,8 @@ export function TiptapCommentEditor({
                 const rect = props.clientRect?.() as DOMRect | null;
                 if (rect && dropdownEl) {
                   dropdownEl.style.left = `${rect.left}px`;
-                  dropdownEl.style.top = `${rect.bottom + 4}px`;
+                  dropdownEl.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+                  dropdownEl.style.top = "auto";
                 }
                 savedCommand = props.command;
                 renderDropdownItems(currentItems, selectedIndex, props.command);

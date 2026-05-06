@@ -13,11 +13,24 @@ export default function NoWorkspacePage() {
   return (
     <div className="min-h-screen bg-white flex items-center justify-center p-6">
       <div className="w-full max-w-[480px] flex flex-col items-center text-center">
-        {/* Icon */}
-        <div style={{ width: 60, height: 60, marginBottom: 20 }}>
-          <svg viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg" width={60} height={60}>
-            <rect x="4" y="14" width="30" height="30" rx="7" stroke="var(--border-strong)" strokeWidth="2.5" fill="none" />
-            <rect x="26" y="16" width="30" height="30" rx="7" stroke="var(--border-strong)" strokeWidth="2.5" fill="none" />
+        {/* Illustration */}
+        <div style={{ width: 200, height: 160, marginBottom: 20 }}>
+          <svg viewBox="0 0 200 160" width="100%" height="100%" style={{ overflow: "visible" }}>
+            <g transform="translate(100 86) translate(-40 -38)">
+              <rect width="80" height="76" rx="6" fill="#F3F4F6" stroke="#D1D5DB" strokeWidth="1.5" />
+              <rect x="12" y="14" width="14" height="14" rx="2" fill="#E5E7EB" />
+              <rect x="34" y="14" width="14" height="14" rx="2" fill="#E5E7EB" />
+              <rect x="56" y="14" width="14" height="14" rx="2" fill="#E5E7EB" />
+              <rect x="12" y="36" width="14" height="14" rx="2" fill="#E5E7EB" />
+              <rect x="34" y="36" width="14" height="14" rx="2" fill="#E5E7EB" />
+              <rect x="56" y="36" width="14" height="14" rx="2" fill="#E5E7EB" />
+              <rect x="32" y="58" width="16" height="18" fill="#FFFFFF" stroke="#D1D5DB" strokeWidth="1.5" />
+            </g>
+            <g transform="translate(146 112)">
+              <circle cx="17" cy="17" r="14" fill="#6B7280" />
+              <path d="M13 14 Q13 10 17 10 Q21 10 21 14 Q21 17 17 18 V20" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+              <circle cx="17" cy="23" r="1.4" fill="#fff" />
+            </g>
           </svg>
         </div>
 

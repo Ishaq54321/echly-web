@@ -1,223 +1,201 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import Image from "next/image";
-import { doc, getDoc } from "firebase/firestore";
-import { auth } from "@/lib/firebase";
-import { db } from "@/lib/firebase";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 import { authFetch } from "@/lib/authFetch";
-import { WorkspaceForm, type WorkspaceFormValues } from "@/components/onboarding/WorkspaceForm";
-import { StepIndicator } from "@/components/onboarding/StepIndicator";
-import { motion } from "framer-motion";
+import { ProfileStep } from "@/components/onboarding/ProfileStep";
+import { WorkspaceStep } from "@/components/onboarding/WorkspaceStep";
+import { InviteStep } from "@/components/onboarding/InviteStep";
+import { ExtensionStep } from "@/components/onboarding/ExtensionStep";
+import { ReadyStep } from "@/components/onboarding/ReadyStep";
+
+type StepId = "profile" | "workspace" | "invite" | "extension" | "ready";
+
+/** Fire-and-forget writeback of progress; never blocks UI. */
+function persistProgress(stepNumber: number) {
+  void authFetch("/api/users", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ onboardingStep: stepNumber }),
+  }).catch(() => {});
+}
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [authReady, setAuthReady] = useState(false);
-  const [isInviteUser, setIsInviteUser] = useState(false);
-  const [displayName, setDisplayName] = useState("");
-  const [displayNameError, setDisplayNameError] = useState<string | null>(null);
+  const {
+    authUid,
+    authReady,
+    authEmail,
+    isIdentityReady,
+    isLoadingWorkspaces,
+    allWorkspaces,
+    firstName: ctxFirstName,
+    lastName: ctxLastName,
+    avatarUrl,
+    workspaceName: ctxWorkspaceName,
+    workspaceLogoUrl: ctxWorkspaceLogoUrl,
+  } = useWorkspace();
 
+  // Live profile/workspace state — updated as the user progresses through
+  // steps so later steps and the right-side preview render fresh values
+  // without waiting for Firestore round-trips.
+  const [firstName, setFirstName] = useState(ctxFirstName);
+  const [lastName, setLastName] = useState(ctxLastName);
+  const [workspaceName, setWorkspaceName] = useState(ctxWorkspaceName ?? "");
+  const [workspaceSlug, setWorkspaceSlug] = useState<string>("");
+  // Logo upload is deferred — the workspace doesn't exist until POST /api/onboarding
+  // succeeds at the final step. We hold the File locally and upload it after.
+  const [workspaceLogoFile, setWorkspaceLogoFile] = useState<File | null>(null);
+  const [workspaceLogoPreviewUrl, setWorkspaceLogoPreviewUrl] = useState<string | null>(
+    ctxWorkspaceLogoUrl ?? null
+  );
+
+  useEffect(() => { if (ctxFirstName) setFirstName(ctxFirstName); }, [ctxFirstName]);
+  useEffect(() => { if (ctxLastName) setLastName(ctxLastName); }, [ctxLastName]);
+  useEffect(() => { if (ctxWorkspaceName) setWorkspaceName(ctxWorkspaceName); }, [ctxWorkspaceName]);
+
+  // Bounce signed-out users to login.
   useEffect(() => {
+    if (authReady && !authUid) {
+      router.replace("/login");
+    }
+  }, [authReady, authUid, router]);
+
+  const ready = isIdentityReady && !isLoadingWorkspaces;
+
+  // Invited users have at least one membership where isOwner === false.
+  // They get a slimmed flow that skips workspace creation and inviting.
+  const isInviteUser = useMemo(
+    () => ready && allWorkspaces.some((w) => !w.isOwner),
+    [ready, allWorkspaces]
+  );
+
+  const steps: StepId[] = useMemo(
+    () => (isInviteUser ? ["profile", "extension", "ready"] : ["profile", "workspace", "invite", "extension", "ready"]),
+    [isInviteUser]
+  );
+
+  const [stepIndex, setStepIndex] = useState(0);
+  const [progressLoaded, setProgressLoaded] = useState(false);
+  const currentStep = steps[stepIndex] ?? "profile";
+
+  // On mount (after identity is ready), fetch the user's stored onboardingStep
+  // and jump to that screen so closing the browser mid-flow resumes from where
+  // the user left off. We only run this once — subsequent advances are local.
+  useEffect(() => {
+    if (!isIdentityReady || progressLoaded) return;
     let cancelled = false;
     void (async () => {
-      await auth.authStateReady();
-      if (cancelled) return;
-      if (!auth.currentUser) {
-        router.replace("/login");
-        return;
-      }
-      // Check if user already has a workspaceId set (invite user path)
       try {
-        const snap = await getDoc(doc(db, "users", auth.currentUser.uid));
-        const data = (snap.exists() ? snap.data() : {}) as Record<string, unknown>;
-        const wid = typeof data.workspaceId === "string" ? data.workspaceId.trim() : "";
-        const memberships = Array.isArray(data.workspaceMemberships) ? data.workspaceMemberships : [];
-        if (wid && memberships.length > 0) {
-          setIsInviteUser(true);
+        const res = await authFetch("/api/users", { method: "GET" });
+        if (cancelled) return;
+        if (!res || !res.ok) {
+          setProgressLoaded(true);
+          return;
         }
-      } catch {/* non-fatal — fall through to normal onboarding */}
-      setAuthReady(true);
-      setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [router]);
-
-  // Minimal onboarding for invite users: just collect displayName
-  const handleInviteSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const name = displayName.trim();
-    if (!name) {
-      setDisplayNameError("Please enter your name.");
-      return;
-    }
-    setDisplayNameError(null);
-    setSubmitting(true);
-    try {
-      await authFetch("/api/users", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ displayName: name }),
-      });
-      router.replace("/dashboard");
-    } catch (e) {
-      console.error("Invite onboarding error:", e);
-      setSubmitting(false);
-    }
-  };
-
-  const handleSubmit = async (values: WorkspaceFormValues) => {
-    const user = auth.currentUser;
-    if (!user) {
-      router.replace("/login");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const createRes = await authFetch("/api/workspaces", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: values.workspaceName || "My Account",
-          role: values.role || undefined,
-          companySize: values.companySize || undefined,
-        }),
-      });
-
-      if (!createRes || !createRes.ok) {
-        const msg = createRes ? await createRes.text() : "Not authenticated";
-        throw new Error(`Failed to create profile: ${msg}`);
+        const body = (await res.json()) as {
+          success?: boolean;
+          data?: { onboardingStep?: number | null };
+        };
+        if (cancelled) return;
+        const saved =
+          typeof body?.data?.onboardingStep === "number"
+            ? body.data.onboardingStep
+            : 0;
+        if (saved >= 2) {
+          // Saved step is 1-indexed; clamp to the available steps for this user.
+          const clamped = Math.min(saved - 1, steps.length - 1);
+          setStepIndex(Math.max(clamped, 0));
+        }
+      } catch {
+        /* non-fatal */
+      } finally {
+        if (!cancelled) setProgressLoaded(true);
       }
+    })();
+    return () => { cancelled = true; };
+  }, [isIdentityReady, progressLoaded, steps.length]);
 
-      router.replace("/onboarding/activate");
-    } catch (e) {
-      console.error("Onboarding error:", e);
-      setSubmitting(false);
+  // Clamp stepIndex if `steps` shrinks (e.g., late-arriving membership data
+  // reveals invited-user status after we've already advanced).
+  useEffect(() => {
+    if (stepIndex >= steps.length) {
+      setStepIndex(steps.length - 1);
     }
+  }, [stepIndex, steps.length]);
+
+  const advance = () => {
+    setStepIndex((i) => {
+      const next = Math.min(i + 1, steps.length - 1);
+      // 1-indexed step number for persistence.
+      persistProgress(next + 1);
+      return next;
+    });
   };
+  const goBack = () => setStepIndex((i) => Math.max(i - 1, 0));
 
-  if (loading || !authReady) {
+  if (!ready || !authUid) {
     return (
-      <div className="w-8 h-8 border-2 border-[var(--border)] border-t-[var(--brand)] rounded-full animate-spin" />
+      <div style={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
+        <div className="ob-spinner" />
+      </div>
     );
   }
 
-  // Minimal onboarding for invite users
-  if (isInviteUser) {
-    return (
-      <>
-        <header className="absolute top-6 left-6 z-20">
-          <Link href="/">
-            <Image src="/Echly_logo.svg" alt="Echly" width={130} height={40} sizes="130px" className="h-12 w-auto" />
-          </Link>
-        </header>
-        <div className="w-full max-w-[480px] mx-auto px-6 flex flex-col items-center justify-center min-h-screen">
-          <motion.div
-            className="w-full rounded-[var(--radius-xl)] bg-white/55 backdrop-blur-xl border border-white/40 shadow-[var(--shadow-xl)] p-8"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35 }}
-          >
-            <h1 className="text-2xl font-semibold text-[var(--text-heading)] tracking-tight mb-1">Welcome to Echly</h1>
-            <p className="text-[var(--text-secondary)] text-sm mb-6">Just one thing before you get started.</p>
-            <form onSubmit={handleInviteSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="display-name" className="block text-sm font-medium text-[var(--text-body)] mb-1">Your name</label>
-                <input
-                  id="display-name"
-                  type="text"
-                  placeholder="e.g. Alex Kim"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  className="w-full h-11 rounded-[var(--radius-sm)] border border-[var(--border)] bg-white text-[var(--text-heading)] text-base pl-3 placeholder:text-[var(--text-placeholder)] focus:outline-none focus:border-[var(--brand)] focus:ring-[3px] focus:ring-[rgba(23,117,224,0.15)]"
-                  required
-                />
-                {displayNameError && <p className="mt-1 text-sm text-[var(--color-danger)]">{displayNameError}</p>}
-              </div>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full h-12 rounded-[var(--radius-sm)] text-white font-medium text-lg disabled:opacity-50 flex items-center justify-center"
-                style={{ background: "var(--brand)" }}
-              >
-                {submitting ? "Saving…" : "Get started"}
-              </button>
-            </form>
-          </motion.div>
-        </div>
-      </>
-    );
+  switch (currentStep) {
+    case "profile":
+      return (
+        <ProfileStep
+          initialFirstName={firstName}
+          initialLastName={lastName}
+          initialAvatarUrl={avatarUrl}
+          onContinue={({ firstName: fn, lastName: ln }) => {
+            setFirstName(fn);
+            setLastName(ln);
+            advance();
+          }}
+        />
+      );
+    case "workspace":
+      return (
+        <WorkspaceStep
+          initialName={workspaceName}
+          initialLogoUrl={workspaceLogoPreviewUrl}
+          initialLogoFile={workspaceLogoFile}
+          onContinue={({ workspaceName: ws, workspaceSlug: wsSlug, logoFile, logoPreviewUrl }) => {
+            setWorkspaceName(ws);
+            setWorkspaceSlug(wsSlug);
+            setWorkspaceLogoFile(logoFile);
+            setWorkspaceLogoPreviewUrl(logoPreviewUrl);
+            advance();
+          }}
+          onBack={goBack}
+        />
+      );
+    case "invite":
+      return (
+        <InviteStep
+          ownerName={[firstName, lastName].filter(Boolean).join(" ")}
+          ownerEmail={authEmail ?? ""}
+          workspaceName={workspaceName}
+          onContinue={advance}
+          onBack={goBack}
+        />
+      );
+    case "extension":
+      return <ExtensionStep onContinue={advance} onBack={goBack} />;
+    case "ready":
+      return (
+        <ReadyStep
+          firstName={firstName}
+          workspaceName={workspaceName}
+          workspaceSlug={workspaceSlug}
+          workspaceLogoFile={workspaceLogoFile}
+          onBack={goBack}
+        />
+      );
+    default:
+      return null;
   }
-
-  return (
-    <>
-      <header className="absolute top-6 left-6 z-20">
-        <Link href="/">
-          <Image
-            src="/Echly_logo.svg"
-            alt="Echly"
-            width={130}
-            height={40}
-            sizes="130px"
-            className="h-12 w-auto"
-          />
-        </Link>
-      </header>
-
-      <div className="w-full max-w-[760px] mx-auto px-6">
-        {/* Step indicator */}
-        <StepIndicator currentStep={1} />
-
-      {/* Hero header */}
-      <header className="flex flex-col items-center text-center">
-        <motion.h1
-          className="text-[44px] font-semibold tracking-tight text-[var(--text-heading)]"
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          Welcome to Echly
-        </motion.h1>
-        <motion.p
-          className="text-[18px] text-[var(--text-secondary)] mt-3"
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.06 }}
-        >
-          Set up your account in seconds.
-        </motion.p>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">You can change everything later.</p>
-      </header>
-
-      {/* Card wrapper — narrower premium layout */}
-      <div className="relative mt-8 max-w-[560px] mx-auto">
-        {/* Onboarding card — frosted glass */}
-        <motion.div
-          className="relative rounded-[var(--radius-xl)] bg-white/55 backdrop-blur-xl border border-white/40 shadow-[var(--shadow-xl)] p-7 transition-all duration-150 ease-out overflow-hidden"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, delay: 0.1 }}
-        >
-          {/* Inner glass highlight layer */}
-          <div
-            className="absolute inset-0 rounded-[var(--radius-xl)] pointer-events-none"
-            style={{
-              background: "linear-gradient(180deg, rgba(255,255,255,0.65) 0%, rgba(255,255,255,0.25) 40%, rgba(255,255,255,0.05) 100%)",
-              opacity: 0.55,
-            }}
-            aria-hidden
-          />
-          <div className="relative">
-            <WorkspaceForm onSubmit={handleSubmit} loading={submitting} />
-          </div>
-        </motion.div>
-      </div>
-      </div>
-    </>
-  );
 }

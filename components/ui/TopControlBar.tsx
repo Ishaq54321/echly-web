@@ -18,6 +18,7 @@ import { ProfileDropdown } from "@/components/layout/ProfileDropdown";
 import { SessionActionsDropdown } from "@/components/dashboard/SessionActionsDropdown";
 import { triggerAddMoreTickets } from "@/components/dashboard/hooks/triggerAddMoreTickets";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { PresenceAvatarRow } from "@/components/presence/PresenceAvatarRow";
 import { copySessionLink } from "@/utils/copySessionLink";
 import {
   assertIdentityResolved,
@@ -36,8 +37,6 @@ export function TopControlBar({
   canManageShare = false,
   canManageAccess = false,
   isWorkspaceMember = false,
-  pendingRequestsCount = 0,
-  onShareModalOpen,
   sessionLoaded = false,
   openCount,
   resolvedCount,
@@ -72,10 +71,6 @@ export function TopControlBar({
   canManageAccess?: boolean;
   /** True for OWNER and WS-MEMBER — gates the ⋯ actions menu. */
   isWorkspaceMember?: boolean;
-  /** Number of pending access requests; shows red dot on Share button when > 0. */
-  pendingRequestsCount?: number;
-  /** Called when share modal is opened (e.g. to clear pending count). */
-  onShareModalOpen?: () => void;
   /** True once the session bundle fetch has resolved (success or error). Gates share/actions buttons. */
   sessionLoaded?: boolean;
   openCount?: number;
@@ -100,9 +95,9 @@ export function TopControlBar({
 
   const share = useShareController(sessionId, {
     canResolve: canManageShare,
-    pendingRequestsCount,
     initialGeneralAccess: session?.generalAccess as ShareGeneralAccess | undefined,
   });
+  const pendingRequestsCount = share.accessRequests.length;
 
   useEffect(() => {
     if (!share.open) return;
@@ -111,8 +106,7 @@ export function TopControlBar({
 
   const handleShareOpen = useCallback(() => {
     share.setOpen(true);
-    onShareModalOpen?.();
-  }, [share, onShareModalOpen]);
+  }, [share]);
 
   const copyCurrentLink = useCallback(async () => {
     if (linkCopyBusy) return;
@@ -191,6 +185,9 @@ export function TopControlBar({
 
         {/* Right: Actions */}
         <div className="flex items-center gap-4">
+          {authUid && (
+            <PresenceAvatarRow sessionId={sessionId} currentUserId={authUid} />
+          )}
           {/* Share + Copy link merged pill */}
           <div className="relative">
             <div className={`flex items-center bg-[var(--brand)] rounded-[var(--radius-btn)] shadow-[0_1px_0_rgba(255,255,255,0.2)_inset,0_1px_2px_rgba(23,117,224,0.3)] overflow-hidden hover:bg-[var(--brand-hover)] transition-colors${!sessionLoaded ? ' opacity-50 pointer-events-none' : ''}`}>
@@ -267,7 +264,6 @@ export function TopControlBar({
                 void share.removeAccess(item).catch(() => {});
               }}
               accessRequests={share.accessRequests}
-              pendingRequestsCount={pendingRequestsCount}
               patchingAccessRequestId={share.patchingAccessRequestId}
               onApproveAccessRequest={(id, access) => {
                 void share.patchAccessRequest(id, "approve", access).catch(() => {});
@@ -276,9 +272,6 @@ export function TopControlBar({
                 void share.patchAccessRequest(id, "reject").catch(() => {});
               }}
               canResolve={canManageShare}
-              linkAccessLevel={share.linkAccessLevel}
-              setLinkAccessLevel={share.setLinkAccessLevel}
-              copyingLink={share.copyingLink}
               linkCopied={share.linkCopied}
               onCopyShareLink={() => void share.copyShareLink().catch(() => {})}
               refetchingAfterApproval={share.refetchingAfterApproval}

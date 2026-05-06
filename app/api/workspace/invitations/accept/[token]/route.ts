@@ -22,6 +22,7 @@ import { getPaymentProvider } from "@/lib/billing/payments";
 import { checkPlanLimit } from "@/lib/billing/checkPlanLimit";
 import type { PlanLimitError } from "@/lib/billing/checkPlanLimit";
 import { planLimitReachedApiError } from "@/lib/billing/planLimitResponse";
+import { composeFullName } from "@/lib/utils/nameSplit";
 
 export const dynamic = "force-dynamic";
 
@@ -139,14 +140,16 @@ export async function POST(
     const profileSnap = await adminDb.doc(`users/${user.uid}`).get();
     const profile = (profileSnap.data() ?? {}) as Record<string, unknown>;
 
+    const composedProfileName = composeFullName(
+      typeof profile.firstName === "string" ? profile.firstName : null,
+      typeof profile.lastName === "string" ? profile.lastName : null
+    );
+    const profileEmailLocal =
+      typeof profile.email === "string" ? profile.email.split("@")[0] ?? "" : "";
     await addWorkspaceMemberRepo(invitation.workspaceId, {
       uid: user.uid,
       email: callerEmail,
-      displayName:
-        typeof profile.displayName === "string" && profile.displayName.trim()
-          ? profile.displayName.trim() :
-        typeof profile.name === "string" && profile.name.trim()
-          ? profile.name.trim() : null,
+      displayName: composedProfileName || profileEmailLocal || null,
       avatarUrl: typeof profile.avatarUrl === "string" ? profile.avatarUrl : null,
       role: invitation.role,
       joinedAt: Timestamp.now(),

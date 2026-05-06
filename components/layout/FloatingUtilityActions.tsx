@@ -13,7 +13,9 @@ export function FloatingUtilityActions() {
       pathSegments.length >= 2 &&
       !["sessions", "insights"].includes(pathSegments[1]));
 
-  if (isSessionFocusedView) {
+  const isDiscussionView = (pathname ?? "") === "/discussion";
+
+  if (isSessionFocusedView || isDiscussionView) {
     return null;
   }
 

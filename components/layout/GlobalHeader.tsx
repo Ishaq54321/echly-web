@@ -12,7 +12,10 @@ export function GlobalHeader() {
   const { plan, isLoaded } = useBillingStore();
   const showUpgrade = isLoaded && plan === "starter";
 
-  useEffect(() => retainNotificationListener(), []);
+  useEffect(() => {
+    const release = retainNotificationListener();
+    return release;
+  }, []);
 
   return (
     <div className="global-header flex h-16 w-full shrink-0 items-center justify-between bg-white px-6">

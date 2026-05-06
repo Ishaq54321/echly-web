@@ -21,11 +21,13 @@ import {
   useWorkspace,
 } from "@/lib/client/workspaceContext";
 import { SESSION_FEEDBACK_PATH } from "@/utils/getSessionLink";
+import { retainSessionsListTickle } from "@/lib/realtime/sessionsListTickle";
 
 const SESSIONS_CACHE_PREFIX = "echly_sessions";
 
-/** Skip GET /api/sessions (first page) when a fresh snapshot exists for this uid. */
-const WORKSPACE_SESSIONS_TTL_MS = 45_000;
+/** Skip GET /api/sessions (first page) when a fresh snapshot exists for this uid.
+ *  Kept short so the realtime tickle's force-refetch always reaches the network. */
+const WORKSPACE_SESSIONS_TTL_MS = 5_000;
 
 function sessionsCacheKey(uid: string, workspaceId: string): string {
   return `${SESSIONS_CACHE_PREFIX}:${uid}:${workspaceId}`;
@@ -395,6 +397,16 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
       cancelled = true;
     };
   }, [userId, workspaceId, isIdentityReady]);
+
+  // Realtime tickle: refetch the list when any session in this workspace changes.
+  // Preserves server-side access filtering (REST is still the source of truth).
+  useEffect(() => {
+    if (!isIdentityReady || !userId || !workspaceId) return;
+    const release = retainSessionsListTickle(workspaceId, () => {
+      void fetchSessions({ force: true });
+    });
+    return () => release();
+  }, [isIdentityReady, userId, workspaceId, fetchSessions]);
 
   const loadMoreSessions = useCallback(async () => {
     const uid = userIdRef.current;

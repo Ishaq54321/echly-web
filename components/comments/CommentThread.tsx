@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import Image from "next/image";
+import { getInitials } from "@/lib/utils/getInitials";
 
 export interface CommentDisplay {
   id: string;
@@ -13,16 +14,6 @@ export interface CommentDisplay {
 
 interface Props {
   comments: CommentDisplay[];
-}
-
-function getInitials(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
-    .map((s) => s[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
 }
 
 function buildThreadSummary(comments: CommentDisplay[]): string {

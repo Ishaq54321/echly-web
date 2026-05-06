@@ -6,9 +6,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useRef, useEffect, useState } from "react";
 import {
   type LucideIcon,
-  Home,
-  MessageSquare,
-  SquareChartGantt,
+  CircleUser,
+  Inbox as InboxIcon,
+  FileText,
+  GalleryHorizontalEnd,
   Settings,
   UserPlus,
   PanelLeftClose,
@@ -16,7 +17,6 @@ import {
   ChevronDown,
   Check,
   Plus,
-  Inbox,
   Loader2,
 } from "lucide-react";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
@@ -37,10 +37,10 @@ type MainNavItem = {
 };
 
 const NAV_ITEMS: MainNavItem[] = [
-  { href: "/dashboard", icon: Home, label: "Dashboard" },
-  { href: "/discussion", icon: MessageSquare, label: "Discussion" },
-  { href: "/activity", icon: SquareChartGantt, label: "Activity", iconStroke: 2.2 },
-  { href: "/shared", icon: Inbox, label: "Shared" },
+  { href: "/dashboard", icon: CircleUser, label: "Dashboard" },
+  { href: "/discussion", icon: InboxIcon, label: "Discussion" },
+  { href: "/activity", icon: FileText, label: "Activity", iconStroke: 2.2 },
+  { href: "/shared", icon: GalleryHorizontalEnd, label: "Shared" },
   { href: "/settings", icon: Settings, label: "Settings" },
 ];
 
@@ -73,7 +73,7 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
   const router = useRouter();
   useAuthGuard({ router });
   // WORKSPACE-MEMBER: replaced hardcoded string with live data
-  const { workspaceName, workspaceLogoUrl, isWorkspaceOwner, allWorkspaces, activeWorkspaceId, switchWorkspace, isLoadingWorkspaces, workspaceId, workspaceDocLoading, hintWorkspaceName, hintWorkspaceLogoUrl, memberCount } = useWorkspace();
+  const { workspaceName, workspaceLogoUrl, isWorkspaceOwner, allWorkspaces, activeWorkspaceId, switchWorkspace, isLoadingWorkspaces, refreshMemberships, workspaceId, workspaceDocLoading, hintWorkspaceName, hintWorkspaceLogoUrl, memberCount } = useWorkspace();
   const effectiveLogoUrl = workspaceDocLoading ? hintWorkspaceLogoUrl : workspaceLogoUrl;
   const effectiveName = workspaceDocLoading ? (hintWorkspaceName ?? workspaceName) : workspaceName;
   const displayName = effectiveName ?? "Workspace";
@@ -87,6 +87,10 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSent, setInviteSent] = useState(false);
+  const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false);
+  const [createWorkspaceName, setCreateWorkspaceName] = useState("");
+  const [createWorkspaceSubmitting, setCreateWorkspaceSubmitting] = useState(false);
+  const [createWorkspaceError, setCreateWorkspaceError] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -96,10 +100,6 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
   useEffect(() => {
     setLogoError(false);
   }, [effectiveLogoUrl]);
-
-  useEffect(() => {
-    localStorage.setItem("echly_sidebar_collapsed", String(isCollapsed));
-  }, [isCollapsed]);
 
   useEffect(() => {
     if (!workspacePopoverOpen) return;
@@ -133,9 +133,9 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
     >
       <aside
         className={cn(
-          "relative flex flex-col bg-[var(--surface)] h-screen shrink-0 min-h-0 overflow-visible py-4",
+          "relative flex flex-col bg-[var(--surface)] h-full shrink-0 min-h-0 overflow-visible py-4 rounded-[var(--content-card-radius)] shadow-[var(--shadow-card)]",
           mounted && "transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
-          effectiveCollapsed ? "w-[64px] items-stretch group/rail" : "w-[270px] items-stretch"
+          effectiveCollapsed ? "w-[64px] items-stretch group/rail" : "w-[220px] items-stretch"
         )}
         aria-label="Global navigation"
       >
@@ -260,7 +260,7 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
                   <UserPlus
                     className="h-[22px] w-[22px] shrink-0"
                     strokeWidth={2.2}
-                    style={{ color: "var(--text-heading)" }}
+                    style={{ color: "var(--text-primary)" }}
                     aria-hidden
                   />
                 </button>
@@ -365,7 +365,7 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
                     : "w-full gap-3 px-3 py-3 rounded-[var(--radius-sm)]",
                   active
                     ? "bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold"
-                    : "text-[var(--text-heading)] hover:bg-[var(--surface-hover)]"
+                    : "text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
                 )}
                 aria-label={label}
                 aria-current={active ? "page" : undefined}
@@ -410,7 +410,7 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
         <div
           className={cn(
             "absolute top-[5.5rem] w-64 rounded-xl border bg-white shadow-lg p-4 z-50",
-            effectiveCollapsed ? "left-[64px]" : "left-[270px]"
+            effectiveCollapsed ? "left-[64px]" : "left-[220px]"
           )}
           role="dialog"
           aria-label="Workspace"
@@ -538,13 +538,13 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
             type="button"
             onClick={() => {
               setWorkspacePopoverOpen(false);
-              window.location.href = "/onboarding";
+              setCreateWorkspaceOpen(true);
             }}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition text-left"
             style={{ color: "var(--brand-text)" }}
           >
             <Plus className="h-4 w-4 shrink-0" strokeWidth={2} style={{ color: "var(--brand-text)" }} aria-hidden />
-            Create workspace
+            Create New Workspace
           </button>
         </div>
       )}
@@ -627,6 +627,84 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
                 className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
               >
                 {inviteSubmitting ? "Sending…" : "Send Invite"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {createWorkspaceOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
+          onClick={() => setCreateWorkspaceOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-workspace-title"
+        >
+          <div
+            className="rounded-2xl shadow-lg bg-white p-6 max-w-md w-full cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="create-workspace-title" className="text-[20px] font-semibold leading-tight text-[var(--text-heading)]">
+              Create New Workspace
+            </h2>
+            <label htmlFor="create-workspace-name" className="sr-only">Workspace name</label>
+            <input
+              id="create-workspace-name"
+              type="text"
+              placeholder="Workspace name"
+              value={createWorkspaceName}
+              maxLength={80}
+              onChange={(e) => setCreateWorkspaceName(e.target.value)}
+              className="mt-4 w-full px-3 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text-heading)] placeholder:text-[#C4BFBB] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:border-transparent"
+              autoFocus
+            />
+            {createWorkspaceError && (
+              <p className="mt-2 text-sm text-[var(--color-danger)]">{createWorkspaceError}</p>
+            )}
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setCreateWorkspaceOpen(false);
+                  setCreateWorkspaceName("");
+                  setCreateWorkspaceError(null);
+                }}
+                className="px-4 py-2.5 text-sm font-medium rounded-xl text-[var(--text-body)] hover:bg-[var(--surface-hover)] transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={createWorkspaceSubmitting || !createWorkspaceName.trim()}
+                onClick={async () => {
+                  const trimmed = createWorkspaceName.trim();
+                  if (!trimmed) return;
+                  setCreateWorkspaceError(null);
+                  setCreateWorkspaceSubmitting(true);
+                  try {
+                    const res = await authFetch("/api/workspaces", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ name: trimmed }),
+                    });
+                    if (!res?.ok) {
+                      const json = await res?.json() as { error?: { message: string } } | undefined;
+                      setCreateWorkspaceError(json?.error?.message ?? "Failed to create workspace.");
+                      return;
+                    }
+                    refreshMemberships();
+                    setCreateWorkspaceOpen(false);
+                    setCreateWorkspaceName("");
+                  } catch {
+                    setCreateWorkspaceError("Failed to create workspace.");
+                  } finally {
+                    setCreateWorkspaceSubmitting(false);
+                  }
+                }}
+                className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+              >
+                {createWorkspaceSubmitting ? "Creating…" : "Create"}
               </button>
             </div>
           </div>

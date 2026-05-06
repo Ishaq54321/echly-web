@@ -2,6 +2,8 @@
 
 import React, { useEffect, useLayoutEffect, useState } from "react";
 import { Loader2, Pencil, ZoomIn } from "lucide-react";
+import { CanvasEmptyState } from "@/components/empty/CanvasEmptyState";
+import { NoScreenshotIllu } from "@/components/empty/canvasIllustrations";
 
 interface ScreenshotBlockProps {
   screenshotId: string | null | undefined;
@@ -70,8 +72,13 @@ export function ScreenshotBlock({
           </div>
         ) : null}
         {!loading && screenshotId && !url && (
-          <div className="absolute inset-0 w-full h-full flex items-center justify-center z-10 bg-[var(--layer-2-bg)] text-[12px] text-[var(--text-tertiary)]">
-            {error ?? "Screenshot unavailable"}
+          <div className="absolute inset-0 w-full h-full flex items-center justify-center z-10 bg-[var(--layer-2-bg)] py-4">
+            <CanvasEmptyState
+              density="compact"
+              illustration={<NoScreenshotIllu />}
+              title="No screenshot"
+              description={error ?? "This ticket doesn't have a screenshot attached."}
+            />
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/8 via-transparent to-transparent pointer-events-none" />

@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { UserAvatar } from "@/components/ui/UserAvatar";
+import { getAvatarColor } from "@/lib/utils/getAvatarColor";
 import {
   Archive,
   Calendar,
@@ -32,6 +33,9 @@ import {
   useShareController,
   type ShareGeneralAccess,
 } from "@/components/share/useShareController";
+import { CanvasEmptyState } from "@/components/empty/CanvasEmptyState";
+import { NoResultsIllu } from "@/components/empty/canvasIllustrations";
+import { useSessionsSearch } from "@/components/dashboard/context/SessionsSearchContext";
 
 const ShareModal = dynamic(
   () => import("@/components/share/ShareModal").then((m) => m.ShareModal),
@@ -271,21 +275,28 @@ function SessionWorkspaceRow({
 
             return (
               <div
-                className="flex items-center -space-x-2 group-hover:opacity-0"
+                className="flex items-center -space-x-1.5 group-hover:opacity-0"
                 aria-label="Recent viewers"
               >
                 {visibleViewers.map((viewer, i) => (
                   <div
                     key={viewer.id}
                     className="rounded-full ring-2 ring-white overflow-hidden"
-                    style={{ zIndex: maxVisible - i + 1, width: 28, height: 28 }}
+                    style={{
+                      zIndex: maxVisible - i + 1,
+                      width: 28,
+                      height: 28,
+                      backgroundColor: viewer.isAnonymous
+                        ? undefined
+                        : getAvatarColor(viewer.id),
+                    }}
                   >
                     <UserAvatar
                       avatarUrl={viewer.avatarUrl}
                       name={viewer.displayName}
                       size={28}
                       isAnonymous={viewer.isAnonymous}
-                      initialsClassName="bg-[var(--surface-hover)] text-[var(--text-secondary)] font-semibold"
+                      initialsClassName="bg-transparent text-white font-semibold"
                     />
                   </div>
                 ))}
@@ -386,6 +397,7 @@ export function SessionsWorkspace({
   onViewModeChange,
 }: SessionsWorkspaceProps) {
   const { authUid, isIdentityResolved } = useWorkspace();
+  const { setSearch } = useSessionsSearch();
   const [internalViewMode, setInternalViewMode] = useState<"list" | "grid">("list");
   const [shareSession, setShareSession] = useState<Session | null>(null);
   const share = useShareController(shareSession?.id ?? "", {
@@ -515,14 +527,21 @@ export function SessionsWorkspace({
       ) : null}
 
       {flatItemCount === 0 ? (
-        <section
-          className="w-full rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-subtle)]/60 px-6 py-14 text-center"
-          aria-live="polite"
-        >
-          <p className="text-sm font-medium text-[var(--text-heading)]">No sessions match the current filters</p>
-          <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            Try another time range or clear your search.
-          </p>
+        <section className="w-full pt-12 pb-10" aria-live="polite">
+          <CanvasEmptyState
+            illustration={<NoResultsIllu />}
+            title="No sessions match your filters"
+            description="Try adjusting your search or clearing filters."
+            cta={
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="inline-flex h-[34px] items-center gap-1.5 px-3.5 rounded-[8px] border border-[var(--border)] bg-white text-[var(--text-heading)] text-[13px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all cursor-pointer"
+              >
+                Clear filters
+              </button>
+            }
+          />
         </section>
       ) : (
         sectionsInput.map((section, sectionIndex) => {
@@ -742,7 +761,6 @@ export function SessionsWorkspace({
             void share.removeAccess(item).catch(() => {});
           }}
           accessRequests={share.accessRequests}
-          pendingRequestsCount={0}
           patchingAccessRequestId={share.patchingAccessRequestId}
           onApproveAccessRequest={(id, access) => {
             void share.patchAccessRequest(id, "approve", access).catch(() => {});
@@ -751,9 +769,6 @@ export function SessionsWorkspace({
             void share.patchAccessRequest(id, "reject").catch(() => {});
           }}
           canResolve
-          linkAccessLevel={share.linkAccessLevel}
-          setLinkAccessLevel={share.setLinkAccessLevel}
-          copyingLink={share.copyingLink}
           linkCopied={share.linkCopied}
           onCopyShareLink={() => void share.copyShareLink().catch(() => {})}
           refetchingAfterApproval={share.refetchingAfterApproval}

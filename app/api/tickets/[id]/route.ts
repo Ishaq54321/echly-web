@@ -22,6 +22,7 @@ import type { Session } from "@/lib/domain/session";
 import { getFeedbackByIdRepo } from "@/lib/repositories/feedbackRepository.server";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { adminDb } from "@/lib/server/firebaseAdmin";
+import { composeFullName } from "@/lib/utils/nameSplit";
 
 async function resolveTicketWorkspaceId(
   req: Request,
@@ -228,12 +229,15 @@ export const PATCH = withAuthorization(
             return apiError({ code: "NOT_FOUND", message: "Assignee not found", status: 404 });
           }
           const userData = (userSnap.data() ?? {}) as Record<string, unknown>;
-          resolvedName =
-            typeof userData.displayName === "string" && userData.displayName.trim()
-              ? userData.displayName.trim()
-              : typeof userData.name === "string" && userData.name.trim()
-                ? userData.name.trim()
-                : null;
+          const composed = composeFullName(
+            typeof userData.firstName === "string" ? userData.firstName : null,
+            typeof userData.lastName === "string" ? userData.lastName : null
+          );
+          const emailLocal =
+            typeof userData.email === "string"
+              ? userData.email.split("@")[0] ?? ""
+              : "";
+          resolvedName = composed || emailLocal || null;
           resolvedAvatar =
             typeof userData.avatarUrl === "string" ? userData.avatarUrl :
             typeof userData.photoURL === "string" ? userData.photoURL : null;

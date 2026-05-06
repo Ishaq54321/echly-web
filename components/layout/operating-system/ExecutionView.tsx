@@ -3,6 +3,8 @@
 import type { FeedbackItemShape } from "@/components/session/feedbackDetail/types";
 import { FeedbackContent } from "@/components/session/feedbackDetail/FeedbackContent";
 import { SessionFeedbackHeader } from "@/components/session/FeedbackHeader";
+import { CanvasEmptyState } from "@/components/empty/CanvasEmptyState";
+import { NoTicketSelectedIllu } from "@/components/empty/canvasIllustrations";
 import type { Comment } from "@/lib/domain/comment";
 import type { ShareSurfacePermissions } from "@/lib/access/resolveAccess";
 import type { Priority } from "@/lib/domain/feedback";
@@ -166,7 +168,15 @@ export function ExecutionView({
         }
       >
         <div className={isShareSurface ? "pt-0 pb-2" : "pt-0 pb-4"}>
-          {displayItem ? (
+          {!displayItem ? (
+            <div className="flex h-full min-h-[320px] items-center justify-center py-16">
+              <CanvasEmptyState
+                illustration={<NoTicketSelectedIllu />}
+                title="Select a ticket"
+                description="Choose a ticket from the list to view details and comments."
+              />
+            </div>
+          ) : (
             <FeedbackContent
               item={displayItem}
               screenshotUrl={screenshotUrl}
@@ -200,7 +210,7 @@ export function ExecutionView({
               updatePinPosition={updatePinPosition}
               participants={participants}
             />
-          ) : null}
+          )}
         </div>
       </div>
     </div>

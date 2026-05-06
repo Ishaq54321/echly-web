@@ -6,6 +6,7 @@ import {
   createWorkspaceRepo,
   getWorkspace,
 } from "@/lib/repositories/workspacesRepository.server";
+import { composeFullName, splitFullName } from "@/lib/utils/nameSplit";
 export {
   addWorkspaceMembershipRepo,
   removeWorkspaceMembershipRepo,
@@ -13,7 +14,10 @@ export {
 
 export type UserLike = {
   uid: string;
-  displayName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  /** Composed name from Firebase Auth — used to seed firstName/lastName when neither is provided. */
+  authDisplayName?: string | null;
   email?: string | null;
   photoURL?: string | null;
 };
@@ -77,11 +81,10 @@ async function resolveOrAssignWorkspaceIdRepo(
     return ownedSnap.docs[0].id;
   }
 
-  const displayName = user.displayName ?? null;
-  const name =
-    typeof displayName === "string" && displayName.trim()
-      ? displayName.trim()
-      : "My Workspace";
+  const composed =
+    composeFullName(user.firstName, user.lastName) ||
+    (user.authDisplayName?.trim() ?? "");
+  const name = composed || "My Workspace";
 
   await createWorkspaceRepo({
     userId: uid,
@@ -89,7 +92,7 @@ async function resolveOrAssignWorkspaceIdRepo(
     name,
     logoUrl: user.photoURL ?? null,
     ownerEmail: user.email ?? null,
-    ownerName: typeof user.displayName === "string" && user.displayName.trim() ? user.displayName.trim() : null,
+    ownerName: composed || null,
   });
   return uid;
 }
@@ -114,13 +117,17 @@ export async function setUserWorkspaceIdRepo(
     ...(extra?.companySize && { companySize: extra.companySize }),
   };
   if (!snap.exists) {
+    const split = splitFullName(user.authDisplayName);
+    const seedFirstName = (user.firstName?.trim() ?? "") || split.firstName;
+    const seedLastName = (user.lastName?.trim() ?? "") || split.lastName;
     await userRef.set({
       uid: user.uid,
-      name: user.displayName ?? null,
-      displayName: user.displayName ?? null,
+      firstName: seedFirstName,
+      lastName: seedLastName,
       email: user.email,
       photoURL: user.photoURL,
       workspaceId: resolvedWorkspaceId,
+      onboardingCompleted: false,
       ...(extra?.role && { role: extra.role }),
       ...(extra?.companySize && { companySize: extra.companySize }),
       createdAt: FieldValue.serverTimestamp(),
@@ -158,35 +165,34 @@ export async function updateUserFieldsRepo(
   const row = ((await userRef.get()).data() ?? {}) as Record<string, unknown>;
   const wid =
     typeof row.workspaceId === "string" ? row.workspaceId.trim() : "";
-  if (!wid) {
+  const onboardingCompleted = row.onboardingCompleted === true;
+  // Self-heal only for users who SHOULD have a workspace (completed onboarding)
+  // but somehow lost it. Mid-onboarding users have workspaceId: null by design.
+  if (!wid && onboardingCompleted) {
     await ensureUserRepo({
       uid,
       email: typeof row.email === "string" ? row.email : null,
-      displayName:
-        typeof row.displayName === "string"
-          ? row.displayName
-          : typeof row.name === "string"
-            ? row.name
-            : null,
+      firstName: typeof row.firstName === "string" ? row.firstName : null,
+      lastName: typeof row.lastName === "string" ? row.lastName : null,
       photoURL: typeof row.photoURL === "string" ? row.photoURL : null,
     });
   }
 }
 
 /**
- * Ensure users/{uid} exists and always has a valid workspaceId (create or link workspace as needed).
+ * Ensure users/{uid} exists. Workspace creation is deferred to onboarding completion
+ * (POST /api/onboarding) — fresh signups receive workspaceId: null and complete the
+ * onboarding flow before a workspace doc is created.
+ *
  * Used by POST /api/users before claims sync.
  */
-export async function ensureUserRepo(user: UserLike): Promise<{ workspaceId: string; avatarUrl: string | null }> {
+export async function ensureUserRepo(user: UserLike): Promise<{ workspaceId: string | null; avatarUrl: string | null }> {
   const userRef = adminDb.doc(`users/${user.uid}`);
   const snap = await userRef.get();
   const email = user.email ?? null;
-  const displayName = user.displayName ?? null;
   const priorData = snap.exists
     ? ((snap.data() ?? {}) as Record<string, unknown>)
     : null;
-
-  const workspaceId = await resolveOrAssignWorkspaceIdRepo(user, priorData);
 
   const existingPhotoURL =
     priorData != null && typeof priorData.photoURL === "string"
@@ -210,32 +216,61 @@ export async function ensureUserRepo(user: UserLike): Promise<{ workspaceId: str
       ? user.photoURL
       : (existingAvatarUrl ?? null);
 
-  const profile = {
+  if (!snap.exists) {
+    // Fresh signup: create the user doc with workspaceId: null. Workspace will
+    // be created when the user completes onboarding (POST /api/onboarding).
+    const split = splitFullName(user.authDisplayName);
+    const seedFirstName = (user.firstName?.trim() ?? "") || split.firstName;
+    const seedLastName = (user.lastName?.trim() ?? "") || split.lastName;
+    const newUserDoc: Record<string, unknown> = {
+      uid: user.uid,
+      email,
+      firstName: seedFirstName,
+      lastName: seedLastName,
+      workspaceId: null,
+      onboardingCompleted: false,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    if (user.photoURL != null) {
+      newUserDoc.photoURL = user.photoURL;
+      newUserDoc.avatarUrl = user.photoURL;
+    }
+    await userRef.set(newUserDoc, { merge: true });
+    return { workspaceId: null, avatarUrl: resolvedAvatarUrl };
+  }
+
+  // Existing user.
+  const priorWid =
+    priorData != null && typeof priorData.workspaceId === "string"
+      ? priorData.workspaceId.trim()
+      : "";
+  const onboardingCompleted = priorData?.onboardingCompleted === true;
+
+  let resolvedWorkspaceId: string | null = priorWid || null;
+
+  // Edge-case recovery: a user who completed onboarding somehow lost their
+  // workspaceId. Re-resolve via the legacy path. We do NOT run this for
+  // unboarded users — they are mid-flow and will create their workspace at
+  // step 5 of onboarding.
+  if (!priorWid && onboardingCompleted) {
+    resolvedWorkspaceId = await resolveOrAssignWorkspaceIdRepo(user, priorData);
+  }
+
+  const profile: Record<string, unknown> = {
     uid: user.uid,
     email,
-    ...(displayName != null && displayName !== ""
-      ? { displayName, name: displayName }
+    ...(shouldRefreshGooglePhoto && user.photoURL != null
+      ? { photoURL: user.photoURL, avatarUrl: user.photoURL }
       : {}),
-    ...(!snap.exists || shouldRefreshGooglePhoto
-      ? user.photoURL != null
-        ? { photoURL: user.photoURL, avatarUrl: user.photoURL }
-        : {}
-      : {}),
-    workspaceId,
     updatedAt: FieldValue.serverTimestamp(),
   };
-
-  if (!snap.exists) {
-    await userRef.set({
-      ...profile,
-      workspaceMemberships: [],
-      createdAt: FieldValue.serverTimestamp(),
-    });
-    return { workspaceId, avatarUrl: resolvedAvatarUrl };
+  if (resolvedWorkspaceId) {
+    profile.workspaceId = resolvedWorkspaceId;
   }
 
   await userRef.set(profile, { merge: true });
-  return { workspaceId, avatarUrl: resolvedAvatarUrl };
+  return { workspaceId: resolvedWorkspaceId, avatarUrl: resolvedAvatarUrl };
 }
 
 /** Returns the user's workspace id or throws — never a null/empty success path. */
@@ -301,7 +336,8 @@ export async function ensureUserWorkspaceLinkRepo(
 
 export interface UserDoc {
   uid: string;
-  name?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
   email?: string | null;
   photoURL?: string | null;
   workspaceId?: string | null;

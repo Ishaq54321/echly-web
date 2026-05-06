@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { formatActionStep } from "@/lib/formatters/formatActionStep";
 import { Plus, Trash2 } from "lucide-react";
+import { CanvasEmptyState } from "@/components/empty/CanvasEmptyState";
+import { NoActionStepsIllu } from "@/components/empty/canvasIllustrations";
 
 interface ActionStepsSectionProps {
   actionSteps: string[];
@@ -84,7 +86,21 @@ export function ActionItemsSection({
   };
 
   if (items.length === 0) {
-    if (isReadOnly) return null;
+    if (isReadOnly) {
+      return (
+        <div className={cardClass}>
+          <h2 className={titleClass}>Action steps</h2>
+          <div className="py-6">
+            <CanvasEmptyState
+              density="compact"
+              illustration={<NoActionStepsIllu />}
+              title="No action steps"
+              description="Action steps will appear here when added."
+            />
+          </div>
+        </div>
+      );
+    }
     return (
       <div className={cardClass}>
         <h2 className={titleClass}>Action steps</h2>

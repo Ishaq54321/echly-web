@@ -99,7 +99,10 @@ export default function CaptureWidget({
   const [showCommandScreen, setShowCommandScreen] = useState(true);
   const [sessionTitle, setSessionTitle] = useState("Untitled Session");
   const [microphones, setMicrophones] = useState<Array<{ deviceId: string; label: string }>>([]);
-  const [selectedMicrophone, setSelectedMicrophone] = useState<string>("");
+  const [selectedMicrophone, setSelectedMicrophone] = useState<string>(() => {
+    if (typeof localStorage === "undefined") return "";
+    try { return localStorage.getItem("echly:selectedMic") ?? ""; } catch { return ""; }
+  });
   const [micDropdownOpen, setMicDropdownOpen] = useState(false);
   /** V2: when true, show mode selection screen instead of home screen. */
   const [showModeSelection, setShowModeSelection] = useState(false);
@@ -116,6 +119,7 @@ export default function CaptureWidget({
   const [copyState, setCopyState] = useState<"idle" | "copying" | "copied">("idle");
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isPrevFeedbackLoading, setIsPrevFeedbackLoading] = useState(false);
+  const [editPauseTooltipVisible, setEditPauseTooltipVisible] = useState(false);
 
   const triggerUpgradeShake = useCallback(() => {
     const el = upgradeInlineRef.current;
@@ -164,11 +168,22 @@ export default function CaptureWidget({
     onDevicesEnumerated: extensionMode
       ? (devices) => {
           setMicrophones(devices);
-          if (devices.length && !selectedMicrophone) setSelectedMicrophone(devices[0].deviceId || "");
+          const stillValid = selectedMicrophone && devices.some((d) => d.deviceId === selectedMicrophone);
+          if (devices.length && !stillValid) {
+            const preferred =
+              devices.find((d) => d.deviceId === "default")?.deviceId ??
+              devices[0].deviceId ??
+              "";
+            if (preferred) {
+              setSelectedMicrophone(preferred);
+              try { localStorage.setItem("echly:selectedMic", preferred); } catch {}
+            }
+          }
         }
       : undefined,
     onVoiceMicrophoneSelect: (deviceId) => {
       setSelectedMicrophone(deviceId);
+      try { localStorage.setItem("echly:selectedMic", deviceId); } catch {}
     },
     captureRootParent,
     environment,
@@ -431,41 +446,12 @@ export default function CaptureWidget({
     };
 
     try {
-      let url: string | null = null;
-
-      if (environment?.authenticatedFetch) {
-        const res = await environment.authenticatedFetch(
-          `/api/sessions/${encodeURIComponent(sessionId)}/share-link`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ access: "view" }),
-          }
-        );
-        const data = res?.ok ? await res.json().catch(() => null) : null;
-        url =
-          (data?.data as { url?: string } | undefined)?.url ??
-          (data as { url?: string } | null)?.url ??
-          null;
-        const token = (data?.data as { token?: string } | undefined)?.token;
-        if (!url && token) {
-          url = `${appOrigin}/session/${encodeURIComponent(sessionId)}?token=${encodeURIComponent(token)}`;
-        }
-      }
-
-      if (!url) {
-        url = `${appOrigin}/session/${sessionId}`;
-      }
-
+      const url = `${appOrigin}/session/${encodeURIComponent(sessionId)}`;
       await finalize(url);
     } catch {
-      try {
-        await finalize(`${appOrigin}/session/${sessionId}`);
-      } catch {
-        setCopyState("idle");
-      }
+      setCopyState("idle");
     }
-  }, [copyState, sessionId, environment, extensionMode]);
+  }, [copyState, sessionId, extensionMode]);
 
   useEffect(() => {
     return () => {
@@ -474,9 +460,17 @@ export default function CaptureWidget({
   }, []);
 
   const handleEditTicket = useCallback((id: string) => {
+    if (globalSessionModeActive && !globalSessionPaused) {
+      handlers.pauseSession();
+      setEditPauseTooltipVisible(true);
+    }
     setEditingTicketId(id);
     handlers.setExpandedId(id);
-  }, [handlers]);
+  }, [handlers, globalSessionModeActive, globalSessionPaused]);
+
+  useEffect(() => {
+    if (!globalSessionPaused) setEditPauseTooltipVisible(false);
+  }, [globalSessionPaused]);
 
   const handleCloseEditor = useCallback(() => {
     setEditingTicketId(null);
@@ -641,7 +635,10 @@ export default function CaptureWidget({
               <MicrophonePanel
                 devices={microphones}
                 selectedDeviceId={selectedMicrophone}
-                onSelect={setSelectedMicrophone}
+                onSelect={(id) => {
+                  setSelectedMicrophone(id);
+                  try { localStorage.setItem("echly:selectedMic", id); } catch {}
+                }}
                 onClose={() => setMicDropdownOpen(false)}
               />
             )}
@@ -1056,6 +1053,22 @@ export default function CaptureWidget({
                     </div>
 
                     <div className="pill-rule" />
+
+                    {editPauseTooltipVisible && (
+                      <div className="tl-edit-pause-tooltip" role="status">
+                        <span className="tl-edit-pause-text">
+                          Session paused. Resume from the controls below when you&apos;re ready.
+                        </span>
+                        <button
+                          type="button"
+                          className="tl-edit-pause-dismiss"
+                          onClick={() => setEditPauseTooltipVisible(false)}
+                          aria-label="Dismiss"
+                        >
+                          <X size={11} strokeWidth={2.5} />
+                        </button>
+                      </div>
+                    )}
 
                     {/* ── Recovery / failed banners ── */}
                     {sessionModeActive && !sessionLoading && feedbackRecovering && (

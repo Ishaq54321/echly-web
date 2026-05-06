@@ -16,6 +16,7 @@ import { sendAccessRequestResultEmail } from "@/lib/email/workspaceEmails";
 import { getUserByIdRepo } from "@/lib/repositories/usersRepository.server";
 import { fireAndForget } from "@/lib/server/fireAndForget";
 import { dispatchNotifications } from "@/lib/server/notificationFanOut.server";
+import { composeFullName } from "@/lib/utils/nameSplit";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
 
@@ -170,7 +171,10 @@ export async function PATCH(
         try {
           const requesterUser = await getUserByIdRepo(accessRequest.requesterUserId);
           rejectedRequesterName =
-            requesterUser?.name?.trim() ||
+            composeFullName(
+              typeof requesterUser?.firstName === "string" ? requesterUser.firstName : null,
+              typeof requesterUser?.lastName === "string" ? requesterUser.lastName : null
+            ) ||
             accessRequest.requesterEmail?.split("@")[0]?.trim() ||
             null;
         } catch {
@@ -262,7 +266,10 @@ export async function PATCH(
       try {
         const requesterUser = await getUserByIdRepo(accessRequest.requesterUserId);
         approvedRequesterName =
-          requesterUser?.name?.trim() ||
+          composeFullName(
+            typeof requesterUser?.firstName === "string" ? requesterUser.firstName : null,
+            typeof requesterUser?.lastName === "string" ? requesterUser.lastName : null
+          ) ||
           accessRequest.requesterEmail?.split("@")[0]?.trim() ||
           null;
       } catch {

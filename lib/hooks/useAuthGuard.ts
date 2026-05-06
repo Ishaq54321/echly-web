@@ -24,7 +24,7 @@ function compatUser(ws: WorkspaceContextValue): User | null {
   return {
     uid: ws.authUid,
     email: ws.authEmail,
-    displayName: ws.authDisplayName,
+    displayName: ws.displayName || null,
     photoURL: ws.authPhotoUrl,
   } as User;
 }

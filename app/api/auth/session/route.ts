@@ -4,6 +4,10 @@ import {
   SESSION_COOKIE_NAME,
   SESSION_MAX_AGE_SECONDS,
 } from "@/lib/server/session";
+import {
+  signEmailVerifiedToken,
+  buildEmailVerifiedCookieString,
+} from "@/lib/server/emailVerifiedCookie";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +35,7 @@ export async function POST(req: Request) {
     const uid = decoded.uid;
     const email = (decoded.email as string) ?? null;
     const name = (decoded.name as string) ?? null;
+    const emailVerified = decoded.email_verified === true;
 
     const sessionPayload = { uid, email, name };
     const token = await signSessionPayload(sessionPayload);
@@ -45,6 +50,14 @@ export async function POST(req: Request) {
       path: "/",
       maxAge: SESSION_MAX_AGE_SECONDS,
     });
+
+    if (emailVerified) {
+      const verifiedToken = await signEmailVerifiedToken(uid);
+      response.headers.append(
+        "Set-Cookie",
+        buildEmailVerifiedCookieString(verifiedToken)
+      );
+    }
 
     console.log("Session cookie created for user:", uid);
     return response;

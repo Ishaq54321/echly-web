@@ -16,6 +16,7 @@ import {
   resolveSessionRecipients,
 } from "@/lib/server/notificationFanOut.server";
 import type { AccessRequest } from "@/lib/domain/accessRequest";
+import { composeFullName } from "@/lib/utils/nameSplit";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
 
@@ -159,7 +160,11 @@ export async function POST(
     let requesterPhoto: string | null = null;
     try {
       const requesterUser = await getUserByIdRepo(userId);
-      requesterName = requesterUser?.name?.trim() || null;
+      requesterName =
+        composeFullName(
+          typeof requesterUser?.firstName === "string" ? requesterUser.firstName : null,
+          typeof requesterUser?.lastName === "string" ? requesterUser.lastName : null
+        ) || null;
       requesterPhoto = requesterUser?.photoURL ?? null;
     } catch {
       // fall back to email-derived name

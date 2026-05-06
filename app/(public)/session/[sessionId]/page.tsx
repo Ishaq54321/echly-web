@@ -1,20 +1,15 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import PublicSessionNav, { PUBLIC_NAV_HEIGHT } from "@/components/layout/PublicSessionNav";
 import SessionPageClient from "@/app/(app)/dashboard/[sessionId]/SessionPageClient";
 import PublicViewerBanner from "@/components/session/PublicViewerBanner";
 import BrandLoader from "@/components/ui/BrandLoader";
 import { useWorkspace } from "@/lib/client/workspaceContext";
-import { setShareToken } from "@/lib/client/shareToken";
 import { getUidHint } from "@/lib/client/workspaceBootstrap";
 
 function PublicSessionView({ sessionId }: { sessionId: string }) {
-  const searchParams = useSearchParams();
-  const token = searchParams.get("token") ?? "";
-
   const { authReady, authUid } = useWorkspace();
 
   const [uidHint, setUidHint] = useState<string | null>(null);
@@ -22,12 +17,6 @@ function PublicSessionView({ sessionId }: { sessionId: string }) {
   useEffect(() => {
     setUidHint(getUidHint());
   }, []);
-
-  useEffect(() => {
-    if (authReady && authUid && token) {
-      setShareToken(token);
-    }
-  }, [authReady, authUid, token]);
 
   const showAuthShell = !!authUid || !!uidHint;
 
@@ -78,7 +67,6 @@ function PublicSessionView({ sessionId }: { sessionId: string }) {
       </div>
       <PublicViewerBanner
         sessionId={sessionId}
-        shareToken={token}
         canRequestAccess={false}
       />
     </div>

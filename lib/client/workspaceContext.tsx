@@ -13,7 +13,6 @@ import {
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { authFetch, clearAuthTokenCache } from "@/lib/authFetch";
-import { MISSING_USER_WORKSPACE_ERROR } from "@/lib/constants/userWorkspace";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository";
 import { clearWorkspaceSubscription } from "@/lib/realtime/workspaceStore";
 import { listenToWorkspace } from "@/lib/repositories/workspacesRepository";
@@ -21,11 +20,11 @@ import {
   clearWorkspaceHint,
   getWorkspaceHint,
   setWorkspaceHint,
-  getUidHint,
   setUidHint,
   clearUidHint,
 } from "@/lib/client/workspaceBootstrap";
 import type { Workspace } from "@/lib/domain/workspace";
+import { composeFullName } from "@/lib/utils/nameSplit";
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([
@@ -50,6 +49,8 @@ export type WorkspaceContextValue = {
   workspaceError: string | null;
   /** True while a signed-in user is being resolved and workspaceId is not yet known. */
   workspaceLoading: boolean;
+  /** True when POST /api/users succeeded but the user has no workspace yet — they need to complete onboarding. */
+  needsOnboarding: boolean;
   /**
    * True only after POST /api/users succeeds and `getIdToken(true)` has run — custom claims are usable for Firestore rules.
    */
@@ -66,7 +67,12 @@ export type WorkspaceContextValue = {
   /** Firebase Auth uid when signed in; null when signed out. */
   authUid: string | null;
   authEmail: string | null;
-  authDisplayName: string | null;
+  /** First name from users/{uid}.firstName; "" when unknown. */
+  firstName: string;
+  /** Last name from users/{uid}.lastName; "" when unknown or mononymic. */
+  lastName: string;
+  /** Composed `${firstName} ${lastName}`; "" when both unset. */
+  displayName: string;
   authPhotoUrl: string | null;
   /** Workspace display name from the workspace document. */
   workspaceName: string | null;
@@ -86,6 +92,8 @@ export type WorkspaceContextValue = {
   switchWorkspace: (workspaceId: string) => Promise<void>;
   /** True while allWorkspaces is loading. */
   isLoadingWorkspaces: boolean;
+  /** Force refetch of allWorkspaces (call after creating/joining a workspace). */
+  refreshMemberships: () => void;
   /** User's uploaded avatar URL (updated immediately after upload without page reload). */
   avatarUrl: string | null;
   /** Update the local avatar URL in context (call after upload/remove in Settings). */
@@ -123,7 +131,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const authSyncGenerationRef = useRef(0);
   const syncLockUidRef = useRef<string | null>(null);
   const workspaceIdRef = useRef<string | null>(null);
-  const membershipsLastFetchedRef = useRef<number | null>(null);
   const retryCountRef = useRef(0);
   const authUidRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
@@ -135,7 +142,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [authReady, setAuthReady] = useState(false);
   const [authUid, setAuthUid] = useState<string | null>(null);
   const [authEmail, setAuthEmail] = useState<string | null>(null);
-  const [authDisplayName, setAuthDisplayName] = useState<string | null>(null);
+  const [firstName, setFirstName] = useState<string>("");
+  const [lastName, setLastName] = useState<string>("");
   const [authPhotoUrl, setAuthPhotoUrl] = useState<string | null>(null);
   const [workspaceDoc, setWorkspaceDoc] = useState<Workspace | null>(null);
   const [allWorkspaces, setAllWorkspaces] = useState<WorkspaceMembership[]>([]);
@@ -146,13 +154,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [hintWorkspaceName, setHintWorkspaceName] = useState<string | null>(null);
   const [hintWorkspaceLogoUrl, setHintWorkspaceLogoUrl] = useState<string | null>(null);
   const [memberCount, setMemberCount] = useState<number>(0);
+  const [membershipsRefreshTick, setMembershipsRefreshTick] = useState(0);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
-  useEffect(() => {
-    const hint = getUidHint();
-    if (hint) {
-      setAuthUid(hint);
-    }
+  const refreshMemberships = useCallback(() => {
+    setMembershipsRefreshTick((n) => n + 1);
   }, []);
+
+  // authUid is set ONLY by onAuthStateChanged after Firebase confirms the user.
+  // Stale localStorage uidHint must NOT seed authUid — anon viewers with a stale
+  // hint would otherwise pass isIdentityReady gates and attach Firestore listeners
+  // that fail with permission-denied. The uidHint remains usable for layout-only
+  // decisions (e.g., showAuthShell) by reading getUidHint() directly at the call site.
 
   useEffect(() => {
     authUidRef.current = authUid;
@@ -177,6 +190,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
     if (!mountedRef.current) return;
     setWorkspaceError(null);
+    setNeedsOnboarding(false);
     setWorkspaceLoading(true);
     setClaimsReady(false);
 
@@ -205,13 +219,36 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       if (!mountedRef.current) return;
       if (currentGen !== authSyncGenerationRef.current) return;
 
+      let workspaceIdFromResponse: string | null = null;
       if (res != null && res.ok) {
         try {
-          const body = await res.json() as { success?: boolean; data?: { avatarUrl?: string | null } };
+          const body = await res.json() as {
+            success?: boolean;
+            data?: {
+              workspaceId?: string;
+              avatarUrl?: string | null;
+              firstName?: string;
+              lastName?: string;
+            };
+          };
           if (body?.data?.avatarUrl) {
             setAvatarUrl(body.data.avatarUrl);
           }
-        } catch { /* non-fatal */ }
+          if (typeof body?.data?.firstName === "string") {
+            setFirstName(body.data.firstName);
+          }
+          if (typeof body?.data?.lastName === "string") {
+            setLastName(body.data.lastName);
+          }
+          if (typeof body?.data?.workspaceId === "string" && body.data.workspaceId.trim()) {
+            workspaceIdFromResponse = body.data.workspaceId.trim();
+          }
+        } catch (e) {
+          if (process.env.NODE_ENV === "development") {
+            console.warn("[WorkspaceContext] response body parse failed", e);
+          }
+          /* non-fatal — fallback to client-SDK read */
+        }
       }
 
       if (!mountedRef.current) return;
@@ -220,7 +257,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const currentUser = auth.currentUser;
       if (currentUser) {
         try {
-          await withTimeout(currentUser.getIdToken(false), 5000, "getIdToken");
+          await withTimeout(currentUser.getIdToken(true), 5000, "getIdToken");
         } catch (err) {
           console.warn("[WorkspaceContext] Token refresh failed/timed out:", err);
         }
@@ -229,19 +266,35 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       if (!mountedRef.current) return;
       if (currentGen !== authSyncGenerationRef.current) return;
 
-      const resolved = await withTimeout(
-        getUserWorkspaceIdRepo(uid),
-        5000,
-        "getUserWorkspaceIdRepo"
-      );
+      // If POST /api/users returned OK, trust the response as source of truth.
+      // A null workspaceIdFromResponse with a successful POST means the user
+      // just signed up and needs onboarding — NOT an error. Only fall back to
+      // the client-SDK read when the POST itself failed or timed out.
+      let resolved: string | null = null;
+      if (workspaceIdFromResponse) {
+        resolved = workspaceIdFromResponse;
+      } else if (res != null && res.ok) {
+        resolved = null;
+      } else {
+        // POST /api/users failed or timed out. Don't call the client-SDK fallback
+        // (getUserWorkspaceIdRepo) — it races the doc write and throws
+        // MISSING_USER_WORKSPACE on fresh signups. Set resolved to null and let
+        // the !normalized block handle it: sets needsOnboarding for fresh signups,
+        // retries for returning users via the retry logic below.
+        resolved = null;
+      }
       const normalized = normalizeWorkspaceId(resolved);
 
       if (!mountedRef.current) return;
       if (currentGen !== authSyncGenerationRef.current) return;
 
       if (!normalized) {
+        // User has no workspaceId — either needs onboarding (fresh signup)
+        // or genuinely missing (edge case). Set needsOnboarding state and
+        // let middleware/gate handle the redirect. Do NOT throw.
         commitWorkspaceId(null);
-        setWorkspaceError(MISSING_USER_WORKSPACE_ERROR);
+        setNeedsOnboarding(true);
+        setWorkspaceError(null);
         setClaimsReady(false);
         setWorkspaceLoading(false);
         if (syncLockUidRef.current === uid) {
@@ -251,6 +304,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       }
 
       commitWorkspaceId(normalized);
+      setNeedsOnboarding(false);
       setWorkspaceError(null);
       setClaimsReady(true);
       retryCountRef.current = 0;
@@ -275,15 +329,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const isTimeout = err instanceof Error && err.message.includes("timed out");
       const isMissing = message.includes("MISSING_USER_WORKSPACE");
 
-      if (isMissing) {
-        commitWorkspaceId(null);
-        setClaimsReady(false);
-        setWorkspaceLoading(false);
-      } else if (isTimeout && retryCountRef.current < 2) {
+      if ((isMissing || isTimeout) && retryCountRef.current < 2) {
         retryCountRef.current += 1;
         const genAtSchedule = authSyncGenerationRef.current;
         console.warn(
-          `[WorkspaceContext] Auto-retrying identity sync (attempt ${retryCountRef.current})`
+          `[WorkspaceContext] Auto-retrying identity sync (attempt ${retryCountRef.current})`,
+          { reason: isMissing ? "missing" : "timeout" }
         );
         setTimeout(() => {
           if (!mountedRef.current) return;
@@ -294,6 +345,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         }, 1500);
         // Stay in loading state — don't flip claimsReady here.
       } else {
+        // Retries exhausted. If the cause is MISSING_USER_WORKSPACE (user doc
+        // doesn't exist yet or has no workspaceId), treat as "needs onboarding"
+        // rather than surfacing an error overlay.
+        if (isMissing) {
+          setNeedsOnboarding(true);
+          setWorkspaceError(null);
+        }
         commitWorkspaceId(null);
         setClaimsReady(false);
         setWorkspaceLoading(false);
@@ -327,10 +385,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           workspaceIdRef.current = null;
           setAuthUid(null);
           setAuthEmail(null);
-          setAuthDisplayName(null);
+          setFirstName("");
+          setLastName("");
           setAuthPhotoUrl(null);
           setWorkspaceId(null);
           setWorkspaceError(null);
+          setNeedsOnboarding(false);
           setWorkspaceLoading(false);
           setClaimsReady(false);
           setAllWorkspaces([]);
@@ -344,7 +404,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setAuthUid(uid);
       setUidHint(uid);
       setAuthEmail(user.email ?? null);
-      setAuthDisplayName(user.displayName ?? null);
       setAuthPhotoUrl(user.photoURL ?? null);
 
       void runIdentitySync(uid);
@@ -366,19 +425,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setActiveWorkspaceId(workspaceId);
   }, [authUid, workspaceId]);
 
-  // Fetch all workspace memberships when identity is ready
+  // Fetch all workspace memberships when identity is ready, or when an external
+  // event (workspace created/joined) bumps membershipsRefreshTick.
   useEffect(() => {
     if (!claimsReady || !authUid) {
       setAllWorkspaces([]);
       return;
     }
-    const MEMBERSHIPS_TTL_MS = 5 * 60 * 1000;
-    const lastFetched = membershipsLastFetchedRef.current;
-    if (lastFetched && Date.now() - lastFetched < MEMBERSHIPS_TTL_MS) {
-      return;
-    }
-    membershipsLastFetchedRef.current = Date.now();
     let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
     setIsLoadingWorkspaces(true);
     authFetch("/api/workspace/memberships")
       .then((res) => {
@@ -388,15 +443,32 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       .then((body) => {
         if (cancelled) return;
         if (body?.success && body.data?.memberships) {
-          setAllWorkspaces(body.data.memberships);
+          const list = body.data.memberships;
+          setAllWorkspaces(list);
+          // If the active workspaceId isn't represented in the response, the
+          // server-side self-heal write may still be propagating. Retry once.
+          const currentWid = workspaceIdRef.current;
+          if (
+            currentWid &&
+            list.length > 0 &&
+            !list.some((w) => w.workspaceId === currentWid)
+          ) {
+            retryTimer = setTimeout(() => {
+              if (cancelled) return;
+              setMembershipsRefreshTick((n) => n + 1);
+            }, 1500);
+          }
         }
       })
       .catch(() => {/* non-fatal */})
       .finally(() => {
         if (!cancelled) setIsLoadingWorkspaces(false);
       });
-    return () => { cancelled = true; };
-  }, [claimsReady, authUid]);
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [claimsReady, authUid, membershipsRefreshTick]);
 
   // Fetch member count once when active workspace changes
   useEffect(() => {
@@ -461,9 +533,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       // 2. Update localStorage preference
       localStorage.setItem(`echly_active_workspace_${authUid}`, wid);
 
-      // 3. Clear memberships TTL so new workspace appears immediately after switch
-      membershipsLastFetchedRef.current = null;
-
       // Clear workspace-unaware session cache entries for this user
       const keysToRemove: string[] = [];
       for (let i = 0; i < sessionStorage.length; i++) {
@@ -508,9 +577,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [authReady, claimsReady, workspaceId]
   );
 
+  // claimsReady gates Firestore listeners; needsOnboarding lets the onboarding
+  // page render for fresh signups whose workspace hasn't been created yet.
   const isIdentityReady = useMemo(
-    () => Boolean(authUid) && claimsReady,
-    [authUid, claimsReady]
+    () => Boolean(authUid) && (claimsReady || needsOnboarding),
+    [authUid, claimsReady, needsOnboarding]
   );
 
   useEffect(() => {
@@ -521,18 +592,26 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   // PERF R-004: memoize context value so the ~20+ consumers only re-render when
   // a field they actually use changes, not on every WorkspaceProvider render.
+  const displayName = useMemo(
+    () => composeFullName(firstName, lastName),
+    [firstName, lastName]
+  );
+
   const contextValue = useMemo(
     () => ({
       workspaceId,
       workspaceError,
       workspaceLoading,
+      needsOnboarding,
       claimsReady,
       isIdentityReady,
       authReady,
       isIdentityResolved,
       authUid,
       authEmail,
-      authDisplayName,
+      firstName,
+      lastName,
+      displayName,
       authPhotoUrl,
       // Derived from workspace document — zero additional Firestore reads
       workspaceName: workspaceDoc?.name ?? null,
@@ -544,6 +623,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       activeWorkspaceId,
       switchWorkspace,
       isLoadingWorkspaces,
+      refreshMemberships,
       avatarUrl: avatarUrl ?? authPhotoUrl,
       updateAvatarUrl,
       workspaceDocLoading,
@@ -556,19 +636,23 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       workspaceId,
       workspaceError,
       workspaceLoading,
+      needsOnboarding,
       claimsReady,
       isIdentityReady,
       authReady,
       isIdentityResolved,
       authUid,
       authEmail,
-      authDisplayName,
+      firstName,
+      lastName,
+      displayName,
       authPhotoUrl,
       workspaceDoc,
       allWorkspaces,
       activeWorkspaceId,
       switchWorkspace,
       isLoadingWorkspaces,
+      refreshMemberships,
       avatarUrl,
       updateAvatarUrl,
       workspaceDocLoading,

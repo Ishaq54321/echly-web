@@ -200,22 +200,21 @@ export function subscribeWorkspace(workspaceId: string): void {
         });
         return;
       }
+      const raw = snap.data();
+      const workspace = mapWorkspaceDoc(snap.id, raw);
+      let data: WorkspaceUsageRealtimeData | null = null;
+      let usageError: Error | null = null;
       try {
-        const raw = snap.data();
-        setSnapshot({
-          workspace: mapWorkspaceDoc(snap.id, raw),
-          data: mapWorkspaceUsage(raw),
-          loading: false,
-          error: null,
-        });
+        data = mapWorkspaceUsage(raw);
       } catch (e) {
-        setSnapshot({
-          workspace: null,
-          data: null,
-          loading: false,
-          error: e instanceof Error ? e : new Error(String(e)),
-        });
+        usageError = e instanceof Error ? e : new Error(String(e));
       }
+      setSnapshot({
+        workspace,
+        data,
+        loading: false,
+        error: usageError,
+      });
     },
     (err) => {
       if (currentWorkspaceId !== normalizedWorkspaceId) return;

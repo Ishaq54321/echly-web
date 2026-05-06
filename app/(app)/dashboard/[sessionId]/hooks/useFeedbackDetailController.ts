@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import {
   addComment,
   updatePinPosition,
@@ -19,7 +18,6 @@ import { useToast } from "@/components/dashboard/context/ToastContext";
 import {
   useWorkspace,
 } from "@/lib/client/workspaceContext";
-import { getShareToken } from "@/lib/client/shareToken";
 import { useCommentsRepoSubscription } from "@/lib/hooks/useCommentsRepoSubscription";
 import { handlePermissionError } from "@/lib/client/permissionError";
 import { safeResolveAction } from "@/lib/client/safeResolveAction";
@@ -85,27 +83,27 @@ export function useFeedbackDetailController(args: {
   feedbackId: string | null | undefined;
   /** From {@link AccessCapabilities.canResolve}; required for resolve-thread mutations. */
   canResolve: boolean;
+  /**
+   * Gates the comments Firestore listener. False for anon viewers and authed-but-unauthorized
+   * viewers; they fall through to REST mode. Mirrors the SessionPageClient retain-effect gate.
+   */
+  canSubscribeToFirestore: boolean;
   onRequestResolveAccess: () => void;
 }) {
-  const { sessionId, feedbackId, canResolve, onRequestResolveAccess } = args;
+  const { sessionId, feedbackId, canResolve, canSubscribeToFirestore, onRequestResolveAccess } = args;
   const { showToast } = useToast();
   const {
     authUid,
-    authDisplayName,
+    displayName,
     authPhotoUrl,
     isIdentityResolved,
     authReady,
   } = useWorkspace();
 
-  const searchParams = useSearchParams();
-  const tokenFromUrl =
-    searchParams.get("token")?.trim() || searchParams.get("shareToken")?.trim() || "";
-  const shareTokenPresent =
-    tokenFromUrl !== "" || (getShareToken()?.trim() ?? "") !== "";
   const commentsPollEnabled =
     authReady &&
     Boolean(sessionId?.trim()) &&
-    (Boolean(authUid?.trim()) || shareTokenPresent);
+    Boolean(authUid?.trim());
 
   const [comments, setComments] = useState<LocalComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
@@ -144,14 +142,14 @@ export function useFeedbackDetailController(args: {
   }, [sessionId, feedbackId]);
 
   useEffect(() => {
-    if (authReady && !authUid?.trim() && !shareTokenPresent) {
+    if (authReady && !authUid?.trim()) {
       pendingDeletedCommentIdsRef.current.clear();
       pendingCommentPatchesRef.current.clear();
       deleteRevertSnapshotRef.current = null;
       setComments([]);
       setLoadingComments(false);
     }
-  }, [authReady, authUid, shareTokenPresent]);
+  }, [authReady, authUid]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -163,6 +161,7 @@ export function useFeedbackDetailController(args: {
     sessionId,
     feedbackId: undefined,
     enabled: commentsPollEnabled,
+    canSubscribeToFirestore,
     onComments: (incomingComments) => {
       setLocalCountsOverride(null);
       const incomingIds = new Set(incomingComments.map((c) => c.id));
@@ -196,7 +195,7 @@ export function useFeedbackDetailController(args: {
     if (!trimmed && !attachment && (!attachments || attachments.length === 0)) return "";
     const payload: AddCommentOptions = {
       userId: authUid,
-      userName: authDisplayName || "User",
+      userName: displayName || "User",
       userAvatar: authPhotoUrl || "",
       message: trimmed,
       ...(attachments && attachments.length > 0 ? { attachments } : {}),
@@ -236,7 +235,7 @@ export function useFeedbackDetailController(args: {
     if (!trimmed && !attachment && (!attachments || attachments.length === 0)) return;
     const payload: AddCommentOptions = {
       userId: authUid,
-      userName: authDisplayName || "User",
+      userName: displayName || "User",
       userAvatar: authPhotoUrl || "",
       message: trimmed,
       threadId,
@@ -273,7 +272,7 @@ export function useFeedbackDetailController(args: {
     if (!trimmed) return null;
     const payload: AddCommentOptions = {
       userId: authUid,
-      userName: authDisplayName || "User",
+      userName: displayName || "User",
       userAvatar: authPhotoUrl || "",
       message: trimmed,
       type: "pin",
@@ -321,7 +320,7 @@ export function useFeedbackDetailController(args: {
     if (!trimmed) return null;
     const payload: AddCommentOptions = {
       userId: authUid,
-      userName: authDisplayName || "User",
+      userName: displayName || "User",
       userAvatar: authPhotoUrl || "",
       message: trimmed,
       type: "text",

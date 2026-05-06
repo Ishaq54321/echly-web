@@ -1,19 +1,6 @@
 /*
- * CRITICAL PATH TRACE — new user signup (normal path):
- * 1. Firebase Auth creates account
- * 2. WorkspaceProvider calls POST /api/users
- * 3. ensureUserRepo → createWorkspaceRepo
- *    → addWorkspaceMemberRepo called ✓ (WS-001 fix)
- *    → addWorkspaceMembershipRepo called ✓ (WS-001 fix)
- * 4. User goes through onboarding
- * 5. POST /api/workspaces fires
- * 6. Early-return guard fires (workspaceId already set)
- * 7. Heal check runs — member doc already exists → skip ✓ (WS-002 fix)
- * 8. setWorkspaceClaim called ✓
- * 9. User lands on dashboard
- * 10. User opens Members tab, clicks Invite
- * 11. Invite API: isOwnerByField = true (ownerId === uid) ✓ (WS-004 fix)
- * 12. No 403 — invite proceeds ✓
+ * POST handler removed in Fix #1. Onboarding completion now flows through
+ * POST /api/onboarding. PATCH handler remains for workspace settings updates.
  */
 import type { NextRequest } from "next/server";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
@@ -23,15 +10,52 @@ import {
 } from "@/lib/server/auth/authorize";
 import { corsHeaders } from "@/lib/server/cors";
 import { adminDb } from "@/lib/server/firebaseAdmin";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
+import { getWorkspaceMemberRepo, addWorkspaceMemberRepo } from "@/lib/repositories/workspaceMembersRepository.server";
+import { addWorkspaceMembershipRepo } from "@/lib/repositories/userMembershipsRepository.server";
 import { defaultWorkspaceDoc } from "@/lib/domain/workspace";
-import { getUserWorkspaceIdRepo, addWorkspaceMembershipRepo } from "@/lib/repositories/usersRepository.server";
-import {
-  addWorkspaceMemberRepo,
-  getWorkspaceMemberRepo,
-} from "@/lib/repositories/workspaceMembersRepository.server";
-import { setWorkspaceClaim } from "@/lib/server/setWorkspaceClaim";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { NextResponse } from "next/server";
+import { generateSlug, isValidSlug } from "@/lib/utils/slugify";
+
+/**
+ * Atomically reserves `slug` for `workspaceId` (writing slugs/{slug}) and
+ * releases the previous slug if any. Throws "SLUG_TAKEN" if another workspace
+ * already owns it.
+ */
+async function reserveSlug(opts: {
+  workspaceId: string;
+  newSlug: string;
+  previousSlug?: string | null;
+}): Promise<void> {
+  const { workspaceId, newSlug, previousSlug } = opts;
+  const newRef = adminDb.doc(`slugs/${newSlug}`);
+  const prevRef =
+    previousSlug && previousSlug !== newSlug
+      ? adminDb.doc(`slugs/${previousSlug}`)
+      : null;
+
+  await adminDb.runTransaction(async (tx) => {
+    const newSnap = await tx.get(newRef);
+    if (newSnap.exists) {
+      const data = (newSnap.data() ?? {}) as Record<string, unknown>;
+      if (data.workspaceId !== workspaceId) {
+        throw new Error("SLUG_TAKEN");
+      }
+      // Already owned by this workspace — no-op write.
+      return;
+    }
+    tx.set(newRef, {
+      workspaceId,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    if (prevRef) {
+      tx.delete(prevRef);
+    }
+  });
+}
+
+const MAX_WORKSPACE_NAME_LEN = 80;
 
 export const dynamic = "force-dynamic";
 
@@ -41,13 +65,6 @@ export async function OPTIONS(req: NextRequest) {
     headers: corsHeaders(req),
   });
 }
-
-type WorkspacePostBody = {
-  name?: string;
-  logoUrl?: string | null;
-  role?: string;
-  companySize?: string;
-};
 
 type WorkspacePatchBody = {
   updates: Record<string, unknown>;
@@ -61,7 +78,9 @@ function unauthorizedResponse(req: NextRequest, errRes: Response): NextResponse 
   });
 }
 
-/** POST /api/workspaces — legacy endpoint, now user-scoped only. */
+/** POST /api/workspaces — creates an additional workspace for an authenticated user.
+ *  Does NOT change the user's active workspaceId. The caller switches via switchWorkspace().
+ */
 export async function POST(req: NextRequest) {
   let user;
   try {
@@ -70,9 +89,9 @@ export async function POST(req: NextRequest) {
     return unauthorizedResponse(req, toAuthorizationResponse(err));
   }
 
-  let body: WorkspacePostBody;
+  let body: { name?: string; slug?: string };
   try {
-    body = (await req.json()) as WorkspacePostBody;
+    body = (await req.json()) as { name?: string; slug?: string };
   } catch {
     return apiError({
       code: "INVALID_INPUT",
@@ -82,152 +101,102 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const name = typeof body.name === "string" && body.name.trim() ? body.name.trim() : "My Account";
-  const role = typeof body.role === "string" ? body.role.trim() : "";
-  const companySize = typeof body.companySize === "string" ? body.companySize.trim() : "";
+  const name = typeof body.name === "string" ? body.name.trim() : "";
+  if (!name) {
+    return apiError({
+      code: "INVALID_INPUT",
+      message: "name is required",
+      status: 400,
+      init: { headers: corsHeaders(req) },
+    });
+  }
+  if (name.length > MAX_WORKSPACE_NAME_LEN) {
+    return apiError({
+      code: "INVALID_INPUT",
+      message: `name must be ${MAX_WORKSPACE_NAME_LEN} characters or fewer`,
+      status: 400,
+      init: { headers: corsHeaders(req) },
+    });
+  }
+
+  const requestedSlug =
+    typeof body.slug === "string" ? body.slug.trim().toLowerCase() : "";
+  const slugCandidate = requestedSlug || generateSlug(name);
+  if (slugCandidate && !isValidSlug(slugCandidate)) {
+    return apiError({
+      code: "INVALID_INPUT",
+      message: "Invalid slug format",
+      status: 400,
+      init: { headers: corsHeaders(req) },
+    });
+  }
 
   try {
-    const userRef = adminDb.doc(`users/${user.uid}`);
-    const preSnap = await userRef.get();
-    if (preSnap.exists) {
-      const preWid =
-        typeof (preSnap.data() as { workspaceId?: unknown })?.workspaceId === "string"
-          ? String((preSnap.data() as { workspaceId: string }).workspaceId).trim()
-          : "";
-      if (preWid) {
-        // WS-002 FIX: ensure owner member doc exists even on early-return path
-        // (handles workspaces created before Phase 2 fix and any race conditions)
-        try {
-          const existingMember = await getWorkspaceMemberRepo(preWid, user.uid);
-          if (!existingMember) {
-            const preData = (preSnap.data() ?? {}) as Record<string, unknown>;
-            const healAvatarUrl =
-              typeof preData.avatarUrl === "string" ? preData.avatarUrl :
-              typeof preData.photoURL === "string" ? preData.photoURL : null;
-            await addWorkspaceMemberRepo(preWid, {
-              uid: user.uid,
-              email: user.email ?? "",
-              displayName:
-                typeof preData.displayName === "string" && preData.displayName.trim()
-                  ? preData.displayName.trim() :
-                typeof preData.name === "string" && preData.name.trim()
-                  ? preData.name.trim() : null,
-              avatarUrl: healAvatarUrl,
-              role: "OWNER",
-              joinedAt: Timestamp.now(),
-              invitedBy: null,
-            });
-            await addWorkspaceMembershipRepo(user.uid, preWid);
-          }
-        } catch (healErr) {
-          // Non-fatal — log but continue. User can still use app.
-          console.error("[WS-002 heal] member doc heal failed:", healErr);
-        }
-        await setWorkspaceClaim(user.uid, preWid);
-        return apiSuccess(
-          { workspaceId: preWid, userId: user.uid },
-          null,
-          { headers: corsHeaders(req) }
-        );
-      }
-    }
-
-    const workspaceRef = adminDb.collection("workspaces").doc();
-    const newWorkspaceId = workspaceRef.id;
-    const workspacePayload = defaultWorkspaceDoc({
-      ownerId: user.uid,
-      name,
-      logoUrl: body.logoUrl ?? null,
-    });
-
-    await adminDb.runTransaction(async (tx) => {
-      const userSnap = await tx.get(userRef);
-      const existingWid =
-        userSnap.exists &&
-        typeof (userSnap.data() as { workspaceId?: unknown })?.workspaceId === "string"
-          ? String((userSnap.data() as { workspaceId: string }).workspaceId).trim()
-          : "";
-      if (existingWid) {
-        return;
-      }
-
-      tx.set(workspaceRef, {
-        ...workspacePayload,
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-
-      if (!userSnap.exists) {
-        tx.set(userRef, {
-          uid: user.uid,
-          email: user.email ?? null,
-          displayName: name,
-          avatarUrl: body.logoUrl ?? null,
-          workspaceId: newWorkspaceId,
-          ...(role && { role }),
-          ...(companySize && { companySize }),
-          createdAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-      } else {
-        tx.set(
-          userRef,
-          {
-            displayName: name,
-            avatarUrl: body.logoUrl ?? null,
-            workspaceId: newWorkspaceId,
-            ...(role && { role }),
-            ...(companySize && { companySize }),
-            updatedAt: FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        );
-      }
-    });
-
-    const after = await userRef.get();
-    const resolvedWid =
-      typeof (after.data() as { workspaceId?: unknown } | undefined)?.workspaceId === "string"
-        ? String((after.data() as { workspaceId: string }).workspaceId).trim()
-        : "";
-    if (!resolvedWid) {
-      throw new Error("Missing workspaceId after workspace provisioning");
-    }
-
-    await setWorkspaceClaim(user.uid, resolvedWid);
-
-    // WS-003 FIX: member doc write is critical — do not swallow
-    try {
-      const userSnap2 = await adminDb.doc(`users/${user.uid}`).get();
-      const userData = (userSnap2.data() ?? {}) as Record<string, unknown>;
-      await addWorkspaceMemberRepo(resolvedWid, {
-        uid: user.uid,
-        email: typeof userData.email === "string" ? userData.email : (user.email ?? ""),
-        displayName:
-          typeof userData.displayName === "string" && userData.displayName.trim()
-            ? userData.displayName.trim() :
-          typeof userData.name === "string" && userData.name.trim()
-            ? userData.name.trim() : null,
-        avatarUrl: typeof userData.avatarUrl === "string" ? userData.avatarUrl : null,
-        role: "OWNER",
-        joinedAt: Timestamp.now(),
-        invitedBy: null,
-      });
-      await addWorkspaceMembershipRepo(user.uid, resolvedWid);
-    } catch (memberErr) {
-      console.error("[workspace creation] CRITICAL: member doc failed", memberErr);
-      // Return error — client will retry. Workspace doc exists
-      // but we report failure so client doesn't proceed with a broken state.
+    const userSnap = await adminDb.doc(`users/${user.uid}`).get();
+    if (!userSnap.exists) {
       return apiError({
-        code: "INTERNAL_ERROR",
-        message: "Workspace created but membership setup failed. Please refresh and try again.",
-        status: 500,
+        code: "NOT_FOUND",
+        message: "User not found",
+        status: 404,
         init: { headers: corsHeaders(req) },
       });
     }
+    const userData = (userSnap.data() ?? {}) as Record<string, unknown>;
+    const ownerEmail =
+      typeof userData.email === "string" ? userData.email : (user.email ?? "");
+    const firstNameStr = typeof userData.firstName === "string" ? userData.firstName : "";
+    const lastNameStr = typeof userData.lastName === "string" ? userData.lastName : "";
+    const composedName = `${firstNameStr} ${lastNameStr}`.trim();
+    const ownerName = composedName || null;
+    const ownerAvatarUrl =
+      typeof userData.avatarUrl === "string" ? userData.avatarUrl : null;
+
+    const newRef = adminDb.collection("workspaces").doc();
+
+    // Reserve slug before writing the workspace doc so a duplicate slug fails fast.
+    let finalSlug: string | null = null;
+    if (slugCandidate) {
+      try {
+        await reserveSlug({ workspaceId: newRef.id, newSlug: slugCandidate });
+        finalSlug = slugCandidate;
+      } catch (err) {
+        if ((err as Error).message === "SLUG_TAKEN") {
+          return apiError({
+            code: "INVALID_INPUT",
+            message: "SLUG_TAKEN",
+            status: 409,
+            init: { headers: corsHeaders(req) },
+          });
+        }
+        throw err;
+      }
+    }
+
+    const payload = defaultWorkspaceDoc({
+      ownerId: user.uid,
+      name,
+      logoUrl: null,
+      slug: finalSlug,
+    });
+    await newRef.set({
+      ...payload,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    await addWorkspaceMemberRepo(newRef.id, {
+      uid: user.uid,
+      email: ownerEmail,
+      displayName: ownerName,
+      avatarUrl: ownerAvatarUrl,
+      role: "OWNER",
+      joinedAt: Timestamp.now(),
+      invitedBy: null,
+    });
+    await addWorkspaceMembershipRepo(user.uid, newRef.id);
 
     return apiSuccess(
-      { workspaceId: resolvedWid, userId: user.uid },
+      { workspaceId: newRef.id },
       null,
       { headers: corsHeaders(req) }
     );
@@ -235,7 +204,7 @@ export async function POST(req: NextRequest) {
     console.error("POST /api/workspaces:", err);
     return apiError({
       code: "INTERNAL_ERROR",
-      message: "Failed to upsert user profile",
+      message: "Failed to create workspace",
       status: 500,
       init: { headers: corsHeaders(req) },
     });
@@ -287,6 +256,9 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
+  const slugInput =
+    typeof updates.slug === "string" ? updates.slug.trim().toLowerCase() : undefined;
+
   const allowedUpdates = {
     name:
       typeof updates.name === "string" && updates.name.trim()
@@ -302,7 +274,7 @@ export async function PATCH(req: NextRequest) {
     Object.entries(allowedUpdates).filter(([_, v]) => v !== undefined)
   );
 
-  if (Object.keys(cleanedUpdates).length === 0) {
+  if (Object.keys(cleanedUpdates).length === 0 && slugInput === undefined) {
     return apiError({
       code: "INVALID_INPUT",
       message: "No valid fields to update",
@@ -311,8 +283,55 @@ export async function PATCH(req: NextRequest) {
     });
   }
 
+  if (slugInput !== undefined && slugInput && !isValidSlug(slugInput)) {
+    return apiError({
+      code: "INVALID_INPUT",
+      message: "Invalid slug format",
+      status: 400,
+      init: { headers: corsHeaders(req) },
+    });
+  }
+
   try {
     const workspaceId = await getUserWorkspaceIdRepo(user.uid);
+
+    const callerMember = await getWorkspaceMemberRepo(workspaceId, user.uid);
+    if (callerMember?.role !== "OWNER") {
+      return apiError({
+        code: "FORBIDDEN",
+        message: "Only workspace owners can update workspace settings",
+        status: 403,
+        init: { headers: corsHeaders(req) },
+      });
+    }
+
+    // Reserve the new slug atomically before touching the workspace doc.
+    if (slugInput !== undefined && slugInput) {
+      try {
+        const wsSnap = await adminDb.doc(`workspaces/${workspaceId}`).get();
+        const prevSlug =
+          typeof wsSnap.data()?.slug === "string"
+            ? (wsSnap.data()!.slug as string)
+            : null;
+        await reserveSlug({
+          workspaceId,
+          newSlug: slugInput,
+          previousSlug: prevSlug,
+        });
+        (cleanedUpdates as Record<string, unknown>).slug = slugInput;
+      } catch (err) {
+        if ((err as Error).message === "SLUG_TAKEN") {
+          return apiError({
+            code: "INVALID_INPUT",
+            message: "SLUG_TAKEN",
+            status: 409,
+            init: { headers: corsHeaders(req) },
+          });
+        }
+        throw err;
+      }
+    }
+
     await adminDb.doc(`workspaces/${workspaceId}`).set(
       {
         ...cleanedUpdates,
@@ -320,7 +339,7 @@ export async function PATCH(req: NextRequest) {
       },
       { merge: true }
     );
-    return apiSuccess({}, null, { headers: corsHeaders(req) });
+    return apiSuccess({ slug: (cleanedUpdates as Record<string, unknown>).slug ?? null }, null, { headers: corsHeaders(req) });
   } catch (err) {
     console.error("PATCH /api/workspaces:", err);
     return apiError({

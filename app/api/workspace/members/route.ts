@@ -7,6 +7,7 @@ import { assertWorkspaceActive } from "@/lib/server/assertWorkspaceActive";
 import { getWorkspaceMembersRepo } from "@/lib/repositories/workspaceMembersRepository.server";
 import type { WorkspaceMember } from "@/lib/domain/workspaceMember";
 import { adminDb } from "@/lib/server/firebaseAdmin";
+import { composeFullName } from "@/lib/utils/nameSplit";
 
 export const dynamic = "force-dynamic";
 
@@ -53,10 +54,10 @@ export async function GET(req: NextRequest) {
           typeof data?.photoURL === "string" ? data.photoURL : null;
 
         displayNameByUid[uid] =
-          typeof data?.displayName === "string" && data.displayName.trim()
-            ? data.displayName.trim() :
-          typeof data?.name === "string" && data.name.trim()
-            ? data.name.trim() : null;
+          composeFullName(
+            typeof data?.firstName === "string" ? data.firstName : null,
+            typeof data?.lastName === "string" ? data.lastName : null
+          ) || null;
       });
 
       membersWithAvatars = sorted.map((m) => ({

@@ -1,9 +1,10 @@
 ﻿"use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { memo, useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Pencil, Trash2, CircleCheck, SmilePlus } from "lucide-react";
-import EmojiPicker from "emoji-picker-react";
+import dynamic from "next/dynamic";
+const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 import type { Comment } from "@/lib/domain/comment";
 import { formatCommentDate } from "@/lib/utils/formatCommentDate";
 import { CommentAttachmentCard } from "@/components/discussion/CommentAttachmentCard";
@@ -48,7 +49,7 @@ function renderMessageWithMentions(message: string) {
   });
 }
 
-export function CommentItem({
+function CommentItemBase({
   comment,
   currentUserId,
   currentUserName,
@@ -160,7 +161,7 @@ export function CommentItem({
       <div className="flex-1 min-w-0">
         {!editing && (
           <div className="flex items-center gap-2 min-w-0">
-            <div className="flex items-center gap-2 min-w-0 group-hover/item:hidden">
+            <div className={`flex items-center gap-2 min-w-0 ${!comment.threadId && ticketTitle ? 'group-hover/item:hidden' : ''}`}>
               <span
                 className={`font-semibold text-discussion-title text-[14px] truncate`}
               >
@@ -307,7 +308,9 @@ export function CommentItem({
             )}
             {comment.reactions && Object.keys(comment.reactions).length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
-                {Object.entries(comment.reactions).map(([emoji, data]) => {
+                {Object.entries(comment.reactions)
+                  .filter(([, data]) => Array.isArray(data?.userIds) && data.userIds.length > 0)
+                  .map(([emoji, data]) => {
                   const isMine = currentUserId ? data.userIds.includes(currentUserId) : false;
                   return (
                     <Tooltip key={emoji} content={data.userNames.join(", ")}>
@@ -409,7 +412,7 @@ export function CommentItem({
           }}
         >
           <EmojiPicker
-            onEmojiClick={async (emojiData) => {
+            onEmojiClick={async (emojiData: { emoji: string }) => {
               setReactionPickerOpen(false);
               await handleToggleReaction(emojiData.emoji);
             }}
@@ -424,3 +427,5 @@ export function CommentItem({
     </div>
   );
 }
+
+export const CommentItem = memo(CommentItemBase);

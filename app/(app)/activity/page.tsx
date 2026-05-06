@@ -8,8 +8,15 @@ import {
   useRef,
   useState,
 } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Check, ChevronDown, Clock, Filter, Settings, Users2 } from "lucide-react";
+import { Check, ChevronDown, Clock, Settings } from "lucide-react";
+import {
+  ActivityErrorIllustration,
+  ActivityFilterNoResultsIllustration,
+  ActivityNoActivityIllustration,
+  ActivityUnauthenticatedIllustration,
+} from "@/components/discussion/EmptyStateIllustrations";
 import { authFetch } from "@/lib/authFetch";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { ActivityItem } from "@/components/activity/ActivityItem";
@@ -362,6 +369,7 @@ function ActivityFeed() {
   const nextCursorRef = useRef<ActivityFeedData["nextCursor"]>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [refetchTick, setRefetchTick] = useState(0);
   const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(() => new Set());
   const [expandedSystemKeys, setExpandedSystemKeys] = useState<Set<string>>(() => new Set());
   const [expandedGroups, setExpandedGroups] = useState<Record<string, ActivityEvent[]>>({});
@@ -554,7 +562,7 @@ function ActivityFeed() {
     return () => {
       cancelled = true;
     };
-  }, [user?.uid, authLoading, selectedSessionId, eventTypesParamKey, actorIdForApi, activityCacheKey]);
+  }, [user?.uid, authLoading, selectedSessionId, eventTypesParamKey, actorIdForApi, activityCacheKey, refetchTick]);
 
   const onSessionFilterChange = useCallback(
     (value: string) => {
@@ -759,11 +767,27 @@ function ActivityFeed() {
     return (
       <div className="w-full px-6 py-8">
         <div className="mx-auto w-full max-w-[1280px]">
-        <div className="flex items-center gap-2.5 mb-7">
-          <Clock className="h-4 w-4 text-[var(--text-secondary)]" aria-hidden />
-          <h1 className="text-[16px] font-medium text-[var(--text-heading)]">Activity</h1>
-        </div>
-        <p className="text-sm text-[var(--text-secondary)]">Please sign in to view activity.</p>
+          <div className="flex items-center gap-2.5 mb-7">
+            <Clock className="h-4 w-4 text-[var(--text-secondary)]" aria-hidden />
+            <h1 className="text-[16px] font-medium text-[var(--text-heading)]">Activity</h1>
+          </div>
+          <div className="flex flex-col items-center text-center px-6 py-16">
+            <div className="mb-4">
+              <ActivityUnauthenticatedIllustration />
+            </div>
+            <h3 className="text-[15px] font-semibold text-[var(--text-heading)]">
+              Sign in to view activity
+            </h3>
+            <p className="text-[13px] text-[var(--text-secondary)] mt-1.5 max-w-[260px] leading-relaxed">
+              You need to be signed in to see workspace activity.
+            </p>
+            <Link
+              href="/login"
+              className="mt-4 inline-flex items-center h-[34px] px-3.5 rounded-[var(--radius-btn)] bg-[var(--brand)] text-white text-[13px] font-medium hover:bg-[var(--brand-hover)] transition-colors"
+            >
+              Sign in
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -776,16 +800,14 @@ function ActivityFeed() {
       <div className="mx-auto w-full max-w-[1280px]">
 
         {/* Page header */}
-        <div className="flex items-center justify-between mb-7">
-          <div>
-            <h1 className="text-xl font-bold text-[var(--text-heading)] tracking-[-0.4px] mt-1 mb-0">
-              Activity
-            </h1>
-            <p className="text-sm font-normal text-[var(--text-secondary)] mt-1">
-              All activity across your workspace
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center justify-end">
+        <div className="mb-7">
+          <h1 className="text-xl font-bold text-[var(--text-heading)] tracking-[-0.4px] mt-1 mb-0">
+            Activity
+          </h1>
+          <p className="text-sm font-normal text-[var(--text-secondary)] mt-2">
+            Everything that&apos;s happened across your sessions and workspace
+          </p>
+          <div className="flex items-center gap-2 mt-5">
             <div
               className="flex flex-wrap items-center gap-1"
               role="toolbar"
@@ -805,11 +827,6 @@ function ActivityFeed() {
                     (selectedSessionId || sessionFilterTouched) ? FILTER_PILL_SESSION_ACTIVE : FILTER_PILL_DEFAULT
                   }`}
                 >
-                  <Filter
-                    className={`h-3.5 w-3.5 shrink-0 ${(selectedSessionId || sessionFilterTouched) ? 'text-white opacity-100' : 'text-[var(--text-secondary)] opacity-60'}`}
-                    strokeWidth={2}
-                    aria-hidden
-                  />
                   <span className="min-w-0 flex-1 truncate">{selectedSessionLabel}</span>
                   <ChevronDown
                     className={`h-3.5 w-3.5 shrink-0 ${(selectedSessionId || sessionFilterTouched) ? 'text-white opacity-100' : 'text-[var(--text-secondary)] opacity-60'} transition-transform duration-150 ${sessionMenuOpen ? "rotate-180" : ""}`}
@@ -902,12 +919,7 @@ function ActivityFeed() {
                         );
                         return selected?.displayName ?? selected?.email.split("@")[0] ?? "Members";
                       })()
-                    : (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                          <Users2 size={14} />
-                          Members
-                        </span>
-                      )}
+                    : "Members"}
                   <ChevronDown className="h-3.5 w-3.5 ml-1" />
                 </button>
 
@@ -1001,36 +1013,62 @@ function ActivityFeed() {
           </div>
         </div>
 
-        {/* Error */}
-        {error ? (
-          <p className="px-6 py-4 text-sm text-[var(--color-danger)]" role="alert">
-            {error}
-          </p>
-        ) : null}
-
         {/* Initial load — partial skeleton reads as "content arriving", not a full-page wait */}
         {loadingInitial ? (
           <div className="w-full" aria-busy="true" aria-live="polite">
             <ActivitySkeletonStack count={4} />
           </div>
-        ) : groupedFromServer.length === 0 && !error ? (
-          /* Empty state */
-          <div className="flex flex-col items-center py-16 text-center px-6">
-            <div className="relative mb-6" aria-hidden>
-              <div className="absolute inset-0 rounded-full bg-primary/5 blur-2xl scale-150" />
-              <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--border)]/60 bg-gradient-to-b from-muted/80 to-muted/40 shadow-sm">
-                <Clock className="h-7 w-7 text-[var(--text-secondary)]/55" strokeWidth={1.25} />
-              </div>
+        ) : error && groupedFromServer.length === 0 ? (
+          /* Error state */
+          <div className="flex flex-col items-center py-16 text-center px-6" role="alert">
+            <div className="mb-4">
+              <ActivityErrorIllustration />
             </div>
-            <p className="text-[15px] font-medium text-[var(--text-heading)]/90 tracking-tight">
-              Nothing here yet
+            <h3 className="text-[15px] font-semibold text-[var(--text-heading)]">
+              Couldn&apos;t load activity
+            </h3>
+            <p className="text-[13px] text-[var(--text-secondary)] mt-1.5 max-w-[260px] leading-relaxed">
+              Something went wrong. Please try again.
             </p>
-            <p className="mt-2 max-w-sm text-sm leading-relaxed text-[var(--text-secondary)]">
-              When your team comments, creates feedback, or resolves tickets, it will appear in this
-              timeline.
-            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                setRefetchTick((t) => t + 1);
+              }}
+              className="mt-4 inline-flex items-center h-[34px] px-3.5 rounded-[var(--radius-btn)] bg-[var(--brand)] text-white text-[13px] font-medium hover:bg-[var(--brand-hover)] transition-colors"
+            >
+              Retry
+            </button>
           </div>
-        ) : groupedFromServer.length === 0 ? null : (
+        ) : groupedFromServer.length === 0 ? (
+          /* Empty state — distinguish between "no activity at all" and "filter has no matches" */
+          (selectedSessionId || selectedCategory || selectedMemberId) ? (
+            <div className="flex flex-col items-center py-16 text-center px-6">
+              <div className="mb-4">
+                <ActivityFilterNoResultsIllustration />
+              </div>
+              <h3 className="text-[15px] font-semibold text-[var(--text-heading)]">
+                No matching activity
+              </h3>
+              <p className="text-[13px] text-[var(--text-secondary)] mt-1.5 max-w-[260px] leading-relaxed">
+                Try a different filter to see more results.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center py-16 text-center px-6">
+              <div className="mb-4">
+                <ActivityNoActivityIllustration />
+              </div>
+              <h3 className="text-[15px] font-semibold text-[var(--text-heading)]">
+                No activity yet
+              </h3>
+              <p className="text-[13px] text-[var(--text-secondary)] mt-1.5 max-w-[260px] leading-relaxed">
+                Actions across your workspace will appear here as your team gets started.
+              </p>
+            </div>
+          )
+        ) : (
 
           /* Feed — single calm enter when surface replaces skeleton */
           <div className="space-y-4 activity-feed-row-enter">
@@ -1048,14 +1086,8 @@ function ActivityFeed() {
                     <div className="flex-1 h-px bg-border" aria-hidden />
                   </div>
 
-                  {/* Event rows with timeline spine */}
+                  {/* Event rows */}
                   <div className="relative pb-3">
-                    {/* Vertical spine — centred on w-[52px] column (26px from row left edge) */}
-                    <div
-                      className="pointer-events-none absolute bottom-0 top-0 w-px bg-border/50"
-                      style={{ left: 26 }}
-                      aria-hidden
-                    />
 
                     {renderRows.map((row, rowIndex) => {
                       /* System-event collapse chip */
@@ -1071,7 +1103,7 @@ function ActivityFeed() {
                             <button
                               type="button"
                               onClick={() => toggleSystemGroup(row.key)}
-                              className="flex w-full cursor-pointer items-center gap-3 border-0 bg-transparent py-3 text-left transition-colors hover:bg-[var(--surface-hover)]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              className="flex w-full cursor-pointer items-center gap-3 border-0 bg-transparent py-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             >
                               <div className="relative z-10 flex w-[52px] shrink-0 justify-center">
                                 <div

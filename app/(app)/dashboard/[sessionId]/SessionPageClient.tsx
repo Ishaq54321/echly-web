@@ -2,7 +2,6 @@
 
 import { authFetch, type AuthFetchInit } from "@/lib/authFetch";
 import GlobalRail from "@/components/layout/GlobalRail";
-import { clearShareToken, getActiveShareToken, setShareToken } from "@/lib/client/shareToken";
 import {
   useEffect,
   useLayoutEffect,
@@ -24,7 +23,6 @@ import { getScreenshotUrl } from "@/lib/client/screenshotResolver";
 import { useScreenshotUrl } from "@/lib/client/useScreenshotUrl";
 import { normalizeTicketStatus } from "@/lib/domain/normalizeTicketStatus";
 import { useFeedbackDetailController } from "./hooks/useFeedbackDetailController";
-import { useSessionFeedbackPaginated } from "./hooks/useSessionFeedbackPaginated";
 import type { Feedback } from "@/lib/domain/feedback";
 import { getTicketStatus } from "@/lib/domain/feedback";
 import type { Session } from "@/lib/domain/session";
@@ -37,10 +35,22 @@ import {
 } from "@/lib/client/permissionError";
 import { safeResolveAction } from "@/lib/client/safeResolveAction";
 import {
-  getSessionDetailCache,
-  setSessionDetailCache,
-  invalidateSessionDetailCache,
-} from "@/lib/client/sessionDetailCache";
+  retainSessionListener,
+  hydrateSessionFromBundle,
+  useSessionStore,
+} from "@/lib/realtime/sessionStore";
+import {
+  retainFeedbackListener,
+  useFeedbackStore,
+} from "@/lib/realtime/feedbackStore";
+import {
+  retainPresenceListener,
+  usePresenceStore,
+} from "@/lib/realtime/presenceStore";
+import { retainAccessRequestsListener } from "@/lib/realtime/accessRequestStore";
+import { useCommentsStore } from "@/lib/realtime/commentsStore";
+import { usePresenceHeartbeat } from "@/lib/hooks/usePresenceHeartbeat";
+import { Timestamp } from "firebase/firestore";
 import { warn } from "@/lib/utils/logger";
 import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 import {
@@ -154,6 +164,97 @@ async function authFetchOrAnonCookie(
   });
 }
 
+/**
+ * Convert a REST-shaped feedback row (as returned by the bundle for anonymous
+ * viewers) into a domain {@link Feedback}. Mirrors the serializer in
+ * `lib/server/serializeFeedback.ts` for parity with what the listener emits.
+ */
+function bundleFeedbackRowToFeedback(
+  row: Record<string, unknown>,
+  sessionIdFallback: string
+): Feedback | null {
+  if (row.isDeleted === true) return null;
+  const id = typeof row.id === "string" ? row.id : "";
+  if (!id) return null;
+  const sessionId =
+    typeof row.sessionId === "string" && row.sessionId.trim() !== ""
+      ? row.sessionId
+      : sessionIdFallback;
+  const rawStatus =
+    typeof row.status === "string"
+      ? row.status
+      : row.isResolved === true
+        ? "resolved"
+        : "open";
+  const normalizedStatus =
+    rawStatus === "resolved" ? "resolved" : rawStatus === "processing" ? "processing" : "open";
+  let createdAt: Timestamp | null = null;
+  if (typeof row.createdAt === "string" && row.createdAt.trim() !== "") {
+    const d = new Date(row.createdAt);
+    if (!Number.isNaN(d.getTime())) {
+      createdAt = Timestamp.fromDate(d);
+    }
+  }
+  let lastCommentAt: Timestamp | null = null;
+  const lastRaw = row.lastCommentAt as { seconds?: number } | string | null | undefined;
+  if (lastRaw != null && typeof lastRaw === "object" && typeof lastRaw.seconds === "number") {
+    lastCommentAt = new Timestamp(lastRaw.seconds, 0);
+  } else if (typeof lastRaw === "string" && lastRaw.trim() !== "") {
+    const d = new Date(lastRaw);
+    if (!Number.isNaN(d.getTime())) {
+      lastCommentAt = Timestamp.fromDate(d);
+    }
+  }
+  return {
+    id,
+    sessionId,
+    title: typeof row.title === "string" ? row.title : "",
+    instruction:
+      (typeof row.instruction === "string" ? row.instruction : "") ||
+      (typeof row.description === "string" ? row.description : "") ||
+      "",
+    description: typeof row.description === "string" ? row.description : "",
+    suggestion: "",
+    type: typeof row.type === "string" ? row.type : "Feedback",
+    isResolved: normalizedStatus === "resolved",
+    createdAt,
+    contextSummary: null,
+    actionSteps: Array.isArray(row.actionSteps)
+      ? (row.actionSteps as unknown[]).filter((s): s is string => typeof s === "string")
+      : null,
+    suggestedTags: Array.isArray(row.suggestedTags)
+      ? (row.suggestedTags as unknown[]).filter((s): s is string => typeof s === "string")
+      : null,
+    url: null,
+    viewportWidth: null,
+    viewportHeight: null,
+    userAgent: null,
+    clientTimestamp: null,
+    screenshotId: typeof row.screenshotId === "string" ? row.screenshotId : null,
+    screenshotStatus:
+      row.screenshotStatus === "attached" ||
+      row.screenshotStatus === "pending" ||
+      row.screenshotStatus === "none" ||
+      row.screenshotStatus === "failed"
+        ? row.screenshotStatus
+        : null,
+    status: normalizedStatus,
+    commentCount: typeof row.commentCount === "number" ? row.commentCount : 0,
+    lastCommentPreview:
+      typeof row.lastCommentPreview === "string" ? row.lastCommentPreview : undefined,
+    lastCommentAt,
+    isDeleted: row.isDeleted === true,
+    assigneeId: typeof row.assigneeId === "string" ? row.assigneeId : null,
+    assigneeName: typeof row.assigneeName === "string" ? row.assigneeName : null,
+    assigneeAvatarUrl:
+      typeof row.assigneeAvatarUrl === "string" ? row.assigneeAvatarUrl : null,
+    priority:
+      row.priority === "high" || row.priority === "medium" || row.priority === "low"
+        ? (row.priority as "high" | "medium" | "low")
+        : null,
+  };
+}
+
 function sameStringArrayContent(
   a: string[] | null | undefined,
   b: string[] | null | undefined
@@ -190,7 +291,25 @@ export default function SessionPageClient({
   const editFromUrl = searchParams.get("edit") === "true";
   const commentIdFromUrl = searchParams.get("comment");
 
-  const [session, setSession] = useState<Session | null>(null);
+  /**
+   * Local optimistic overlay for session-level mutations (rename, archive, title edit).
+   * The realtime store ({@link useSessionStore}) is the source of truth; this overlay
+   * provides instant feedback and is cleared after the listener catches up.
+   */
+  const [optimisticSession, setSession] = useState<Session | null>(null);
+  // Realtime store snapshot for this session id — listener-driven source of truth.
+  const sessionStoreState = useSessionStore(sessionId);
+  // Subscribe to comments + presence stores so the accessRevoked watcher below
+  // sees a permission-denied from any of the four listeners. These hooks only
+  // call useSyncExternalStore — they do NOT retain listeners on their own.
+  const commentsStoreState = useCommentsStore(sessionId);
+  const presenceStoreState = usePresenceStore(sessionId);
+  /**
+   * Effective session = listener data when present, else local optimistic overlay.
+   * Listener wins because it's the authoritative server state; overlay covers the
+   * window between a local mutation and the listener tick that reflects it.
+   */
+  const session: Session | null = sessionStoreState.session ?? optimisticSession;
   /** General-access gate (restricted mode + anonymous): server returned access with canView false. */
   const [accessBlocked, setAccessBlocked] = useState(false);
   /** Set when GET /api/sessions/:id fails after auth is known (anonymous-friendly). */
@@ -207,16 +326,27 @@ export default function SessionPageClient({
   const [requestAccessStatus, setRequestAccessStatus] = useState<
     "idle" | "pending" | "submitted" | "already_requested" | "rejected"
   >("idle");
-  /** Pending access request count shown as red dot on Share button. */
-  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   /** True when the current user belongs to the session's workspace (OWNER or WS-MEMBER). */
   const [isWorkspaceMember, setIsWorkspaceMember] = useState(false);
-  /** First feedback page from GET /api/session-page-bundle when {@link USE_BUNDLE} is true. */
-  const [bundledFirstFeedbackPage, setBundledFirstFeedbackPage] = useState<{
-    feedback: Record<string, unknown>[];
-    nextCursor?: string | null;
-    hasMore?: boolean;
-  } | null>(null);
+  /**
+   * True when the viewer holds a realtime-eligible grant (workspace member, session
+   * member doc, or sessionAccess mirror). Drives `canSubscribeToFirestore`. Authed
+   * link_view viewers without an explicit grant get false here and use the bundle path.
+   */
+  const [hasDirectSessionGrant, setHasDirectSessionGrant] = useState(false);
+  /** Pagination state for bundle-mode viewers (anon + authed link_view). */
+  const [feedbackCursor, setFeedbackCursor] = useState<string | null>(null);
+  const [hasMoreFeedbackPaginated, setHasMoreFeedbackPaginated] = useState(false);
+  const [feedbackLoadingMorePaginated, setFeedbackLoadingMorePaginated] = useState(false);
+  const feedbackLoadMoreRefInternal = useRef<HTMLDivElement | null>(null);
+  /**
+   * Anonymous-viewer fallback: bundle returns first page of feedback for non-authenticated
+   * share-link viewers (they cannot subscribe to the `feedback` collection). For
+   * authenticated viewers this stays null and {@link useFeedbackStore} drives the list.
+   */
+  const [anonymousBundledFeedback, setAnonymousBundledFeedback] = useState<
+    Feedback[] | null
+  >(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   /** Tracks the newest ticket id for the highlight animation; cleared after animation ends. */
   const [newTicketId, setNewTicketId] = useState<string | null>(null);
@@ -237,7 +367,48 @@ export default function SessionPageClient({
   /** Invalidates in-flight load work when the effect re-runs (e.g. React Strict Mode). */
   const sessionLoadEffectNonceRef = useRef(0);
 
-  const { authUid, authDisplayName, isIdentityResolved, authReady, workspaceName, authEmail, authPhotoUrl } = useWorkspace();
+  const {
+    authUid,
+    firstName,
+    displayName,
+    isIdentityResolved,
+    isIdentityReady,
+    authReady,
+    workspaceId: ctxWorkspaceId,
+    workspaceName,
+    authEmail,
+    authPhotoUrl,
+  } = useWorkspace();
+
+  const presenceUser = useMemo(
+    () =>
+      authUid
+        ? {
+            uid: authUid,
+            displayName: displayName || "User",
+            photoURL: authPhotoUrl ?? null,
+          }
+        : null,
+    [authUid, displayName, authPhotoUrl]
+  );
+
+  usePresenceHeartbeat({
+    sessionId,
+    enabled: isIdentityReady && !!authUid,
+    user: presenceUser,
+  });
+
+  /**
+   * Clear the optimistic overlay only after the listener has had time to catch up
+   * to the mutation (500ms grace). Clearing on every listener tick would wipe an
+   * in-flight optimistic rename when the listener fires its initial pre-mutation
+   * snapshot, causing a visible revert.
+   */
+  useEffect(() => {
+    if (!sessionStoreState.session || !optimisticSession) return;
+    const t = setTimeout(() => setSession(null), 500);
+    return () => clearTimeout(t);
+  }, [sessionStoreState.version, optimisticSession]);
   const authUidRef = useRef<string | null>(null);
   useEffect(() => {
     authUidRef.current = authUid;
@@ -328,35 +499,7 @@ export default function SessionPageClient({
 
   const feedbackSessionId = sessionId || undefined;
 
-  const shareTokenFromUrl =
-    searchParams.get("token")?.trim() ||
-    searchParams.get("shareToken")?.trim() ||
-    "";
-  const searchParamsSignature = searchParams.toString();
-  /**
-   * Effective share token for optional-auth APIs. Must match {@link getActiveShareToken}:
-   * signed-in requests only send Firebase Bearer, so restricted share links need `?token=` on the URL.
-   */
-  const shareTokenForApi =
-    typeof window !== "undefined"
-      ? getActiveShareToken()?.trim() ?? ""
-      : shareTokenFromUrl;
-  const shareTokenForApiRef = useRef(shareTokenForApi);
-  shareTokenForApiRef.current = shareTokenForApi;
   const isAnonymousViewer = authReady && !authUid;
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get("token") || params.get("shareToken");
-    if (token) {
-      setShareToken(token);
-    } else {
-      clearShareToken();
-    }
-  }, [searchParamsSignature]);
-
-  const restFeedbackFetch = useCallback((url: string) => authFetchOrAnonCookie(url), []);
 
   const listScrollRef = useRef<HTMLDivElement | null>(null);
   const [openExpanded, setOpenExpanded] = useState(true);
@@ -394,7 +537,7 @@ export default function SessionPageClient({
     setSearchResults([]);
     setSearchLoading(false);
     setAccessBlocked(false);
-    setBundledFirstFeedbackPage(null);
+    setAnonymousBundledFeedback(null);
     setIsWorkspaceMember(false);
   }, [sessionId]);
 
@@ -435,9 +578,6 @@ export default function SessionPageClient({
             sessionId: feedbackSessionId,
             query: q,
           });
-          if (shareTokenForApiRef.current !== "") {
-            sp.set("token", shareTokenForApiRef.current);
-          }
           const url = `/api/feedback/search?${sp.toString()}`;
           const res = await authFetchOrAnonCookie(url);
           if (!res.ok) {
@@ -465,29 +605,14 @@ export default function SessionPageClient({
       cancelled = true;
       window.clearTimeout(handle);
     };
-  }, [searchQuery, feedbackSessionId, shareTokenForApi]);
+  }, [searchQuery, feedbackSessionId]);
 
-  /** In-flight action steps per ticket — merged onto list updates to avoid flicker. */
+  /** In-flight action steps per ticket — merged into the listener-derived list to avoid flicker. */
   const pendingOptimisticActionStepsRef = useRef(
     new Map<string, { steps: string[] | null }>()
   );
   /** Monotonic save generation per ticket; stale PATCH responses must not overwrite UI. */
   const actionStepsSaveLatestGenRef = useRef(new Map<string, number>());
-  const mergeRealtimeFeedbackListRef = useRef<
-    ((list: Feedback[]) => Feedback[]) | null
-  >(null);
-
-  const mergeRealtimeFeedbackList = useCallback((incoming: Feedback[]) => {
-    const pending = pendingOptimisticActionStepsRef.current;
-    if (pending.size === 0) return incoming;
-    return incoming.map((item) => {
-      const row = pending.get(item.id);
-      if (!row) return item;
-      return { ...item, actionSteps: row.steps };
-    });
-  }, []);
-
-  mergeRealtimeFeedbackListRef.current = mergeRealtimeFeedbackList;
 
   useLayoutEffect(() => {
     pendingOptimisticActionStepsRef.current.clear();
@@ -514,50 +639,265 @@ export default function SessionPageClient({
   const sessionRestResolved =
     session == null ? -1 : Math.max(0, typeof session.resolvedCount === "number" ? session.resolvedCount : 0);
 
-  const feedbackHookOptions = useMemo(
-    () => ({
-      mergeRealtimeListRef: mergeRealtimeFeedbackListRef,
-      enabled: authReady,
-      shareToken: shareTokenForApi || null,
-      restSessionCounts:
-        session != null
-          ? { total: sessionRestTotal, open: sessionRestOpen, resolved: sessionRestResolved }
-          : null,
-      restFetch: restFeedbackFetch,
-      awaitBundledFirstFeedback: USE_BUNDLE,
-      bundledFirstFeedbackPage: USE_BUNDLE ? bundledFirstFeedbackPage : null,
-    }),
-    [
-      authReady,
-      shareTokenForApi,
-      restFeedbackFetch,
-      session?.id ?? "",
-      sessionRestTotal,
-      sessionRestOpen,
-      sessionRestResolved,
-      bundledFirstFeedbackPage,
-    ]
+  // Listener-driven feedback list. The realtime store is the source of truth for
+  // authenticated viewers; anonymous viewers fall back to the bundle's first page
+  // (since they cannot subscribe to Firestore).
+  const feedbackStoreState = useFeedbackStore(sessionId);
+
+  /**
+   * Per-id optimistic overlay. Each entry is either a `Partial<Feedback>` (field
+   * overrides applied on top of listener data) or `null` (treat the id as removed
+   * — used for delete optimism). Each entry auto-clears 500ms after it's set so
+   * the listener's authoritative value wins shortly after.
+   */
+  const [optimisticFeedback, setOptimisticFeedback] = useState<
+    Map<string, Partial<Feedback> | null>
+  >(() => new Map());
+  const optimisticTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+
+  /** Items that don't yet exist in the listener (extension creates, deep-link hydrate). */
+  const [insertedFeedback, setInsertedFeedback] = useState<Feedback[]>([]);
+
+  useLayoutEffect(() => {
+    setOptimisticFeedback(new Map());
+    setInsertedFeedback([]);
+    for (const t of optimisticTimersRef.current.values()) clearTimeout(t);
+    optimisticTimersRef.current.clear();
+  }, [sessionId]);
+
+  useEffect(() => {
+    return () => {
+      for (const t of optimisticTimersRef.current.values()) clearTimeout(t);
+      optimisticTimersRef.current.clear();
+    };
+  }, []);
+
+  const scheduleOptimisticClear = useCallback((id: string) => {
+    const existing = optimisticTimersRef.current.get(id);
+    if (existing) clearTimeout(existing);
+    const handle = setTimeout(() => {
+      optimisticTimersRef.current.delete(id);
+      setOptimisticFeedback((prev) => {
+        if (!prev.has(id)) return prev;
+        const next = new Map(prev);
+        next.delete(id);
+        return next;
+      });
+    }, 500);
+    optimisticTimersRef.current.set(id, handle);
+  }, []);
+
+  const setOptimisticOverride = useCallback(
+    (id: string, value: Partial<Feedback> | null) => {
+      setOptimisticFeedback((prev) => {
+        const next = new Map(prev);
+        const existing = prev.get(id);
+        if (existing && existing !== null && value !== null) {
+          next.set(id, { ...existing, ...value });
+        } else {
+          next.set(id, value);
+        }
+        return next;
+      });
+      scheduleOptimisticClear(id);
+    },
+    [scheduleOptimisticClear]
   );
 
-  const {
-    feedback,
-    setFeedback,
-    total: feedbackTotal,
-    activeCount: feedbackActiveCount,
-    resolvedCount: feedbackResolvedCount,
-    countsLoading: feedbackCountsLoading,
-    loading: feedbackLoading,
-    isCountsSynced,
-    hasMore: hasMoreFeedback,
-    hasReachedLimit: feedbackReachedLimit,
-    loadingMore: feedbackLoadingMore,
-    isLoadingResolved: feedbackLoadingResolved,
-    loadMoreRef: feedbackLoadMoreRef,
-    setCountsDelta: setSessionCountsDelta,
-  } = useSessionFeedbackPaginated(feedbackSessionId, feedbackHookOptions);
+  // Anonymous bundle feedback is the source list when not authenticated; otherwise
+  // the listener supplies it.
+  const baseFeedback: Feedback[] = useMemo(() => {
+    if (anonymousBundledFeedback != null) return anonymousBundledFeedback;
+    return feedbackStoreState.feedback;
+  }, [anonymousBundledFeedback, feedbackStoreState.feedback]);
 
+  /**
+   * Listener-driven derivation:
+   *   inserted (not yet in listener) → base list → per-id overlay → action-step overlay.
+   * Sorted by createdAt DESC with id tiebreaker.
+   */
+  const feedback: Feedback[] = useMemo(() => {
+    const baseIds = new Set(baseFeedback.map((f) => f.id));
+    const overlay = optimisticFeedback;
+    const actionStepsOverlay = pendingOptimisticActionStepsRef.current;
+    const merged: Feedback[] = [];
+    const pushItem = (item: Feedback) => {
+      const ov = overlay.get(item.id);
+      if (ov === null) return; // treat as deleted
+      let next = ov ? { ...item, ...ov } : item;
+      const stepRow = actionStepsOverlay.get(item.id);
+      if (stepRow) next = { ...next, actionSteps: stepRow.steps };
+      merged.push(next);
+    };
+    for (const ins of insertedFeedback) {
+      if (baseIds.has(ins.id)) continue;
+      pushItem(ins);
+    }
+    for (const item of baseFeedback) pushItem(item);
+    merged.sort((a, b) => {
+      const ams =
+        a.createdAt && typeof (a.createdAt as Timestamp).toMillis === "function"
+          ? (a.createdAt as Timestamp).toMillis()
+          : 0;
+      const bms =
+        b.createdAt && typeof (b.createdAt as Timestamp).toMillis === "function"
+          ? (b.createdAt as Timestamp).toMillis()
+          : 0;
+      const diff = bms - ams;
+      if (diff !== 0) return diff;
+      return b.id.localeCompare(a.id);
+    });
+    return merged;
+  }, [baseFeedback, insertedFeedback, optimisticFeedback]);
+
+  /**
+   * Shim with the same {@link React.Dispatch} shape that the deleted hook exposed.
+   * Translates `(prev) => next` updaters into per-id overlay patches by diffing
+   * `next` against the current listener-derived list. Most call sites use the
+   * `prev.map((item) => item.id === X ? {...item, fields} : item)` pattern, which
+   * this shim turns into a single overlay entry for X.
+   */
   const feedbackRef = useRef(feedback);
   feedbackRef.current = feedback;
+  const setFeedback: React.Dispatch<React.SetStateAction<Feedback[]>> = useCallback(
+    (updater) => {
+      const prev = feedbackRef.current;
+      const next = typeof updater === "function"
+        ? (updater as (p: Feedback[]) => Feedback[])(prev)
+        : updater;
+      const prevById = new Map(prev.map((p) => [p.id, p]));
+      const nextById = new Map(next.map((n) => [n.id, n]));
+      // Removed ids → mark as deleted in overlay.
+      for (const [id] of prevById) {
+        if (!nextById.has(id)) setOptimisticOverride(id, null);
+      }
+      // Added ids → push into insertedFeedback (not yet in listener).
+      for (const [id, item] of nextById) {
+        if (!prevById.has(id)) {
+          setInsertedFeedback((cur) => {
+            if (cur.some((c) => c.id === id)) return cur;
+            return [...cur, item];
+          });
+          continue;
+        }
+        // Mutated → write overlay diff.
+        const before = prevById.get(id)!;
+        const diff: Partial<Feedback> = {};
+        let changed = false;
+        const beforeAny = before as unknown as Record<string, unknown>;
+        const itemAny = item as unknown as Record<string, unknown>;
+        for (const k of Object.keys(itemAny)) {
+          if (itemAny[k] !== beforeAny[k]) {
+            (diff as Record<string, unknown>)[k] = itemAny[k];
+            changed = true;
+          }
+        }
+        if (changed) setOptimisticOverride(id, diff);
+      }
+    },
+    [setOptimisticOverride]
+  );
+
+  // Counts derive from the overlaid list directly — no separate counts state needed.
+  const feedbackTotal = feedback.length;
+  const feedbackActiveCount = useMemo(
+    () => feedback.filter((f) => normalizeTicketStatus(getTicketStatus(f)) === "open").length,
+    [feedback]
+  );
+  const feedbackResolvedCount = useMemo(
+    () => feedback.filter((f) => normalizeTicketStatus(getTicketStatus(f)) === "resolved").length,
+    [feedback]
+  );
+  const feedbackLoading =
+    anonymousBundledFeedback == null ? feedbackStoreState.loading : false;
+  const feedbackCountsLoading = feedbackLoading;
+  const isCountsSynced = !feedbackLoading;
+  // Bundle-mode pagination: real flags when bundle is the source list, otherwise
+  // listener-mode (which has no append-pagination — the listener delivers the
+  // whole collection).
+  const hasMoreFeedback =
+    anonymousBundledFeedback != null ? hasMoreFeedbackPaginated : false;
+  const feedbackReachedLimit = false;
+  const feedbackLoadingMore = feedbackLoadingMorePaginated;
+  const feedbackLoadingResolved = false;
+  const feedbackLoadMoreRef: React.RefObject<HTMLDivElement | null> | undefined =
+    anonymousBundledFeedback != null ? feedbackLoadMoreRefInternal : undefined;
+
+  // Load-more for bundle-mode viewers. Calls /api/feedback (auth-aware, supports
+  // anon share-token via authFetchOrAnonCookie) with the cursor and appends to
+  // the bundle list. authFetchOrAnonCookie attaches Bearer for authed viewers
+  // and the share-token cookie for anon viewers, so the API capability gate
+  // sees the same access context as the bundle did.
+  const loadMoreFeedback = useCallback(async () => {
+    if (feedbackLoadingMorePaginated) return;
+    if (!hasMoreFeedbackPaginated) return;
+    if (!feedbackCursor) return;
+    const sid = sessionId.trim();
+    if (!sid) return;
+    setFeedbackLoadingMorePaginated(true);
+    try {
+      const url = `/api/feedback?sessionId=${encodeURIComponent(sid)}&cursor=${encodeURIComponent(
+        feedbackCursor
+      )}&limit=50`;
+      const res = await authFetchOrAnonCookie(url);
+      if (!res || !res.ok) return;
+      const body = await res.json().catch(() => null);
+      if (body === null || typeof body !== "object") return;
+      let parsed: { feedback?: unknown[]; nextCursor?: string | null; hasMore?: boolean };
+      try {
+        parsed = requireApiSuccessData<{
+          feedback?: unknown[];
+          nextCursor?: string | null;
+          hasMore?: boolean;
+        }>(body);
+      } catch {
+        return;
+      }
+      const rows = Array.isArray(parsed.feedback)
+        ? (parsed.feedback as Record<string, unknown>[])
+        : [];
+      const mapped: Feedback[] = [];
+      for (const row of rows) {
+        const f = bundleFeedbackRowToFeedback(row, sid);
+        if (f) mapped.push(f);
+      }
+      setAnonymousBundledFeedback((prev) => {
+        const base = prev ?? [];
+        const seen = new Set(base.map((b) => b.id));
+        const additions = mapped.filter((m) => !seen.has(m.id));
+        return [...base, ...additions];
+      });
+      setFeedbackCursor(typeof parsed.nextCursor === "string" ? parsed.nextCursor : null);
+      setHasMoreFeedbackPaginated(parsed.hasMore === true);
+    } finally {
+      setFeedbackLoadingMorePaginated(false);
+    }
+  }, [feedbackCursor, feedbackLoadingMorePaginated, hasMoreFeedbackPaginated, sessionId]);
+
+  // IntersectionObserver: fire loadMore when the sentinel scrolls into view.
+  // Only active when bundle-mode is the source list AND there is more to load.
+  useEffect(() => {
+    if (anonymousBundledFeedback == null) return;
+    if (!hasMoreFeedbackPaginated) return;
+    const node = feedbackLoadMoreRefInternal.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          void loadMoreFeedback();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [anonymousBundledFeedback, hasMoreFeedbackPaginated, loadMoreFeedback]);
+
+  // Listener-derived counts auto-update from optimistic overlays, so the deltas
+  // the deleted hook tracked are no longer needed.
+  const setSessionCountsDelta: React.Dispatch<
+    React.SetStateAction<{ open: number; resolved: number; total: number }>
+  > = useCallback(() => {}, []);
 
   const deepLinkTicketInList =
     Boolean(ticketIdFromUrl) && feedback.some((f) => f.id === ticketIdFromUrl);
@@ -806,26 +1146,8 @@ export default function SessionPageClient({
       setSessionFetchError(null);
       setAccessBlocked(false);
       setPendingResolveRequest(false);
-      setBundledFirstFeedbackPage(null);
+      setAnonymousBundledFeedback(null);
       return;
-    }
-
-    // Cache short-circuit BEFORE identity gate. Cached data was already fetched
-    // with valid credentials on a prior visit, so it's safe to render while
-    // identity re-resolves (e.g. token refresh during rapid back/forward nav).
-    // Mutations remain gated on isIdentityResolved independently.
-    if (USE_BUNDLE) {
-      const cached = getSessionDetailCache(sessionId.trim());
-      if (cached) {
-        setSession(cached.session);
-        setSessionAccess(cached.sessionAccess);
-        setIsWorkspaceMember(cached.isWorkspaceMember);
-        setPendingResolveRequest(cached.pendingResolveRequest);
-        setBundledFirstFeedbackPage(cached.bundledFirstFeedbackPage);
-        setSessionFetchError(null);
-        setAccessBlocked(false);
-        return;
-      }
     }
 
     const effectNonce = ++sessionLoadEffectNonceRef.current;
@@ -844,14 +1166,11 @@ export default function SessionPageClient({
         }
       }
       if (cancelled || effectNonce !== sessionLoadEffectNonceRef.current) return;
-      const tok = shareTokenForApiRef.current;
-      const qs = tok !== "" ? `?token=${encodeURIComponent(tok)}` : "";
 
       if (USE_BUNDLE) {
         // PERF R-006: cache short-circuit happens synchronously above, before
         // the identity gate. By the time we get here, no cached entry exists.
         const bundleSp = new URLSearchParams({ sessionId: sessionId.trim() });
-        if (tok !== "") bundleSp.set("token", tok);
         if (!authUidRef.current?.trim()) {
           const anonId = getViewerId(null);
           if (anonId) bundleSp.set("viewerId", anonId);
@@ -862,7 +1181,7 @@ export default function SessionPageClient({
         const body = await res.json().catch(() => null);
         if (cancelled || effectNonce !== sessionLoadEffectNonceRef.current) return;
         if (body === null || typeof body !== "object") {
-          setBundledFirstFeedbackPage(null);
+          setAnonymousBundledFeedback(null);
           setSessionFetchError("error");
           return;
         }
@@ -870,7 +1189,7 @@ export default function SessionPageClient({
           access?: { capabilities?: Partial<AccessCapabilities>; isWorkspaceMember?: boolean };
         };
         if (res.status === 403) {
-          setBundledFirstFeedbackPage(null);
+          setAnonymousBundledFeedback(null);
           const errorBody = body as {
             data?: {
               access?: { capabilities?: Partial<AccessCapabilities> };
@@ -912,7 +1231,7 @@ export default function SessionPageClient({
           return;
         }
         if (res.status === 404) {
-          setBundledFirstFeedbackPage(null);
+          setAnonymousBundledFeedback(null);
           setAccessBlocked(false);
           setSession(null);
           setSessionAccess(null);
@@ -921,7 +1240,7 @@ export default function SessionPageClient({
           return;
         }
         if (!res.ok) {
-          setBundledFirstFeedbackPage(null);
+          setAnonymousBundledFeedback(null);
           setAccessBlocked(false);
           setSession(null);
           setSessionAccess(null);
@@ -931,37 +1250,37 @@ export default function SessionPageClient({
         }
         let sessionPayload: Record<string, unknown>;
         let requestPayload: { pendingResolve?: boolean } | undefined;
-        let bundleFeedbackRows: Record<string, unknown>[] = [];
+        let bundleFeedbackRows: Record<string, unknown>[] | null = null;
         let bundleNextCursor: string | null = null;
         let bundleHasMore = false;
         let bundleCapabilities: Partial<AccessCapabilities> | undefined;
         let bundleIsWorkspaceMember = false;
-        let bundlePendingAccessRequestsCount = 0;
+        let bundleHasDirectSessionGrant = false;
         try {
           const inner = requireApiSuccessData<{
             session: Record<string, unknown>;
-            feedback: unknown[];
+            feedback?: unknown[];
             nextCursor?: string | null;
             hasMore?: boolean;
             request?: { pendingResolve?: boolean };
-            access?: { capabilities?: Partial<AccessCapabilities>; isWorkspaceMember?: boolean };
-            pendingAccessRequestsCount?: number;
+            access?: {
+              capabilities?: Partial<AccessCapabilities>;
+              isWorkspaceMember?: boolean;
+              hasDirectSessionGrant?: boolean;
+            };
           }>(body);
           sessionPayload = inner.session;
           requestPayload = inner.request;
           bundleCapabilities = inner.access?.capabilities;
           bundleIsWorkspaceMember = inner.access?.isWorkspaceMember === true;
+          bundleHasDirectSessionGrant = inner.access?.hasDirectSessionGrant === true;
           bundleFeedbackRows = Array.isArray(inner.feedback)
             ? (inner.feedback as Record<string, unknown>[])
-            : [];
-          bundleNextCursor =
-            typeof inner.nextCursor === "string" || inner.nextCursor === null
-              ? inner.nextCursor
-              : null;
+            : null;
+          bundleNextCursor = typeof inner.nextCursor === "string" ? inner.nextCursor : null;
           bundleHasMore = inner.hasMore === true;
-          bundlePendingAccessRequestsCount = typeof inner.pendingAccessRequestsCount === "number" ? inner.pendingAccessRequestsCount : 0;
         } catch {
-          setBundledFirstFeedbackPage(null);
+          setAnonymousBundledFeedback(null);
           setAccessBlocked(false);
           setSession(null);
           setSessionAccess(null);
@@ -970,7 +1289,7 @@ export default function SessionPageClient({
           return;
         }
         if (!sessionPayload) {
-          setBundledFirstFeedbackPage(null);
+          setAnonymousBundledFeedback(null);
           setAccessBlocked(false);
           setSession(null);
           setSessionAccess(null);
@@ -1008,29 +1327,38 @@ export default function SessionPageClient({
         const assembledIsWorkspaceMember =
           accessRoot.access?.isWorkspaceMember === true || bundleIsWorkspaceMember;
         setIsWorkspaceMember(assembledIsWorkspaceMember);
+        const assembledHasDirectSessionGrant =
+          (accessRoot.access as { hasDirectSessionGrant?: boolean } | undefined)?.hasDirectSessionGrant === true
+          || bundleHasDirectSessionGrant
+          || assembledIsWorkspaceMember;
+        setHasDirectSessionGrant(assembledHasDirectSessionGrant);
         const assembledPendingResolve =
           requestPayload !== undefined && requestPayload.pendingResolve === true;
         setPendingResolveRequest(assembledPendingResolve);
-        const assembledFeedbackPage = {
-          feedback: bundleFeedbackRows,
-          nextCursor: bundleNextCursor,
-          hasMore: bundleHasMore,
-        };
-        setBundledFirstFeedbackPage(assembledFeedbackPage);
-        // PERF R-006: store in cache so back-navigation skips the network round-trip
-        setSessionDetailCache(sessionId.trim(), {
-          session: assembledSession,
-          sessionAccess: assembledAccess,
-          pendingResolveRequest: assembledPendingResolve,
-          bundledFirstFeedbackPage: assembledFeedbackPage,
-          isWorkspaceMember: assembledIsWorkspaceMember,
-        });
+        // Bundle-mode viewers (anon + authed link_view) get the first page of feedback
+        // for first paint — they cannot subscribe to Firestore. Listener-mode viewers
+        // get null here and useFeedbackStore drives the list.
+        if (bundleFeedbackRows != null) {
+          const mapped: Feedback[] = [];
+          for (const row of bundleFeedbackRows) {
+            const f = bundleFeedbackRowToFeedback(row, sessionId);
+            if (f) mapped.push(f);
+          }
+          setAnonymousBundledFeedback(mapped);
+          setFeedbackCursor(bundleNextCursor);
+          setHasMoreFeedbackPaginated(bundleHasMore);
+        } else {
+          setAnonymousBundledFeedback(null);
+          setFeedbackCursor(null);
+          setHasMoreFeedbackPaginated(false);
+        }
+        // First-paint hydration: seed the realtime store synchronously from the bundle
+        // so the next render shows session data without waiting for the onSnapshot tick.
+        hydrateSessionFromBundle(sessionId.trim(), assembledSession);
 
-        // Phase 5: pending request count is included in the bundle response
-        setPendingRequestsCount(bundlePendingAccessRequestsCount);
         /* View count: recorded server-side in GET /api/session-page-bundle (see recordSessionViewIfNewRepo). */
       } else {
-        const url = `/api/sessions/${encodeURIComponent(sessionId)}${qs}`;
+        const url = `/api/sessions/${encodeURIComponent(sessionId)}`;
         const res = await authFetchOrAnonCookie(url);
         if (cancelled || effectNonce !== sessionLoadEffectNonceRef.current) return;
         const body = await res.json().catch(() => null);
@@ -1110,11 +1438,13 @@ export default function SessionPageClient({
         }
         setSessionFetchError(null);
         const raw = sessionPayload as { accessLevel?: unknown };
-        setSession({
+        const assembledLegacySession = {
           id: sessionId,
           ...(sessionPayload as object),
           accessLevel: requireAccessLevel(raw.accessLevel),
-        } as Session);
+        } as Session;
+        setSession(assembledLegacySession);
+        hydrateSessionFromBundle(sessionId, assembledLegacySession);
         const cap = accessRoot.access?.capabilities;
         setSessionAccess(
           cap
@@ -1144,8 +1474,6 @@ export default function SessionPageClient({
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              shareToken:
-                shareTokenForApiRef.current !== "" ? shareTokenForApiRef.current : undefined,
               viewerId: anonId || undefined,
             }),
           }).catch(() => {});
@@ -1155,7 +1483,130 @@ export default function SessionPageClient({
     return () => {
       cancelled = true;
     };
-  }, [sessionId, authReady, shareTokenForApi]);
+  }, [sessionId, authReady]);
+
+  // Listener-attach gate: only users with a direct realtime-eligible grant
+  // (workspace member, session-member doc, or sessionAccess mirror) may attach
+  // listeners. Authed link_view viewers are intentionally excluded — Firestore
+  // rules would deny their listener attach. They receive feedback via the
+  // bundle (REST mode) instead.
+  const canSubscribeToFirestore = hasDirectSessionGrant;
+
+  // Read workspaceId for listeners via a ref so it stays out of the retain-effect
+  // dep array. session?.workspaceId hydrates from the bundle after first mount;
+  // putting it in the dep array would detach + re-attach the same listener,
+  // firing the listener's error path twice on permission-denied.
+  const workspaceIdForListenersRef = useRef<string>("");
+  useEffect(() => {
+    workspaceIdForListenersRef.current = (session?.workspaceId ?? ctxWorkspaceId ?? "").trim();
+  }, [ctxWorkspaceId, session?.workspaceId]);
+
+  // Realtime session doc subscription. Gated on identity AND session-level access;
+  // auto-detaches on sign-out via the module-init auth observer in sessionStore.
+  useEffect(() => {
+    if (!isIdentityReady) return;
+    if (!canSubscribeToFirestore) return;
+    const sid = sessionId?.trim();
+    const wid = (workspaceIdForListenersRef.current ?? "").trim();
+    if (!sid || !wid) return;
+    const release = retainSessionListener(sid, wid);
+    return () => release();
+  }, [isIdentityReady, canSubscribeToFirestore, sessionId, session?.workspaceId]);
+
+  // Realtime feedback subscription. Same gating as the session listener;
+  // anonymous and unauthorized authed viewers fall through to the REST/bundle path.
+  useEffect(() => {
+    if (!isIdentityReady) return;
+    if (!canSubscribeToFirestore) return;
+    const sid = sessionId?.trim();
+    const wid = (workspaceIdForListenersRef.current ?? "").trim();
+    if (!sid || !wid) return;
+    const release = retainFeedbackListener(sid, wid);
+    return () => release();
+  }, [isIdentityReady, canSubscribeToFirestore, sessionId, session?.workspaceId]);
+
+  // Realtime presence subscription. Same gating as the other listeners.
+  // The store filters stale heartbeats client-side and runs a 15s GC interval
+  // so closed-tab ghosts disappear automatically.
+  useEffect(() => {
+    if (!isIdentityReady) return;
+    if (!canSubscribeToFirestore) return;
+    const sid = sessionId?.trim();
+    if (!sid) return;
+    const release = retainPresenceListener(sid);
+    return () => release();
+  }, [isIdentityReady, canSubscribeToFirestore, sessionId]);
+
+  // Realtime access-requests subscription — workspace members only. Drives the
+  // red-dot badge on the Share button live (no bundle-seeded count, no manual
+  // clear on modal open).
+  useEffect(() => {
+    if (!isIdentityReady) return;
+    if (!isWorkspaceMember) return;
+    const sid = sessionId?.trim();
+    if (!sid) return;
+    const release = retainAccessRequestsListener(sid);
+    return () => release();
+  }, [isIdentityReady, isWorkspaceMember, sessionId]);
+
+  // Deletion detection: redirect to /dashboard once the listener confirms the session
+  // doc is gone (exists === false after a successful initial load).
+  useEffect(() => {
+    if (sessionStoreState.loading) return;
+    if (sessionStoreState.exists) return;
+    if (sessionStoreState.error) return;
+    showToast("Session was deleted");
+    router.push("/dashboard");
+  }, [
+    sessionStoreState.loading,
+    sessionStoreState.exists,
+    sessionStoreState.error,
+    router,
+    showToast,
+  ]);
+
+  // Track when canView was first confirmed so we can distinguish "just landed
+  // on the page during a write propagation race" from "real mid-view revocation."
+  const canViewConfirmedAtRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (sessionAccess?.canView && canViewConfirmedAtRef.current === null) {
+      canViewConfirmedAtRef.current = Date.now();
+    }
+  }, [sessionAccess?.canView]);
+
+  // Mid-view revocation: when any listener detects permission-denied AFTER its
+  // initial load, redirect with a toast. If it fires within 2s of canView being
+  // confirmed, it is more likely a write-propagation race (member doc + mirror
+  // not yet visible to a fresh listener) than a real revocation — show a softer
+  // toast and skip the redirect so a refresh recovers.
+  useEffect(() => {
+    const revoked =
+      sessionStoreState.accessRevoked ||
+      feedbackStoreState.accessRevoked ||
+      commentsStoreState.accessRevoked ||
+      presenceStoreState.accessRevoked;
+    if (!revoked) return;
+
+    const confirmedAt = canViewConfirmedAtRef.current;
+    const isPropagationRace =
+      confirmedAt !== null && Date.now() - confirmedAt < 2000;
+
+    if (isPropagationRace) {
+      showToast("Access is still propagating. Please refresh in a moment.");
+      return;
+    }
+
+    showToast("Your access to this session was removed.");
+    router.push("/dashboard");
+  }, [
+    sessionStoreState.accessRevoked,
+    feedbackStoreState.accessRevoked,
+    commentsStoreState.accessRevoked,
+    presenceStoreState.accessRevoked,
+    router,
+    showToast,
+    sessionAccess?.canView,
+  ]);
 
   // Deep link: when ?ticket= is present, select that ticket and open detail panel.
   const hasAppliedTicketParam = useRef(false);
@@ -1183,9 +1634,7 @@ export default function SessionPageClient({
     let cancelled = false;
     void (async () => {
       try {
-        const tok = shareTokenForApiRef.current;
-        const qs = tok !== "" ? `?token=${encodeURIComponent(tok)}` : "";
-        const url = `/api/tickets/${encodeURIComponent(ticketIdFromUrl)}${qs}`;
+        const url = `/api/tickets/${encodeURIComponent(ticketIdFromUrl)}`;
         const res = await authFetchOrAnonCookie(url);
         if (res.status === 403 || res.status === 404 || !res.ok) return;
         const rawDeep = await res.json();
@@ -1223,7 +1672,6 @@ export default function SessionPageClient({
     };
   }, [
     authReady,
-    shareTokenForApi,
     ticketIdFromUrl,
     feedbackSessionId,
     sessionId,
@@ -1352,14 +1800,6 @@ export default function SessionPageClient({
     };
   }, [selectedBaseItem, contextualPosition.index, contextualPosition.total]);
 
-  const bootstrapFirstTicket = useMemo((): (Feedback & { index: number; total: number }) | null => {
-    if (stableScopedFeedback.length > 0) return null;
-    if (!bundledFirstFeedbackPage?.feedback?.length) return null;
-    const raw = bundledFirstFeedbackPage.feedback[0];
-    if (!raw) return null;
-    return { ...(raw as unknown as Feedback), index: 1, total: -1 };
-  }, [stableScopedFeedback.length, bundledFirstFeedbackPage]);
-
   const handleSessionRenameFromMenu = useCallback(
     (updated: { id: string; title: string; updatedAt?: unknown }) => {
       if (updated.id !== sessionId) return;
@@ -1459,6 +1899,7 @@ export default function SessionPageClient({
     sessionId,
     feedbackId: effectiveSelectedId,
     canResolve: sessionAccess?.canResolve === true,
+    canSubscribeToFirestore,
     onRequestResolveAccess: openRequestAccessModal,
   });
 
@@ -1820,9 +2261,6 @@ export default function SessionPageClient({
                 item.id === ticketId ? { ...item, ...ticketPayload } : item
               )
             );
-            // PERF R-006: session counters changed — stale cache entry must be
-            // evicted so the next navigation re-fetches accurate counts.
-            invalidateSessionDetailCache(sessionId);
             broadcastTicketUpdated(ticketPayload);
             onSuccess?.();
           } catch (err) {
@@ -1900,9 +2338,8 @@ export default function SessionPageClient({
             : item
         )
       );
-      invalidateSessionDetailCache(sessionId);
     },
-    [effectiveSelectedId, sessionId, setFeedback]
+    [effectiveSelectedId, setFeedback]
   );
 
   const handlePriorityChanged = useCallback(
@@ -1914,9 +2351,8 @@ export default function SessionPageClient({
           item.id === ticketId ? { ...item, priority } : item
         )
       );
-      invalidateSessionDetailCache(sessionId);
     },
-    [effectiveSelectedId, sessionId, setFeedback]
+    [effectiveSelectedId, setFeedback]
   );
 
   const handleSessionTitleBlur = useCallback(async () => {
@@ -2055,8 +2491,6 @@ export default function SessionPageClient({
               }),
               timeout: 60000,
             });
-            // PERF R-006: invalidate cache after bulk resolve so next navigation re-fetches fresh counters
-            invalidateSessionDetailCache(sessionId);
             if (!res || !res.ok) {
               setFeedback((prev) =>
                 prev.map((item) => previousById.get(item.id) ?? item)
@@ -2106,8 +2540,6 @@ export default function SessionPageClient({
               }),
               timeout: 60000,
             });
-            // PERF R-006: invalidate cache after bulk unresolve so next navigation re-fetches fresh counters
-            invalidateSessionDetailCache(sessionId);
             if (!res || !res.ok) {
               setFeedback((prev) =>
                 prev.map((item) => previousById.get(item.id) ?? item)
@@ -2180,8 +2612,6 @@ export default function SessionPageClient({
         showToast("Could not delete ticket");
         return;
       }
-      // PERF R-006: invalidate cache so next navigation doesn't serve deleted feedback
-      invalidateSessionDetailCache(sessionId);
       const currentPath = window.location.pathname;
       router.push(currentPath);
     } catch (err) {
@@ -2287,7 +2717,7 @@ export default function SessionPageClient({
 
   const renderExecutionContent = () => {
     if (stableScopedFeedback.length === 0) {
-      if (feedbackLoading && !bootstrapFirstTicket) {
+      if (feedbackLoading) {
         return (
           <div className="exec-skeleton" aria-busy="true" aria-label="Loading ticket">
             {/* Eyebrow row: position pill + status pill */}
@@ -2335,19 +2765,6 @@ export default function SessionPageClient({
               </div>
             </div>
           </div>
-        );
-      }
-      if (feedbackLoading) {
-        return (
-          <ExecutionView
-            item={bootstrapFirstTicket}
-            setIsImageExpanded={setIsImageExpanded}
-            isCommentMode={false}
-            comments={[]}
-            screenshotUrl={null}
-            screenshotUrlLoading={bootstrapFirstTicket?.screenshotId != null}
-            screenshotUrlError={null}
-          />
         );
       }
       return (
@@ -2477,7 +2894,7 @@ export default function SessionPageClient({
         onDismiss={() => setActionToastState("hidden")}
         errorText="Failed to save"
       />
-      <div className="flex flex-col h-full min-h-0 overflow-hidden relative bg-[var(--surface-subtle)]">
+      <div className="session-page-shell flex flex-col h-full min-h-0 overflow-hidden relative bg-[var(--surface-subtle)]">
         {!isPublicRoute && (
           <TopControlBar
             sessionId={sessionId}
@@ -2490,8 +2907,6 @@ export default function SessionPageClient({
             canManageShare={sessionAccess?.canResolve === true}
             canManageAccess={sessionAccess?.canDeleteTicket === true}
             isWorkspaceMember={isWorkspaceMember}
-            pendingRequestsCount={pendingRequestsCount}
-            onShareModalOpen={() => setPendingRequestsCount(0)}
             sessionLoaded={sessionLoaded}
             openCount={isCountsSynced ? feedbackActiveCount : Math.max(0, sessionRestOpen)}
             resolvedCount={isCountsSynced ? feedbackResolvedCount : Math.max(0, sessionRestResolved)}
@@ -2558,6 +2973,7 @@ export default function SessionPageClient({
             recentViewers={session?.recentViewers}
             canRenameTitle={isWorkspaceMember}
             onRenameTitle={handleSidebarRenameTitle}
+            isWorkspaceMember={isWorkspaceMember}
           />
           </aside>
 
@@ -2610,8 +3026,8 @@ export default function SessionPageClient({
                   activeThreadId={activeThreadId}
                   onSelectThread={setActiveThreadId}
                   currentUserId={authUid}
-                  currentUserInitial={authDisplayName ? authDisplayName.charAt(0).toUpperCase() : "?"}
-                  currentUserName={authDisplayName || undefined}
+                  currentUserInitial={firstName ? firstName.charAt(0).toUpperCase() : "?"}
+                  currentUserName={displayName || undefined}
                   currentUserAvatarUrl={authPhotoUrl || undefined}
                   updateComment={updateComment}
                   deleteComment={deleteComment}
@@ -2680,6 +3096,7 @@ export default function SessionPageClient({
               recentViewers={session?.recentViewers}
               canRenameTitle={isWorkspaceMember}
               onRenameTitle={handleSidebarRenameTitle}
+              isWorkspaceMember={isWorkspaceMember}
               />
           </div>
         </div>
@@ -2718,7 +3135,7 @@ export default function SessionPageClient({
             className="fixed inset-0 z-[60] bg-black/15 backdrop-blur-[1px]"
             onClick={() => setNavPanelOpen(false)}
           />
-          <div className="fixed top-0 left-0 bottom-0 z-[61] w-[270px] bg-[var(--surface)] animate-in slide-in-from-left duration-200">
+          <div className="fixed top-0 left-0 bottom-0 z-[61] w-[220px] bg-[var(--surface)] animate-in slide-in-from-left duration-200">
             <GlobalRail forceExpanded />
           </div>
         </>

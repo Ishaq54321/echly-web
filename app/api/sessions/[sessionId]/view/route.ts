@@ -3,28 +3,32 @@ import { checkRateLimit, clientKeyFromRequest } from "@/lib/server/rateLimit";
 import { tryBuildRequestContext } from "@/lib/server/requestContext";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { adminDb } from "@/lib/server/firebaseAdmin";
+import { composeFullName } from "@/lib/utils/nameSplit";
 
 async function loadViewerProfile(
   uid: string
 ): Promise<{ displayName: string | null; avatarUrl: string | null }> {
   let displayName: string | null = null;
   let avatarUrl: string | null = null;
+  let email: string | null = null;
   try {
     const snap = await adminDb.doc(`users/${uid}`).get();
     if (snap.exists) {
       const d = snap.data() ?? {};
-      displayName =
-        typeof d.displayName === "string" && d.displayName.trim()
-          ? d.displayName.trim()
-          : typeof d.name === "string" && d.name.trim()
-            ? d.name.trim()
-            : null;
+      const composed = composeFullName(
+        typeof d.firstName === "string" ? d.firstName : null,
+        typeof d.lastName === "string" ? d.lastName : null
+      );
+      displayName = composed || null;
       avatarUrl =
         typeof d.photoURL === "string" && d.photoURL.trim()
           ? d.photoURL.trim()
           : typeof d.avatarUrl === "string" && d.avatarUrl.trim()
             ? d.avatarUrl.trim()
             : null;
+      if (typeof d.email === "string" && d.email.trim()) {
+        email = d.email.trim();
+      }
     }
   } catch {
     // Firestore read failed — fall through to Auth lookup
@@ -35,10 +39,9 @@ async function loadViewerProfile(
       const { getAuth } = await import("firebase-admin/auth");
       const authUser = await getAuth().getUser(uid);
       if (!displayName) {
-        if (authUser?.displayName?.trim()) {
-          displayName = authUser.displayName.trim();
-        } else if (authUser?.email) {
-          displayName = authUser.email.split("@")[0];
+        const fallbackEmail = email ?? authUser?.email ?? null;
+        if (fallbackEmail) {
+          displayName = fallbackEmail.split("@")[0] ?? null;
         }
       }
       if (!avatarUrl && authUser?.photoURL) {
@@ -70,20 +73,14 @@ export async function POST(
     });
   }
 
-  let body: { token?: unknown; shareToken?: unknown; viewerId?: unknown } = {};
+  let body: { viewerId?: unknown } = {};
   try {
     body = (await req.json()) as {
-      token?: unknown;
-      shareToken?: unknown;
       viewerId?: unknown;
     };
   } catch {
     body = {};
   }
-
-  const tokenFromBody =
-    (typeof body.token === "string" ? body.token.trim() : "") ||
-    (typeof body.shareToken === "string" ? body.shareToken.trim() : "");
 
   const anonViewerIdFromBody =
     typeof body.viewerId === "string" && body.viewerId.startsWith("anon_")
@@ -94,7 +91,6 @@ export async function POST(
     req,
     sessionId,
     optionalAuth: true,
-    bodyShareToken: tokenFromBody !== "" ? tokenFromBody : null,
   });
   if (!built.ok) {
     return built.response;

@@ -28,7 +28,6 @@ import {
 } from "../internal/domHelpers";
 import { echlyLog } from "@/lib/debug/echlyLogger";
 import { logger } from "@/lib/logger";
-import { getOrCreateShareLink } from "@/lib/share/getOrCreateShareLink";
 import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 
 const SAFE_MARGIN = 24;
@@ -923,11 +922,7 @@ export function useCaptureWidget({
   const handleShare = useCallback(async () => {
     try {
       guardWorkspaceMutation();
-      const origin = window.location.origin;
-      const url = await getOrCreateShareLink({
-        sessionId,
-        origin,
-      });
+      const url = `${window.location.origin}/session/${encodeURIComponent(sessionId)}`;
       await navigator.clipboard.writeText(url);
     } catch (err) {
       logger.error("error", "share_clipboard_failed", err);

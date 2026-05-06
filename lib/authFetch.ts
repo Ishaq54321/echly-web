@@ -1,5 +1,4 @@
 import { auth } from "@/lib/firebase";
-import { getShareToken } from "@/lib/client/shareToken";
 
 // PERF R-014: guard behind NODE_ENV so localStorage is never read in production
 // builds — eliminates a synchronous localStorage read on every authFetch call.
@@ -57,7 +56,6 @@ export async function authFetch(
   input: RequestInfo | URL,
   init: AuthFetchInit = {}
 ): Promise<Response | null> {
-  const shareToken = getShareToken()?.trim() ?? "";
   const user = auth.currentUser;
 
   const perf = echlyPerfEnabled();
@@ -69,7 +67,6 @@ export async function authFetch(
   const headers = new Headers(init.headers || {});
 
   let tokenMs = 0;
-  /** Signed-in users always use Bearer so a stale sessionStorage share token cannot override auth. */
   if (user) {
     if (perf) {
       console.log("[ECHLY_PERF] TOKEN START");
@@ -81,11 +78,6 @@ export async function authFetch(
       console.log("[ECHLY_PERF] TOKEN END", tokenMs.toFixed(1), "ms");
     }
     headers.set("Authorization", `Bearer ${token}`);
-  } else if (shareToken !== "") {
-    headers.set("Authorization", `Bearer ${shareToken}`);
-    if (perf) {
-      console.log("[ECHLY_PERF] share link bearer set (no Firebase id token)");
-    }
   } else {
     return null;
   }

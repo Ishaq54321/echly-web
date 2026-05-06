@@ -1,69 +1,105 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { fetchComments } from "@/lib/comments";
 import type { Comment } from "@/lib/domain/comment";
+import {
+  getCommentsSnapshot,
+  retainCommentsListener,
+  subscribeToComments,
+} from "@/lib/realtime/commentsStore";
+import { useSessionStore } from "@/lib/realtime/sessionStore";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 
 type Args = {
   sessionId: string | null | undefined;
+  /** Accepted for source-compat with existing call sites; ignored — store is whole-session. */
   feedbackId?: string | null | undefined;
-  /**
-   * When false, no fetches (caller clears comment state if needed).
-   */
   enabled?: boolean;
+  /**
+   * When false, listener mode is suppressed and the hook falls through to REST mode.
+   * Required to prevent unauthorized authed viewers (signed-in but no session access)
+   * from attaching a Firestore comments listener that would fail with permission-denied.
+   * Default true preserves behavior for authed-workspace contexts.
+   */
+  canSubscribeToFirestore?: boolean;
   onComments: (comments: Comment[]) => void;
 };
 
 /**
- * Fetches GET /api/comments/:sessionId when active and delivers comments for `feedbackId` via `onComments`.
- * One automatic fetch per sessionId+feedbackId open; use `refetch()` for manual sync (force refresh).
+ * Comments subscription. Authenticated viewers — workspace members AND
+ * cross-workspace session-invited users (both have Firestore listener access via
+ * Phase 6b's sessionAccess rules) — drive an onSnapshot listener via
+ * commentsStore. Anonymous viewers (no Firebase Auth) fall back to the REST
+ * endpoint with an initial fetch + manual refetch. The `canSubscribeToFirestore`
+ * prop additionally suppresses listener mode for authed viewers without a
+ * direct session grant (e.g. link_view), routing them to REST.
+ *
+ * The workspaceId is sourced from the *session*'s workspaceId (via sessionStore),
+ * not the viewer's workspaceId — listeners must query the workspace the session
+ * belongs to.
  */
 export function useCommentsRepoSubscription({
   sessionId,
-  feedbackId,
   enabled = true,
+  canSubscribeToFirestore = true,
   onComments,
 }: Args): { refetch: () => Promise<void> } {
+  const { authUid } = useWorkspace();
   const onCommentsRef = useRef(onComments);
-  const initialDoneRef = useRef("");
-  const prevScopeRef = useRef<string | null>(null);
-  const inFlightRef = useRef(false);
-  const queuedRefetchRef = useRef(false);
-
   useEffect(() => {
     onCommentsRef.current = onComments;
   }, [onComments]);
 
   const sid = typeof sessionId === "string" ? sessionId.trim() : "";
-  const fetchEnabled = enabled && !!sid;
-  const scopeKey = sid;
+  const uid = typeof authUid === "string" ? authUid.trim() : "";
+
+  const sessionState = useSessionStore(sid);
+  const sessionWorkspaceId =
+    typeof sessionState.session?.workspaceId === "string"
+      ? sessionState.session.workspaceId.trim()
+      : "";
+
+  const useListener =
+    enabled && canSubscribeToFirestore && !!sid && !!uid && !!sessionWorkspaceId;
+  const useRest = enabled && !!sid && !useListener;
+
+  // ── Listener mode (authenticated workspace members) ───────────────────────
+  useEffect(() => {
+    if (!useListener) return;
+    const release = retainCommentsListener(sid, sessionWorkspaceId);
+    const unsubscribe = subscribeToComments(sid, () => {
+      onCommentsRef.current(getCommentsSnapshot(sid).comments);
+    });
+    // Initial emit: deliver whatever's in the store right now (could be empty).
+    onCommentsRef.current(getCommentsSnapshot(sid).comments);
+    return () => {
+      unsubscribe();
+      release();
+    };
+  }, [useListener, sid, sessionWorkspaceId]);
+
+  // ── REST mode (anonymous share-link viewers) ──────────────────────────────
+  const initialDoneRef = useRef("");
+  const inFlightRef = useRef(false);
+  const queuedRefetchRef = useRef(false);
+  const restScopeKey = useRest ? sid : "";
 
   useEffect(() => {
-    if (!scopeKey) return;
-    if (prevScopeRef.current !== scopeKey) {
-      prevScopeRef.current = scopeKey;
+    if (!restScopeKey) {
       initialDoneRef.current = "";
+      return;
     }
-  }, [scopeKey]);
-
-  useEffect(() => {
-    if (!fetchEnabled) {
-      initialDoneRef.current = "";
-    }
-  }, [fetchEnabled]);
-
-  useEffect(() => {
-    if (!fetchEnabled || !scopeKey) return;
-    if (initialDoneRef.current === scopeKey) return;
+    if (initialDoneRef.current === restScopeKey) return;
     let cancelled = false;
     void (async () => {
       try {
-        const scoped = await fetchComments(sid, {
+        const scoped = await fetchComments(restScopeKey, {
           feedbackId: undefined,
           force: false,
         });
         if (cancelled) return;
-        initialDoneRef.current = scopeKey;
+        initialDoneRef.current = restScopeKey;
         onCommentsRef.current(scoped);
       } catch (e) {
         console.error("[useCommentsRepoSubscription] fetchComments failed", e);
@@ -72,39 +108,37 @@ export function useCommentsRepoSubscription({
     return () => {
       cancelled = true;
     };
-  }, [fetchEnabled, scopeKey, sid]);
-
-  const runRefetch = useCallback(
-    async (queueIfBusy: boolean) => {
-      if (!sid) return;
-
-      if (inFlightRef.current) {
-        if (queueIfBusy) queuedRefetchRef.current = true;
-        return;
-      }
-      inFlightRef.current = true;
-      try {
-        do {
-          queuedRefetchRef.current = false;
-          const scoped = await fetchComments(sid, {
-            feedbackId: undefined,
-            force: true,
-          });
-          initialDoneRef.current = scopeKey;
-          onCommentsRef.current(scoped);
-        } while (queuedRefetchRef.current);
-      } catch (e) {
-        console.error("[useCommentsRepoSubscription] refetch failed", e);
-      } finally {
-        inFlightRef.current = false;
-      }
-    },
-    [sid, scopeKey],
-  );
+  }, [restScopeKey]);
 
   const refetch = useCallback(async () => {
-    await runRefetch(true);
-  }, [runRefetch]);
+    if (!sid) return;
+    if (useListener) {
+      // Listener already streams updates; re-emit current snapshot for any consumer
+      // whose manual "Refresh" button wants to flush stuck local state.
+      onCommentsRef.current(getCommentsSnapshot(sid).comments);
+      return;
+    }
+    if (inFlightRef.current) {
+      queuedRefetchRef.current = true;
+      return;
+    }
+    inFlightRef.current = true;
+    try {
+      do {
+        queuedRefetchRef.current = false;
+        const scoped = await fetchComments(sid, {
+          feedbackId: undefined,
+          force: true,
+        });
+        initialDoneRef.current = sid;
+        onCommentsRef.current(scoped);
+      } while (queuedRefetchRef.current);
+    } catch (e) {
+      console.error("[useCommentsRepoSubscription] refetch failed", e);
+    } finally {
+      inFlightRef.current = false;
+    }
+  }, [sid, useListener]);
 
-  return { refetch };
+  return useMemo(() => ({ refetch }), [refetch]);
 }

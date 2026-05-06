@@ -5,16 +5,16 @@ import {
   buildCapabilities,
   type AccessContext,
 } from "@/lib/access/resolveAccess";
-import type { AccessLevel } from "@/lib/domain/accessLevel";
 import type { AccessRequest } from "@/lib/domain/accessRequest";
 import type { SessionInvite } from "@/lib/domain/sessionInvite";
 import type { SessionMember } from "@/lib/domain/sessionMember";
 import type { Session } from "@/lib/domain/session";
 import { MISSING_USER_WORKSPACE_ERROR } from "@/lib/constants/userWorkspace";
-import { getShareLinkByToken } from "@/lib/repositories/shareLinksRepository";
 import { getInviteByEmail, getSessionMember } from "@/lib/repositories/sessionMembersRepository.server";
+import { writeSessionAccessDoc } from "@/lib/repositories/sessionAccessRepository.server";
 import { getRequestByUser } from "@/lib/repositories/accessRequestsRepository.server";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
+import { sessionAccessDocPath } from "@/lib/repositories/sessionPaths";
 import { getWorkspaceMemberRepo } from "@/lib/repositories/workspaceMembersRepository.server";
 import { AuthorizationError } from "@/lib/server/auth/authorize";
 import { adminDb } from "@/lib/server/firebaseAdmin";
@@ -42,13 +42,10 @@ export type GetAccessContextResult = {
   };
 };
 
-type TokenPayload = {
-  generalAccess: AccessLevel;
-  isActive: boolean;
-  expiresAt: number | null;
-};
-
-const ACCESS_CTX_CACHE_TTL_MS = 2_000;
+// Short TTL: this cache exists only to dedup parallel fan-out within a single
+// request. 250ms covers that window without serving stale "no access" decisions
+// across distinct requests, which compounded the view-only invite propagation race.
+const ACCESS_CTX_CACHE_TTL_MS = 250;
 const ACCESS_CTX_CACHE_MAX = 200;
 
 type AccessCtxCacheEntry = { exp: number; val: GetAccessContextResult };
@@ -74,52 +71,14 @@ function accessCtxCacheSet(key: string, val: GetAccessContextResult) {
 
 function buildAccessCtxCacheKey(
   sessionId: string,
-  context: SystemContext,
-  effectiveToken: string
+  context: SystemContext
 ): string {
   return [
     context.identityType,
     context.userId?.trim() ?? "",
     context.workspaceId ?? "",
-    context.shareToken ?? "",
     sessionId,
-    effectiveToken,
   ].join("\x1f");
-}
-
-/** Share link is an optional enhancer; only active rows are passed to {@link resolveAccess}. */
-function tokenPayloadForResolve(payload: TokenPayload | null) {
-  if (!payload?.isActive) return null;
-  return {
-    generalAccess: payload.generalAccess,
-    isActive: true,
-    expiresAt: payload.expiresAt,
-  };
-}
-
-async function loadShareLinkPayloadForSession(
-  token: string,
-  sessionId: string
-): Promise<TokenPayload | null> {
-  const trimmed = token.trim();
-  if (!trimmed || trimmed.length < 20) {
-    return null;
-  }
-  const row = await getShareLinkByToken(trimmed);
-  if (!row || row.sessionId.trim() !== sessionId.trim()) {
-    return null;
-  }
-
-  let expiresAtMs: number | null = null;
-  if (row.expiresAt && typeof row.expiresAt.toMillis === "function") {
-    expiresAtMs = row.expiresAt.toMillis();
-  }
-
-  return {
-    generalAccess: row.generalAccess,
-    isActive: row.isActive,
-    expiresAt: expiresAtMs,
-  };
 }
 
 async function loadUserEmailAndWorkspaceForAccess(
@@ -161,8 +120,9 @@ function toAccessContext(params: {
   role: AccessContext["role"];
   sessionGranted: boolean;
   isWorkspaceMember: boolean;
+  hasDirectSessionGrant: boolean;
 }): AccessContext {
-  const { sessionId, workspaceId, user, role, sessionGranted, isWorkspaceMember } = params;
+  const { sessionId, workspaceId, user, role, sessionGranted, isWorkspaceMember, hasDirectSessionGrant } = params;
   const userId = user == null ? null : user.uid.trim();
   if (user != null) {
     assert(userId, "Missing user uid for access context");
@@ -175,12 +135,12 @@ function toAccessContext(params: {
     isPublicViewer: user === null,
     capabilities: buildCapabilities(role, userId, sessionGranted),
     isWorkspaceMember,
+    hasDirectSessionGrant,
   };
 }
 
 function accessInputsFromContext(context: SystemContext): {
   user: AccessContextUser | null;
-  tokenString: string | undefined;
   viewerWorkspaceIdOverride: string | null | undefined;
 } {
   if (context.identityType === "USER" && context.userId) {
@@ -188,37 +148,18 @@ function accessInputsFromContext(context: SystemContext): {
     if (!uid) {
       return {
         user: null,
-        tokenString: undefined,
         viewerWorkspaceIdOverride: undefined,
       };
     }
     const ws = context.workspaceId == null ? "" : context.workspaceId.trim();
-    const shareTok =
-      context.shareToken == null || context.shareToken === ""
-        ? ""
-        : context.shareToken.trim();
     return {
       user: { uid },
-      tokenString: shareTok !== "" ? shareTok : undefined,
       viewerWorkspaceIdOverride: ws !== "" ? ws : undefined,
-    };
-  }
-
-  if (context.identityType === "SHARE") {
-    const tok =
-      context.shareToken == null || context.shareToken === ""
-        ? ""
-        : context.shareToken.trim();
-    return {
-      user: null,
-      tokenString: tok !== "" ? tok : undefined,
-      viewerWorkspaceIdOverride: undefined,
     };
   }
 
   return {
     user: null,
-    tokenString: undefined,
     viewerWorkspaceIdOverride: undefined,
   };
 }
@@ -232,8 +173,9 @@ function finalizeAccessContextResult(params: {
   invite: SessionInvite | null;
   inviteIgnoredReason: "WORKSPACE_MEMBER" | null;
   resolveAccessRequest: AccessRequest | null;
-  tokenPayload: TokenPayload | null;
   workspaceRole?: "OWNER" | "MEMBER" | null;
+  effectiveMemberAccess: "view" | "resolve" | null;
+  hasDirectSessionGrant: boolean;
 }): GetAccessContextResult {
   const {
     session,
@@ -244,8 +186,9 @@ function finalizeAccessContextResult(params: {
     invite,
     inviteIgnoredReason,
     resolveAccessRequest,
-    tokenPayload,
     workspaceRole,
+    effectiveMemberAccess,
+    hasDirectSessionGrant,
   } = params;
 
   const { role, sessionGranted, isWorkspaceMember } = resolveAccess({
@@ -257,8 +200,7 @@ function finalizeAccessContextResult(params: {
       generalAccess: session.generalAccess,
     },
     user: user ? { uid: user.uid, workspaceId: userWorkspaceId } : null,
-    token: tokenPayloadForResolve(tokenPayload),
-    memberAccess: member?.access ?? null,
+    memberAccess: effectiveMemberAccess,
     workspaceRole: workspaceRole ?? null,
   });
 
@@ -269,6 +211,7 @@ function finalizeAccessContextResult(params: {
     role,
     sessionGranted,
     isWorkspaceMember,
+    hasDirectSessionGrant,
   });
 
   return {
@@ -305,11 +248,10 @@ export async function getAccessContext(options: {
     throw new AuthorizationError("Missing session id", 400, "INVALID_INPUT");
   }
 
-  const { user, tokenString, viewerWorkspaceIdOverride } =
+  const { user, viewerWorkspaceIdOverride } =
     accessInputsFromContext(options.context);
 
-  const effectiveToken = tokenString?.trim() ?? "";
-  const cacheKey = buildAccessCtxCacheKey(sid, options.context, effectiveToken);
+  const cacheKey = buildAccessCtxCacheKey(sid, options.context);
   const hit = accessCtxCacheGet(cacheKey);
   if (hit) return hit;
 
@@ -341,28 +283,10 @@ export async function getAccessContext(options: {
     inviteIgnoredReason: null as "WORKSPACE_MEMBER" | null,
   };
 
-  if (
-    user == null &&
-    effectiveToken === "" &&
-    session.generalAccess === "link_view"
-  ) {
-    const result = finalizeAccessContextResult({
-      session,
-      sid,
-      user: null,
-      userWorkspaceId: "",
-      ...noInviteDebug,
-      resolveAccessRequest: null,
-      tokenPayload: null,
-    });
-    accessCtxCacheSet(cacheKey, result);
-    return result;
-  }
-
   if (user == null) {
-    const tokenPayload = effectiveToken
-      ? await loadShareLinkPayloadForSession(effectiveToken, sid)
-      : null;
+    // Anonymous viewer: link_view sessions grant public access (the session id is the
+    // credential). Restricted sessions fall through with sessionGranted=false → access
+    // denied → client renders the "Sign in to request access" UX.
     const result = finalizeAccessContextResult({
       session,
       sid,
@@ -370,7 +294,8 @@ export async function getAccessContext(options: {
       userWorkspaceId: "",
       ...noInviteDebug,
       resolveAccessRequest: null,
-      tokenPayload,
+      effectiveMemberAccess: null,
+      hasDirectSessionGrant: false,
     });
     accessCtxCacheSet(cacheKey, result);
     return result;
@@ -383,15 +308,50 @@ export async function getAccessContext(options: {
     userWorkspaceId === session.workspaceId.trim();
 
   // WORKSPACE-MEMBER: checking subcollection instead of members[] array
-  const [member, resolveAccessRequest, tokenPayload, workspaceMemberDoc] =
+  const [member, resolveAccessRequest, workspaceMemberDoc, sessionAccessSnap] =
     await Promise.all([
       getSessionMember(sid, user.uid),
       getRequestByUser(sid, user.uid),
-      effectiveToken ? loadShareLinkPayloadForSession(effectiveToken, sid) : Promise.resolve(null),
       user.uid
         ? getWorkspaceMemberRepo(session.workspaceId.trim(), user.uid)
         : Promise.resolve(null),
+      adminDb.doc(sessionAccessDocPath(user.uid, sid)).get(),
     ]);
+
+  const sessionAccessMirrorLevel: "view" | "resolve" | null = (() => {
+    if (!sessionAccessSnap.exists) return null;
+    const lvl = sessionAccessSnap.data()?.accessLevel;
+    return lvl === "view" || lvl === "resolve" ? lvl : null;
+  })();
+
+  // Self-heal: member doc exists with a valid level but the sessionAccess mirror
+  // is missing. Recover from pre-Phase-6b legacy data or a one-time dual-write
+  // failure by writing the mirror inline. writeSessionAccessDoc upserts so this
+  // is idempotent.
+  let resolvedSessionAccessMirrorLevel = sessionAccessMirrorLevel;
+  if (
+    !sessionAccessMirrorLevel
+    && member
+    && (member.access === "view" || member.access === "resolve")
+    && user.uid
+    && session.workspaceId
+  ) {
+    try {
+      await writeSessionAccessDoc({
+        userId: user.uid,
+        sessionId: sid,
+        workspaceId: session.workspaceId.trim(),
+        accessLevel: member.access,
+        addedBy: member.addedBy ?? user.uid,
+      });
+      resolvedSessionAccessMirrorLevel = member.access;
+    } catch (err) {
+      console.warn("[getAccessContext] sessionAccess self-heal failed", { uid: user.uid, sid, err });
+    }
+  }
+
+  const effectiveMemberAccess: "view" | "resolve" | null =
+    member?.access ?? resolvedSessionAccessMirrorLevel;
 
   const isWorkspaceMemberBySubcollection = workspaceMemberDoc !== null;
   const isWorkspaceMember =
@@ -405,7 +365,7 @@ export async function getAccessContext(options: {
   let invite: SessionInvite | null = null;
   if (userEmail && !isWorkspaceMember) {
     const hasMemberAccess =
-      member?.access === "view" || member?.access === "resolve";
+      effectiveMemberAccess === "view" || effectiveMemberAccess === "resolve";
     if (!hasMemberAccess) {
       invite = await getInviteByEmail(sid, userEmail);
     }
@@ -422,6 +382,13 @@ export async function getAccessContext(options: {
     invite = null;
   }
 
+  // Direct grant = workspace member OR explicit session-level access (member
+  // doc OR sessionAccess mirror, after self-heal). link_view alone does NOT
+  // qualify because Firestore rules still deny listener attach for users who
+  // hold no member/mirror record.
+  const hasDirectSessionGrant =
+    isWorkspaceMember || effectiveMemberAccess !== null;
+
   const result = finalizeAccessContextResult({
     session,
     sid,
@@ -431,8 +398,9 @@ export async function getAccessContext(options: {
     invite,
     inviteIgnoredReason,
     resolveAccessRequest,
-    tokenPayload,
     workspaceRole: (workspaceMemberDoc?.role as "OWNER" | "MEMBER" | null | undefined) ?? null,
+    effectiveMemberAccess,
+    hasDirectSessionGrant,
   });
   accessCtxCacheSet(cacheKey, result);
   return result;

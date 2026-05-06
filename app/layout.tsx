@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { DM_Sans } from "next/font/google";
 import "./globals.css";
+import { ToastProvider } from "@/components/dashboard/context/ToastContext";
+import { RootProviders } from "@/components/providers/RootProviders";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -23,7 +25,11 @@ export default function RootLayout({
         className={`${dmSans.className} font-sans antialiased h-full overflow-y-auto`}
         suppressHydrationWarning
       >
-        <div className="env-canvas h-full flex flex-col">{children}</div>
+        <ToastProvider>
+          <RootProviders>
+            <div className="env-canvas h-full flex flex-col">{children}</div>
+          </RootProviders>
+        </ToastProvider>
       </body>
     </html>
   );

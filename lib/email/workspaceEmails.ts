@@ -8,6 +8,7 @@ import { accessRequestNotificationEmailHtml } from "./templates/accessRequestNot
 import { accessRequestResultEmailHtml } from "./templates/accessRequestResult";
 import { emailChangeEmailHtml } from "./templates/emailChange";
 import { passwordResetEmailHtml } from "./templates/passwordReset";
+import { emailVerificationHtml } from "./templates/emailVerification";
 
 // WS-006 FIX: always use verified sender domain
 // regardless of APP_URL (localhost would break Resend)
@@ -184,6 +185,22 @@ export async function sendPasswordResetEmail({
     to,
     subject: "Reset your Echly password",
     html: passwordResetEmailHtml({ resetUrl, userName }),
+  });
+}
+
+export async function sendEmailVerification({
+  to,
+  verifyUrl,
+  userName,
+}: {
+  to: string;
+  verifyUrl: string;
+  userName: string;
+}): Promise<void> {
+  await sendEmailOrLog({
+    to,
+    subject: "Verify your email — Echly",
+    html: emailVerificationHtml({ verifyUrl, userName }),
   });
 }
 

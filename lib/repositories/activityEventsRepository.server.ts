@@ -4,6 +4,7 @@ import { adminDb } from "@/lib/server/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
 import { getUserByIdRepo } from "@/lib/repositories/usersRepository.server";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
+import { composeFullName } from "@/lib/utils/nameSplit";
 
 /** Denormalized fields the activity UI reads; extra keys (e.g. changedFields) are merged in Firestore. */
 export type ActivityEventMetadata = {
@@ -79,9 +80,12 @@ export async function resolveActorForActivityEvent(actorId: string): Promise<{
 
   const u = await getUserByIdRepo(id);
   const row = (u ?? {}) as Record<string, unknown>;
+  const composed = composeFullName(
+    typeof row.firstName === "string" ? row.firstName : null,
+    typeof row.lastName === "string" ? row.lastName : null
+  );
   const name =
-    (typeof row.name === "string" && row.name.trim()) ||
-    (typeof row.displayName === "string" && row.displayName.trim()) ||
+    composed ||
     (typeof row.email === "string" && row.email.split("@")[0]?.trim()) ||
     "";
   if (!name) {

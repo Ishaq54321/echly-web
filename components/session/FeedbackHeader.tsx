@@ -10,11 +10,9 @@ import type { ShareSurfacePermissions } from "@/lib/access/resolveAccess";
 import type { Priority } from "@/lib/domain/feedback";
 import {
   Check,
-  UserPlus,
   Clock,
   MessageSquare,
   Lock,
-  Flag,
   Trash2,
   RotateCcw,
 } from "lucide-react";
@@ -168,20 +166,6 @@ export function SessionFeedbackHeader({
     else onBlocked({ reason: "app", action: "comment" });
   };
 
-  const gateAssign = () => {
-    if (!shareGating) return;
-    const { permissions, onBlocked } = shareGating;
-    if (!permissions.canAssign) onBlocked({ reason: "tier", action: "assign" });
-    else onBlocked({ reason: "app", action: "assign" });
-  };
-
-  const gateDefer = () => {
-    if (!shareGating) return;
-    const { permissions, onBlocked } = shareGating;
-    if (!permissions.canDefer) onBlocked({ reason: "tier", action: "defer" });
-    else onBlocked({ reason: "app", action: "defer" });
-  };
-
   return (
     <header className="sticky top-0 z-20 shrink-0 bg-[var(--surface-card)] pt-0 px-0 pb-0">
       <div className="mb-6">
@@ -266,16 +250,35 @@ export function SessionFeedbackHeader({
                     {isResolved ? "Resolved" : "Resolve"}
                   </button>
                 )}
-                {/* Assign */}
-                <button type="button" className={actionBtn} onClick={gateAssign}>
-                  <UserPlus size={14} strokeWidth={1.5} />
-                  Assign
-                </button>
-                {/* Priority */}
-                <button type="button" className={actionBtn} onClick={gateDefer}>
-                  <Flag size={14} strokeWidth={1.5} />
-                  Priority
-                </button>
+                {/* Assign — only when set, read-only for view/resolve viewers */}
+                {item && assigneeId ? (
+                  <div className={dropdownBtnOverride}>
+                    <AssignDropdown
+                      feedbackId={item.id}
+                      sessionId={""}
+                      currentAssigneeId={assigneeId}
+                      currentAssigneeName={assigneeName ?? null}
+                      currentAssigneeAvatarUrl={assigneeAvatarUrl ?? null}
+                      onAssigned={() => {}}
+                      disabled={true}
+                      readOnly={true}
+                      iconOnly={false}
+                    />
+                  </div>
+                ) : null}
+                {/* Priority — only when set, read-only for view/resolve viewers */}
+                {item && priority ? (
+                  <div className={dropdownBtnOverride}>
+                    <PriorityDropdown
+                      feedbackId={item.id}
+                      currentPriority={priority}
+                      onPriorityChanged={() => {}}
+                      disabled={true}
+                      readOnly={true}
+                      iconOnly={false}
+                    />
+                  </div>
+                ) : null}
                 {/* Comment */}
                 <button type="button" className={actionBtn} onClick={gateComment}>
                   <MessageSquare size={14} strokeWidth={1.5} />
@@ -355,7 +358,7 @@ export function SessionFeedbackHeader({
                       onAssigned={() => {}}
                       disabled={true}
                       readOnly={true}
-                      iconOnly
+                      iconOnly={false}
                     />
                   </div>
                 )}
@@ -368,7 +371,7 @@ export function SessionFeedbackHeader({
                       onPriorityChanged={() => {}}
                       disabled={true}
                       readOnly={true}
-                      iconOnly
+                      iconOnly={false}
                     />
                   </div>
                 )}
@@ -422,7 +425,7 @@ export function SessionFeedbackHeader({
                   </button>
                 )
               ) : null}
-              {/* Assign — only render if the user can actually manage it */}
+              {/* Assign — manage when workspace member, read-only fallback for cross-workspace authed viewers */}
               {item && !isAnonymousViewer && canAssignTicket && isWorkspaceMember && onAssigned ? (
                 <div className={dropdownBtnOverride}>
                   <AssignDropdown
@@ -437,8 +440,22 @@ export function SessionFeedbackHeader({
                     iconOnly
                   />
                 </div>
+              ) : item && !isAnonymousViewer && !isWorkspaceMember && assigneeId ? (
+                <div className={dropdownBtnOverride}>
+                  <AssignDropdown
+                    feedbackId={item.id}
+                    sessionId={""}
+                    currentAssigneeId={assigneeId}
+                    currentAssigneeName={assigneeName ?? null}
+                    currentAssigneeAvatarUrl={assigneeAvatarUrl ?? null}
+                    onAssigned={() => {}}
+                    disabled={true}
+                    readOnly={true}
+                    iconOnly={false}
+                  />
+                </div>
               ) : null}
-              {/* Priority — only render if the user can actually manage it */}
+              {/* Priority — manage when workspace member, read-only fallback for cross-workspace authed viewers */}
               {item && !isAnonymousViewer && isWorkspaceMember && onPriorityChanged ? (
                 <div className={dropdownBtnOverride}>
                   <PriorityDropdown
@@ -448,6 +465,17 @@ export function SessionFeedbackHeader({
                     onPriorityChanged={onPriorityChanged}
                     onSaveStateChange={onSaveStateChange}
                     iconOnly
+                  />
+                </div>
+              ) : item && !isAnonymousViewer && !isWorkspaceMember && priority ? (
+                <div className={dropdownBtnOverride}>
+                  <PriorityDropdown
+                    feedbackId={item.id}
+                    currentPriority={priority}
+                    onPriorityChanged={() => {}}
+                    disabled={true}
+                    readOnly={true}
+                    iconOnly={false}
                   />
                 </div>
               ) : null}

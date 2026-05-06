@@ -20,7 +20,7 @@ import {
 } from "@/lib/utils/sessionTimeRange";
 import type { SessionsTimeRange } from "@/lib/utils/sessionTimeRange";
 import { useSessionsSearch } from "@/components/dashboard/context/SessionsSearchContext";
-import EmptySessionsCard from "@/components/dashboard/EmptySessionsCard";
+import EmptyDashboardCarousel from "@/components/dashboard/EmptyDashboardCarousel";
 import { ArchiveEmptyState } from "@/components/empty/ArchiveEmptyState";
 import { ToastProvider, useToast } from "@/components/dashboard/context/ToastContext";
 import { SessionsSearchProvider } from "@/components/dashboard/context/SessionsSearchContext";
@@ -75,7 +75,7 @@ function DashboardContent() {
     setSessionArchived,
     deleteSession,
   } = useWorkspaceStore();
-  const { authUid, isIdentityResolved, authDisplayName, workspaceName } = useWorkspace();
+  const { authUid, isIdentityResolved, firstName, workspaceName } = useWorkspace();
   const stableSessions = useStableState(sessions, true, authUid);
   const { search } = useSessionsSearch();
   const [debouncedSearch, setDebouncedSearch] = useState(search);
@@ -152,11 +152,11 @@ function DashboardContent() {
   };
 
   return (
-    <div className="relative flex min-h-0 w-full flex-1 flex-col bg-white">
+    <div className="relative flex min-h-0 w-full flex-1 flex-col">
       <div className="mx-auto w-full max-w-[1280px] px-6 pb-10 pt-10">
         <SessionsHeader
           workspaceName={workspaceName ?? undefined}
-          firstName={authDisplayName?.split(" ")[0] ?? undefined}
+          firstName={firstName || undefined}
         />
 
         <main className="flex-1">
@@ -202,7 +202,7 @@ function DashboardContent() {
                     <BrandLoader />
                   </div>
                 ) : listArchiveTab === "sessions" && activeSessions.length === 0 ? (
-                  <EmptySessionsCard />
+                  <EmptyDashboardCarousel />
                 ) : listArchiveTab === "archived" && archivedSessions.length === 0 ? (
                   <ArchiveEmptyState />
                 ) : (

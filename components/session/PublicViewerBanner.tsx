@@ -5,7 +5,6 @@ import { Lock, LogIn, X } from "lucide-react";
 
 type PublicViewerBannerProps = {
   sessionId: string;
-  shareToken: string;
   canRequestAccess: boolean;
 };
 

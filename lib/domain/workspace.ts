@@ -17,6 +17,8 @@ export interface WorkspaceStats {
 export interface Workspace {
   id: string;
   name: string;
+  /** Vanity URL slug — unique, lowercase, alphanumeric + hyphens. May be missing on legacy docs. */
+  slug?: string | null;
   logoUrl: string | null;
   ownerId: string;
   // WORKSPACE-MEMBER: member list moved to workspaces/{id}/members subcollection
@@ -115,11 +117,13 @@ export function defaultWorkspaceDoc(params: {
   ownerId: string;
   name?: string | null;
   logoUrl?: string | null;
+  slug?: string | null;
 }): WorkspaceDoc {
   const now = new Date();
   const resetDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
   return {
     name: (params.name ?? "My Workspace").trim() || "My Workspace",
+    slug: params.slug ?? null,
     logoUrl: params.logoUrl ?? null,
     ownerId: params.ownerId,
     // WORKSPACE-MEMBER: member list moved to workspaces/{id}/members subcollection

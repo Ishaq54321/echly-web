@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
+  Bug,
   Command,
   CreditCard,
   ExternalLink,
@@ -590,6 +591,11 @@ export function ProfileCommandPanel({
                 window.open("mailto:support@echly.com", "_self");
                 onClose();
               }}
+            />
+            <MenuItem
+              icon={Bug}
+              label="Report a Bug"
+              onClick={() => { onClose(); }}
             />
           </div>
 

@@ -732,6 +732,16 @@ textarea:focus-visible {
   box-shadow: 0 0 0 1px var(--brand);
 }
 
+/* Auth pages own their focus styles — opt out of global ring */
+.auth-root button:focus-visible,
+.auth-root a:focus-visible,
+.auth-root [role="button"]:focus-visible,
+.auth-root input:focus-visible,
+.auth-root select:focus-visible,
+.auth-root textarea:focus-visible {
+  box-shadow: none;
+}
+
 .no-focus-ring:focus,
 .no-focus-ring:focus-visible {
   outline: none !important;
@@ -3649,12 +3659,6 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
 
 .main-content {
   padding-top: 0;
-}
-
-.content-divider {
-  width: 1px;
-  flex-shrink: 0;
-  background: var(--border);
 }
 
 .top-controls-shell {

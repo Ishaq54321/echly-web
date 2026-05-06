@@ -47,14 +47,24 @@ export async function createWorkspaceRepo(params: {
     name: params.name.trim() || "My Workspace",
     logoUrl: params.logoUrl ?? null,
   });
-  await ref.set({
-    ...payload,
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp(),
-  });
+  try {
+    await ref.create({
+      ...payload,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  } catch (err: unknown) {
+    const code = (err as { code?: number })?.code;
+    if (code === 6) {
+      // ALREADY_EXISTS — workspace was created by a concurrent request.
+      // Skip member + membership writes (they were done by the first caller).
+      return;
+    }
+    throw err;
+  }
   invalidateWorkspaceDocCache(resolvedUserId);
 
-  // WS-001 FIX: ensure owner member doc always exists
+  // Only reached if we successfully created the workspace (we won the race).
   const ownerSnap = await adminDb.doc(`users/${params.ownerId}`).get();
   const ownerAvatarUrl = ownerSnap.exists
     ? ((ownerSnap.data()?.avatarUrl ?? ownerSnap.data()?.photoURL) as string | null | undefined) ?? null

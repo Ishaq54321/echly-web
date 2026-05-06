@@ -1,7 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { authFetch } from "@/lib/authFetch";
+import {
+  retainAccessRequestsListener,
+  useAccessRequestsStore,
+} from "@/lib/realtime/accessRequestStore";
 
 export type ShareAccess = "view" | "resolve";
 export type ShareGeneralAccess = "restricted" | "link_view";
@@ -50,10 +54,9 @@ function itemKey(item: Pick<ShareItem, "type" | "id">): string {
 
 export function useShareController(
   sessionId: string,
-  options?: { canResolve?: boolean; pendingRequestsCount?: number; initialGeneralAccess?: ShareGeneralAccess }
+  options?: { canResolve?: boolean; initialGeneralAccess?: ShareGeneralAccess }
 ) {
   const canResolve = options?.canResolve ?? false;
-  const pendingRequestsCount = options?.pendingRequestsCount;
   const initialGeneralAccess = options?.initialGeneralAccess;
 
   const [open, setOpen] = useState(false);
@@ -70,18 +73,25 @@ export function useShareController(
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [listError, setListError] = useState("");
   const [inviteError, setInviteError] = useState("");
-  const [accessRequests, setAccessRequests] = useState<ShareAccessRequestItem[]>([]);
+  const accessRequestsState = useAccessRequestsStore(sessionId);
+  const accessRequests = useMemo<ShareAccessRequestItem[]>(
+    () =>
+      accessRequestsState.requests.map((r) => ({
+        id: r.id,
+        requesterEmail: r.requesterEmail,
+        requestedAccess: r.requestedAccess,
+        status: r.status,
+      })),
+    [accessRequestsState.requests]
+  );
   const [patchingAccessRequestId, setPatchingAccessRequestId] = useState<string | null>(null);
   const [refetchingAfterApproval, setRefetchingAfterApproval] = useState(false);
   const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([]);
   const [loadingWorkspaceMembers, setLoadingWorkspaceMembers] = useState(false);
 
-  // Link access level for share link copy
-  const [linkAccessLevel, setLinkAccessLevel] = useState<ShareAccess>("view");
-  const [copyingLink, setCopyingLink] = useState(false);
+  // Link copy state ("Copy link" → "Copied" toggle).
   const [linkCopied, setLinkCopied] = useState(false);
   const linkCopiedTimerRef = useRef<number | null>(null);
-  const preFetchedLinkRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     const sid = sessionId.trim();
@@ -89,10 +99,7 @@ export function useShareController(
     setInitialLoading(true);
     setListError("");
 
-    const [res, arRes] = await Promise.all([
-      authFetch(`/api/sessions/${encodeURIComponent(sid)}/members`),
-      authFetch(`/api/sessions/${encodeURIComponent(sid)}/access-requests`),
-    ]);
+    const res = await authFetch(`/api/sessions/${encodeURIComponent(sid)}/members`);
 
     if (!res) {
       setInitialLoading(false);
@@ -103,24 +110,10 @@ export function useShareController(
     }>;
     if (!res.ok || !json.success) {
       setListError(getErrorMessage(json));
-      setAccessRequests([]);
       setInitialLoading(false);
       return;
     }
     setItems(Array.isArray(json.data?.items) ? json.data.items : []);
-
-    if (arRes?.ok) {
-      const arJson = (await arRes.json().catch(() => ({}))) as ApiEnvelope<{
-        requests?: ShareAccessRequestItem[];
-      }>;
-      if (arJson.success && Array.isArray(arJson.data?.requests)) {
-        setAccessRequests(arJson.data.requests);
-      } else {
-        setAccessRequests([]);
-      }
-    } else {
-      setAccessRequests([]);
-    }
 
     setInitialLoading(false);
   }, [sessionId]);
@@ -206,81 +199,32 @@ export function useShareController(
     [sessionId, generalAccess]
   );
 
-  useEffect(() => {
-    if (!open || !sessionId) return;
-    preFetchedLinkRef.current = null;
-    const sid = sessionId.trim();
-    if (!sid) return;
-
-    authFetch(`/api/sessions/${encodeURIComponent(sid)}/share-link`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ access: linkAccessLevel }),
-    })
-      .then((r) => (r?.ok ? r.json() : null))
-      .then((data: ApiEnvelope<{ url?: string; token?: string }> | null) => {
-        if (!data) return;
-        const url =
-          (data.data as { url?: string } | undefined)?.url ??
-          (data as { url?: string }).url ??
-          null;
-        if (url) {
-          preFetchedLinkRef.current = url;
-          return;
-        }
-        const token = data.data?.token;
-        if (token) {
-          preFetchedLinkRef.current = `${window.location.origin}/session/${encodeURIComponent(sid)}?token=${encodeURIComponent(token)}`;
-        }
-      })
-      .catch(() => {});
-  }, [open, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const copyShareLink = useCallback(async () => {
     const sid = sessionId.trim();
-    if (!sid || copyingLink) return;
-    setCopyingLink(true);
+    if (!sid) return;
+    const url = `${window.location.origin}/session/${encodeURIComponent(sid)}`;
     try {
-      let url = preFetchedLinkRef.current;
-
-      if (!url) {
-        const res = await authFetch(`/api/sessions/${encodeURIComponent(sid)}/share-link`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ access: linkAccessLevel }),
-        });
-        const data = res?.ok ? ((await res.json().catch(() => ({}))) as ApiEnvelope<{ url?: string; token?: string }>) : null;
-        url =
-          (data?.data as { url?: string } | undefined)?.url ??
-          (data as { url?: string } | null)?.url ??
-          null;
-        if (!url && data?.data?.token) {
-          url = `${window.location.origin}/session/${encodeURIComponent(sid)}?token=${encodeURIComponent(data.data.token)}`;
-        }
-      }
-
-      if (url) {
-        try {
-          await navigator.clipboard.writeText(url);
-        } catch {
-          // fallback: no-op
-        }
-        if (linkCopiedTimerRef.current != null) window.clearTimeout(linkCopiedTimerRef.current);
-        setLinkCopied(true);
-        linkCopiedTimerRef.current = window.setTimeout(() => setLinkCopied(false), 2000);
-      }
+      await navigator.clipboard.writeText(url);
     } catch {
-      // silent fail
-    } finally {
-      setCopyingLink(false);
+      return;
     }
-  }, [sessionId, linkAccessLevel, copyingLink]);
+    if (linkCopiedTimerRef.current != null) window.clearTimeout(linkCopiedTimerRef.current);
+    setLinkCopied(true);
+    linkCopiedTimerRef.current = window.setTimeout(() => setLinkCopied(false), 2000);
+  }, [sessionId]);
 
   useEffect(() => {
     return () => {
       if (linkCopiedTimerRef.current != null) window.clearTimeout(linkCopiedTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    const sid = sessionId.trim();
+    if (!sid) return;
+    const release = retainAccessRequestsListener(sid);
+    return release;
+  }, [sessionId]);
 
   const updateRole = useCallback(
     async (item: Pick<ShareItem, "type" | "id">, access: ShareAccess) => {
@@ -327,13 +271,9 @@ export function useShareController(
       setPatchingAccessRequestId(rid);
       setListError("");
 
-      // Optimistic: remove request from list immediately
+      // Optimistic: add new member for approve. Request removal is handled by
+      // the realtime accessRequests listener once the server PATCH commits.
       const optimisticRequest = accessRequests.find(r => r.id === rid);
-      if (action === "approve" || action === "reject") {
-        setAccessRequests(prev => prev.filter(r => r.id !== rid));
-      }
-
-      // Optimistic: add new member for approve
       if (action === "approve" && optimisticRequest) {
         const optimisticMember: ShareItem = {
           id: optimisticRequest.id,
@@ -356,10 +296,6 @@ export function useShareController(
         }),
       });
       if (!res) {
-        // Rollback: restore the request
-        if (optimisticRequest) {
-          setAccessRequests(prev => [...prev, optimisticRequest]);
-        }
         if (optimisticMemberId) {
           setItems(prev => prev.filter(i => i.id !== optimisticMemberId));
         }
@@ -368,10 +304,6 @@ export function useShareController(
       }
       const json = (await res.json().catch(() => ({}))) as ApiEnvelope<{ type?: string }>;
       if (!res.ok || !json.success) {
-        // Rollback: restore the request
-        if (optimisticRequest) {
-          setAccessRequests(prev => [...prev, optimisticRequest]);
-        }
         if (optimisticMemberId) {
           setItems(prev => prev.filter(i => i.id !== optimisticMemberId));
         }
@@ -382,23 +314,10 @@ export function useShareController(
       setPatchingAccessRequestId(null);
       setRefetchingAfterApproval(true);
 
-      const [memRes, arRes2] = await Promise.all([
-        authFetch(`/api/sessions/${encodeURIComponent(sid)}/members`),
-        authFetch(`/api/sessions/${encodeURIComponent(sid)}/access-requests`),
-      ]);
-
-      const [mj, arJson] = await Promise.all([
-        memRes?.ok ? memRes.json() : Promise.resolve(null),
-        arRes2?.ok ? arRes2.json() : Promise.resolve(null),
-      ]);
-
-      // Both state updates in the same synchronous block
-      // React 18 batches these into one render
+      const memRes = await authFetch(`/api/sessions/${encodeURIComponent(sid)}/members`);
+      const mj = memRes?.ok ? await memRes.json() : null;
       if (mj?.success && Array.isArray(mj.data?.items)) {
         setItems(mj.data.items);
-      }
-      if (arJson?.success && Array.isArray(arJson.data?.requests)) {
-        setAccessRequests(arJson.data.requests);
       }
 
       setRefetchingAfterApproval(false);
@@ -486,9 +405,6 @@ export function useShareController(
     updateRole,
     removeAccess,
     canResolve,
-    linkAccessLevel,
-    setLinkAccessLevel,
-    copyingLink,
     linkCopied,
     copyShareLink,
     refetchingAfterApproval,

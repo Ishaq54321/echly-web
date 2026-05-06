@@ -52,12 +52,8 @@ export interface ShareModalProps {
   patchingAccessRequestId: string | null;
   onApproveAccessRequest: (requestId: string, access?: "view" | "resolve") => void;
   onRejectAccessRequest: (requestId: string) => void;
-  pendingRequestsCount?: number;
   // Link copy section
   canResolve: boolean;
-  linkAccessLevel: ShareAccess;
-  setLinkAccessLevel: (v: ShareAccess) => void;
-  copyingLink: boolean;
   linkCopied: boolean;
   onCopyShareLink: () => void;
   refetchingAfterApproval?: boolean;
@@ -118,11 +114,7 @@ export function ShareModal({
   patchingAccessRequestId,
   onApproveAccessRequest,
   onRejectAccessRequest,
-  pendingRequestsCount = 0,
   canResolve,
-  linkAccessLevel,
-  setLinkAccessLevel,
-  copyingLink,
   linkCopied,
   onCopyShareLink,
   refetchingAfterApproval = false,
@@ -257,8 +249,7 @@ export function ShareModal({
           {/* Requests */}
           {canWrite ? (
             <>
-              {((pendingRequestsCount ?? 0) > 0 ||
-                accessRequests.length > 0) && (
+              {(accessRequests.length > 0 || initialLoading) && (
               <>
               <section className="share-modal-requests shrink-0 py-3">
                 <h3 className="text-[14px] font-medium text-[var(--text-heading)]/70 mb-3">Requests</h3>
@@ -274,7 +265,29 @@ export function ShareModal({
                     ))}
                   </div>
                 ) : accessRequests.length === 0 ? (
-                  <p className="share-modal-general-access-hint m-0 py-1">No pending requests</p>
+                  <div className="flex flex-col items-center justify-center text-center" style={{ padding: "20px 16px" }}>
+                    <div style={{ width: 120, height: 100, marginBottom: 12 }}>
+                      <svg viewBox="0 0 200 160" width="100%" height="100%" style={{ overflow: "visible" }}>
+                        <g transform="translate(100 86) translate(-44 -28)">
+                          <path d="M0 28 L0 50 L88 50 L88 28 L66 28 L60 36 L28 36 L22 28 Z" fill="#F3F4F6" stroke="#D1D5DB" strokeWidth="1.5" />
+                          <path d="M14 8 L74 8 L74 28 L14 28 Z" fill="#FFFFFF" stroke="#D1D5DB" strokeWidth="1.5" />
+                          <rect x="22" y="14" width="40" height="3" rx="1.5" fill="#E5E7EB" />
+                          <rect x="22" y="20" width="32" height="3" rx="1.5" fill="#E5E7EB" />
+                        </g>
+                        <g transform="translate(146 112)">
+                          <circle cx="17" cy="17" r="14" fill="#6B7280" />
+                          <rect x="10" y="13" width="14" height="9" rx="1.5" fill="none" stroke="#fff" strokeWidth="1.8" />
+                          <path d="M10 13 L17 19 L24 13" fill="none" stroke="#fff" strokeWidth="1.8" />
+                        </g>
+                      </svg>
+                    </div>
+                    <h4 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-heading)", margin: "0 0 4px 0" }}>
+                      No pending requests
+                    </h4>
+                    <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5, margin: 0, maxWidth: 240 }}>
+                      Access requests from external viewers will appear here.
+                    </p>
+                  </div>
                 ) : (
                   <ul className="share-access-request-list m-0 list-none p-0">
                     {accessRequests.map((req) => {
@@ -578,11 +591,8 @@ export function ShareModal({
               type="button"
               className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--brand-muted)] bg-[var(--brand-subtle)] text-[var(--brand)] text-[14px] font-medium hover:bg-[var(--brand-muted)] transition-colors cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
               onClick={onCopyShareLink}
-              disabled={copyingLink}
             >
-              {copyingLink ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-              ) : linkCopied ? (
+              {linkCopied ? (
                 <Check className="h-3.5 w-3.5" aria-hidden />
               ) : (
                 <Link className="h-3.5 w-3.5" aria-hidden />
@@ -613,8 +623,7 @@ export function ShareModal({
                 removingId !== null ||
                 updatingGeneralAccess ||
                 patchingAccessRequestId !== null ||
-                refetchingAfterApproval ||
-                copyingLink
+                refetchingAfterApproval
               }
             >
               Done

@@ -200,6 +200,13 @@ function renderNotificationText(n: NotificationRow): React.ReactNode {
           <span className="notif-session-name">{sessionTitle}</span>
         </>
       );
+    case "invite.sent":
+      return (
+        <>
+          <strong>{actorName}</strong> invited you to{" "}
+          <span className="notif-session-name">{n.entityTitle || "a workspace"}</span>
+        </>
+      );
     case "access_request.pending":
       return (
         <>

@@ -1,7 +1,9 @@
 import { NextRequest } from "next/server";
+import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { tryGetAuthUser } from "@/lib/server/auth/authorize";
 import { apiSuccess, apiError } from "@/lib/server/apiResponse";
+import { composeFullName } from "@/lib/utils/nameSplit";
 
 export async function POST(req: NextRequest) {
   const user = await tryGetAuthUser(req);
@@ -13,7 +15,13 @@ export async function POST(req: NextRequest) {
   const userDoc = await adminDb.collection("users").doc(uid).get();
   if (userDoc.exists) {
     const userData = userDoc.data();
-    userName = userData?.displayName || userData?.name || "User";
+    const composed = composeFullName(
+      typeof userData?.firstName === "string" ? userData.firstName : null,
+      typeof userData?.lastName === "string" ? userData.lastName : null
+    );
+    const emailLocal =
+      typeof userData?.email === "string" ? userData.email.split("@")[0] : "";
+    userName = composed || emailLocal || "User";
   }
 
   let body: { commentId?: string; emoji?: string };
@@ -35,26 +43,36 @@ export async function POST(req: NextRequest) {
   }
 
   const data = commentSnap.data();
-  const reactions: Record<string, { userIds: string[]; userNames: string[] }> = data?.reactions ?? {};
-  const existing = reactions[emoji] ?? { userIds: [], userNames: [] };
-
-  const userIndex = existing.userIds.indexOf(uid);
-  if (userIndex > -1) {
-    existing.userIds.splice(userIndex, 1);
-    existing.userNames.splice(userIndex, 1);
-    if (existing.userIds.length === 0) {
-      delete reactions[emoji];
-    } else {
-      reactions[emoji] = existing;
-    }
-  } else {
-    existing.userIds.push(uid);
-    existing.userNames.push(userName);
-    reactions[emoji] = existing;
-  }
+  const reactionsBefore: Record<string, { userIds: string[]; userNames: string[] }> =
+    data?.reactions ?? {};
+  const existing = reactionsBefore[emoji] ?? { userIds: [], userNames: [] };
+  const isAdding = existing.userIds.indexOf(uid) === -1;
 
   try {
-    await commentRef.update({ reactions });
+    if (isAdding) {
+      await commentRef.update({
+        [`reactions.${emoji}.userIds`]: FieldValue.arrayUnion(uid),
+        [`reactions.${emoji}.userNames`]: FieldValue.arrayUnion(userName),
+      });
+    } else {
+      // Remove using the *stored* userName so display-name drift since the original
+      // react doesn't leave a stale name behind in the parallel userNames array.
+      const idx = existing.userIds.indexOf(uid);
+      const storedName =
+        idx >= 0 && typeof existing.userNames[idx] === "string"
+          ? existing.userNames[idx]
+          : userName;
+      await commentRef.update({
+        [`reactions.${emoji}.userIds`]: FieldValue.arrayRemove(uid),
+        [`reactions.${emoji}.userNames`]: FieldValue.arrayRemove(storedName),
+      });
+    }
+    // Re-read so the client receives the post-write authoritative shape.
+    const fresh = await commentRef.get();
+    const reactions = (fresh.data()?.reactions ?? {}) as Record<
+      string,
+      { userIds: string[]; userNames: string[] }
+    >;
     return apiSuccess({ reactions });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to toggle reaction";

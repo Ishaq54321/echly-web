@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useWorkspace } from "@/lib/client/workspaceContext";
-import { MISSING_USER_WORKSPACE_ERROR } from "@/lib/constants/userWorkspace";
 import { OverlayError } from "@/components/ui/OverlayError";
 
 type Props = { children: React.ReactNode };
@@ -11,8 +12,14 @@ type Props = { children: React.ReactNode };
  * Explicit workspace load failures surface as a non-destructive overlay; underlying UI stays mounted.
  */
 export function WorkspaceIdentityGate({ children }: Props) {
-  const { workspaceError } = useWorkspace();
-  const needsOnboarding = workspaceError === MISSING_USER_WORKSPACE_ERROR;
+  const { workspaceError, needsOnboarding } = useWorkspace();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (needsOnboarding) {
+      router.replace("/onboarding");
+    }
+  }, [needsOnboarding, router]);
 
   return (
     <>
@@ -24,7 +31,7 @@ export function WorkspaceIdentityGate({ children }: Props) {
             workspaceError ||
             "Your account workspace could not be loaded. Try refreshing the page or sign in again."
           }
-          showOnboardingLink={needsOnboarding}
+          showOnboardingLink={false}
         />
       ) : null}
     </>

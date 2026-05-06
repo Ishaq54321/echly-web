@@ -1,39 +1,30 @@
 "use client";
 
-import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   signInWithGoogle,
   signUpWithEmailPassword,
 } from "@/lib/auth/authActions";
-import { AuthLayout } from "@/components/auth/AuthLayout";
-import { AuthCard } from "@/components/auth/AuthCard";
-
-const inputClass =
-  "w-full h-11 rounded-[var(--radius-sm)] border border-[var(--border)] bg-white text-[var(--text-heading)] text-base pl-3 placeholder:text-[var(--text-placeholder)] focus:outline-none focus:border-[var(--brand)] focus:ring-[3px] focus:ring-[rgba(23,117,224,0.15)]";
-
-const primaryButtonClass =
-  "w-full h-12 rounded-[var(--radius-sm)] text-white font-medium text-lg transition-all disabled:opacity-50 hover:brightness-105 flex items-center justify-center";
-const primaryButtonStyle = {
-  background: "var(--brand)",
-};
+import { mapAuthError } from "@/lib/auth/errorMessages";
+import {
+  ArrowIcon,
+  AuthFoot,
+  GoogleIcon,
+  ShareIcon,
+} from "@/components/auth/AuthShell";
 
 async function createSessionCookie(user: { getIdToken: () => Promise<string> }) {
-  try {
-    const idToken = await user.getIdToken();
-    const res = await fetch("/api/auth/session", {
-      method: "POST",
-      cache: "no-store",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ idToken }),
-      credentials: "include",
-    });
-    if (!res.ok) throw new Error("Session API failed");
-  } catch (e) {
-    console.error("Session creation failed", e);
-  }
+  const idToken = await user.getIdToken();
+  const res = await fetch("/api/auth/session", {
+    method: "POST",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ idToken }),
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error("Session API failed");
 }
 
 function SignupPageContent() {
@@ -42,17 +33,46 @@ function SignupPageContent() {
   const returnUrl = searchParams.get("returnUrl");
 
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [pw, setPw] = useState("");
+  const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handlePostSignup(user: { getIdToken: () => Promise<string> }) {
+  const score = useMemo(() => {
+    return Math.min(
+      4,
+      (pw.length >= 8 ? 1 : 0) +
+        (/[A-Z]/.test(pw) ? 1 : 0) +
+        (/[0-9]/.test(pw) ? 1 : 0) +
+        (/[^A-Za-z0-9]/.test(pw) ? 1 : 0)
+    );
+  }, [pw]);
+  const labels = ["", "Weak", "Fair", "Strong", "Excellent"];
+
+  async function handlePostSignup(
+    user: { getIdToken: () => Promise<string>; email: string | null },
+    isGoogle: boolean
+  ) {
     await createSessionCookie(user);
-    if (returnUrl && typeof returnUrl === "string" && returnUrl.startsWith("/")) {
-      router.replace(returnUrl);
+    if (isGoogle) {
+      if (returnUrl && returnUrl.startsWith("/")) {
+        router.replace(returnUrl);
+        return;
+      }
+      router.replace("/onboarding");
       return;
     }
-    router.replace("/onboarding");
+    try {
+      await fetch("/api/auth/send-verification", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+      });
+    } catch {
+      // non-fatal — user can resend from check-email
+    }
+    const emailParam = encodeURIComponent(user.email ?? email);
+    router.replace(`/check-email?email=${emailParam}&type=verification`);
   }
 
   const handleGoogle = async () => {
@@ -60,7 +80,7 @@ function SignupPageContent() {
     setLoading(true);
     try {
       const user = await signInWithGoogle();
-      await handlePostSignup(user);
+      await handlePostSignup(user, true);
     } catch (e: unknown) {
       const err = e as { code?: string; message?: string };
       if (
@@ -69,7 +89,7 @@ function SignupPageContent() {
       ) {
         return;
       }
-      setError(err?.message ?? (e instanceof Error ? e.message : "Sign up failed"));
+      setError(mapAuthError(e, "Sign up failed"));
     } finally {
       setLoading(false);
     }
@@ -80,124 +100,227 @@ function SignupPageContent() {
     setError(null);
     setLoading(true);
     try {
-      const user = await signUpWithEmailPassword(email, password);
-      await handlePostSignup(user);
+      const user = await signUpWithEmailPassword(email, pw);
+      await handlePostSignup(user, false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Sign up failed");
+      setError(mapAuthError(e, "Sign up failed"));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <AuthLayout>
-      <div className="flex flex-col items-center w-full max-w-[420px]">
-        <Link href="/" className="mb-8" aria-label="Echly home">
-          <Image
-            src="/Echly_logo.svg"
-            alt="Echly"
-            width={120}
-            height={32}
-            sizes="120px"
-            className="h-8 w-auto"
-          />
-        </Link>
-        <h1 className="text-5xl font-semibold tracking-tight text-[var(--text-heading)] text-center mb-3">
-        Capture Feedback Exactly Where it Happens
-        </h1>
-        <p className="text-lg text-[var(--text-secondary)] text-center mb-10 max-w-md">
-          Turn screenshots into actionable tickets for your team in seconds.
-        </p>
-        <AuthCard>
-          <h2 className="text-2xl font-semibold text-[var(--text-heading)] mb-6">Create your Echly account</h2>
+    <div className="auth-root">
+      <div className="auth">
+        <div className="auth-left">
+          <header className="auth-head">
+            <span className="brand">
+              <span className="brand-mark">E</span>
+              <span>Echly</span>
+            </span>
+          </header>
 
-          <button
-            type="button"
-            onClick={handleGoogle}
-            disabled={loading}
-            className="w-full h-12 rounded-[var(--radius-sm)] border border-[var(--border)] bg-white text-[var(--text-heading)] font-medium text-base hover:bg-[var(--surface-hover)] transition-colors disabled:opacity-50 flex items-center justify-center gap-3"
-          >
-            <GoogleIcon />
-            Continue with Google
-          </button>
+          <div className="auth-body">
+            <div className="auth-meta" style={{ marginBottom: 14 }}>
+              <span>Already have an account?</span>
+              <Link href="/login">Log in</Link>
+            </div>
+            <h1 className="auth-h">
+              Start finding bugs <span className="accent">faster.</span>
+            </h1>
+            <p className="auth-sub">
+              Join the teams using Echly to turn web feedback into shipped fixes. Free for 14 days, no card required.
+            </p>
 
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-[var(--border)]" />
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-3 bg-white text-[var(--text-secondary)]">OR</span>
-            </div>
+            <button
+              className="btn btn-google btn-block"
+              type="button"
+              onClick={handleGoogle}
+              disabled={loading}
+            >
+              <span className="gwrap">
+                <GoogleIcon />
+              </span>
+              Continue with Google
+            </button>
+
+            <div className="auth-divider">or with email</div>
+
+            <form onSubmit={handleEmail}>
+              <div className="field">
+                <label className="field-label">Work email</label>
+                <input
+                  className="input"
+                  type="email"
+                  placeholder="you@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
+                  required
+                />
+              </div>
+
+              <div className="field">
+                <label className="field-label">
+                  Password
+                </label>
+                <div className="input-wrap">
+                  <input
+                    type={showPw ? "text" : "password"}
+                    placeholder="Create a password"
+                    value={pw}
+                    onChange={(e) => setPw(e.target.value)}
+                    autoComplete="new-password"
+                    minLength={8}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="toggle-vis"
+                    onClick={() => setShowPw(!showPw)}
+                  >
+                    {showPw ? "Hide" : "Show"}
+                  </button>
+                </div>
+                <div
+                  className="pw-meter"
+                  style={{ visibility: pw ? "visible" : "hidden" }}
+                >
+                  <div className="pw-bars">
+                    {[1, 2, 3, 4].map((i) => (
+                      <span
+                        key={i}
+                        className={"bar " + (i <= score ? `on-${score}` : "")}
+                      />
+                    ))}
+                  </div>
+                  <span className="pw-label">
+                    Strength: <b>{labels[score] || "—"}</b>
+                  </span>
+                </div>
+              </div>
+
+              {error && <p className="auth-error">{error}</p>}
+
+              <button
+                type="submit"
+                className="btn btn-primary btn-block"
+                style={{ marginTop: 6 }}
+                disabled={loading}
+              >
+                Create account
+                <ArrowIcon size={13} />
+              </button>
+            </form>
+
+            <p className="auth-terms">
+              By creating an account you agree to Echly&apos;s{" "}
+              <a href="#" className="ilink">Terms of Service</a> and{" "}
+              <a href="#" className="ilink">Privacy Policy</a>. We&apos;ll send you product updates — you can opt out anytime.
+            </p>
           </div>
 
-          <form onSubmit={handleEmail} className="space-y-4">
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className={inputClass}
-              required
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className={inputClass}
-              required
-              minLength={6}
-            />
-            {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
-            <button
-              type="submit"
-              disabled={loading}
-              className={primaryButtonClass}
-              style={primaryButtonStyle}
-            >
-              Create account
-            </button>
-          </form>
+          <AuthFoot />
+        </div>
 
-          <p className="mt-6 text-center text-[var(--text-secondary)] text-sm">
-            Already have an account?{" "}
-            <Link href="/login" className="text-[var(--brand)] hover:underline font-medium">
-              Sign in
-            </Link>
-          </p>
-        </AuthCard>
+        <div className="auth-right">
+          <SignUpStage />
+        </div>
       </div>
-    </AuthLayout>
+    </div>
   );
 }
 
 export default function SignupPage() {
   return (
-    <Suspense fallback={<div className="w-8 h-8 border-2 border-[var(--border)] border-t-[var(--brand)] rounded-full animate-spin" />}>
+    <Suspense fallback={<div className="auth-root" />}>
       <SignupPageContent />
     </Suspense>
   );
 }
 
-function GoogleIcon() {
+function SignUpStage() {
   return (
-    <svg className="w-5 h-5" viewBox="0 0 24 24">
-      <path
-        fill="#4285F4"
-        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-      />
-      <path
-        fill="#34A853"
-        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-      />
-      <path
-        fill="#EA4335"
-        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-      />
-    </svg>
+    <div className="stage">
+      <div className="stage-inner">
+        <div style={{ position: "relative" }}>
+          <div className="float-card stage-comment">
+            <span className="sc-av">AR</span>
+            <div>
+              <div className="sc-meta">
+                <b>Amelia Reyes</b> · just now
+              </div>
+              <div className="sc-text">
+                &quot;This is exactly the broken state I was seeing in staging.&quot;
+              </div>
+            </div>
+          </div>
+
+          <div className="float-card ticket-card">
+            <div className="tc-head">
+              <span className="tc-pill session">Sprint 14 review</span>
+              <span className="tc-id">ECH-2418</span>
+              <span className="tc-grow" />
+              <span className="tc-prio">
+                <span className="pdot" />
+                High
+              </span>
+            </div>
+            <div className="tc-body">
+              <div className="tc-title">CTA misaligned on hover</div>
+              <div className="tc-desc">
+                Pricing page · Chrome 132 · 1440×900 · The &quot;Start free&quot; button shifts 4px right on hover, causing the row to reflow.
+              </div>
+              <div className="tc-shot">
+                <span className="shot-line l1" />
+                <span className="shot-line l2" />
+                <span className="shot-line l3" />
+                <div className="cap">
+                  <span className="cap-label">CAPTURED · 130×50</span>
+                </div>
+                <div className="annot-bubble">+4px on hover</div>
+              </div>
+              <div className="tc-foot">
+                <div className="tc-stack">
+                  <span
+                    className="av"
+                    style={{ background: "linear-gradient(135deg, #1775E0, #0F5BB5)" }}
+                  >
+                    IM
+                  </span>
+                  <span
+                    className="av"
+                    style={{ background: "linear-gradient(135deg, #B6648E, #803060)" }}
+                  >
+                    AR
+                  </span>
+                  <span
+                    className="av"
+                    style={{ background: "linear-gradient(135deg, #34C29A, #157A57)" }}
+                  >
+                    JK
+                  </span>
+                </div>
+                <span className="tc-meta">
+                  <b>3 reviewers</b> · 7 comments
+                </span>
+                <span className="tc-time">2m ago</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="float-card stage-resolved">
+            <span className="check">
+              <ShareIcon size={11} />
+            </span>
+            <span>
+              <b style={{ color: "var(--ink)", fontWeight: 600 }}>Share session</b> with your team
+            </span>
+          </div>
+        </div>
+
+        <div className="stage-caption">A real session ticket from a real Echly team.</div>
+      </div>
+    </div>
   );
 }

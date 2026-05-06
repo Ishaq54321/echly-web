@@ -8,11 +8,11 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  updateProfile,
   sendPasswordResetEmail,
   signOut,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { useWorkspace } from "@/lib/client/workspaceContext";
 import { Toast } from "@/components/ui/Toast";
 import {
   ChevronLeft,
@@ -327,6 +327,7 @@ function PasswordInput({
 export default function InviteAcceptPage() {
   const { token } = useParams<{ token: string }>();
   const router = useRouter();
+  const { refreshMemberships } = useWorkspace();
 
   const [state, setState] = useState<InviteState>({
     phase: "loading",
@@ -341,11 +342,9 @@ export default function InviteAcceptPage() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [showLoginPw, setShowLoginPw] = useState(false);
 
-  const [signupName, setSignupName] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupLoading, setSignupLoading] = useState(false);
   const [showSignupPw, setShowSignupPw] = useState(false);
-  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({
@@ -483,6 +482,8 @@ export default function InviteAcceptPage() {
     if (auth.currentUser) {
       await auth.currentUser.getIdToken(true);
     }
+
+    refreshMemberships();
 
     showToast(`You've joined ${workspaceName} — switching now`);
 
@@ -627,7 +628,6 @@ export default function InviteAcceptPage() {
         preview.email,
         signupPassword
       );
-      await updateProfile(cred.user, { displayName: signupName.trim() });
       await createSessionCookie(cred.user);
       const idToken = await cred.user.getIdToken();
 
@@ -1090,47 +1090,6 @@ export default function InviteAcceptPage() {
                     void handleSignup();
                   }}
                 >
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0',
-                      marginBottom: '16px',
-                    }}
-                  >
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        color: 'var(--text-secondary)',
-                        marginBottom: '6px',
-                      }}
-                    >
-                      Your name
-                    </label>
-                    <input
-                      type="text"
-                      value={signupName}
-                      onChange={(e) => setSignupName(e.target.value)}
-                      autoFocus
-                      required
-                      className="invite-input"
-                      placeholder="Jane Smith"
-                      style={{
-                        ...inputStyle,
-                        border: focusedField === 'name'
-                          ? '1.5px solid #1775E0'
-                          : '1.5px solid var(--border)',
-                        boxShadow: focusedField === 'name'
-                          ? '0 0 0 3px rgba(23,117,224,0.12)'
-                          : 'none',
-                      }}
-                      onFocus={() => setFocusedField('name')}
-                      onBlur={() => setFocusedField(null)}
-                    />
-                  </div>
-
                   <div style={{ marginBottom: 4 }}>
                     <PasswordInput
                       label="Password"
@@ -1138,6 +1097,7 @@ export default function InviteAcceptPage() {
                       onChange={setSignupPassword}
                       show={showSignupPw}
                       onToggle={() => setShowSignupPw((p) => !p)}
+                      autoFocus
                       placeholder="Minimum 8 characters"
                       minLength={8}
                       fieldKey="password"

@@ -1,17 +1,12 @@
 import GlobalRail from "@/components/layout/GlobalRail";
 import { FloatingUtilityActions } from "@/components/layout/FloatingUtilityActions";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { WorkspaceProvider } from "@/lib/client/workspaceContext";
 import { WorkspaceStoreProvider } from "@/lib/client/workspaceStore";
 import { WorkspaceSuspendedGuard } from "@/components/workspace/WorkspaceSuspendedGuard";
 import { WorkspaceIdentityGate } from "@/components/workspace/WorkspaceIdentityGate";
 import { BillingUsageCacheInitializer } from "@/components/billing/BillingUsageCacheInitializer";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
-import {
-  AppBootGate,
-  AppBootReadinessBridge,
-} from "@/components/providers/AppBootGate";
-import { ToastProvider } from "@/components/dashboard/context/ToastContext";
+import { AppBootReadinessBridge } from "@/components/providers/AppBootGate";
 
 export default function AppLayout({
   children,
@@ -19,33 +14,26 @@ export default function AppLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ToastProvider>
-    <AppBootGate>
-      <WorkspaceProvider>
-        <WorkspaceSuspendedGuard>
-          <WorkspaceIdentityGate>
-            <WorkspaceStoreProvider>
-              <BillingUsageCacheInitializer />
-              <AppBootReadinessBridge />
-              <div className="main-layout flex h-screen overflow-hidden">
-                <GlobalRail />
-                <div className="content-divider shrink-0" aria-hidden />
-                <main className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]">
-                  <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
-                    <FloatingUtilityActions />
-                    <ErrorBoundary>{children}</ErrorBoundary>
-                  </div>
-                </main>
+    <WorkspaceSuspendedGuard>
+      <WorkspaceIdentityGate>
+        <WorkspaceStoreProvider>
+          <BillingUsageCacheInitializer />
+          <AppBootReadinessBridge />
+          <div className="main-layout flex h-screen overflow-hidden p-[14px] gap-[10px]">
+            <GlobalRail />
+            <main className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]">
+              <div className="content-card flex-1 min-h-0 overflow-y-auto">
+                <FloatingUtilityActions />
+                <ErrorBoundary>{children}</ErrorBoundary>
               </div>
-              <GlobalSearch />
-              <div className="fixed bottom-4 right-6 text-[12px] text-meta pointer-events-none">
-                All changes saved • Secure session
-              </div>
-            </WorkspaceStoreProvider>
-          </WorkspaceIdentityGate>
-        </WorkspaceSuspendedGuard>
-      </WorkspaceProvider>
-    </AppBootGate>
-    </ToastProvider>
+            </main>
+          </div>
+          <GlobalSearch />
+          <div className="fixed bottom-4 right-6 text-[12px] text-meta pointer-events-none">
+            All changes saved • Secure session
+          </div>
+        </WorkspaceStoreProvider>
+      </WorkspaceIdentityGate>
+    </WorkspaceSuspendedGuard>
   );
 }

@@ -901,6 +901,63 @@ export async function getDiscussionInboxFeedbackForUserRepo(args: {
   return merged.slice(0, pageSize);
 }
 
+const DISCUSSION_MENTIONS_COMMENT_SCAN_LIMIT = 200;
+
+/**
+ * Discussion mentions: feedback whose comments @mention the user.
+ * Scans recent comments via `mentionedUserIds array-contains userId`, dedupes feedbackIds,
+ * then loads matching feedback docs. Caller should filter by access at the API layer.
+ *
+ * Required Firestore index:
+ *   collection: comments
+ *   fields: mentionedUserIds (Array contains) + createdAt (Descending)
+ */
+export async function getDiscussionMentionsForUserRepo(args: {
+  userId: string;
+  limit: number;
+}): Promise<Feedback[]> {
+  const pageSize = args.limit;
+  assertQueryLimit(pageSize, "getDiscussionMentionsForUserRepo");
+  const userId = requireUserId(args.userId, "getDiscussionMentionsForUserRepo");
+
+  const commentsSnap = await adminDb
+    .collection("comments")
+    .where("mentionedUserIds", "array-contains", userId)
+    .orderBy("createdAt", "desc")
+    .limit(DISCUSSION_MENTIONS_COMMENT_SCAN_LIMIT)
+    .get();
+
+  const seen = new Set<string>();
+  const feedbackIds: string[] = [];
+  for (const doc of commentsSnap.docs) {
+    const fid = (doc.data() as { feedbackId?: unknown }).feedbackId;
+    if (typeof fid !== "string" || !fid) continue;
+    if (seen.has(fid)) continue;
+    seen.add(fid);
+    feedbackIds.push(fid);
+    if (feedbackIds.length >= pageSize * 2) break;
+  }
+  if (feedbackIds.length === 0) return [];
+
+  const snaps = await Promise.all(
+    feedbackIds.map((fid) => adminDb.doc(`feedback/${fid}`).get())
+  );
+  const feedback: Feedback[] = [];
+  for (const snap of snaps) {
+    if (!snap.exists) continue;
+    const row = snap.data() as { isDeleted?: unknown } | undefined;
+    if (row?.isDeleted === true) continue;
+    feedback.push(docToFeedback(snap as QueryDocumentSnapshot));
+  }
+  feedback.sort((a, b) => {
+    const tb = lastCommentAtSortMs(b);
+    const ta = lastCommentAtSortMs(a);
+    if (tb !== ta) return tb - ta;
+    return b.id.localeCompare(a.id);
+  });
+  return feedback.slice(0, pageSize);
+}
+
 /**
  * Fetches one page of feedback for a session using cursor pagination.
  * Composite index required: feedback (sessionId ASC, status ASC, createdAt DESC).

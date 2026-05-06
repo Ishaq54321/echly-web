@@ -105,9 +105,9 @@ export function ContextPanel({
             assignee={assignee ?? null}
           />
           <dl className="space-y-1.5 text-[12px]">
-            {safeTags.length > 0 ? (
-              <div>
-                <dt className="text-[var(--text-tertiary)]">Tags</dt>
+            <div>
+              <dt className="text-[var(--text-tertiary)]">Tags</dt>
+              {safeTags.length > 0 ? (
                 <dd className="mt-0.5 flex flex-wrap gap-1.5">
                   {safeTags.map((tag) => (
                     <span
@@ -118,24 +118,30 @@ export function ContextPanel({
                     </span>
                   ))}
                 </dd>
-              </div>
-            ) : null}
-            {priorityLabel?.trim() ? (
-              <div>
-                <dt className="text-[var(--text-tertiary)]">Priority</dt>
+              ) : (
+                <dd className="mt-0.5 text-[var(--text-tertiary)] italic">Not set</dd>
+              )}
+            </div>
+            <div>
+              <dt className="text-[var(--text-tertiary)]">Priority</dt>
+              {priorityLabel?.trim() ? (
                 <dd className="mt-0.5 text-[var(--text-primary-strong)] font-medium">
                   {priorityLabel}
                 </dd>
-              </div>
-            ) : null}
-            {estimatedEffortLabel?.trim() ? (
-              <div>
-                <dt className="text-[var(--text-tertiary)]">Estimated effort</dt>
+              ) : (
+                <dd className="mt-0.5 text-[var(--text-tertiary)] italic">Not set</dd>
+              )}
+            </div>
+            <div>
+              <dt className="text-[var(--text-tertiary)]">Estimated effort</dt>
+              {estimatedEffortLabel?.trim() ? (
                 <dd className="mt-0.5 text-[var(--text-primary-strong)] font-medium">
                   {estimatedEffortLabel}
                 </dd>
-              </div>
-            ) : null}
+              ) : (
+                <dd className="mt-0.5 text-[var(--text-tertiary)] italic">Not set</dd>
+              )}
+            </div>
           </dl>
         </section>
 
@@ -165,10 +171,33 @@ export function ContextPanel({
           <h2 className="text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--text-tertiary)] mb-2">
             Execution insights
           </h2>
-          <p className="text-[12px] text-[var(--text-tertiary)] leading-relaxed">
-            Reserved for AI velocity metrics. This panel will surface risk, effort,
-            and throughput signals as the system learns from execution patterns.
-          </p>
+          <div className="flex flex-col items-center justify-center text-center" style={{ padding: "8px 0 4px" }}>
+            <div style={{ width: 120, height: 96, marginBottom: 8 }}>
+              <svg viewBox="0 0 200 160" width="100%" height="100%" style={{ overflow: "visible" }}>
+                <g transform="translate(100 80) rotate(-3) translate(-50 -34)">
+                  <rect width="100" height="68" rx="12" fill="#FFFFFF" stroke="#D1D5DB" strokeWidth="1.5" />
+                  <rect x="14" y="16" width="50" height="5" rx="2.5" fill="#E5E7EB" />
+                  <rect x="16" y="44" width="10" height="14" rx="2" fill="#E5E7EB" />
+                  <rect x="32" y="36" width="10" height="22" rx="2" fill="#D1D5DB" />
+                  <rect x="48" y="30" width="10" height="28" rx="2" fill="#E5E7EB" />
+                  <rect x="64" y="40" width="10" height="18" rx="2" fill="#E5E7EB" />
+                  <rect x="80" y="32" width="10" height="26" rx="2" fill="#D1D5DB" />
+                </g>
+                <g transform="translate(146 112)">
+                  <circle cx="17" cy="17" r="14" fill="#6B7280" />
+                  <rect x="10" y="17" width="3" height="6" fill="#fff" />
+                  <rect x="15.5" y="14" width="3" height="9" fill="#fff" />
+                  <rect x="21" y="11" width="3" height="12" fill="#fff" />
+                </g>
+              </svg>
+            </div>
+            <h3 className="text-[13px] font-semibold text-[var(--text-heading)]" style={{ margin: "0 0 4px 0" }}>
+              Insights coming soon
+            </h3>
+            <p className="text-[12px] text-[var(--text-tertiary)] leading-relaxed" style={{ margin: 0 }}>
+              AI-powered velocity and risk signals will appear here.
+            </p>
+          </div>
         </section>
       </div>
     </aside>

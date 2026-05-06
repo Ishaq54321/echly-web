@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import {
   getDiscussionInboxFeedbackForUserRepo,
+  getDiscussionMentionsForUserRepo,
   getSessionFeedbackPageForUserWithStringCursorRepo,
 } from "@/lib/repositories/feedbackRepository.server";
 import { getSessionByIdRepo } from "@/lib/repositories/sessionsRepository.server";
@@ -10,6 +11,33 @@ import { corsHeaders } from "@/lib/server/cors";
 import { tryGetAuthUser } from "@/lib/server/auth/authorize";
 import { tryBuildRequestContext } from "@/lib/server/requestContext";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
+import { adminDb } from "@/lib/server/firebaseAdmin";
+import { composeFullName } from "@/lib/utils/nameSplit";
+import type { Feedback } from "@/lib/domain/feedback";
+
+async function buildUserNameMap(userIds: string[]): Promise<Map<string, string>> {
+  const unique = [...new Set(userIds.filter((id) => typeof id === "string" && id.trim()))];
+  if (unique.length === 0) return new Map();
+  const snaps = await Promise.all(
+    unique.map((uid) => adminDb.collection("users").doc(uid).get())
+  );
+  const map = new Map<string, string>();
+  for (const snap of snaps) {
+    if (!snap.exists) continue;
+    const data = snap.data() ?? {};
+    const composed = composeFullName(
+      typeof data.firstName === "string" ? data.firstName : null,
+      typeof data.lastName === "string" ? data.lastName : null
+    );
+    const fallback =
+      typeof data.email === "string" && data.email.includes("@")
+        ? data.email.split("@")[0]
+        : "";
+    const name = composed || fallback || "Anonymous";
+    map.set(snap.id, name);
+  }
+  return map;
+}
 
 export async function OPTIONS(req: NextRequest) {
   return new Response(null, {
@@ -20,8 +48,16 @@ export async function OPTIONS(req: NextRequest) {
 
 /**
  * GET /api/feedback?sessionId=ID&cursor=XYZ&limit=20&status=open|resolved
+ * GET /api/feedback?mentionsUserId=UID&limit=20  → discussion @mentions
  *
  * Session-scoped and inbox: `buildRequestContext` → `access.capabilities`.
+ *
+ * NOTE: As of Phase 2 the web session page no longer uses this endpoint —
+ * authenticated viewers get tickets via the Firestore listener in
+ * `lib/realtime/feedbackStore.ts`. Remaining live consumers are:
+ *   - `echly-extension/src/background.ts` (paginated session ticket sync)
+ *   - `app/(app)/discussion/page.tsx` (no-sessionId inbox + mentions paths)
+ *   - `app/api/session-page-bundle/route.ts` for anonymous share-link viewers (first page only)
  */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -39,6 +75,7 @@ export async function GET(req: NextRequest) {
   const safeLimit = Math.min(normalizedRequestedLimit, 50);
 
   const trimmedSid = sessionIdRaw?.trim() ?? "";
+  const mentionsUserIdRaw = searchParams.get("mentionsUserId")?.trim() ?? "";
 
   if (trimmedSid === "") {
     const user = await tryGetAuthUser(req);
@@ -52,10 +89,26 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-      const feedback = await getDiscussionInboxFeedbackForUserRepo({
-        userId: user.uid,
-        limit: safeLimit,
-      });
+      let feedback: Feedback[];
+      if (mentionsUserIdRaw) {
+        if (mentionsUserIdRaw !== user.uid) {
+          return apiError({
+            code: "FORBIDDEN",
+            message: "Cannot query mentions for another user",
+            status: 403,
+            init: { headers: corsHeaders(req) },
+          });
+        }
+        feedback = await getDiscussionMentionsForUserRepo({
+          userId: user.uid,
+          limit: safeLimit,
+        });
+      } else {
+        feedback = await getDiscussionInboxFeedbackForUserRepo({
+          userId: user.uid,
+          limit: safeLimit,
+        });
+      }
 
       const sessionIds = [...new Set(feedback.map((f) => f.sessionId).filter(Boolean))];
       const titleBySessionId = new Map<string, string>();
@@ -84,16 +137,21 @@ export async function GET(req: NextRequest) {
         })
       );
 
-      const payload = feedback
-        .filter((f) => accessBySessionId.has(f.sessionId))
-        .map((f) => {
-          const sid = f.sessionId;
-          const name = titleBySessionId.get(sid);
-          return {
-            ...serializeFeedback(f, accessBySessionId.get(sid)!),
-            sessionName: name === undefined ? "" : name,
-          };
-        });
+      const accessibleFeedback = feedback.filter((f) => accessBySessionId.has(f.sessionId));
+      const userNameMap = await buildUserNameMap(
+        accessibleFeedback.map((f) => f.userId).filter((id): id is string => typeof id === "string")
+      );
+
+      const payload = accessibleFeedback.map((f) => {
+        const sid = f.sessionId;
+        const name = titleBySessionId.get(sid);
+        const uid = typeof f.userId === "string" ? f.userId : "";
+        return {
+          ...serializeFeedback(f, accessBySessionId.get(sid)!),
+          sessionName: name === undefined ? "" : name,
+          userName: (uid && userNameMap.get(uid)) || "Anonymous",
+        };
+      });
 
       return apiSuccess({ feedback: payload, nextCursor: null, hasMore: false }, null, {
         headers: corsHeaders(req),

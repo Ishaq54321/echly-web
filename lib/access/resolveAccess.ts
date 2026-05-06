@@ -24,6 +24,13 @@ export type AccessContext = {
   userId: string | null;
   capabilities: AccessCapabilities;
   isWorkspaceMember: boolean;
+  /**
+   * True when the user has a realtime-eligible grant: workspace member OR an
+   * explicit session member doc / sessionAccess mirror exists. `link_view`
+   * alone does NOT qualify because Firestore rules still deny listener attaches
+   * for cross-workspace authed viewers under link_view.
+   */
+  hasDirectSessionGrant: boolean;
 };
 
 export function buildCapabilities(
@@ -86,6 +93,7 @@ export function accessContextToResponseBody(access: AccessContext): Record<strin
     isPublicViewer: access.isPublicViewer,
     capabilities: access.capabilities,
     isWorkspaceMember: access.isWorkspaceMember ?? false,
+    hasDirectSessionGrant: access.hasDirectSessionGrant ?? false,
   };
 }
 
@@ -109,13 +117,7 @@ type ResolveAccessInput = {
     uid: string;
     workspaceId: string;
   } | null;
-  /** Present only when the share_links row is active; expiry downgrades tier, not grant. */
-  token?: {
-    generalAccess: AccessLevel;
-    isActive: boolean;
-    expiresAt?: number | null;
-  } | null;
-  /** Direct session membership (`sessions/{id}/members/{userId}`); runs after workspace, before link. */
+  /** Direct session membership (`sessions/{id}/members/{userId}`); runs after workspace. */
   memberAccess?: "view" | "resolve" | null;
   /** Workspace-level role; used to grant OWNER capability to workspace owners. */
   workspaceRole?: "OWNER" | "MEMBER" | null;
@@ -125,13 +127,13 @@ export type ResolveAccessResult = { role: Role; sessionGranted: boolean; isWorks
 
 /**
  * Single access engine. Grant rule:
- * - `link_view` → public session surface (anyone may enter; tier from session / token).
- * - `restricted` → owner, same-workspace member, session member (`memberAccess`), or active share link (`token`).
+ * - `link_view` → public session surface (anyone may enter; session id is the credential).
+ * - `restricted` → owner, same-workspace member, or session member (`memberAccess`).
  *
- * Role precedence: OWNER → workspace RESOLVER → session member (view/resolve) → link / session `accessLevel` tier.
+ * Role precedence: OWNER → workspace RESOLVER → session member (view/resolve) → session `accessLevel` tier.
  */
 export function resolveAccess(input: ResolveAccessInput): ResolveAccessResult {
-  const { session, user, token } = input;
+  const { session, user } = input;
 
   assert(session.accessLevel, "Missing accessLevel");
 
@@ -150,33 +152,15 @@ export function resolveAccess(input: ResolveAccessInput): ResolveAccessResult {
   const hasMemberAccess =
     input.memberAccess === "view" || input.memberAccess === "resolve";
 
-  const hasShareLinkContext = token != null && token.isActive;
-  const tokenExpired =
-    hasShareLinkContext &&
-    token.expiresAt != null &&
-    Date.now() > token.expiresAt;
-
   const isLinkView = session.generalAccess === "link_view";
-  const isRestricted = session.generalAccess === "restricted";
 
   const accessGranted =
     isLinkView ||
     isOwner ||
     isWorkspaceMember ||
-    hasMemberAccess ||
-    (hasShareLinkContext && !isRestricted);
+    hasMemberAccess;
 
   if (!accessGranted) {
-    return { role: "VIEWER", sessionGranted: false, isWorkspaceMember: false };
-  }
-
-  const shareTokenIsOnlyGrant =
-    !isLinkView &&
-    !isOwner &&
-    !isWorkspaceMember &&
-    !hasMemberAccess &&
-    hasShareLinkContext;
-  if (shareTokenIsOnlyGrant && tokenExpired) {
     return { role: "VIEWER", sessionGranted: false, isWorkspaceMember: false };
   }
 
@@ -201,15 +185,10 @@ export function resolveAccess(input: ResolveAccessInput): ResolveAccessResult {
     return { role: "VIEWER", sessionGranted: true, isWorkspaceMember: false };
   }
 
-  let level: AccessLevel;
-  if (hasShareLinkContext) {
-    level = tokenExpired ? "view" : requireAccessLevel(token.generalAccess);
-  } else {
-    level = requireAccessLevel(session.accessLevel);
-  }
+  const level: AccessLevel = requireAccessLevel(session.accessLevel);
 
   if (level === "resolve") {
-    // Unauthenticated users with a "resolve" link can view but must sign in to resolve
+    // Unauthenticated link_view viewers with a "resolve" session can view but must sign in to resolve.
     if (user !== null) {
       return { role: "RESOLVER", sessionGranted: true, isWorkspaceMember: false };
     }

@@ -35,6 +35,7 @@ import type { Workspace } from "@/lib/domain/workspace";
 import {
   assertIdentityResolved,
   useWorkspace,
+  type WorkspaceMembership,
 } from "@/lib/client/workspaceContext";
 import { BillingUsageProvider } from "@/lib/billing/BillingUsageProvider";
 import {
@@ -75,6 +76,7 @@ function SectionHeader({
 
 const TABS = [
   { id: "profile", label: "My account" },
+  { id: "workspaces", label: "Workspaces" },
   { id: "workspace", label: "Workspace" },
   { id: "security", label: "Security" },
   { id: "billing", label: "Billing" },
@@ -90,6 +92,9 @@ function SettingsPageInner() {
     workspaceLoading,
     isIdentityResolved,
     isIdentityReady,
+    allWorkspaces,
+    activeWorkspaceId,
+    switchWorkspace,
   } = useWorkspace();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>("profile");
@@ -142,7 +147,7 @@ function SettingsPageInner() {
   }
 
   return (
-    <div className="flex flex-1 min-h-0 bg-white overflow-auto">
+    <div className="flex flex-1 min-h-0 overflow-auto">
       <div className="flex-1 min-w-0 max-w-[1280px] mx-auto px-6 py-10 w-full">
         {/* Page header */}
         <header className="mb-8">
@@ -159,7 +164,7 @@ function SettingsPageInner() {
           className="flex items-center gap-10 border-b border-[var(--border-default)] mb-8"
           aria-label="Settings sections"
         >
-          {TABS.map(({ id, label }) => {
+          {TABS.filter((t) => t.id !== "workspaces" || allWorkspaces.length > 1).map(({ id, label }) => {
             const isActive = activeTab === id;
             return (
               <button
@@ -187,6 +192,13 @@ function SettingsPageInner() {
         {/* Tab content */}
         <BillingUsageProvider>
           {activeTab === "profile" && <MyAccountTab />}
+          {activeTab === "workspaces" && (
+            <WorkspacesTab
+              allWorkspaces={allWorkspaces}
+              activeWorkspaceId={activeWorkspaceId ?? workspaceId}
+              switchWorkspace={switchWorkspace}
+            />
+          )}
           {activeTab === "workspace" && (
             <WorkspaceTab
               workspace={workspace}
@@ -204,7 +216,7 @@ function SettingsPageInner() {
 
 function SettingsSuspenseFallback() {
   return (
-    <div className="flex flex-1 min-h-0 bg-white overflow-auto" aria-busy="true" aria-live="polite">
+    <div className="flex flex-1 min-h-0 overflow-auto" aria-busy="true" aria-live="polite">
       <div className="flex flex-1 min-h-[520px] min-w-0 max-w-[1280px] mx-auto w-full items-center justify-center px-6 py-10">
         <MinimalLoader label="Loading settings…" />
       </div>
@@ -220,6 +232,80 @@ export default function SettingsPage() {
   );
 }
 
+function WorkspacesTab({
+  allWorkspaces,
+  activeWorkspaceId,
+  switchWorkspace,
+}: {
+  allWorkspaces: WorkspaceMembership[];
+  activeWorkspaceId: string | null;
+  switchWorkspace: (wid: string) => Promise<void>;
+}) {
+  const [switchingTo, setSwitchingTo] = useState<string | null>(null);
+
+  return (
+    <div style={{ maxWidth: 900, width: "100%", padding: "32px 0" }}>
+      <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid var(--border)" }}>
+        <h1 className="text-lg font-semibold text-[var(--text-heading)] mb-1">Your workspaces</h1>
+        <p style={{ fontSize: 14, color: "var(--text-secondary)", margin: 0 }}>
+          Switch between workspaces you belong to.
+        </p>
+      </div>
+      <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
+        {allWorkspaces.map((ws, idx) => {
+          const isCurrent = ws.workspaceId === activeWorkspaceId;
+          const initial = ws.name.trim().charAt(0).toUpperCase() || "W";
+          return (
+            <button
+              key={ws.workspaceId}
+              type="button"
+              disabled={isCurrent || switchingTo !== null}
+              onClick={async () => {
+                setSwitchingTo(ws.workspaceId);
+                try { await switchWorkspace(ws.workspaceId); }
+                finally { setSwitchingTo(null); }
+              }}
+              style={{
+                display: "flex", alignItems: "center", gap: 14,
+                padding: "16px 24px", width: "100%",
+                background: "transparent", border: "none", textAlign: "left",
+                borderTop: idx === 0 ? "none" : "1px solid var(--surface-hover)",
+                cursor: isCurrent ? "default" : "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              {ws.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={ws.logoUrl} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+              ) : (
+                <span style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--brand)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 600, flexShrink: 0 }}>
+                  {initial}
+                </span>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-heading)" }}>
+                  {ws.name}
+                  {isCurrent && (
+                    <span style={{ marginLeft: 10, fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 999, background: "var(--brand-subtle)", color: "var(--brand)" }}>
+                      Current
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>
+                  {ws.isOwner ? "Owner" : "Member"}
+                </div>
+              </div>
+              {switchingTo === ws.workspaceId && (
+                <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>Switching…</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function WorkspaceTab({
   workspace,
   workspaceId,
@@ -229,7 +315,7 @@ function WorkspaceTab({
   workspaceId: string | null;
   loading: boolean;
 }) {
-  const { isIdentityResolved } = useWorkspace();
+  const { isIdentityResolved, isWorkspaceOwner } = useWorkspace();
   const [nameDraft, setNameDraft] = useState("");
   const lastWorkspaceIdRef = useRef<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -556,7 +642,7 @@ function WorkspaceTab({
           <input
             type="text"
             value={nameDraft}
-            disabled={loading || !workspaceId}
+            disabled={loading || !workspaceId || !isWorkspaceOwner}
             onChange={(e) => setNameDraft(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") void handleSave(); }}
             style={{
@@ -584,53 +670,59 @@ function WorkspaceTab({
             }}
           />
 
-          <button
-            type="button"
-            onClick={() => void handleSave()}
-            disabled={isSaving || loading || !workspaceId || !nameDraft.trim()}
-            style={{
-              marginTop: 16,
-              height: 38,
-              padding: "0 18px",
-              borderRadius: 9,
-              border: "none",
-              background: savedOk ? "var(--color-success)" : "var(--brand)",
-              color: "white",
-              fontSize: 15,
-              fontWeight: 600,
-              cursor: isSaving || loading || !workspaceId || !nameDraft.trim() ? "not-allowed" : "pointer",
-              opacity: isSaving || loading || !workspaceId || !nameDraft.trim() ? 0.7 : 1,
-              transition: "background 200ms",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-            }}
-          >
-            {isSaving ? (
-              <>
-                <span
-                  style={{
-                    width: 16,
-                    height: 16,
-                    borderRadius: "50%",
-                    border: "2px solid rgba(255,255,255,0.4)",
-                    borderTopColor: "white",
-                    animation: "spin 0.7s linear infinite",
-                    display: "block",
-                  }}
-                />
-                Saving...
-              </>
-            ) : savedOk ? (
-              <>
-                <Check size={16} />
-                Saved!
-              </>
-            ) : (
-              "Save changes"
-            )}
-          </button>
+          {isWorkspaceOwner ? (
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={isSaving || loading || !workspaceId || !nameDraft.trim()}
+              style={{
+                marginTop: 16,
+                height: 38,
+                padding: "0 18px",
+                borderRadius: 9,
+                border: "none",
+                background: savedOk ? "var(--color-success)" : "var(--brand)",
+                color: "white",
+                fontSize: 15,
+                fontWeight: 600,
+                cursor: isSaving || loading || !workspaceId || !nameDraft.trim() ? "not-allowed" : "pointer",
+                opacity: isSaving || loading || !workspaceId || !nameDraft.trim() ? 0.7 : 1,
+                transition: "background 200ms",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+              }}
+            >
+              {isSaving ? (
+                <>
+                  <span
+                    style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: "50%",
+                      border: "2px solid rgba(255,255,255,0.4)",
+                      borderTopColor: "white",
+                      animation: "spin 0.7s linear infinite",
+                      display: "block",
+                    }}
+                  />
+                  Saving...
+                </>
+              ) : savedOk ? (
+                <>
+                  <Check size={16} />
+                  Saved!
+                </>
+              ) : (
+                "Save changes"
+              )}
+            </button>
+          ) : (
+            <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-tertiary)" }}>
+              Only workspace owners can edit the name.
+            </div>
+          )}
         </div>
       </div>
 
@@ -875,11 +967,12 @@ function DeleteAccountModal({ onClose }: { onClose: () => void }) {
 
 /* ——— My Account Tab ——— */
 function MyAccountTab() {
-  const { authPhotoUrl, authDisplayName, authEmail, authReady, updateAvatarUrl } = useWorkspace();
+  const { authPhotoUrl, firstName, lastName, authEmail, authReady, updateAvatarUrl } = useWorkspace();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [localAvatarUrl, setLocalAvatarUrl] = useState<string | null>(authPhotoUrl);
-  const [nameDraft, setNameDraft] = useState(authDisplayName ?? "");
+  const [firstNameDraft, setFirstNameDraft] = useState(firstName);
+  const [lastNameDraft, setLastNameDraft] = useState(lastName);
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
@@ -925,7 +1018,8 @@ function MyAccountTab() {
   useEffect(() => {
     if (authPhotoUrl && !localAvatarUrl) setLocalAvatarUrl(authPhotoUrl);
   }, [authPhotoUrl, localAvatarUrl]);
-  useEffect(() => { setNameDraft(authDisplayName ?? ""); }, [authDisplayName]);
+  useEffect(() => { setFirstNameDraft(firstName); }, [firstName]);
+  useEffect(() => { setLastNameDraft(lastName); }, [lastName]);
 
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -999,9 +1093,11 @@ function MyAccountTab() {
   }
 
   async function handleSaveName() {
-    const trimmed = nameDraft.trim();
-    if (!trimmed) return;
-    if (trimmed === (authDisplayName ?? "")) {
+    const fn = firstNameDraft.trim().slice(0, 50);
+    const ln = lastNameDraft.trim().slice(0, 50);
+    if (!fn) return;
+    // Short-circuit only when BOTH drafts match context exactly.
+    if (fn === firstName && ln === lastName) {
       setSavedOk(true);
       setTimeout(() => setSavedOk(false), 2000);
       return;
@@ -1011,7 +1107,7 @@ function MyAccountTab() {
       const res = await authFetch("/api/users", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ displayName: trimmed }),
+        body: JSON.stringify({ firstName: fn, lastName: ln }),
       });
       if (!res?.ok) { showToast("Failed to update name."); return; }
       setSavedOk(true);
@@ -1042,7 +1138,7 @@ function MyAccountTab() {
     }
   }
 
-  const initial = ((authDisplayName ?? authEmail ?? "?").trim().charAt(0) || "?").toUpperCase();
+  const initial = ((firstName || authEmail || "?").trim().charAt(0) || "?").toUpperCase();
 
   const inputStyle: React.CSSProperties = {
     height: 42,
@@ -1174,30 +1270,47 @@ function MyAccountTab() {
 
             <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,.heic,.HEIC" className="hidden" onChange={handleFileChange} aria-label="Upload profile photo" />
 
-            {/* Name field */}
+            {/* Name fields */}
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", display: "block", marginBottom: 6 }}>Full name</label>
-              <input
-                type="text"
-                value={nameDraft}
-                maxLength={60}
-                onChange={(e) => setNameDraft(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") void handleSaveName(); }}
-                style={inputStyle}
-                onFocus={(e) => { e.target.style.borderColor = "var(--brand)"; e.target.style.background = "white"; e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)"; }}
-                onBlur={(e) => { e.target.style.borderColor = "var(--border)"; e.target.style.background = "var(--surface-input)"; e.target.style.boxShadow = "none"; }}
-              />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", display: "block", marginBottom: 6 }}>First name</label>
+                  <input
+                    type="text"
+                    value={firstNameDraft}
+                    maxLength={50}
+                    onChange={(e) => setFirstNameDraft(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") void handleSaveName(); }}
+                    style={inputStyle}
+                    onFocus={(e) => { e.target.style.borderColor = "var(--brand)"; e.target.style.background = "white"; e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)"; }}
+                    onBlur={(e) => { e.target.style.borderColor = "var(--border)"; e.target.style.background = "var(--surface-input)"; e.target.style.boxShadow = "none"; }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", display: "block", marginBottom: 6 }}>Last name</label>
+                  <input
+                    type="text"
+                    value={lastNameDraft}
+                    maxLength={50}
+                    onChange={(e) => setLastNameDraft(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") void handleSaveName(); }}
+                    style={inputStyle}
+                    onFocus={(e) => { e.target.style.borderColor = "var(--brand)"; e.target.style.background = "white"; e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)"; }}
+                    onBlur={(e) => { e.target.style.borderColor = "var(--border)"; e.target.style.background = "var(--surface-input)"; e.target.style.boxShadow = "none"; }}
+                  />
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={() => void handleSaveName()}
-                disabled={isSaving || !nameDraft.trim()}
-                style={{ marginTop: 10, height: 38, padding: "0 18px", borderRadius: 9, border: "none", background: savedOk ? "var(--color-success)" : "var(--brand)", color: "white", fontSize: 14, fontWeight: 600, cursor: isSaving || !nameDraft.trim() ? "not-allowed" : "pointer", opacity: isSaving || !nameDraft.trim() ? 0.7 : 1, transition: "background 200ms", display: "flex", alignItems: "center", gap: 8 }}
+                disabled={isSaving || !firstNameDraft.trim()}
+                style={{ marginTop: 10, height: 38, padding: "0 18px", borderRadius: 9, border: "none", background: savedOk ? "var(--color-success)" : "var(--brand)", color: "white", fontSize: 14, fontWeight: 600, cursor: isSaving || !firstNameDraft.trim() ? "not-allowed" : "pointer", opacity: isSaving || !firstNameDraft.trim() ? 0.7 : 1, transition: "background 200ms", display: "flex", alignItems: "center", gap: 8 }}
               >
                 {isSaving ? (
                   <><span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "white", animation: "spin 0.7s linear infinite", display: "block" }} />Saving...</>
                 ) : savedOk ? (
                   <><Check size={14} />Saved</>
-                ) : "Save name"}
+                ) : "Save"}
               </button>
             </div>
           </div>
@@ -2032,6 +2145,69 @@ function MembersTab({
             <button type="button" onClick={fetchAll} className={BTN_SECONDARY}>
               Try again
             </button>
+          </div>
+        ) : !search.trim() && roleFilter === "all" && statusFilter === "all" && totalMembers === 1 && totalPending === 0 ? (
+          <div className="flex flex-col items-center justify-center text-center" style={{ padding: "40px 24px" }}>
+            <div style={{ width: 160, height: 140, marginBottom: 20 }}>
+              <svg viewBox="0 0 200 160" width="100%" height="100%" style={{ overflow: "visible" }}>
+                <g transform="translate(100 80) rotate(-6) translate(-46 -30)">
+                  <rect width="92" height="60" rx="12" fill="#FFFFFF" stroke="#D1D5DB" strokeWidth="1.5" />
+                  <circle cx="20" cy="20" r="7" fill="#D1D5DB" />
+                  <rect x="32" y="14" width="44" height="5" rx="2.5" fill="#E5E7EB" />
+                  <rect x="32" y="24" width="32" height="4" rx="2" fill="#F3F4F6" />
+                  <rect x="14" y="40" width="64" height="4" rx="2" fill="#F3F4F6" />
+                </g>
+                <g transform="translate(100 80) rotate(8) translate(-46 -16)">
+                  <rect width="92" height="32" rx="10" fill="#F3F4F6" stroke="#E5E7EB" strokeWidth="1.5" />
+                  <circle cx="20" cy="16" r="5" fill="#E5E7EB" />
+                  <rect x="30" y="14" width="40" height="4" rx="2" fill="#E5E7EB" opacity="0.7" />
+                </g>
+                <g transform="translate(146 112)">
+                  <circle cx="17" cy="17" r="14" fill="#6B7280" />
+                  <circle cx="14" cy="15" r="2.5" fill="#fff" />
+                  <circle cx="21" cy="16" r="2" fill="#fff" />
+                  <path d="M9 23 Q9 18 14 18 Q19 18 19 23" fill="#fff" />
+                  <path d="M19 23 Q19 20 22 20 Q26 20 26 23" fill="#fff" />
+                </g>
+              </svg>
+            </div>
+            <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-heading)", letterSpacing: "-0.005em", margin: "0 0 6px 0" }}>
+              You&apos;re the only member
+            </h3>
+            <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5, maxWidth: 260, margin: "0 0 16px 0" }}>
+              Invite teammates to collaborate on sessions and feedback.
+            </p>
+            {isWorkspaceOwner && (
+              <button
+                type="button"
+                onClick={() => setInviteModalOpen(true)}
+                className={BTN_PRIMARY}
+                style={{ height: 34 }}
+              >
+                Invite teammates
+              </button>
+            )}
+          </div>
+        ) : !search.trim() && roleFilter === "all" && statusFilter === "pending" && totalPending === 0 ? (
+          <div className="flex flex-col items-center justify-center text-center" style={{ padding: "40px 24px" }}>
+            <div style={{ width: 160, height: 140, marginBottom: 20 }}>
+              <svg viewBox="0 0 200 160" width="100%" height="100%" style={{ overflow: "visible" }}>
+                <g transform="translate(100 80) rotate(-3) translate(-44 -28)">
+                  <rect width="88" height="56" rx="6" fill="#FFFFFF" stroke="#D1D5DB" strokeWidth="1.5" />
+                  <path d="M0 0 L44 32 L88 0" fill="none" stroke="#D1D5DB" strokeWidth="1.5" />
+                </g>
+                <g transform="translate(146 112)">
+                  <circle cx="17" cy="17" r="14" fill="#6B7280" />
+                  <path d="M11 17 L15.5 22 L24 12" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                </g>
+              </svg>
+            </div>
+            <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-heading)", letterSpacing: "-0.005em", margin: "0 0 6px 0" }}>
+              No pending invitations
+            </h3>
+            <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5, maxWidth: 260, margin: 0 }}>
+              All invitations have been accepted or expired.
+            </p>
           </div>
         ) : filteredRows.length === 0 ? (
           rows.length === 0 ? (

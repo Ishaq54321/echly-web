@@ -16,6 +16,7 @@ import {
   sessionTitleFromSessionRow,
 } from "@/lib/repositories/activityEventsRepository.server";
 import { sendSessionInviteEmail } from "@/lib/email/workspaceEmails";
+import { composeFullName } from "@/lib/utils/nameSplit";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
 
@@ -165,12 +166,14 @@ export async function POST(
     });
 
     const inviterSnap = await adminDb.doc(`users/${inviterId}`).get();
+    const inviterData = (inviterSnap.data() ?? {}) as Record<string, unknown>;
+    const inviterComposed = composeFullName(
+      typeof inviterData.firstName === "string" ? inviterData.firstName : null,
+      typeof inviterData.lastName === "string" ? inviterData.lastName : null
+    );
     const inviterName =
-      typeof inviterSnap.data()?.displayName === "string"
-        ? inviterSnap.data()!.displayName
-        : typeof inviterSnap.data()?.email === "string"
-          ? inviterSnap.data()!.email
-          : "Someone";
+      inviterComposed ||
+      (typeof inviterData.email === "string" ? inviterData.email : "Someone");
     void sendSessionInviteEmail({
       to: email,
       invitedByName: inviterName,
@@ -241,12 +244,14 @@ export async function POST(
     void (async () => {
       try {
         const inviterSnap2 = await adminDb.doc(`users/${invitedByUserId}`).get();
+        const inviterData2 = (inviterSnap2.data() ?? {}) as Record<string, unknown>;
+        const inviterComposed2 = composeFullName(
+          typeof inviterData2.firstName === "string" ? inviterData2.firstName : null,
+          typeof inviterData2.lastName === "string" ? inviterData2.lastName : null
+        );
         const inviterName2 =
-          typeof inviterSnap2.data()?.displayName === "string"
-            ? inviterSnap2.data()!.displayName
-            : typeof inviterSnap2.data()?.email === "string"
-              ? inviterSnap2.data()!.email
-              : "Someone";
+          inviterComposed2 ||
+          (typeof inviterData2.email === "string" ? inviterData2.email : "Someone");
         await sendSessionInviteEmail({
           to: email,
           invitedByName: inviterName2,
