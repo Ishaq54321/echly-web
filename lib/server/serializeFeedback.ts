@@ -54,12 +54,16 @@ export function serializeTicket(ticket: Feedback, access: AccessContext): Record
     type: ticket.type,
     actionSteps: ticket.actionSteps ?? null,
     suggestedTags: ticket.suggestedTags ?? null,
+    pageArea: ticket.pageArea ?? null,
     contextSummary: ticket.contextSummary ?? null,
     url: can ? (ticket.url ?? null) : null,
     viewportWidth: can ? (ticket.viewportWidth ?? null) : null,
     viewportHeight: can ? (ticket.viewportHeight ?? null) : null,
     userAgent: can ? (ticket.userAgent ?? null) : null,
     clientTimestamp: can ? (ticket.clientTimestamp ?? null) : null,
+    screenWidth: can ? (ticket.screenWidth ?? null) : null,
+    screenHeight: can ? (ticket.screenHeight ?? null) : null,
+    devicePixelRatio: can ? (ticket.devicePixelRatio ?? null) : null,
     status: ns,
     isResolved: ns === "resolved",
     createdAt: timestampToIso(ticket.createdAt),
@@ -73,6 +77,8 @@ export function serializeTicket(ticket: Feedback, access: AccessContext): Record
     assigneeName: ticket.assigneeName ?? null,
     assigneeAvatarUrl: ticket.assigneeAvatarUrl ?? null,
     priority: ticket.priority ?? null,
+    creatorName: ticket.creatorName ?? null,
+    creatorAvatarUrl: ticket.creatorAvatarUrl ?? null,
   };
 }
 

@@ -233,7 +233,8 @@ export default function CaptureWidget({
   const showFloatingButton = !effectiveIsOpen && (showSidebar || showSessionSidebar);
   const showPanel = effectiveIsOpen && (showSidebar || showSessionSidebar);
 
-  const hasTickets = typeof totalCount === "number" && totalCount > 0;
+  const hasProcessingJobs = feedbackJobs && feedbackJobs.length > 0;
+  const hasTickets = (typeof totalCount === "number" && totalCount > 0) || hasProcessingJobs;
   /** When true, we are in an active or paused session; always render session layout (ticket list or empty state), never home. */
   const sessionModeActive = globalSessionModeActive === true || globalSessionPaused === true || optimisticSessionActive;
   /** Home screen only when not in a session. */
@@ -425,6 +426,17 @@ export default function CaptureWidget({
 
   const handleClose = () => (onCollapseRequest ? onCollapseRequest() : handlers.setIsOpen(false));
 
+  /** Drag handle: starts drag when pressing on a header background but never on inner buttons/inputs. */
+  const handleHeaderMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (!extensionMode) return;
+      const target = e.target as HTMLElement;
+      if (target.closest("button, input, textarea, select, [role='button']")) return;
+      handlers.startDrag(e);
+    },
+    [extensionMode, handlers]
+  );
+
   const handleCopySessionLink = useCallback(async () => {
     if (copyState === "copying") return;
     if (!sessionId) return;
@@ -585,7 +597,31 @@ export default function CaptureWidget({
       )}
 
       {showFloatingButton && (
-        <div className="echly-floating-trigger-wrapper">
+        <div
+          ref={extensionMode ? refs.widgetRef : undefined}
+          className="echly-floating-trigger-wrapper"
+          onMouseDown={handleHeaderMouseDown}
+          style={
+            extensionMode
+              ? state.position
+                ? {
+                    position: "fixed",
+                    left: state.position.x,
+                    top: state.position.y,
+                    bottom: "auto",
+                    right: "auto",
+                    transition: state.isSnapping ? "left 0.2s ease, top 0.2s ease" : undefined,
+                    cursor: state.isDragging ? "grabbing" : "grab",
+                    pointerEvents: "auto",
+                  }
+                : {
+                    position: "relative",
+                    cursor: state.isDragging ? "grabbing" : "grab",
+                    pointerEvents: "auto",
+                  }
+              : undefined
+          }
+        >
           <button
             type="button"
             id={extensionMode && launcherLogoUrl ? "launcher_container" : undefined}
@@ -620,14 +656,19 @@ export default function CaptureWidget({
             className="echly-sidebar-container"
             style={
               extensionMode
-                ? {
-                    position: "fixed",
-                    ...(state.position
-                      ? { left: state.position.x, top: state.position.y }
-                      : { bottom: "24px", right: "24px" }),
-                    zIndex: 2147483647,
-                    pointerEvents: "auto",
-                  }
+                ? state.position
+                  ? {
+                      position: "fixed",
+                      left: state.position.x,
+                      top: state.position.y,
+                      zIndex: 2147483647,
+                      pointerEvents: "auto",
+                      transition: state.isSnapping ? "left 0.2s ease, top 0.2s ease" : undefined,
+                    }
+                  : {
+                      position: "relative",
+                      pointerEvents: "auto",
+                    }
                 : undefined
             }
           >
@@ -666,7 +707,12 @@ export default function CaptureWidget({
                 </>
               ) : extensionMode && showHomeScreen && showUpgradeScreen ? (
                 /* ── Case 2a: Full ticket-limit upgrade screen (Screen 1) ── */
-                <div className="echly-v2">
+                <div
+                  className="echly-v2"
+                  data-tooltip-placement={
+                    state.trayCorner === "tl" || state.trayCorner === "tr" ? "bottom" : "top"
+                  }
+                >
                   <div className="pill upgrade-full">
                     <div className="upgrade-full-head">
                       <div className="upgrade-full-head-left">
@@ -728,7 +774,12 @@ export default function CaptureWidget({
                 </div>
               ) : extensionMode && showHomeScreen ? (
                 /* ── Case 2b: Extension home screen → V2 design ── */
-                <div className="echly-v2">
+                <div
+                  className="echly-v2"
+                  data-tooltip-placement={
+                    state.trayCorner === "tl" || state.trayCorner === "tr" ? "bottom" : "top"
+                  }
+                >
                   {showPreviousFeedback ? (
                     <PreviousFeedbackView
                       onBack={() => {
@@ -748,6 +799,7 @@ export default function CaptureWidget({
                       onModeChange={(mode) => setMode(mode)}
                       theme={theme}
                       onThemeToggle={onThemeToggle}
+                      onHeaderMouseDown={handleHeaderMouseDown}
                     />
                   ) : showModeSelection ? (
                     <ModeSelectionView
@@ -795,7 +847,11 @@ export default function CaptureWidget({
                       )}
 
                       {/* Header */}
-                      <div className="pill-head">
+                      <div
+                        className="pill-head"
+                        onMouseDown={handleHeaderMouseDown}
+                        style={extensionMode ? { cursor: state.isDragging ? "grabbing" : "grab" } : undefined}
+                      >
                         <span className="pill-mark">E</span>
                         <div className="pill-ws">
                           <span className="pill-ws-name">Echly</span>
@@ -870,11 +926,6 @@ export default function CaptureWidget({
                             </svg>
                           </span>
                           <span>Start Session</span>
-                          <span className="start-meta">
-                            <span className="kbd">⌘</span>
-                            <span className="kbd">⇧</span>
-                            <span className="kbd">E</span>
-                          </span>
                         </button>
 
                         <div className="secondary-row">
@@ -945,10 +996,16 @@ export default function CaptureWidget({
                 </div>
               ) : extensionMode && sessionModeActive ? (
                 /* ── Case 3a: Extension V2 session view (Phase 4) ── */
-                <div className="echly-v2">
+                <div
+                  className="echly-v2"
+                  data-tooltip-placement={
+                    state.trayCorner === "tl" || state.trayCorner === "tr" ? "bottom" : "top"
+                  }
+                >
                   {keepRecordingVisible && (
                     <KeepRecordingPill
                       fading={keepRecordingFading}
+                      placement={state.trayCorner === "tl" || state.trayCorner === "tr" ? "bottom" : "top"}
                       onDismiss={() => {
                         setKeepRecordingFading(true);
                         setTimeout(() => {
@@ -961,7 +1018,11 @@ export default function CaptureWidget({
                   <div className="pill pill-tickets">
 
                     {/* ── Session header ── */}
-                    <div className={`tl-head ${isEditingTitle ? "tl-head--editing" : ""}`}>
+                    <div
+                      className={`tl-head ${isEditingTitle ? "tl-head--editing" : ""}`}
+                      onMouseDown={handleHeaderMouseDown}
+                      style={extensionMode && !isEditingTitle ? { cursor: state.isDragging ? "grabbing" : "grab" } : undefined}
+                    >
                       <span className="pill-mark">E</span>
                       {!showSessionLoading && (
                         <>

@@ -30,6 +30,8 @@ export interface CreateNotificationData {
   accessRequestId?: string | null;
   requestedAccess?: "view" | "resolve" | null;
   actionStatus?: "pending" | "approved" | "rejected" | null;
+  collapseKey?: string | null;
+  collapseCount?: number | null;
 }
 
 function buildPayload(data: CreateNotificationData): Record<string, unknown> {
@@ -55,6 +57,8 @@ function buildPayload(data: CreateNotificationData): Record<string, unknown> {
   if (data.accessRequestId) payload.accessRequestId = data.accessRequestId;
   if (data.requestedAccess) payload.requestedAccess = data.requestedAccess;
   if (data.actionStatus !== undefined) payload.actionStatus = data.actionStatus ?? null;
+  if (data.collapseKey) payload.collapseKey = data.collapseKey;
+  if (typeof data.collapseCount === "number") payload.collapseCount = data.collapseCount;
   return payload;
 }
 
@@ -124,6 +128,9 @@ function rowFromDoc(doc: FirebaseFirestore.QueryDocumentSnapshot): NotificationR
       d.actionStatus === "rejected"
         ? d.actionStatus
         : null,
+    collapseKey: typeof d.collapseKey === "string" ? d.collapseKey : null,
+    collapseCount:
+      typeof d.collapseCount === "number" ? d.collapseCount : null,
   };
 }
 
@@ -228,6 +235,87 @@ export async function updateNotificationActionStatus(
     readAt: FieldValue.serverTimestamp(),
   });
   return true;
+}
+
+const RESOLVE_COLLAPSE_WINDOW_MS = 15 * 60 * 1000;
+
+/**
+ * Dispatch feedback.resolved notifications, collapsing rapid bursts (3rd+ within 15min) into a single doc.
+ * Required composite index: notifications(userId ASC, collapseKey ASC, createdAt DESC).
+ */
+export async function dispatchResolveWithCollapse(args: {
+  recipientIds: string[];
+  actorId: string;
+  workspaceId: string;
+  sessionId: string;
+  sessionTitle: string | null;
+  feedbackId: string;
+  feedbackTitle: string;
+  actor: { id: string; name: string; photoURL?: string | null };
+}): Promise<void> {
+  if (args.recipientIds.length === 0) return;
+  const collapseKey = `resolve:${args.actorId}:${args.sessionId}`;
+  const cutoffMs = Date.now() - RESOLVE_COLLAPSE_WINDOW_MS;
+  const cutoffTs = Timestamp.fromMillis(cutoffMs);
+
+  for (const recipientId of args.recipientIds) {
+    const recentSnap = await adminDb
+      .collection(COLLECTION)
+      .where("userId", "==", recipientId)
+      .where("collapseKey", "==", collapseKey)
+      .where("createdAt", ">", cutoffTs)
+      .orderBy("createdAt", "desc")
+      .get();
+
+    const titleIndividual = `${args.actor.name} resolved "${
+      args.feedbackTitle || "a ticket"
+    }"`;
+
+    if (recentSnap.size <= 1) {
+      const ref = adminDb.collection(COLLECTION).doc();
+      await ref.set({
+        ...buildPayload({
+          userId: recipientId,
+          workspaceId: args.workspaceId,
+          sessionId: args.sessionId,
+          sessionTitle: args.sessionTitle,
+          feedbackId: args.feedbackId,
+          type: "feedback.resolved",
+          actor: args.actor,
+          title: titleIndividual,
+          entityTitle: args.feedbackTitle || null,
+        }),
+        collapseKey,
+        collapseCount: 1,
+      });
+      continue;
+    }
+
+    const docs = recentSnap.docs;
+    const head = docs[0];
+    const headData = head.data() as { collapseCount?: unknown };
+    const headCount =
+      typeof headData.collapseCount === "number" && headData.collapseCount > 0
+        ? headData.collapseCount
+        : 1;
+    const newCount = headCount + 1;
+    const collapsedTitle = `${args.actor.name} resolved ${newCount} tickets`;
+
+    const batch = adminDb.batch();
+    batch.update(head.ref, {
+      collapseCount: newCount,
+      title: collapsedTitle,
+      entityTitle: null,
+      feedbackId: null,
+      read: false,
+      readAt: null,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    for (let i = 1; i < docs.length; i++) {
+      batch.delete(docs[i].ref);
+    }
+    await batch.commit();
+  }
 }
 
 export async function markAllRead(userId: string): Promise<number> {

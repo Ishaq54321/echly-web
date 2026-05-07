@@ -64,6 +64,9 @@ export interface Session {
   /** Firestore creator uid (session owner). */
   createdByUserId: string;
 
+  /** Display name of the session creator (resolved server-side). */
+  creatorName?: string;
+
   /**
    * First-time share configuration UX (persist only; logic deferred).
    */
@@ -188,10 +191,15 @@ export function sessionFromApiItem(item: unknown): Session {
   const hcs = Reflect.get(item, "hasConfiguredShare");
   if (typeof hcs === "boolean") session.hasConfiguredShare = hcs;
 
+  const creatorName = Reflect.get(item, "creatorName");
+  if (typeof creatorName === "string") session.creatorName = creatorName;
+
   const readCount = (key: string): number | undefined => {
     const v = Reflect.get(item, key);
     return typeof v === "number" && Number.isFinite(v) ? v : undefined;
   };
+  const cc = readCount("commentCount");
+  if (cc !== undefined) session.commentCount = cc;
   const oc = readCount("openCount");
   if (oc !== undefined) session.openCount = oc;
   const rc = readCount("resolvedCount");

@@ -143,9 +143,81 @@ general feedback
 
 Ensure the response JSON includes: "title": "..."
 
+TAG SUGGESTIONS:
+Select 1-3 tags from the EXACT list below. Never invent tags. ALWAYS return
+at least 1 tag — every UI feedback relates to some component.
+If only 1 tag fits, return 1.
+
+Component tags (what part of the UI):
+- "layout" — spacing, alignment, positioning, overflow, grid, flexbox
+- "typography" — font size, weight, color, line-height, truncation, text styling
+- "color-theme" — colors, backgrounds, shadows, borders, gradients, dark mode
+- "navigation" — menus, breadcrumbs, tabs, sidebar, routing, links
+- "form-input" — text fields, dropdowns, checkboxes, radio buttons, validation
+- "button-cta" — buttons, CTAs, click targets, submit actions
+- "modal-dialog" — modals, popups, overlays, drawers, toasts, alerts
+- "image-media" — images, videos, icons, illustrations, avatars, thumbnails
+- "table-list" — tables, data grids, lists, cards, pagination, sorting
+- "animation" — transitions, loading states, skeleton screens, spinners
+- "header-footer" — top bar, footer, sticky elements, fixed bars
+- "sidebar-panel" — sidebars, drawers, side panels, rail navigation
+- "notification-toast" — toasts, snackbars, alerts, banners, flash messages
+- "search-filter" — search bars, filters, sort controls, pagination controls
+- "authentication" — login, signup, password reset, session expiry, permissions
+- "file-upload" — upload flows, drag-and-drop, file previews, progress bars
+- "tooltip-popover" — tooltips, popovers, context menus, dropdowns
+- "scroll-overflow" — scroll behavior, sticky positioning, overflow clipping, infinite scroll
+
+Platform tags (where it happens):
+- "responsive" — mobile, tablet, specific viewport, breakpoint issues
+- "cross-browser" — browser-specific rendering, Safari/Firefox/Chrome differences
+- "accessibility" — contrast, screen reader, keyboard nav, ARIA, focus management
+- "performance" — slow loading, jank, lag, large bundle, memory leak
+- "i18n" — translation, RTL, locale-specific, character encoding
+- "dark-mode" — dark theme rendering issues, theme switching problems
+- "high-density" — retina/HiDPI rendering, blurry assets, icon scaling
+- "slow-network" — loading states on 3G/slow connections, timeout behavior
+- "keyboard-shortcut" — hotkeys not working, key conflicts, missing shortcuts
+- "print" — print layout, PDF export rendering
+
+Priority hints (how urgent it feels from the user's words):
+- "blocker" — cannot proceed at all, entire flow broken, deploy stopper
+- "critical" — user explicitly says broken, blocking, crashes, can't proceed
+- "minor" — user says small, slight, nitpick, polish, nice-to-have
+- "cosmetic" — purely visual, zero functional impact, lowest priority
+
+State tags (what condition triggers it):
+- "empty-state" — issue with how empty/zero-data states render
+- "loading-state" — spinners, skeletons, loading behavior issues
+- "error-state" — error messages, error recovery, error boundaries
+- "edge-case" — unusual input, boundary values, race conditions
+- "first-time-use" — onboarding, first interaction, tutorial flows
+
+RULES:
+- Select 1-3 tags maximum. Fewer is better than forced.
+- ALWAYS pick exactly 1 from "Component tags" — every UI feedback affects
+  some component. If nothing specific fits, default to "layout".
+- Pick 0-1 from "Platform/Priority/State" only if the user explicitly mentions it.
+- Never pick more than 3 total.
+- Return tags as lowercase strings exactly as written above.
+
+PAGE AREA DETECTION:
+From the PAGE URL, identify the site name and page name. Format as: "{Site Name} · {Page Name}"
+
+Rules:
+- Site name: extract the domain name without TLD (e.g., "clickup.com" → "ClickUp", "app.prepu.io" → "PrepU", "localhost:3000" → "Localhost")
+- Page name: derive from the URL path (e.g., "/" → "Homepage", "/pricing" → "Pricing", "/dashboard" → "Dashboard", "/checkout/step-2" → "Checkout", "/settings/billing" → "Settings")
+- If the path has multiple segments, use the most meaningful one (e.g., "/app/projects/123" → "Projects", "/blog/my-post" → "Blog")
+- Capitalize naturally: "Homepage", "Pricing", "Dashboard" — not "HOMEPAGE" or "homepage"
+- Keep it under 30 characters
+- Do NOT attempt to detect page sections (hero, footer, sidebar, etc.) — only the site and page
+- If you cannot determine the page name, just return the site name
+
 Example full response:
 {
   "title": "Hero Layout Adjustment",
+  "pageArea": "ClickUp · Pricing",
+  "suggestedTags": ["layout"],
   "actions": [...]
 }
 

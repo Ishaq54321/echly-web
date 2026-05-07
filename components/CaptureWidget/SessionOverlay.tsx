@@ -103,6 +103,46 @@ export function SessionOverlay({
   const sessionCursorActive = sessionMode && !sessionPaused && !sessionActionPending;
 
   /**
+   * First-capture-per-session tooltip: shows "Click anywhere to capture" near the cursor
+   * until the user initiates their first capture in this session. Resets when session ends.
+   */
+  const captureTooltipShownRef = useRef(false);
+  const [tooltipVisible, setTooltipVisible] = useState(false);
+  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    if (sessionMode) {
+      if (!captureTooltipShownRef.current) setTooltipVisible(true);
+    } else {
+      captureTooltipShownRef.current = false;
+      setTooltipVisible(false);
+      setCursorPos(null);
+    }
+  }, [sessionMode]);
+
+  useEffect(() => {
+    if (sessionFeedbackPending && !captureTooltipShownRef.current) {
+      captureTooltipShownRef.current = true;
+      setTooltipVisible(false);
+    }
+  }, [sessionFeedbackPending]);
+
+  const showCaptureTooltip =
+    tooltipVisible &&
+    sessionCursorActive &&
+    !sessionFeedbackPending &&
+    !captureTooltipShownRef.current;
+
+  useEffect(() => {
+    if (!showCaptureTooltip) return;
+    const handleMove = (e: MouseEvent) => {
+      setCursorPos({ x: e.clientX, y: e.clientY });
+    };
+    document.addEventListener("mousemove", handleMove, { passive: true });
+    return () => document.removeEventListener("mousemove", handleMove);
+  }, [showCaptureTooltip]);
+
+  /**
    * Local captureMode override: when the user switches from text → voice inside the panel,
    * we flip to "voice" locally without needing to change the external captureMode prop.
    * Resets whenever sessionFeedbackPending clears.
@@ -161,13 +201,30 @@ export function SessionOverlay({
     onElementClicked,
   ]);
 
-  /* Keep feedback cursor scoped to active session capture mode. */
+  /* Keep feedback cursor scoped to active session capture mode.
+     Sets body cursor AND injects a global !important rule so element-level
+     cursor styles (button, a, [role=button], etc.) don't override the comment cursor. */
   useEffect(() => {
     if (!captureRoot?.isConnected) return;
+    if (!sessionCursorActive) return;
     const previousCursor = document.body.style.cursor;
-    document.body.style.cursor = sessionCursorActive ? COMMENT_CURSOR : "";
+    document.body.style.cursor = COMMENT_CURSOR;
+
+    const styleEl = document.createElement("style");
+    styleEl.setAttribute("data-echly-cursor-override", "true");
+    styleEl.textContent = `
+      html, body, body * {
+        cursor: ${COMMENT_CURSOR} !important;
+      }
+      [data-echly-ui], [data-echly-ui] * {
+        cursor: auto !important;
+      }
+    `;
+    document.head.appendChild(styleEl);
+
     return () => {
       document.body.style.cursor = previousCursor;
+      styleEl.remove();
     };
   }, [sessionCursorActive, captureRoot]);
 
@@ -216,6 +273,41 @@ export function SessionOverlay({
           cursor: sessionCursorActive ? COMMENT_CURSOR : "default",
         }}
       />
+      {showCaptureTooltip && cursorPos && (() => {
+        const TOOLTIP_W = 170;
+        const TOOLTIP_H = 28;
+        const OFFSET = 20;
+        const vw = typeof window !== "undefined" ? window.innerWidth : 1024;
+        const vh = typeof window !== "undefined" ? window.innerHeight : 768;
+        const flipX = cursorPos.x + OFFSET + TOOLTIP_W > vw;
+        const flipY = cursorPos.y + OFFSET + TOOLTIP_H > vh;
+        const left = flipX ? cursorPos.x - OFFSET - TOOLTIP_W : cursorPos.x + OFFSET;
+        const top = flipY ? cursorPos.y - OFFSET - TOOLTIP_H : cursorPos.y + OFFSET;
+        return (
+          <div
+            aria-hidden
+            style={{
+              position: "fixed",
+              left,
+              top,
+              pointerEvents: "none",
+              zIndex: 2147483646,
+              background: "rgba(0, 0, 0, 0.75)",
+              color: "#fff",
+              padding: "6px 12px",
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 500,
+              fontFamily: "'DM Sans', sans-serif",
+              whiteSpace: "nowrap",
+              backdropFilter: "blur(4px)",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+            }}
+          >
+            Click anywhere to capture
+          </div>
+        );
+      })()}
       <SessionControlPanel
         sessionPaused={sessionPaused}
         pausePending={pausePending}

@@ -12,6 +12,7 @@ import {
   MessageSquare,
   PenLine,
   RotateCcw,
+  Share2,
   UserPlus,
 } from "lucide-react";
 import {
@@ -23,6 +24,7 @@ import {
 } from "@/lib/store/notificationStore";
 import type { NotificationRow, NotificationType } from "@/lib/domain/notification";
 import { UserAvatar } from "@/components/ui/UserAvatar";
+import { useWorkspaceStore } from "@/lib/client/workspaceStore";
 
 function getBadgeClass(type: NotificationType | string): string {
   switch (type) {
@@ -38,6 +40,8 @@ function getBadgeClass(type: NotificationType | string): string {
       return "badge-feedback";
     case "invite.accepted":
     case "invite.sent":
+      return "badge-invite";
+    case "session.shared":
       return "badge-invite";
     case "access_request.approved":
       return "badge-access";
@@ -66,6 +70,8 @@ function getTypeIcon(type: NotificationType | string) {
     case "invite.accepted":
     case "invite.sent":
       return <UserPlus {...props} />;
+    case "session.shared":
+      return <Share2 {...props} />;
     case "access_request.approved":
     case "access_request.rejected":
     case "access_request.pending":
@@ -179,13 +185,25 @@ function renderNotificationText(n: NotificationRow): React.ReactNode {
           {inSession}
         </>
       );
-    case "feedback.resolved":
+    case "feedback.resolved": {
+      const count =
+        typeof n.collapseCount === "number" && n.collapseCount > 1
+          ? n.collapseCount
+          : null;
+      if (count) {
+        return (
+          <>
+            <strong>{actorName}</strong> resolved {count} tickets{inSession}
+          </>
+        );
+      }
       return (
         <>
           <strong>{actorName}</strong> resolved{entityPart}
           {inSession}
         </>
       );
+    }
     case "feedback.reopened":
       return (
         <>
@@ -205,6 +223,13 @@ function renderNotificationText(n: NotificationRow): React.ReactNode {
         <>
           <strong>{actorName}</strong> invited you to{" "}
           <span className="notif-session-name">{n.entityTitle || "a workspace"}</span>
+        </>
+      );
+    case "session.shared":
+      return (
+        <>
+          <strong>{actorName}</strong> shared{" "}
+          <span className="notif-session-name">{sessionTitle}</span> with you
         </>
       );
     case "access_request.pending":
@@ -233,24 +258,114 @@ function renderNotificationText(n: NotificationRow): React.ReactNode {
   }
 }
 
-type NotificationGroup = {
+type TicketSubGroup =
+  | { kind: "single"; item: NotificationRow }
+  | {
+      kind: "ticket-group";
+      ticketKey: string;
+      items: NotificationRow[];
+      latest: NotificationRow;
+    };
+
+type NotificationDayGroup = {
   label: string;
-  items: NotificationRow[];
+  subgroups: TicketSubGroup[];
 };
 
-function groupByDay(items: NotificationRow[]): NotificationGroup[] {
-  const groups: NotificationGroup[] = [];
-  let current: NotificationGroup | null = null;
+function ticketGroupKey(n: NotificationRow): string | null {
+  if (!n.feedbackId) return null;
+  if (
+    n.type !== "comment.added" &&
+    n.type !== "comment.mention" &&
+    n.type !== "feedback.created" &&
+    n.type !== "feedback.resolved" &&
+    n.type !== "feedback.reopened"
+  ) {
+    return null;
+  }
+  return `${n.sessionId}::${n.feedbackId}`;
+}
+
+function groupByDayThenTicket(items: NotificationRow[]): NotificationDayGroup[] {
+  type DayState = {
+    label: string;
+    buckets: Map<string, NotificationRow[]>;
+    order: string[];
+  };
+  const days: NotificationDayGroup[] = [];
+  const states: DayState[] = [];
+  let current: DayState | null = null;
+
   for (const n of items) {
-    const label = dayLabel(n.createdAt);
-    if (!current || current.label !== label) {
-      current = { label, items: [n] };
-      groups.push(current);
-    } else {
-      current.items.push(n);
+    const lbl = dayLabel(n.createdAt);
+    if (!current || current.label !== lbl) {
+      current = { label: lbl, buckets: new Map(), order: [] };
+      states.push(current);
+      days.push({ label: lbl, subgroups: [] });
+    }
+    const tk = ticketGroupKey(n);
+    const bucketKey = tk ?? `__single::${n.id}`;
+    if (!current.buckets.has(bucketKey)) {
+      current.buckets.set(bucketKey, []);
+      current.order.push(bucketKey);
+    }
+    current.buckets.get(bucketKey)!.push(n);
+  }
+
+  for (let i = 0; i < days.length; i++) {
+    const day = days[i];
+    const state = states[i];
+    for (const key of state.order) {
+      const arr = state.buckets.get(key)!;
+      if (key.startsWith("__single::") || arr.length === 1) {
+        for (const item of arr) day.subgroups.push({ kind: "single", item });
+      } else {
+        day.subgroups.push({
+          kind: "ticket-group",
+          ticketKey: key,
+          items: arr,
+          latest: arr[0],
+        });
+      }
     }
   }
-  return groups;
+
+  return days;
+}
+
+function summarizeTicketGroup(items: NotificationRow[]): string {
+  const commentCount = items.filter(
+    (n) => n.type === "comment.added" || n.type === "comment.mention"
+  ).length;
+  const wasResolved = items.some((n) => n.type === "feedback.resolved");
+  const wasReopened = items.some((n) => n.type === "feedback.reopened");
+  const wasCreated = items.some((n) => n.type === "feedback.created");
+
+  const actors = new Set<string>();
+  for (const n of items) {
+    if (n.actor?.name) actors.add(n.actor.name);
+  }
+  const actorNames = Array.from(actors);
+  const actorPhrase =
+    actorNames.length === 0
+      ? "Someone"
+      : actorNames.length === 1
+        ? actorNames[0]
+        : actorNames.length === 2
+          ? `${actorNames[0]} and ${actorNames[1]}`
+          : `${actorNames[0]} and ${actorNames.length - 1} others`;
+
+  const parts: string[] = [];
+  if (commentCount > 0) {
+    parts.push(
+      `${actorPhrase} commented${commentCount > 1 ? ` (${commentCount})` : ""}`
+    );
+  }
+  if (wasResolved) parts.push("resolved");
+  if (wasReopened) parts.push("reopened");
+  if (wasCreated) parts.push("created");
+
+  return parts.join(" · ") || "Updated";
 }
 
 export interface NotificationPanelProps {
@@ -262,12 +377,16 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
   const router = useRouter();
   const {
     notifications,
-    unreadCount,
     isLoaded,
     isLoading,
     hasMore,
     nextCursor,
   } = useNotificationStore();
+
+  const { sessions: workspaceSessions } = useWorkspaceStore();
+  const [sharedSessionIds, setSharedSessionIds] = useState<Set<string>>(
+    new Set()
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -276,7 +395,58 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
     }
   }, [open, isLoaded]);
 
-  const groups = useMemo(() => groupByDay(notifications), [notifications]);
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/sessions/shared", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = (await res.json()) as {
+          data?: { sessions?: Array<{ sessionId?: string }> };
+        };
+        const ids = new Set<string>(
+          (json.data?.sessions ?? [])
+            .map((s) => (typeof s?.sessionId === "string" ? s.sessionId : ""))
+            .filter((s) => s.length > 0)
+        );
+        if (!cancelled) setSharedSessionIds(ids);
+      } catch {
+        // ignore — fall back to workspace sessions only
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  const accessibleSessionIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of workspaceSessions) {
+      const id = s.session?.id;
+      if (id) set.add(id);
+    }
+    for (const id of sharedSessionIds) set.add(id);
+    return set;
+  }, [workspaceSessions, sharedSessionIds]);
+
+  const visibleNotifications = useMemo(
+    () =>
+      notifications.filter(
+        (n) => !n.sessionId || accessibleSessionIds.has(n.sessionId)
+      ),
+    [notifications, accessibleSessionIds]
+  );
+
+  const visibleUnreadCount = useMemo(
+    () => visibleNotifications.filter((n) => !n.read).length,
+    [visibleNotifications]
+  );
+
+  const groups = useMemo(
+    () => groupByDayThenTicket(visibleNotifications),
+    [visibleNotifications]
+  );
 
   const handleItemClick = useCallback(
     (n: NotificationRow) => {
@@ -294,6 +464,26 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
       }
       if (n.commentId) {
         url.searchParams.set("comment", n.commentId);
+      }
+      router.push(url.pathname + url.search);
+      onClose();
+    },
+    [onClose, router]
+  );
+
+  const handleTicketGroupClick = useCallback(
+    (items: NotificationRow[], latest: NotificationRow) => {
+      for (const n of items) {
+        if (!n.read) void markRead(n.id);
+      }
+      const sid = (latest.sessionId || "").trim();
+      if (!sid) {
+        onClose();
+        return;
+      }
+      const url = new URL(`/dashboard/${sid}`, window.location.origin);
+      if (latest.feedbackId) {
+        url.searchParams.set("ticket", latest.feedbackId);
       }
       router.push(url.pathname + url.search);
       onClose();
@@ -366,8 +556,149 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
 
   if (!open) return null;
 
-  const showEmpty = isLoaded && notifications.length === 0 && !isLoading;
-  const showInitialLoading = !isLoaded && isLoading && notifications.length === 0;
+  const showEmpty = isLoaded && visibleNotifications.length === 0 && !isLoading;
+  const showInitialLoading =
+    !isLoaded && isLoading && visibleNotifications.length === 0;
+
+  function renderSingle(n: NotificationRow) {
+    const badgeClass = getBadgeClass(n.type);
+    const isPendingAccessRequest = n.type === "access_request.pending";
+    const showActionButtons =
+      isPendingAccessRequest &&
+      (n.actionStatus === "pending" || !n.actionStatus);
+    return (
+      <div
+        key={n.id}
+        className={`notif-item${n.read ? "" : " notif-item--unread"}`}
+        onClick={() => handleItemClick(n)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            handleItemClick(n);
+          }
+        }}
+      >
+        <div className="notif-avatar">
+          <UserAvatar
+            photoURL={n.actor?.photoURL || null}
+            name={n.actor?.name}
+            alt={n.actor?.name || "Notification"}
+            className="h-full w-full"
+          />
+          <span
+            className={`notif-type-badge ${badgeClass}`}
+            aria-hidden
+          >
+            {getTypeIcon(n.type)}
+          </span>
+        </div>
+        <div className="notif-content">
+          <div className="notif-text">{renderNotificationText(n)}</div>
+          {n.body && <div className="notif-preview">{n.body}</div>}
+          <div className="notif-time">{relativeTime(n.createdAt)}</div>
+          {isPendingAccessRequest && (
+            <div className="notif-actions">
+              {showActionButtons ? (
+                <>
+                  <button
+                    type="button"
+                    className="notif-action-approve"
+                    disabled={!!actingId}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleAccessRequestAction(n, "approved");
+                    }}
+                  >
+                    {actingId?.id === n.id && actingId?.action === "approved" ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                        Approve
+                      </>
+                    ) : (
+                      "Approve"
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="notif-action-deny"
+                    disabled={!!actingId}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleAccessRequestAction(n, "rejected");
+                    }}
+                  >
+                    {actingId?.id === n.id && actingId?.action === "rejected" ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                        Deny
+                      </>
+                    ) : (
+                      "Deny"
+                    )}
+                  </button>
+                </>
+              ) : n.actionStatus === "approved" ? (
+                <span className="notif-action-done notif-action-done--approved">
+                  Approved
+                </span>
+              ) : n.actionStatus === "rejected" ? (
+                <span className="notif-action-done notif-action-done--denied">
+                  Denied
+                </span>
+              ) : null}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function renderTicketGroup(
+    ticketKey: string,
+    items: NotificationRow[],
+    latest: NotificationRow
+  ) {
+    const anyUnread = items.some((n) => !n.read);
+    const summary = summarizeTicketGroup(items);
+    const ticketTitle = latest.entityTitle || "a ticket";
+    const badgeClass = getBadgeClass(latest.type);
+    return (
+      <div
+        key={ticketKey}
+        className={`notif-item${anyUnread ? " notif-item--unread" : ""}`}
+        onClick={() => handleTicketGroupClick(items, latest)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            handleTicketGroupClick(items, latest);
+          }
+        }}
+      >
+        <div className="notif-avatar">
+          <UserAvatar
+            photoURL={latest.actor?.photoURL || null}
+            name={latest.actor?.name}
+            alt={latest.actor?.name || "Notification"}
+            className="h-full w-full"
+          />
+          <span className={`notif-type-badge ${badgeClass}`} aria-hidden>
+            {getTypeIcon(latest.type)}
+          </span>
+        </div>
+        <div className="notif-content">
+          <div className="notif-text">
+            <strong>{ticketTitle}</strong>
+          </div>
+          <div className="notif-preview">{summary}</div>
+          <div className="notif-time">{relativeTime(latest.createdAt)}</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -379,13 +710,13 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
       <div className="notif-header">
         <div className="notif-header-left">
           <span className="notif-title">Notifications</span>
-          {unreadCount > 0 && (
+          {visibleUnreadCount > 0 && (
             <span className="notif-badge">
-              {unreadCount > 99 ? "99+" : unreadCount}
+              {visibleUnreadCount > 99 ? "99+" : visibleUnreadCount}
             </span>
           )}
         </div>
-        {unreadCount > 0 && (
+        {visibleUnreadCount > 0 && (
           <button
             type="button"
             className="notif-mark-all"
@@ -432,105 +763,11 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
           groups.map((group) => (
             <div key={group.label}>
               <div className="notif-day">{group.label}</div>
-              {group.items.map((n) => {
-                const badgeClass = getBadgeClass(n.type);
-                const isPendingAccessRequest =
-                  n.type === "access_request.pending";
-                const showActionButtons =
-                  isPendingAccessRequest &&
-                  (n.actionStatus === "pending" || !n.actionStatus);
-                return (
-                  <div
-                    key={n.id}
-                    className={`notif-item${n.read ? "" : " notif-item--unread"}`}
-                    onClick={() => handleItemClick(n)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        handleItemClick(n);
-                      }
-                    }}
-                  >
-                    <div className="notif-avatar">
-                      <UserAvatar
-                        photoURL={n.actor?.photoURL || null}
-                        name={n.actor?.name}
-                        alt={n.actor?.name || "Notification"}
-                        className="h-full w-full"
-                      />
-                      <span
-                        className={`notif-type-badge ${badgeClass}`}
-                        aria-hidden
-                      >
-                        {getTypeIcon(n.type)}
-                      </span>
-                    </div>
-                    <div className="notif-content">
-                      <div className="notif-text">
-                        {renderNotificationText(n)}
-                      </div>
-                      {n.body && <div className="notif-preview">{n.body}</div>}
-                      <div className="notif-time">
-                        {relativeTime(n.createdAt)}
-                      </div>
-                      {isPendingAccessRequest && (
-                        <div className="notif-actions">
-                          {showActionButtons ? (
-                            <>
-                              <button
-                                type="button"
-                                className="notif-action-approve"
-                                disabled={!!actingId}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  void handleAccessRequestAction(n, "approved");
-                                }}
-                              >
-                                {actingId?.id === n.id && actingId?.action === "approved" ? (
-                                  <>
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                                    Approve
-                                  </>
-                                ) : (
-                                  "Approve"
-                                )}
-                              </button>
-                              <button
-                                type="button"
-                                className="notif-action-deny"
-                                disabled={!!actingId}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  void handleAccessRequestAction(n, "rejected");
-                                }}
-                              >
-                                {actingId?.id === n.id && actingId?.action === "rejected" ? (
-                                  <>
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                                    Deny
-                                  </>
-                                ) : (
-                                  "Deny"
-                                )}
-                              </button>
-                            </>
-                          ) : n.actionStatus === "approved" ? (
-                            <span className="notif-action-done notif-action-done--approved">
-                              Approved
-                            </span>
-                          ) : n.actionStatus === "rejected" ? (
-                            <span className="notif-action-done notif-action-done--denied">
-                              Denied
-                            </span>
-                          ) : null}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+              {group.subgroups.map((sg) =>
+                sg.kind === "single"
+                  ? renderSingle(sg.item)
+                  : renderTicketGroup(sg.ticketKey, sg.items, sg.latest)
+              )}
             </div>
           ))}
       </div>

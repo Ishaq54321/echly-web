@@ -747,6 +747,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         title?: string;
         suggestedTags?: string[];
         actionSteps?: string[];
+        pageArea?: string | null;
       };
       const [structureSettled, uploadSettled] = await Promise.allSettled([
         apiFetch("/api/structure-feedback", {
@@ -836,6 +837,36 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                     title: normalized.title,
                     suggestedTags: normalized.suggestedTags ?? [],
                     actionSteps: normalized.actionSteps ?? [],
+                    pageArea: normalized.pageArea ?? null,
+                    url: enrichedContext.url ?? undefined,
+                    viewportWidth:
+                      typeof enrichedContext.viewportWidth === "number"
+                        ? enrichedContext.viewportWidth
+                        : undefined,
+                    viewportHeight:
+                      typeof enrichedContext.viewportHeight === "number"
+                        ? enrichedContext.viewportHeight
+                        : undefined,
+                    screenWidth:
+                      typeof (enrichedContext as { screenWidth?: number }).screenWidth === "number"
+                        ? (enrichedContext as { screenWidth?: number }).screenWidth
+                        : (typeof window !== "undefined" && typeof window.screen?.width === "number"
+                            ? window.screen.width
+                            : undefined),
+                    screenHeight:
+                      typeof (enrichedContext as { screenHeight?: number }).screenHeight === "number"
+                        ? (enrichedContext as { screenHeight?: number }).screenHeight
+                        : (typeof window !== "undefined" && typeof window.screen?.height === "number"
+                            ? window.screen.height
+                            : undefined),
+                    devicePixelRatio:
+                      typeof enrichedContext.devicePixelRatio === "number"
+                        ? enrichedContext.devicePixelRatio
+                        : (typeof window !== "undefined" ? (window.devicePixelRatio || 1) : undefined),
+                    userAgent:
+                      typeof navigator !== "undefined" && typeof navigator.userAgent === "string"
+                        ? navigator.userAgent
+                        : undefined,
                   },
                   screenshotId: finalScreenshotId,
                 },
@@ -906,6 +937,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           type: tick.type ?? "Feedback",
           screenshotId: finalScreenshotId,
           suggestedTags: normalized.suggestedTags ?? [],
+          pageArea: normalized.pageArea ?? null,
         };
         notifyFeedbackCreated(created, effectiveSessionId);
         return created;
@@ -932,6 +964,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         viewportWidth?: number;
         viewportHeight?: number;
         devicePixelRatio?: number;
+        screenWidth?: number;
+        screenHeight?: number;
         domPath?: string | null;
         nearbyText?: string | null;
         subtreeText?: string | null;
@@ -1276,6 +1310,12 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     );
   }, []);
 
+  const onCloseWidget = React.useCallback(() => {
+    chrome.runtime.sendMessage({ type: "ECHLY_CLOSE_WIDGET" }).catch((err) =>
+      logSendMessageRejection("ECHLY_CLOSE_WIDGET", err)
+    );
+  }, []);
+
   if (authState === "loading" && !user) {
     return (
       <div className="echly-v2">
@@ -1304,7 +1344,42 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   if (authState === "unauthenticated" || !user) {
     return (
       <div className="echly-v2">
-        <div className="pill pill-sm">
+        <div className="pill pill-sm" style={{ position: "relative" }}>
+          <button
+            type="button"
+            onClick={onCloseWidget}
+            style={{
+              position: "absolute",
+              top: 10,
+              right: 10,
+              width: 28,
+              height: 28,
+              borderRadius: 8,
+              border: "none",
+              background: "transparent",
+              color: "#78716C",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "background 0.12s, color 0.12s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#F0F1F3";
+              e.currentTarget.style.color = "#1C1917";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.color = "#78716C";
+            }}
+            title="Close"
+            aria-label="Close Echly"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
           <div className="auth-body">
             <div className="auth-icon">
               <svg width="22" height="22" viewBox="0 0 16 16" fill="none">
@@ -1659,14 +1734,18 @@ function injectWidgetUI(): void {
     host = document.createElement("div");
     host.id = SHADOW_HOST_ID;
     host.setAttribute("data-echly-ui", "true");
+    /* Host is content-sized and pinned to a corner. Drag/snap moves the host itself via
+       updateHostPosition(corner); the inner widget stays at the host's origin. Critically,
+       the host must NOT be a full-viewport overlay or it intercepts every page click and
+       breaks click-to-capture. */
     host.style.position = "fixed";
     host.style.bottom = "24px";
     host.style.right = "24px";
+    host.style.top = "auto";
+    host.style.left = "auto";
     host.style.width = "auto";
     host.style.height = "auto";
     host.style.zIndex = "2147483647";
-    /* Default visible: bootstrap only loads widget when shouldShowTray() OR user opened it,
-       so by the time we mount, the tray is meant to be on screen. */
     host.style.display = "block";
     host.style.pointerEvents = "auto";
     host.style.visibility = "visible";
@@ -1676,7 +1755,44 @@ function injectWidgetUI(): void {
       mountReactApp(host!);
     });
   }
+  installHostPositionUpdater(host!);
   ensureScrollDebugListeners();
+}
+
+/** Expose updateHostPosition(corner) on window so the drag-snap logic in useCaptureWidget
+ *  can move the shadow host itself. The host stays content-sized to avoid intercepting
+ *  page clicks; only its corner anchor changes. */
+function installHostPositionUpdater(host: HTMLDivElement): void {
+  const w = window as Window & {
+    __ECHLY_UPDATE_HOST_POSITION__?: (corner: "tl" | "tr" | "bl" | "br") => void;
+  };
+  if (w.__ECHLY_UPDATE_HOST_POSITION__) return;
+  w.__ECHLY_UPDATE_HOST_POSITION__ = (corner) => {
+    const target = document.getElementById(SHADOW_HOST_ID) as HTMLDivElement | null;
+    if (!target) return;
+    if (corner === "tl") {
+      target.style.top = "24px";
+      target.style.left = "24px";
+      target.style.bottom = "auto";
+      target.style.right = "auto";
+    } else if (corner === "tr") {
+      target.style.top = "24px";
+      target.style.right = "24px";
+      target.style.bottom = "auto";
+      target.style.left = "auto";
+    } else if (corner === "bl") {
+      target.style.bottom = "24px";
+      target.style.left = "24px";
+      target.style.top = "auto";
+      target.style.right = "auto";
+    } else {
+      target.style.bottom = "24px";
+      target.style.right = "24px";
+      target.style.top = "auto";
+      target.style.left = "auto";
+    }
+  };
+  void host;
 }
 
 /** Widget entry point: invoked when bootstrap appends widget.js. Idempotent. */

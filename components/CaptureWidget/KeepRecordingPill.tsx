@@ -5,11 +5,15 @@ import React from "react";
 type KeepRecordingPillProps = {
   onDismiss: () => void;
   fading?: boolean;
+  placement?: "top" | "bottom";
 };
 
-export function KeepRecordingPill({ onDismiss, fading }: KeepRecordingPillProps) {
+export function KeepRecordingPill({ onDismiss, fading, placement }: KeepRecordingPillProps) {
   return (
-    <div className={`echly-v2 echly-v2-keep-pill-anchor${fading ? " echly-keep-pill-fading" : ""}`}>
+    <div
+      className={`echly-v2 echly-v2-keep-pill-anchor${fading ? " echly-keep-pill-fading" : ""}`}
+      data-placement={placement || "top"}
+    >
       <div className="echly-keep-pill">
         <span className="keep-icon" aria-hidden>
           <span className="keep-sparkles">

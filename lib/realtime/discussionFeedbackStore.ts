@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 import {
   collection,
+  limit,
   onSnapshot,
   orderBy,
   query,
@@ -22,59 +23,57 @@ import {
   recordListenerUpdate,
 } from "@/lib/observability/listenerEvents";
 
-export interface FeedbackState {
-  feedback: Feedback[];
+export interface DiscussionFeedbackState {
+  items: Feedback[];
   loading: boolean;
   error: Error | null;
-  /** Set true when a permission-denied error occurs AFTER initial load — signals mid-view access revocation. */
   accessRevoked: boolean;
   version: number;
 }
 
-interface FeedbackEntry {
-  state: FeedbackState;
+interface Entry {
+  state: DiscussionFeedbackState;
   unsubscribe: (() => void) | null;
   retainCount: number;
-  workspaceId: string | null;
 }
 
-const initialState = (): FeedbackState => ({
-  feedback: [],
+const initialState = (): DiscussionFeedbackState => ({
+  items: [],
   loading: true,
   error: null,
   accessRevoked: false,
   version: 0,
 });
 
-const EMPTY_FEEDBACK_LIST: readonly Feedback[] = Object.freeze([]);
-const EMPTY_FEEDBACK_STATE: FeedbackState = Object.freeze({
-  feedback: EMPTY_FEEDBACK_LIST as Feedback[],
+const EMPTY_LIST: readonly Feedback[] = Object.freeze([]);
+const EMPTY_STATE: DiscussionFeedbackState = Object.freeze({
+  items: EMPTY_LIST as Feedback[],
   loading: true,
   error: null,
   accessRevoked: false,
   version: 0,
-}) as FeedbackState;
+}) as DiscussionFeedbackState;
 
-const entries = new Map<string, FeedbackEntry>();
-const listenersBySession = new Map<string, Set<() => void>>();
+const entries = new Map<string, Entry>();
+const listenersByWorkspace = new Map<string, Set<() => void>>();
 
-function getOrCreateEntry(sessionId: string): FeedbackEntry {
-  let e = entries.get(sessionId);
+function getOrCreateEntry(workspaceId: string): Entry {
+  let e = entries.get(workspaceId);
   if (!e) {
-    e = { state: initialState(), unsubscribe: null, retainCount: 0, workspaceId: null };
-    entries.set(sessionId, e);
+    e = { state: initialState(), unsubscribe: null, retainCount: 0 };
+    entries.set(workspaceId, e);
   }
   return e;
 }
 
-function emitFor(sessionId: string) {
-  listenersBySession.get(sessionId)?.forEach((l) => l());
+function emitFor(workspaceId: string) {
+  listenersByWorkspace.get(workspaceId)?.forEach((l) => l());
 }
 
-function setState(sessionId: string, patch: Partial<FeedbackState>) {
-  const e = getOrCreateEntry(sessionId);
+function setState(workspaceId: string, patch: Partial<DiscussionFeedbackState>) {
+  const e = getOrCreateEntry(workspaceId);
   e.state = { ...e.state, ...patch, version: e.state.version + 1 };
-  emitFor(sessionId);
+  emitFor(workspaceId);
 }
 
 function asTimestamp(value: unknown): Timestamp | null {
@@ -88,15 +87,12 @@ function asTimestamp(value: unknown): Timestamp | null {
   return null;
 }
 
-function getMillis(ts: Timestamp | null): number {
+function getMillis(ts: Timestamp | null | undefined): number {
   return ts ? ts.toMillis() : 0;
 }
 
-/**
- * Mirror of `feedbackFromRestApiRow` (in the deleted pagination hook) so the listener-emitted
- * Feedback shape matches the REST shape the rest of the app already expects. Any divergence
- * causes a flicker when the listener overrides bundle-seeded data (anonymous viewers).
- */
+// Mirror of mapFeedbackFromSnap in feedbackStore.ts. Kept in sync so
+// listener-emitted Feedback shape matches the REST shape consumers expect.
 function mapFeedbackFromSnap(snap: QueryDocumentSnapshot<DocumentData>): Feedback | null {
   const data = snap.data();
   if (data.isDeleted === true) return null;
@@ -177,16 +173,20 @@ function mapFeedbackFromSnap(snap: QueryDocumentSnapshot<DocumentData>): Feedbac
   };
 }
 
-function attachListener(sessionId: string, workspaceId: string) {
-  const e = getOrCreateEntry(sessionId);
+function attachListener(workspaceId: string) {
+  const e = getOrCreateEntry(workspaceId);
   if (e.unsubscribe) return;
-  e.workspaceId = workspaceId;
 
+  // Requires composite index: feedback (workspaceId Asc, commentCount Asc, lastCommentAt Desc).
+  // commentCount inequality forces orderBy(commentCount) first; we re-sort by
+  // lastCommentAt client-side after the snapshot lands.
   const q = query(
     collection(db, "feedback"),
-    where("sessionId", "==", sessionId),
     where("workspaceId", "==", workspaceId),
-    orderBy("createdAt", "desc")
+    where("commentCount", ">", 0),
+    orderBy("commentCount"),
+    orderBy("lastCommentAt", "desc"),
+    limit(100)
   );
 
   const unsub = onSnapshot(
@@ -199,19 +199,19 @@ function attachListener(sessionId: string, workspaceId: string) {
           if (f) list.push(f);
         });
         list.sort((a, b) => {
-          const diff = getMillis(b.createdAt) - getMillis(a.createdAt);
+          const diff = getMillis(b.lastCommentAt) - getMillis(a.lastCommentAt);
           if (diff !== 0) return diff;
           return b.id.localeCompare(a.id);
         });
-        setState(sessionId, { feedback: list, loading: false, error: null });
-        recordListenerUpdate("feedback", sessionId, {
+        setState(workspaceId, { items: list, loading: false, error: null });
+        recordListenerUpdate("discussionFeedback", workspaceId, {
           count: list.length,
           fromCache: snap.metadata.fromCache,
         });
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
-        setState(sessionId, { error, loading: false });
-        recordListenerError("feedback", sessionId, error, { workspaceId });
+        setState(workspaceId, { error, loading: false });
+        recordListenerError("discussionFeedback", workspaceId, error, { workspaceId });
       }
     },
     (err) => {
@@ -220,37 +220,33 @@ function attachListener(sessionId: string, workspaceId: string) {
       if (code !== undefined && (error as { code?: unknown }).code === undefined) {
         (error as { code?: unknown }).code = code;
       }
-      const wasLoaded = !getOrCreateEntry(sessionId).state.loading;
+      const wasLoaded = !getOrCreateEntry(workspaceId).state.loading;
       const accessRevoked = code === "permission-denied" && wasLoaded;
-      setState(sessionId, { error, loading: false, accessRevoked });
-      recordListenerError("feedback", sessionId, error, { workspaceId });
+      setState(workspaceId, { error, loading: false, accessRevoked });
+      recordListenerError("discussionFeedback", workspaceId, error, { workspaceId });
     }
   );
 
   e.unsubscribe = unsub;
-  recordListenerAttach("feedback", sessionId, { workspaceId });
+  recordListenerAttach("discussionFeedback", workspaceId, { workspaceId });
 }
 
-function detachListener(sessionId: string) {
-  const e = entries.get(sessionId);
+function detachListener(workspaceId: string) {
+  const e = entries.get(workspaceId);
   if (!e?.unsubscribe) return;
   e.unsubscribe();
   e.unsubscribe = null;
-  recordListenerDetach("feedback", sessionId);
+  recordListenerDetach("discussionFeedback", workspaceId);
 }
 
-/**
- * D10 lock: tear down every active listener and reset state on sign-out.
- * Consumers' effects re-run when isIdentityReady flips and call retain themselves.
- */
 function tearDownAllOnSignOut() {
-  for (const sid of Array.from(entries.keys())) {
-    detachListener(sid);
-    const e = entries.get(sid);
+  for (const wid of Array.from(entries.keys())) {
+    detachListener(wid);
+    const e = entries.get(wid);
     if (!e) continue;
     e.retainCount = 0;
     e.state = { ...initialState(), version: e.state.version + 1 };
-    emitFor(sid);
+    emitFor(wid);
   }
 }
 
@@ -260,59 +256,55 @@ if (typeof window !== "undefined") {
   });
 }
 
-/**
- * Increment retain count and ensure the `feedback` query is listened to for this session.
- * Always call the returned function on unmount so other surfaces (if any) keep the listener alive.
- */
-export function retainFeedbackListener(
-  sessionId: string,
-  workspaceId: string
-): () => void {
-  const sid = typeof sessionId === "string" ? sessionId.trim() : "";
+export function retainDiscussionFeedbackListener(workspaceId: string): () => void {
   const wid = typeof workspaceId === "string" ? workspaceId.trim() : "";
-  if (!sid || !wid) return () => {};
+  if (!wid) return () => {};
 
-  const e = getOrCreateEntry(sid);
+  const e = getOrCreateEntry(wid);
   e.retainCount += 1;
-  attachListener(sid, wid);
+  attachListener(wid);
 
   let released = false;
   return () => {
     if (released) return;
     released = true;
-    const cur = entries.get(sid);
+    const cur = entries.get(wid);
     if (!cur) return;
     cur.retainCount = Math.max(0, cur.retainCount - 1);
     if (cur.retainCount === 0) {
-      detachListener(sid);
+      detachListener(wid);
     }
   };
 }
 
-export function getFeedbackSnapshot(sessionId: string): FeedbackState {
-  return entries.get(sessionId)?.state ?? EMPTY_FEEDBACK_STATE;
+export function getDiscussionFeedbackSnapshot(workspaceId: string): DiscussionFeedbackState {
+  return entries.get(workspaceId)?.state ?? EMPTY_STATE;
 }
 
-export function subscribeToFeedback(
-  sessionId: string,
+export function subscribeToDiscussionFeedback(
+  workspaceId: string,
   listener: () => void
 ): () => void {
-  let set = listenersBySession.get(sessionId);
+  let set = listenersByWorkspace.get(workspaceId);
   if (!set) {
     set = new Set();
-    listenersBySession.set(sessionId, set);
+    listenersByWorkspace.set(workspaceId, set);
   }
   set.add(listener);
   return () => {
-    const s = listenersBySession.get(sessionId);
+    const s = listenersByWorkspace.get(workspaceId);
     if (!s) return;
     s.delete(listener);
-    if (s.size === 0) listenersBySession.delete(sessionId);
+    if (s.size === 0) listenersByWorkspace.delete(workspaceId);
   };
 }
 
-export function useFeedbackStore(sessionId: string): FeedbackState {
-  const subscribe = (l: () => void) => subscribeToFeedback(sessionId, l);
-  const get = () => getFeedbackSnapshot(sessionId);
+export function useDiscussionFeedback(workspaceId: string | null): DiscussionFeedbackState {
+  const wid = workspaceId ?? "";
+  const subscribe = (l: () => void) => {
+    if (!wid) return () => {};
+    return subscribeToDiscussionFeedback(wid, l);
+  };
+  const get = () => (wid ? getDiscussionFeedbackSnapshot(wid) : EMPTY_STATE);
   return useSyncExternalStore(subscribe, get, get);
 }

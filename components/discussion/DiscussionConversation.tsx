@@ -13,7 +13,6 @@ import {
   X,
 } from "lucide-react";
 import { EmptyNoThreadSelectedIllustration } from "@/components/discussion/EmptyStateIllustrations";
-import { MinimalLoader } from "@/components/ui/MinimalLoader";
 import { Modal } from "@/components/ui/Modal";
 import { authFetch } from "@/lib/authFetch";
 import {
@@ -71,6 +70,20 @@ export interface DiscussionConversationProps {
   onCommentAdded?: () => void;
   /** When false, do not show empty-state message (e.g. while ticket list is still loading). */
   listLoaded?: boolean;
+  /**
+   * Pre-seeded ticket data from the workspace-scoped discussion listener.
+   * When provided AND matching feedbackId, skips the per-ticket REST fetch
+   * and only fetches the session (for sessionName + access).
+   */
+  initialTicket?: {
+    id: string;
+    title?: string;
+    sessionId?: string;
+    screenshotId?: string | null;
+    actionSteps?: string[] | null;
+    status?: "open" | "resolved";
+    isResolved?: boolean;
+  } | null;
 }
 
 interface TicketData {
@@ -119,6 +132,7 @@ export function DiscussionConversation({
   feedbackId,
   onCommentAdded,
   listLoaded = true,
+  initialTicket = null,
 }: DiscussionConversationProps) {
   const {
     isIdentityResolved,
@@ -186,6 +200,54 @@ export function DiscussionConversation({
       setLoading(false);
       return;
     }
+
+    // Seed from the workspace-scoped discussion listener when available.
+    // Skips the /api/tickets/{id} fetch and only fetches the session for
+    // sessionName + access. The realtime listener will reconcile any later
+    // changes to title/status/screenshotId on its own re-render path
+    // (the parent re-passes initialTicket each tick — but we intentionally
+    // keep this effect tied to feedbackId so we don't churn on every snapshot).
+    if (initialTicket && initialTicket.id === feedbackId) {
+      setTicket({
+        id: initialTicket.id,
+        title: initialTicket.title,
+        sessionId: initialTicket.sessionId,
+        screenshotId: initialTicket.screenshotId ?? null,
+        actionSteps: initialTicket.actionSteps ?? undefined,
+        status: initialTicket.status,
+        isResolved: initialTicket.isResolved,
+      });
+      setSessionName("");
+      setAccess(null);
+      setLoading(false);
+
+      const sid = initialTicket.sessionId;
+      if (!sid || !authUid) return;
+      const controller = new AbortController();
+      const { signal } = controller;
+      void (async () => {
+        try {
+          const sessionRes = await authFetch(`/api/sessions/${sid}`, { signal });
+          if (!sessionRes || !sessionRes.ok) return;
+          if (signal.aborted) return;
+          const sessionRaw: unknown = await sessionRes.json();
+          if (signal.aborted) return;
+          const accessRoot = sessionRaw as { access?: SessionAccess };
+          setAccess(accessRoot.access ?? null);
+          const sessionPayload = requireApiSuccessData<{
+            session: { title?: string };
+          }>(sessionRaw);
+          const title = sessionPayload.session.title;
+          if (typeof title === "string" && title.trim()) setSessionName(title);
+        } catch (err) {
+          if (err instanceof Error && err.name === "AbortError") return;
+          console.error("[DiscussionConversation] session fetch error:", err);
+        }
+      })();
+      return () => controller.abort();
+    }
+
+    // Fallback: thread isn't in the listener window (or no seed provided).
     setTicket(null);
     setSessionName("");
     setAccess(null);
@@ -237,6 +299,8 @@ export function DiscussionConversation({
 
     void run();
     return () => controller.abort();
+    // initialTicket intentionally omitted — we seed on feedbackId change only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [feedbackId, authUid]);
 
   // Fetch session participants for @mention autocomplete
@@ -450,7 +514,7 @@ export function DiscussionConversation({
   if (!feedbackId) {
     if (!listLoaded) {
       return (
-        <div className="flex-1 flex flex-col h-full min-w-0 bg-white">
+        <div className="flex-1 flex flex-col h-full min-w-0 bg-[var(--surface-card)] shadow-[var(--shadow-panel)]">
           <div className="shrink-0 px-6 pt-4 pb-4 flex items-start justify-end">
             <RightHeaderActions />
           </div>
@@ -458,7 +522,7 @@ export function DiscussionConversation({
       );
     }
     return (
-      <div className="flex-1 flex flex-col h-full min-w-0 bg-white">
+      <div className="flex-1 flex flex-col h-full min-w-0 bg-[var(--surface-card)] shadow-[var(--shadow-panel)]">
         <div className="shrink-0 px-6 pt-4 pb-4 flex items-start justify-end">
           <RightHeaderActions />
         </div>
@@ -479,12 +543,34 @@ export function DiscussionConversation({
 
   if (loading || !ticket) {
     return (
-      <div className="flex-1 flex flex-col h-full min-w-0 bg-white">
+      <div className="flex-1 flex flex-col h-full min-w-0 bg-[var(--surface-card)] shadow-[var(--shadow-panel)]">
         <div className="shrink-0 px-6 pt-4 pb-4 flex items-start justify-end">
           <RightHeaderActions />
         </div>
-        <div className="flex-1 flex items-center justify-center">
-          <MinimalLoader label="Loading conversation…" />
+        <div className="flex-1 px-6 py-4" aria-busy="true">
+          <div className="h-5 skel-block rounded-md mb-2" style={{ width: "55%" }} />
+          <div className="flex items-center gap-2 mb-6">
+            <div className="h-3.5 w-14 skel-block rounded-full" />
+            <div className="h-3 skel-block rounded-md" style={{ width: "35%" }} />
+          </div>
+          <div className="h-[180px] skel-block rounded-[14px] mb-6" />
+          <div className="h-3.5 w-28 skel-block rounded-md mb-3" />
+          <div className="flex flex-col gap-2.5 mb-6">
+            <div className="h-3 skel-block rounded-md" style={{ width: "80%" }} />
+            <div className="h-3 skel-block rounded-md" style={{ width: "65%" }} />
+            <div className="h-3 skel-block rounded-md" style={{ width: "70%" }} />
+          </div>
+          <div className="h-3.5 w-24 skel-block rounded-md mb-4" />
+          {[0, 1].map((i) => (
+            <div key={i} className="flex gap-3 mb-4">
+              <div className="w-8 h-8 rounded-full skel-block shrink-0" />
+              <div className="flex-1">
+                <div className="h-3 skel-block rounded-md mb-1.5" style={{ width: "25%" }} />
+                <div className="h-3 skel-block rounded-md mb-1" style={{ width: "90%" }} />
+                <div className="h-3 skel-block rounded-md" style={{ width: "60%" }} />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -495,7 +581,7 @@ export function DiscussionConversation({
   const steps = ticket.actionSteps;
   const hasSteps = steps && Array.isArray(steps) && steps.length > 0;
   return (
-    <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden bg-white">
+    <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden bg-[var(--surface-card)] shadow-[var(--shadow-panel)]">
       {/* Header */}
       <div className="shrink-0 px-6 pt-4 pb-4">
         <div className="flex items-start gap-4">
@@ -596,8 +682,17 @@ export function DiscussionConversation({
 
           <div className="px-5 py-4">
             {!commentsInitialized ? (
-              <div className="flex justify-center py-6" aria-busy="true">
-                <MinimalLoader compact label="Loading replies…" />
+              <div className="px-5 py-4" aria-busy="true">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex gap-3 mb-4">
+                    <div className="w-8 h-8 rounded-full skel-block shrink-0" />
+                    <div className="flex-1">
+                      <div className="h-3 skel-block rounded-md mb-1.5" style={{ width: "20%" }} />
+                      <div className="h-3 skel-block rounded-md mb-1" style={{ width: `${85 - i * 10}%` }} />
+                      <div className="h-3 skel-block rounded-md" style={{ width: `${55 - i * 5}%` }} />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : rootComments.length === 0 ? (
               <p className="text-[13px] text-[var(--text-secondary)] py-2">

@@ -16,10 +16,7 @@ import {
   truncateActivityCommentPreview,
 } from "@/lib/repositories/activityEventsRepository.server";
 import { fireAndForget } from "@/lib/server/fireAndForget";
-import {
-  resolveSessionRecipients,
-  dispatchNotifications,
-} from "@/lib/server/notificationFanOut.server";
+import { dispatchNotifications } from "@/lib/server/notificationFanOut.server";
 
 /** Thrown when the feedback doc is missing (e.g. hard-deleted); map to HTTP 404 in API routes. */
 export const ADD_COMMENT_FEEDBACK_MISSING = "ADD_COMMENT_FEEDBACK_MISSING";
@@ -134,6 +131,9 @@ export async function addCommentRepo(
     commentCount: FieldValue.increment(1),
     lastCommentPreview: preview || null,
     lastCommentAt: FieldValue.serverTimestamp(),
+    ...(filteredMentionedUserIds.length > 0
+      ? { mentionedUserIds: FieldValue.arrayUnion(...filteredMentionedUserIds) }
+      : {}),
   });
   batch.update(workspaceRef, {
     "stats.totalComments": FieldValue.increment(1),
@@ -174,38 +174,23 @@ export async function addCommentRepo(
     const titleLabel = feedbackTitle || "a ticket";
     const previewBody = commentPreview || null;
 
-    const recipients = await resolveSessionRecipients({
-      sessionId,
-      workspaceId,
-      includeWorkspaceOwners: false,
-      excludeUserIds: [resolvedUserId],
-    });
-
     const feedbackCreatorId =
       typeof feedbackData.userId === "string" ? feedbackData.userId : "";
     const feedbackAssigneeId =
       typeof feedbackData.assigneeId === "string"
         ? feedbackData.assigneeId
         : "";
-    if (
-      feedbackCreatorId &&
-      feedbackCreatorId !== resolvedUserId &&
-      !recipients.includes(feedbackCreatorId)
-    ) {
-      recipients.push(feedbackCreatorId);
-    }
-    if (
-      feedbackAssigneeId &&
-      feedbackAssigneeId !== resolvedUserId &&
-      !recipients.includes(feedbackAssigneeId)
-    ) {
-      recipients.push(feedbackAssigneeId);
-    }
-
     const mentionedIds = filteredMentionedUserIds;
-    const commentRecipients = recipients.filter(
-      (id) => !mentionedIds.includes(id)
-    );
+
+    const commentRecipientSet = new Set<string>();
+    if (feedbackCreatorId && feedbackCreatorId !== resolvedUserId) {
+      commentRecipientSet.add(feedbackCreatorId);
+    }
+    if (feedbackAssigneeId && feedbackAssigneeId !== resolvedUserId) {
+      commentRecipientSet.add(feedbackAssigneeId);
+    }
+    for (const mid of mentionedIds) commentRecipientSet.delete(mid);
+    const commentRecipients = Array.from(commentRecipientSet);
 
     if (commentRecipients.length > 0) {
       await dispatchNotifications({

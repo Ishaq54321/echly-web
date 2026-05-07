@@ -18,7 +18,7 @@ export function GlobalHeader() {
   }, []);
 
   return (
-    <div className="global-header flex h-16 w-full shrink-0 items-center justify-between bg-white px-6">
+    <div className="global-header flex h-16 w-full shrink-0 items-center justify-between bg-[var(--surface-card)] px-6">
       <button
         type="button"
         onClick={() => window.dispatchEvent(new CustomEvent("echly:open-search-overlay"))}

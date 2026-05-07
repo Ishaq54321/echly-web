@@ -1,20 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/authFetch";
-import { Building2, Calendar, Check, CircleDashed, RotateCcw, WifiOff } from "lucide-react";
+import { RotateCcw, WifiOff } from "lucide-react";
 import type { SharedSessionMembership } from "@/lib/domain/session";
 import { useWorkspace } from "@/lib/client/workspaceContext";
-import ProgressPie from "@/components/ui/ProgressPie";
+import { SessionWorkspaceRow } from "@/components/dashboard/SessionsWorkspace";
+import { sharedToSessionWithCounts } from "@/lib/utils/sharedSessionAdapter";
 
-function formatDate(
-  addedAt: { seconds: number; nanoseconds: number } | null
-): string {
-  if (!addedAt) return "";
-  const d = new Date(addedAt.seconds * 1000);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
+const LeaveSessionModal = dynamic(
+  () =>
+    import("@/components/dashboard/LeaveSessionModal").then((m) => m.LeaveSessionModal),
+  { ssr: false }
+);
 
 function ErrorState() {
   return (
@@ -171,178 +171,13 @@ function EmptyState() {
   );
 }
 
-function SessionRow({
-  session,
-  onClick,
-}: {
-  session: SharedSessionMembership;
-  onClick: () => void;
-}) {
-  const dateLabel = formatDate(session.addedAt);
-  const workspaceLabel =
-    session.workspaceName ?? session.workspaceId.slice(0, 8) + "...";
-
-  const open = session.openCount ?? 0;
-  const resolved = session.resolvedCount ?? 0;
-  const total = open + resolved;
-  let progress = total === 0 ? 0 : (resolved / total) * 100;
-  if (progress >= 100) progress = 99.999;
-
-  // Pill shared style — matches dashboard SessionWorkspaceRow chips
-  const chipStyle: React.CSSProperties = {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "6px",
-    borderRadius: "9999px",
-    border: "1px solid var(--border)",
-    background: "#FFFFFF",
-    padding: "6px 12px",
-    fontSize: "14px",
-    fontWeight: "500",
-    color: "var(--text-body)",
-    whiteSpace: "nowrap",
-    minHeight: "36px",
-  };
-
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") onClick();
-      }}
-      onMouseEnter={(e) => {
-        const el = e.currentTarget as HTMLDivElement;
-        el.style.background = "var(--surface-hover)";
-        el.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)";
-        el.style.transform = "translateY(-1px)";
-        el.style.borderRadius = "12px";
-      }}
-      onMouseLeave={(e) => {
-        const el = e.currentTarget as HTMLDivElement;
-        el.style.background = "#FFFFFF";
-        el.style.boxShadow = "none";
-        el.style.transform = "translateY(0)";
-        el.style.borderRadius = "12px";
-      }}
-      style={{
-        display: "flex",
-        width: "100%",
-        alignItems: "center",
-        justifyContent: "space-between",
-        borderRadius: "12px",
-        padding: "16px",
-        background: "#FFFFFF",
-        cursor: "pointer",
-        transition: "all 150ms",
-        outline: "none",
-        marginBottom: "12px",
-      }}
-    >
-      {/* Left section */}
-      <div style={{ display: "flex", alignItems: "center", gap: "16px", minWidth: 0 }}>
-        <ProgressPie value={progress} size={32} />
-
-        <div style={{ minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: "15px",
-              fontWeight: "500",
-              color: "var(--text-heading)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {session.sessionName}
-          </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              marginTop: "3px",
-            }}
-          >
-            <span style={{ fontSize: "14px", color: "var(--text-secondary)", fontWeight: "400" }}>
-              {session.addedByName
-                ? `Shared by ${session.addedByName}`
-                : "Added to session"}
-            </span>
-            <span
-              style={{
-                width: "3px",
-                height: "3px",
-                borderRadius: "50%",
-                background: "var(--border-strong)",
-                flexShrink: 0,
-              }}
-            />
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "5px",
-                background: "var(--surface-hover)",
-                border: "1px solid var(--border)",
-                borderRadius: "9999px",
-                padding: "3px 10px",
-                fontSize: "14px",
-                fontWeight: "500",
-                color: "var(--text-body)",
-                flexShrink: 0,
-                whiteSpace: "nowrap",
-              }}
-            >
-              <Building2 size={15} color="var(--text-body)" />
-              {workspaceLabel}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Right section */}
-      <div
-        style={{
-          flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          gap: "14px",
-        }}
-      >
-        {open > 0 && (
-          <div style={chipStyle}>
-            <CircleDashed size={16} style={{ color: "#1775E0", flexShrink: 0 }} />
-            <span style={{ letterSpacing: "-0.01em" }}>{open} open</span>
-          </div>
-        )}
-
-        {resolved > 0 && (
-          <div style={chipStyle}>
-            <Check size={16} strokeWidth={2.5} style={{ color: "var(--color-success)", flexShrink: 0 }} />
-            <span style={{ letterSpacing: "-0.01em" }}>{resolved} resolved</span>
-          </div>
-        )}
-
-        {dateLabel && (
-          <div style={{ ...chipStyle, minWidth: "5.5rem" }}>
-            <Calendar size={16} strokeWidth={2.5} style={{ color: "var(--color-warning)", flexShrink: 0 }} />
-            <span style={{ letterSpacing: "-0.01em" }}>{dateLabel}</span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export default function SharedPage() {
   const router = useRouter();
   const { isIdentityResolved } = useWorkspace();
   const [sessions, setSessions] = useState<SharedSessionMembership[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [leaveModalSessionId, setLeaveModalSessionId] = useState<string | null>(null);
 
   const isLoading = loading || !isIdentityResolved;
 
@@ -384,6 +219,39 @@ export default function SharedPage() {
       cancelled = true;
     };
   }, [isIdentityResolved]);
+
+  const handleViewShared = useCallback(
+    (sessionId: string) => {
+      router.push(`/session/${sessionId}`);
+    },
+    [router]
+  );
+
+  const handleLeaveSession = useCallback((sessionId: string) => {
+    setLeaveModalSessionId(sessionId);
+  }, []);
+
+  const leaveModalSession = useMemo(
+    () =>
+      leaveModalSessionId
+        ? sessions.find((s) => s.sessionId === leaveModalSessionId) ?? null
+        : null,
+    [leaveModalSessionId, sessions]
+  );
+
+  const confirmLeaveSession = useCallback(async () => {
+    if (!leaveModalSessionId) return;
+    const res = await authFetch(
+      `/api/sessions/shared/${leaveModalSessionId}`,
+      { method: "DELETE" }
+    );
+    if (!res || !res.ok) {
+      throw new Error("Failed to leave session");
+    }
+    setSessions((prev) =>
+      prev.filter((s) => s.sessionId !== leaveModalSessionId)
+    );
+  }, [leaveModalSessionId]);
 
   return (
     <>
@@ -539,17 +407,32 @@ export default function SharedPage() {
           ) : sessions.length === 0 ? (
             <EmptyState />
           ) : (
-            sessions.map((session) => (
-              <SessionRow
-                key={session.sessionId}
-                session={session}
-                onClick={() => router.push(`/session/${session.sessionId}`)}
-              />
-            ))
+            <div className="space-y-3">
+              {sessions.map((m) => (
+                <SessionWorkspaceRow
+                  key={m.sessionId}
+                  item={sharedToSessionWithCounts(m)}
+                  onView={handleViewShared}
+                  isSharedSession
+                  sharedByName={m.addedByName ?? undefined}
+                  workspaceLabel={m.workspaceName ?? undefined}
+                  onLeaveSession={handleLeaveSession}
+                />
+              ))}
+            </div>
           )}
         </div>
         </div>
       </div>
+
+      {leaveModalSessionId ? (
+        <LeaveSessionModal
+          open
+          onClose={() => setLeaveModalSessionId(null)}
+          sessionTitle={leaveModalSession?.sessionName ?? ""}
+          onConfirm={confirmLeaveSession}
+        />
+      ) : null}
     </>
   );
 }

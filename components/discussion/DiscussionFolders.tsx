@@ -35,6 +35,7 @@ export interface DiscussionFoldersProps {
   onFolderChange: (key: FolderKey) => void;
   onSessionChange: (sessionId: string | null) => void;
   onCompose?: () => void;
+  loading?: boolean;
 }
 
 interface MainFolderItem {
@@ -60,9 +61,35 @@ export function DiscussionFolders({
   onFolderChange,
   onSessionChange,
   onCompose,
+  loading = false,
 }: DiscussionFoldersProps) {
+  if (loading) {
+    return (
+      <aside className="flex flex-col h-full w-full bg-[var(--surface-card)] overflow-y-auto px-3 py-4 shadow-[var(--shadow-panel)]">
+        <div className="flex items-center justify-between px-1.5 mb-3.5">
+          <h2 className="text-[15px] font-semibold text-[var(--text-heading)]">Discussion</h2>
+        </div>
+        <div className="px-3 py-4" aria-busy="true">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex items-center gap-3 px-2 py-[7px] mb-1">
+              <div className="w-[18px] h-[18px] rounded-md skel-block" />
+              <div className="h-3 skel-block rounded-md flex-1" style={{ width: `${60 - i * 8}%` }} />
+            </div>
+          ))}
+          <div className="h-2.5 w-20 skel-block rounded-md mt-5 mb-2 mx-2" />
+          {[0, 1].map((i) => (
+            <div key={i} className="flex items-center gap-3 px-2 py-1.5 mb-1">
+              <div className="h-3 skel-block rounded-md flex-1" style={{ width: `${55 - i * 10}%` }} />
+              <div className="h-2.5 w-5 skel-block rounded-md" />
+            </div>
+          ))}
+        </div>
+      </aside>
+    );
+  }
+
   return (
-    <aside className="flex flex-col h-full w-full bg-white overflow-y-auto px-3 py-4">
+    <aside className="flex flex-col h-full w-full bg-[var(--surface-card)] overflow-y-auto px-3 py-4 shadow-[var(--shadow-panel)]">
       {/* Heading */}
       <div className="flex items-center justify-between px-1.5 mb-3.5">
         <h2 className="text-[15px] font-semibold text-[var(--text-heading)]">Discussion</h2>

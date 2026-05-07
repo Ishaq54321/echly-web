@@ -167,7 +167,7 @@ export function SessionFeedbackHeader({
   };
 
   return (
-    <header className="sticky top-0 z-20 shrink-0 bg-[var(--surface-card)] pt-0 px-0 pb-0">
+    <header className="sticky top-0 z-20 shrink-0 bg-[var(--surface)] pt-0 px-0 pb-0">
       <div className="mb-6">
         {/* Row 1: Eyebrow */}
         <div className="flex items-center gap-2.5 mb-3">

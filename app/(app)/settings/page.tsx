@@ -49,7 +49,7 @@ import { Tooltip } from "@/components/ui/Tooltip";
 
 /* Premium workspace settings: wide layout, strong hierarchy */
 const SETTINGS_CARD =
-  "rounded-[var(--radius-md)] border border-[var(--border-default)] bg-white p-[28px] transition-[border-color,box-shadow] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-md)]";
+  "rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] p-[28px] transition-[border-color,box-shadow] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-md)]";
 const CARD_GAP = "space-y-8"; /* 32px between section cards */
 const ROW_GAP = "space-y-5"; /* 20px between setting rows */
 const SECTION_TITLE = "text-lg font-semibold text-[var(--text-heading)]"; /* H2: section heading */
@@ -134,7 +134,7 @@ function SettingsPageInner() {
         (!workspaceId || workspaceId.trim() === "")))
   ) {
     return (
-      <div className="flex flex-1 min-h-0 bg-white overflow-auto">
+      <div className="flex flex-1 min-h-0 bg-[var(--surface-card)] overflow-auto">
         <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 max-w-lg mx-auto text-center">
           <p className="text-lg font-medium text-[var(--text-heading)]">Workspace unavailable</p>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
@@ -1594,7 +1594,7 @@ function MembersTableSkeleton() {
       {[0, 1, 2].map((i) => (
         <div
           key={i}
-          className="hidden md:grid items-center border-b border-[var(--surface-hover)] last:border-b-0 bg-white"
+          className="hidden md:grid items-center border-b border-[var(--surface-hover)] last:border-b-0 bg-[var(--surface-card)]"
           style={{ gridTemplateColumns: TABLE_COLS, minHeight: 56, padding: "12px 16px" }}
         >
           <div className="flex items-center gap-2.5 min-w-0">
@@ -2996,7 +2996,7 @@ function BillingTab() {
       {/* Current plan status card — shown for Business/Enterprise */}
       {isOnPaidPlan && (
         <div className="billing-container mb-8">
-          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-6">
+          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-card)] p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <span className="text-lg font-semibold text-[var(--text-heading)]">

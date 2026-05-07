@@ -471,9 +471,10 @@
   color: var(--ink);
   letter-spacing: -0.01em;
   line-height: 1.2;
+  margin-bottom: 6px;
 }
 .echly-v2 .mode-card-sub {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
   letter-spacing: -0.003em;
   line-height: 1.35;

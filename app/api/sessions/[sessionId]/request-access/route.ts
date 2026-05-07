@@ -6,7 +6,10 @@ import {
   createAccessRequest,
   getRequestByUser,
 } from "@/lib/repositories/accessRequestsRepository.server";
-import { getSessionMember } from "@/lib/repositories/sessionMembersRepository.server";
+import {
+  getSessionMember,
+  listSessionMembers,
+} from "@/lib/repositories/sessionMembersRepository.server";
 import { getWorkspaceMembersRepo } from "@/lib/repositories/workspaceMembersRepository.server";
 import { sendAccessRequestNotificationEmail } from "@/lib/email/workspaceEmails";
 import { getUserByIdRepo } from "@/lib/repositories/usersRepository.server";
@@ -126,9 +129,25 @@ export async function POST(
       if (!sess) return;
       const workspaceId = typeof sess.workspaceId === "string" ? sess.workspaceId.trim() : "";
       if (!workspaceId) return;
-      const members = await getWorkspaceMembersRepo(workspaceId);
-      const emails = members.map((m) => m.email).filter((e) => e && e !== requesterEmail);
+
+      const [wsMembers, sessionMembers] = await Promise.all([
+        getWorkspaceMembersRepo(workspaceId),
+        listSessionMembers(sessionId),
+      ]);
+
+      const ownerEmails = wsMembers
+        .filter((m) => m.role === "OWNER")
+        .map((m) => m.email)
+        .filter((e): e is string => typeof e === "string" && e.length > 0);
+      const sessionMemberEmails = sessionMembers
+        .map((m) => m.email)
+        .filter((e): e is string => typeof e === "string" && e.length > 0);
+
+      const emails = Array.from(
+        new Set([...ownerEmails, ...sessionMemberEmails])
+      ).filter((e) => e !== requesterEmail);
       if (emails.length === 0) return;
+
       await sendAccessRequestNotificationEmail({
         to: emails,
         requesterEmail,

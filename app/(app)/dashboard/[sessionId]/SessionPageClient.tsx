@@ -225,11 +225,15 @@ function bundleFeedbackRowToFeedback(
     suggestedTags: Array.isArray(row.suggestedTags)
       ? (row.suggestedTags as unknown[]).filter((s): s is string => typeof s === "string")
       : null,
+    pageArea: typeof row.pageArea === "string" ? row.pageArea : null,
     url: null,
-    viewportWidth: null,
-    viewportHeight: null,
-    userAgent: null,
+    viewportWidth: typeof row.viewportWidth === "number" ? row.viewportWidth : null,
+    viewportHeight: typeof row.viewportHeight === "number" ? row.viewportHeight : null,
+    userAgent: typeof row.userAgent === "string" ? row.userAgent : null,
     clientTimestamp: null,
+    screenWidth: typeof row.screenWidth === "number" ? row.screenWidth : null,
+    screenHeight: typeof row.screenHeight === "number" ? row.screenHeight : null,
+    devicePixelRatio: typeof row.devicePixelRatio === "number" ? row.devicePixelRatio : null,
     screenshotId: typeof row.screenshotId === "string" ? row.screenshotId : null,
     screenshotStatus:
       row.screenshotStatus === "attached" ||
@@ -252,6 +256,9 @@ function bundleFeedbackRowToFeedback(
       row.priority === "high" || row.priority === "medium" || row.priority === "low"
         ? (row.priority as "high" | "medium" | "low")
         : null,
+    creatorName: typeof row.creatorName === "string" ? row.creatorName : null,
+    creatorAvatarUrl:
+      typeof row.creatorAvatarUrl === "string" ? row.creatorAvatarUrl : null,
   };
 }
 
@@ -2932,7 +2939,7 @@ export default function SessionPageClient({
           }}
         >
           {/* Left card: Ticket list */}
-          <aside className="hidden lg:flex flex-col bg-[var(--surface-card)] rounded-[14px] min-h-0 overflow-hidden" style={{ boxShadow: 'var(--shadow-card)' }}>
+          <aside className="hidden lg:flex flex-col bg-[var(--surface)] rounded-[14px] min-h-0 overflow-hidden" style={{ boxShadow: 'var(--shadow-panel)' }}>
           <TicketList
             counts={{
               total: isCountsSynced ? feedbackTotal : Math.max(0, sessionRestTotal),
@@ -2978,13 +2985,13 @@ export default function SessionPageClient({
           </aside>
 
           {/* Center card: Main content */}
-          <section className="flex flex-col bg-[var(--surface-card)] rounded-[14px] min-h-0 overflow-hidden" style={{ boxShadow: 'var(--shadow-card)' }}>
+          <section className="flex flex-col bg-[var(--surface)] rounded-[14px] min-h-0 overflow-hidden" style={{ boxShadow: 'var(--shadow-panel)' }}>
           {pendingResolveRequest && sessionAccess?.canResolve === false ? (
             <PendingAccessBanner />
           ) : null}
           <main className="flex-1 min-h-0 overflow-y-auto flex flex-col min-w-0">
             <div className="h-full flex flex-col min-w-0">
-              <div className="z-20 shrink-0 flex items-center gap-2 px-4 py-3 lg:hidden bg-[var(--layer-1-bg)]">
+              <div className="z-20 shrink-0 flex items-center gap-2 px-4 py-3 lg:hidden bg-[var(--surface)]">
                 <button
                   type="button"
                   onClick={() => setIsTicketNavigatorOpen(true)}
@@ -3008,7 +3015,7 @@ export default function SessionPageClient({
               className="flex flex-col min-h-0 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300"
               style={{ animationTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)' }}
             >
-              <div className="flex flex-col flex-1 min-h-0 bg-[var(--surface-card)] rounded-[14px] overflow-hidden" style={{ boxShadow: 'var(--shadow-card)' }}>
+              <div className="flex flex-col flex-1 min-h-0 bg-[var(--surface)] rounded-[14px] overflow-hidden" style={{ boxShadow: 'var(--shadow-panel)' }}>
                 <CommentPanel
                   variant="sidebar"
                   isOpen

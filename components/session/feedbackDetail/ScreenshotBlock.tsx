@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useEffect, useLayoutEffect, useState } from "react";
-import { Loader2, Pencil, ZoomIn } from "lucide-react";
+import { Info, Loader2, Pencil, ZoomIn } from "lucide-react";
+import type { Timestamp } from "firebase/firestore";
 import { CanvasEmptyState } from "@/components/empty/CanvasEmptyState";
 import { NoScreenshotIllu } from "@/components/empty/canvasIllustrations";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 interface ScreenshotBlockProps {
   screenshotId: string | null | undefined;
@@ -16,6 +18,87 @@ interface ScreenshotBlockProps {
   canEdit?: boolean;
   /** Omit outer frame when nested inside a parent attachment card. */
   embeddedInCard?: boolean;
+  /** AI-detected page/section, e.g. "Pricing Page → Hero Section". Hidden when null/empty. */
+  pageArea?: string | null;
+  userAgent?: string | null;
+  viewportWidth?: number | null;
+  viewportHeight?: number | null;
+  devicePixelRatio?: number | null;
+  createdAt?: string | number | Timestamp | null;
+}
+
+function parseDeviceInfo(
+  ua: string | null | undefined,
+  vw: number | null | undefined,
+  vh: number | null | undefined,
+  dpr: number | null | undefined
+): string | null {
+  if (!ua) return null;
+
+  let browser = "Unknown";
+  let os = "Unknown";
+
+  if (ua.includes("Chrome") && !ua.includes("Edg")) {
+    const match = ua.match(/Chrome\/(\d+)/);
+    browser = match ? `Chrome ${match[1]}` : "Chrome";
+  } else if (ua.includes("Edg")) {
+    const match = ua.match(/Edg\/(\d+)/);
+    browser = match ? `Edge ${match[1]}` : "Edge";
+  } else if (ua.includes("Firefox")) {
+    const match = ua.match(/Firefox\/(\d+)/);
+    browser = match ? `Firefox ${match[1]}` : "Firefox";
+  } else if (ua.includes("Safari") && !ua.includes("Chrome")) {
+    const match = ua.match(/Version\/(\d+[\.\d]*)/);
+    browser = match ? `Safari ${match[1]}` : "Safari";
+  }
+
+  if (ua.includes("Mac OS X")) {
+    const match = ua.match(/Mac OS X (\d+[._]\d+)/);
+    os = match ? `macOS ${match[1].replace(/_/g, ".")}` : "macOS";
+  } else if (ua.includes("Windows NT 10")) {
+    os = ua.includes("Windows NT 10.0") ? "Windows 10/11" : "Windows";
+  } else if (ua.includes("Linux")) {
+    os = "Linux";
+  } else if (ua.includes("iPhone") || ua.includes("iPad")) {
+    const match = ua.match(/OS (\d+[._]\d+)/);
+    os = match ? `iOS ${match[1].replace(/_/g, ".")}` : "iOS";
+  } else if (ua.includes("Android")) {
+    const match = ua.match(/Android (\d+[\.\d]*)/);
+    os = match ? `Android ${match[1]}` : "Android";
+  }
+
+  const viewport = vw && vh ? `${vw}×${vh}` : null;
+  const ratio = dpr ? `@${dpr}x` : null;
+
+  const parts = [browser, os, [viewport, ratio].filter(Boolean).join(" ")].filter(Boolean);
+  return parts.join(" · ");
+}
+
+function formatLocalDateTime(createdAt: string | number | Timestamp | null | undefined): string | null {
+  if (!createdAt) return null;
+  try {
+    let date: Date;
+    if (typeof createdAt === "number") {
+      date = new Date(createdAt);
+    } else if (typeof createdAt === "string") {
+      date = new Date(createdAt);
+    } else if (typeof (createdAt as Timestamp).toDate === "function") {
+      date = (createdAt as Timestamp).toDate();
+    } else {
+      return null;
+    }
+    if (isNaN(date.getTime())) return null;
+    return date.toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch {
+    return null;
+  }
 }
 
 export function ScreenshotBlock({
@@ -27,7 +110,17 @@ export function ScreenshotBlock({
   onEdit,
   canEdit,
   embeddedInCard = false,
+  pageArea,
+  userAgent,
+  viewportWidth,
+  viewportHeight,
+  devicePixelRatio,
+  createdAt,
 }: ScreenshotBlockProps) {
+  const trimmedPageArea = typeof pageArea === "string" ? pageArea.trim() : "";
+  const deviceLine = parseDeviceInfo(userAgent, viewportWidth, viewportHeight, devicePixelRatio);
+  const dateLine = formatLocalDateTime(createdAt);
+  const tooltipContent = [trimmedPageArea, deviceLine, dateLine].filter(Boolean).join("\n");
   const [imageDecoded, setImageDecoded] = useState(false);
 
   useLayoutEffect(() => {
@@ -105,6 +198,18 @@ export function ScreenshotBlock({
             >
               <ZoomIn className="h-[1.375rem] w-[1.375rem]" strokeWidth={1.5} />
             </button>
+            {tooltipContent ? (
+              <div className="absolute top-3 left-3">
+                <Tooltip content={tooltipContent} position="right">
+                  <span
+                    aria-label={trimmedPageArea ? `Page area: ${trimmedPageArea}` : "Device info"}
+                    className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-black/55 text-white backdrop-blur-sm shadow-[var(--shadow-level-1)]"
+                  >
+                    <Info className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden />
+                  </span>
+                </Tooltip>
+              </div>
+            ) : null}
           </>
         ) : null}
       </div>

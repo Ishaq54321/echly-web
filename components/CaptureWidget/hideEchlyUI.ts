@@ -30,6 +30,7 @@ const UI_SELECTORS = [
   ".echly-mode-card",
   ".echly-voice-pill-wrapper",
   ".echly-voice-pill",
+  ".echly-sc-root",
 ];
 
 export function hideEchlyUI(): Element[] {
@@ -45,6 +46,14 @@ export function hideEchlyUI(): Element[] {
       (el as HTMLElement).dataset.prevVisibility = (el as HTMLElement).style.visibility;
       (el as HTMLElement).style.visibility = "hidden";
     });
+  });
+
+  // Also hide portaled light-DOM UI (session control bar, overlays)
+  const lightDomSelectors = UI_SELECTORS.join(", ");
+  document.querySelectorAll(lightDomSelectors).forEach((el) => {
+    hidden.push(el);
+    (el as HTMLElement).dataset.prevVisibility = (el as HTMLElement).style.visibility;
+    (el as HTMLElement).style.visibility = "hidden";
   });
 
   return hidden;

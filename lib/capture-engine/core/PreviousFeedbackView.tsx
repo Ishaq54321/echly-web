@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, type MouseEvent as ReactMouseEvent } from "react";
 import { X, Mic, Pen, ChevronLeft } from "lucide-react";
 import { ECHLY_DEBUG } from "@/lib/utils/logger";
 import type { SessionOption } from "./ResumeSessionModal";
@@ -57,6 +57,7 @@ type PreviousFeedbackViewProps = {
   onModeChange?: (mode: "voice" | "text") => void;
   theme?: "light" | "dark";
   onThemeToggle?: () => void;
+  onHeaderMouseDown?: (e: ReactMouseEvent) => void;
 };
 
 export default function PreviousFeedbackView({
@@ -66,6 +67,7 @@ export default function PreviousFeedbackView({
   fetchSessions,
   captureMode = "voice",
   onModeChange,
+  onHeaderMouseDown,
 }: PreviousFeedbackViewProps) {
   const [sessions, setSessions] = useState<SessionOption[]>([]);
   const [loading, setLoading] = useState(false);
@@ -118,7 +120,14 @@ export default function PreviousFeedbackView({
   return (
     <div className="pill pill-md">
       {/* Header */}
-      <div className="pill-head">
+      <div
+        className="pill-head"
+        onMouseDown={(e) => {
+          if ((e.target as HTMLElement).closest("button")) return;
+          onHeaderMouseDown?.(e);
+        }}
+        style={{ cursor: onHeaderMouseDown ? "grab" : undefined }}
+      >
         <span className="pill-mark">E</span>
         <div className="pill-ws">
           <span className="pill-ws-name">Previous Feedback</span>

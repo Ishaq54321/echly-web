@@ -88,6 +88,17 @@ async function verifyDashboardSession(): Promise<boolean> {
   }
 }
 
+async function startSessionInActiveTab(): Promise<void> {
+  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  const tabId = tabs[0]?.id;
+  if (!tabId) return;
+  const injected = await ensureContentScriptInjected(tabId);
+  if (!injected) return;
+  chrome.tabs
+    .sendMessage(tabId, { type: "ECHLY_START_SESSION" })
+    .catch((error) => logMessageDeliveryError("ECHLY_START_SESSION", error));
+}
+
 chrome.action.onClicked.addListener(() => {
   chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
     const tab = tabs[0];
@@ -1148,6 +1159,14 @@ async function createFeedbackInternal({
     suggestedTags?: string[];
     actionSteps?: string[];
     status?: "open" | "resolved";
+    pageArea?: string | null;
+    url?: string;
+    viewportWidth?: number;
+    viewportHeight?: number;
+    screenWidth?: number;
+    screenHeight?: number;
+    devicePixelRatio?: number;
+    userAgent?: string;
   };
   screenshotId: string;
 }): Promise<Response> {
@@ -1225,16 +1244,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "ECHLY_START_SESSION") {
-    void (async () => {
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      const tabId = tabs[0]?.id;
-      if (!tabId) return;
-      const injected = await ensureContentScriptInjected(tabId);
-      if (!injected) return;
-      chrome.tabs
-        .sendMessage(tabId, { type: "ECHLY_START_SESSION" })
-        .catch((error) => logMessageDeliveryError("ECHLY_START_SESSION", error));
-    })();
+    void startSessionInActiveTab();
     sendResponse({ ok: true });
     return false;
   }
@@ -1969,6 +1979,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           description?: string;
           suggestedTags?: string[];
           actionSteps?: string[];
+          pageArea?: string | null;
         };
         screenshotId?: string;
       };

@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { StructuredFeedback } from "./types";
-import { getTicketIcon } from "@/lib/utils/getTicketIcon";
+import { getTicketIconFromTags } from "@/lib/utils/getTicketIconFromTags";
 
 function priorityFromType(type: string | undefined): "critical" | "high" | "medium" | "low" {
   const t = (type ?? "").toLowerCase();
@@ -46,7 +46,7 @@ function FeedbackItem({
   const [isDeleting, setIsDeleting] = useState(false);
 
   const priority = priorityFromType(ticket.type);
-  const IconComponent = getTicketIcon(ticket.title);
+  const IconComponent = getTicketIconFromTags(ticket.suggestedTags ?? null, ticket.title);
 
   useEffect(() => {
     if (highlightTicketId === ticket.id) {
@@ -67,7 +67,7 @@ function FeedbackItem({
   }, [ticket.id, onDelete, isDeleting]);
 
   const stepCount = ticket.actionSteps?.length ?? 0;
-  const stepLabel = stepCount === 1 ? "action step" : "action steps";
+  const stepLabel = stepCount === 1 ? "change" : "changes";
 
   return (
     <div
@@ -168,7 +168,7 @@ export function TicketEditorOverlay({
   const isFirstRenderRef = useRef(true);
   const focusStepIndexRef = useRef<number | null>(null);
 
-  const IconComponent = getTicketIcon(ticket.title);
+  const IconComponent = getTicketIconFromTags(ticket.suggestedTags ?? null, ticket.title);
   const screenshotUrl =
     ticket.screenshotId ? tryBuildScreenshotUrl(sessionId, ticket.screenshotId) : null;
 
@@ -376,7 +376,7 @@ export function TicketEditorOverlay({
 
           {/* Action steps */}
           <div className="editor-steps">
-            <div className="editor-steps-label">Action steps</div>
+            <div className="editor-steps-label">What to change</div>
             <div className="editor-steps-list" ref={stepsListRef}>
               {editedSteps.map((step, i) => (
                 <div key={i} className="step-row">
@@ -385,7 +385,7 @@ export function TicketEditorOverlay({
                     className="step-text"
                     value={step}
                     rows={1}
-                    placeholder="Add an action step…"
+                    placeholder="Add a change…"
                     ref={(el) => resizeTextarea(el)}
                     onChange={(e) => {
                       setEditedSteps((prev) =>
@@ -434,7 +434,7 @@ export function TicketEditorOverlay({
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
-              Add action step
+              Add a change
             </button>
           </div>
         </div>

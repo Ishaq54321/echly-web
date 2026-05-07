@@ -8,6 +8,11 @@ import {
   signEmailVerifiedToken,
   buildEmailVerifiedCookieString,
 } from "@/lib/server/emailVerifiedCookie";
+import {
+  signOnboardedToken,
+  buildOnboardedCookieString,
+} from "@/lib/server/onboardingCookie";
+import { adminDb } from "@/lib/server/firebaseAdmin";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 
 export const dynamic = "force-dynamic";
@@ -56,6 +61,23 @@ export async function POST(req: Request) {
       response.headers.append(
         "Set-Cookie",
         buildEmailVerifiedCookieString(verifiedToken)
+      );
+    }
+
+    // Re-issue onboarded cookie for returning users who already completed onboarding.
+    // Without this, logout clears the cookie and middleware bounces to /onboarding
+    // before WorkspaceProvider can re-issue it via POST /api/users.
+    const userSnap = await adminDb.doc(`users/${uid}`).get();
+    const userData = userSnap.data() ?? {};
+    const onboardingCompleted = userData.onboardingCompleted;
+    const hasWorkspace =
+      typeof userData.workspaceId === "string" &&
+      userData.workspaceId.trim().length > 0;
+    if (onboardingCompleted !== false && hasWorkspace) {
+      const onboardedToken = await signOnboardedToken(uid);
+      response.headers.append(
+        "Set-Cookie",
+        buildOnboardedCookieString(onboardedToken)
       );
     }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { memo } from "react";
-import { getTicketIcon } from "@/lib/utils/getTicketIcon";
+import { getTicketIconFromTags } from "@/lib/utils/getTicketIconFromTags";
 
 interface TicketItemProps {
   id: string;
@@ -13,6 +13,7 @@ interface TicketItemProps {
   onSelect: (id: string) => void;
   /** When true, applies a brief highlight animation (new ticket from realtime). */
   isNewTicket?: boolean;
+  suggestedTags?: string[] | null;
 }
 
 function TicketItemInner({
@@ -23,8 +24,9 @@ function TicketItemInner({
   active,
   onSelect,
   isNewTicket = false,
+  suggestedTags,
 }: TicketItemProps) {
-  const IconComponent = getTicketIcon(title);
+  const IconComponent = getTicketIconFromTags(suggestedTags, title);
 
   const handleClick = () => {
     onSelect(id);

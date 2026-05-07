@@ -23,9 +23,9 @@
 
   /* ─── SURFACES ───────────────────────────── */
   --surface:            #FFFFFF;
-  --surface-page:       #F8F8F8;
-  --surface-card:       #FFFFFF;
-  --surface-subtle:     #F8F8F8;
+  --surface-page:       #F5F5F5;
+  --surface-card:       #FAFAFA;
+  --surface-subtle:     #F5F5F5;
   --surface-hover:      #F0F1F3;
   --surface-active:     #EBF4FF;
   --surface-input:      #FAFAFA;
@@ -100,6 +100,7 @@
                   0 4px 14px rgba(0,0,0,0.08);
   --shadow-card:  0 1px 0 rgba(28,25,23,0.04),
                   0 6px 24px -16px rgba(28,25,23,0.10);
+  --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.03);
 
   /* ─── WARM BORDERS (session page) ────────── */
   --hair:         #E7E5E4;
@@ -590,7 +591,7 @@ body {
 .content-card   {
   background: var(--surface-card);
   border-radius: var(--content-card-radius);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-panel);
   flex: 1;
   min-height: 0;
   min-width: 0;

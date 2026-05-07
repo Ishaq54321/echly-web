@@ -9,6 +9,8 @@ export type StructuredFeedback = {
   type?: string;
   screenshotId?: string | null;
   suggestedTags?: string[];
+  /** AI-detected page/section, e.g. "Pricing Page → Hero Section". */
+  pageArea?: string | null;
 };
 
 /** Element bounding rect (viewport coordinates) for anchoring capture card. */
@@ -36,6 +38,8 @@ export type CaptureContext = {
   viewportWidth: number;
   viewportHeight: number;
   devicePixelRatio: number;
+  screenWidth?: number;
+  screenHeight?: number;
   domPath: string | null;
   nearbyText: string | null;
   /** Visible text from the DOM subtree at domPath (for spatial scope). */

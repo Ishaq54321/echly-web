@@ -472,12 +472,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   // Fetch member count once when active workspace changes
   useEffect(() => {
-    if (!activeWorkspaceId) return;
-    fetch("/api/workspace/members/all")
-      .then((res) => res.json())
-      .then((data: { totalMembers?: number }) => setMemberCount(data.totalMembers || 0))
+    if (!activeWorkspaceId || !claimsReady) return;
+    authFetch("/api/workspace/members/all")
+      .then((res) => res?.ok ? res.json() : null)
+      .then((body: { success?: boolean; data?: { totalMembers?: number } } | null) =>
+        setMemberCount(body?.data?.totalMembers ?? 0)
+      )
       .catch(() => setMemberCount(0));
-  }, [activeWorkspaceId]);
+  }, [activeWorkspaceId, claimsReady]);
 
   // Subscribe to the workspace document for live name/logo/owner data
   useEffect(() => {

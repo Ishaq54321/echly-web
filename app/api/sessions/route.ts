@@ -16,6 +16,7 @@ import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.serve
 import { listAccessibleSessionsForUser } from "@/lib/server/listAccessibleSessionsForUser";
 import type { Session } from "@/lib/domain/session";
 import { assert } from "@/lib/utils/assert";
+import { adminDb } from "@/lib/server/firebaseAdmin";
 
 function sessionFieldToIso(value: Session["updatedAt"]): string | null {
   if (value == null) return null;
@@ -100,6 +101,26 @@ export async function GET(req: NextRequest) {
     });
 
     const pagedSessions = sessions.slice(offset, offset + SESSION_PAGE_SIZE);
+
+    const creatorIds = [
+      ...new Set(pagedSessions.map((s) => s.createdByUserId).filter(Boolean)),
+    ];
+    const creatorSnaps = await Promise.all(
+      creatorIds.map((id) => adminDb.doc(`users/${id}`).get())
+    );
+    const creatorNameMap = new Map<string, string>();
+    for (const snap of creatorSnaps) {
+      if (snap.exists) {
+        const d = snap.data()!;
+        const first = typeof d.firstName === "string" ? d.firstName : "";
+        const last = typeof d.lastName === "string" ? d.lastName : "";
+        const composed = `${first} ${last}`.trim();
+        const email = typeof d.email === "string" ? d.email : "";
+        const name = composed || email.split("@")[0] || "Unknown";
+        creatorNameMap.set(snap.id, name);
+      }
+    }
+
     const sessionsPayload = pagedSessions.map((session) => {
       const updatedAt =
         sessionFieldToIso(session.updatedAt) ??
@@ -131,6 +152,8 @@ export async function GET(req: NextRequest) {
       const recentViewers = Array.isArray(session.recentViewers)
         ? session.recentViewers
         : [];
+      const commentCount =
+        typeof session.commentCount === "number" ? session.commentCount : 0;
 
       return {
         id: session.id,
@@ -149,6 +172,8 @@ export async function GET(req: NextRequest) {
         feedbackCount,
         viewCount,
         recentViewers,
+        commentCount,
+        creatorName: creatorNameMap.get(session.createdByUserId) ?? "Unknown",
       };
     });
     const nextOffset = offset + sessionsPayload.length;

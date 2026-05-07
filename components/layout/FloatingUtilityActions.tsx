@@ -20,7 +20,7 @@ export function FloatingUtilityActions() {
   }
 
   return (
-    <header className="sticky top-0 z-[100] w-full shrink-0 bg-white">
+    <header className="sticky top-0 z-[100] w-full shrink-0 bg-[var(--surface-card)]">
       <GlobalHeader />
     </header>
   );

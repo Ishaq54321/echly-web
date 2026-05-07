@@ -15,6 +15,13 @@ export interface FeedbackItemShape {
   contextSummary?: string | null;
   actionSteps?: string[] | null;
   suggestedTags?: string[] | null;
+  pageArea?: string | null;
+  userAgent?: string | null;
+  viewportWidth?: number | null;
+  viewportHeight?: number | null;
+  screenWidth?: number | null;
+  screenHeight?: number | null;
+  devicePixelRatio?: number | null;
   /** Public share only: sanitized attachment metadata (screenshots + files). */
   publicAttachments?: ReadonlyArray<
     | { kind: "screenshot"; url: string }

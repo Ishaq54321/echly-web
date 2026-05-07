@@ -12,6 +12,8 @@ export type CaptureContext = {
   viewportWidth: number;
   viewportHeight: number;
   devicePixelRatio: number;
+  screenWidth?: number;
+  screenHeight?: number;
   /** CSS selector path (e.g. #hero-section > div.container > button.cta-primary). */
   domPath: string | null;
   /** Text content near the selected element (parent, siblings, children). */
@@ -289,6 +291,8 @@ export function buildCaptureContext(
     viewportWidth: win.innerWidth,
     viewportHeight: win.innerHeight,
     devicePixelRatio: win.devicePixelRatio ?? 1,
+    screenWidth: typeof win.screen?.width === "number" ? win.screen.width : undefined,
+    screenHeight: typeof win.screen?.height === "number" ? win.screen.height : undefined,
     domPath,
     nearbyText: nearbyText ?? null,
     subtreeText: subtreeText ?? null,

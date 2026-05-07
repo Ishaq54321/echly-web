@@ -11,6 +11,7 @@ import {
   updateInsightsOnResolveRepo,
   updateInsightsOnTypeChangeRepo,
 } from "@/lib/repositories/insightsRepository.server";
+import { dispatchResolveWithCollapse } from "@/lib/repositories/notificationsRepository.server";
 import {
   createActivityEvent,
   normalizeFeedbackTitleForActivity,
@@ -59,16 +60,22 @@ const feedbackPayload = (
   contextSummary: data.contextSummary ?? null,
   actionSteps: data.actionSteps ?? null,
   suggestedTags: data.suggestedTags ?? null,
+  pageArea: data.pageArea ?? null,
 
   url: data.url ?? null,
   viewportWidth: data.viewportWidth ?? null,
   viewportHeight: data.viewportHeight ?? null,
   userAgent: data.userAgent ?? null,
   clientTimestamp: data.timestamp ?? null,
+  screenWidth: (data as { screenWidth?: number }).screenWidth ?? null,
+  screenHeight: (data as { screenHeight?: number }).screenHeight ?? null,
+  devicePixelRatio: (data as { devicePixelRatio?: number }).devicePixelRatio ?? null,
 
   screenshotId: data.screenshotId ?? null,
   screenshotStatus: data.screenshotStatus ?? null,
   isDeleted: false,
+  creatorName: (data as { creatorName?: string | null }).creatorName ?? null,
+  creatorAvatarUrl: (data as { creatorAvatarUrl?: string | null }).creatorAvatarUrl ?? null,
 });
 
 /** Same shape as {@link docToFeedback} for a row just written by {@link addFeedbackWithSessionCountersRepo} (avoids post-write read). */
@@ -103,17 +110,23 @@ export function feedbackFromCreateInsert(args: {
     contextSummary: row.contextSummary ?? null,
     actionSteps: row.actionSteps ?? null,
     suggestedTags: row.suggestedTags ?? null,
+    pageArea: row.pageArea ?? null,
     url: row.url ?? null,
     viewportWidth: row.viewportWidth ?? null,
     viewportHeight: row.viewportHeight ?? null,
     userAgent: row.userAgent ?? null,
     clientTimestamp: row.timestamp ?? null,
+    screenWidth: (row as { screenWidth?: number }).screenWidth ?? null,
+    screenHeight: (row as { screenHeight?: number }).screenHeight ?? null,
+    devicePixelRatio: (row as { devicePixelRatio?: number }).devicePixelRatio ?? null,
     screenshotId: row.screenshotId ?? null,
     screenshotStatus: row.screenshotStatus ?? null,
     commentCount: 0,
     lastCommentAt: null,
     isDeleted: false,
     status: "open",
+    creatorName: (row as { creatorName?: string | null }).creatorName ?? null,
+    creatorAvatarUrl: (row as { creatorAvatarUrl?: string | null }).creatorAvatarUrl ?? null,
   };
 }
 
@@ -267,6 +280,7 @@ export async function addFeedbackWithSessionCountersRepo(
               const recipients = await resolveSessionRecipients({
                 sessionId,
                 workspaceId: resolvedWorkspaceId,
+                includeWorkspaceOwners: false,
                 excludeUserIds: [resolvedUserId],
               });
               if (recipients.length > 0) {
@@ -684,6 +698,21 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
             recipients.push(feedbackAssigneeId);
           }
           if (recipients.length === 0) return;
+
+          if (notifEventType === "feedback.resolved") {
+            await dispatchResolveWithCollapse({
+              recipientIds: recipients,
+              actorId,
+              workspaceId: notifWorkspaceId,
+              sessionId: notifSessionId,
+              sessionTitle: sessionTitle || null,
+              feedbackId,
+              feedbackTitle: notifTitleLabel,
+              actor: notifActor,
+            });
+            return;
+          }
+
           await dispatchNotifications({
             recipientIds: recipients,
             workspaceId: notifWorkspaceId,
@@ -819,11 +848,16 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
     contextSummary: data.contextSummary ?? null,
     actionSteps: data.actionSteps ?? data.actionItems ?? null,
     suggestedTags: data.suggestedTags ?? null,
+    pageArea: typeof data.pageArea === "string" ? data.pageArea : null,
     url: data.url ?? null,
     viewportWidth: data.viewportWidth ?? null,
     viewportHeight: data.viewportHeight ?? null,
     userAgent: data.userAgent ?? null,
     clientTimestamp: data.clientTimestamp ?? null,
+    screenWidth: typeof data.screenWidth === "number" ? data.screenWidth : null,
+    screenHeight: typeof data.screenHeight === "number" ? data.screenHeight : null,
+    devicePixelRatio:
+      typeof data.devicePixelRatio === "number" ? data.devicePixelRatio : null,
     screenshotId: data.screenshotId ?? null,
     screenshotStatus:
       (data.screenshotStatus as Feedback["screenshotStatus"] | undefined) ?? null,
@@ -836,6 +870,8 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
     assigneeName: data.assigneeName ?? null,
     assigneeAvatarUrl: data.assigneeAvatarUrl ?? null,
     priority: (data.priority as Feedback["priority"]) ?? null,
+    creatorName: typeof data.creatorName === "string" ? data.creatorName : null,
+    creatorAvatarUrl: typeof data.creatorAvatarUrl === "string" ? data.creatorAvatarUrl : null,
   };
 }
 

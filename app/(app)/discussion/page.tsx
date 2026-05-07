@@ -14,10 +14,13 @@ import {
 } from "@/components/discussion/DiscussionThreadList";
 import { DiscussionConversation } from "@/components/discussion/DiscussionConversation";
 import { MinimalLoader } from "@/components/ui/MinimalLoader";
-import { authFetch } from "@/lib/authFetch";
-import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 import { useWorkspace } from "@/lib/client/workspaceContext";
-import { getTicketStatus } from "@/lib/domain/feedback";
+import { useWorkspaceStore } from "@/lib/client/workspaceStore";
+import { getTicketStatus, type Feedback } from "@/lib/domain/feedback";
+import {
+  retainDiscussionFeedbackListener,
+  useDiscussionFeedback,
+} from "@/lib/realtime/discussionFeedbackStore";
 
 const FOLDER_LABEL: Record<FolderKey, string> = {
   inbox: "Inbox",
@@ -26,34 +29,17 @@ const FOLDER_LABEL: Record<FolderKey, string> = {
   saved: "Saved",
 };
 
-interface RawFeedbackItem {
-  id?: string;
-  title?: string;
-  sessionId?: string;
-  sessionName?: string;
-  commentCount?: number;
-  lastCommentPreview?: string;
-  status?: string;
-  isResolved?: boolean;
-  updatedAt?: string;
-  createdAt?: ThreadListItem["createdAt"];
-  lastCommentAt?: ThreadListItem["lastCommentAt"];
-  isUnread?: boolean;
-  assigneeId?: string | null;
-  userId?: string | null;
-  userName?: string | null;
-}
-
 export default function DiscussionPage() {
   const { user, loading } = useAuthGuard();
-  const { authUid } = useWorkspace();
+  const { authUid, workspaceId, isIdentityReady } = useWorkspace();
 
-  const [items, setItems] = useState<ThreadListItem[]>([]);
-  const [allItemsRaw, setAllItemsRaw] = useState<RawFeedbackItem[]>([]);
-  const [mentionsRaw, setMentionsRaw] = useState<RawFeedbackItem[]>([]);
-  const [loadingItems, setLoadingItems] = useState(false);
-  const [loadingMentions, setLoadingMentions] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    items: realtimeItems,
+    loading: loadingItems,
+    error: storeError,
+  } = useDiscussionFeedback(workspaceId);
+
+  const { sessions: workspaceSessions } = useWorkspaceStore();
 
   const [selectedFolder, setSelectedFolder] = useState<FolderKey>("inbox");
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -62,92 +48,62 @@ export default function DiscussionPage() {
 
   const [mobileView, setMobileView] = useState<"list" | "detail">("list");
 
-  // Fetch inbox threads
+  // Realtime workspace-scoped feedback listener (threads w/ comments).
   useEffect(() => {
-    if (!authUid) return;
-    let cancelled = false;
-    setLoadingItems(true);
-    setError(null);
-    void (async () => {
-      try {
-        const res = await authFetch("/api/feedback?conversationsOnly=true&limit=50", {
-          cache: "no-store",
-        });
-        if (!res || !res.ok) throw new Error("Failed to load feedback");
-        const inner = requireApiSuccessData<{ feedback: unknown[] }>(await res.json());
-        if (cancelled) return;
-        if (!Array.isArray(inner.feedback)) {
-          throw new Error("Invalid response: feedback must be an array");
-        }
-        const raw = inner.feedback as RawFeedbackItem[];
-        setAllItemsRaw(raw);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load");
-      } finally {
-        if (!cancelled) setLoadingItems(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [authUid]);
+    if (!isIdentityReady) return;
+    const wid = workspaceId?.trim();
+    if (!wid) return;
+    const release = retainDiscussionFeedbackListener(wid);
+    return () => release();
+  }, [isIdentityReady, workspaceId]);
 
-  // Fetch mentions on demand
-  useEffect(() => {
-    if (!authUid) return;
-    if (selectedFolder !== "mentions") return;
-    let cancelled = false;
-    setLoadingMentions(true);
-    void (async () => {
-      try {
-        const res = await authFetch(
-          `/api/feedback?mentionsUserId=${encodeURIComponent(authUid)}&limit=50`,
-          { cache: "no-store" }
-        );
-        if (!res || !res.ok) throw new Error("Failed to load mentions");
-        const inner = requireApiSuccessData<{ feedback: unknown[] }>(await res.json());
-        if (cancelled) return;
-        if (!Array.isArray(inner.feedback)) {
-          throw new Error("Invalid response: feedback must be an array");
-        }
-        setMentionsRaw(inner.feedback as RawFeedbackItem[]);
-      } catch (err) {
-        if (!cancelled) {
-          console.error("[DiscussionPage] mentions fetch:", err);
-          setMentionsRaw([]);
-        }
-      } finally {
-        if (!cancelled) setLoadingMentions(false);
+  const sessionTitleMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of workspaceSessions) {
+      if (s.session?.id && typeof s.session.title === "string" && s.session.title.trim()) {
+        m.set(s.session.id, s.session.title);
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [authUid, selectedFolder]);
+    }
+    return m;
+  }, [workspaceSessions]);
 
-  // Map raw to ThreadListItem
-  useEffect(() => {
-    const mapRow = (f: RawFeedbackItem): ThreadListItem => {
-      const id = String(f.id ?? "");
+  const mentionedFeedbackIds = useMemo(() => {
+    const set = new Set<string>();
+    const uid = authUid ?? "";
+    if (!uid) return set;
+    for (const f of realtimeItems) {
+      if (f.mentionedUserIds?.includes(uid)) set.add(f.id);
+    }
+    return set;
+  }, [realtimeItems, authUid]);
+
+  const items: ThreadListItem[] = useMemo(() => {
+    return realtimeItems.map((f: Feedback): ThreadListItem => {
       const isResolved = f.status === "resolved" || f.isResolved === true;
       return {
-        id,
+        id: f.id,
         title: typeof f.title === "string" ? f.title.trim() : "",
-        sessionId: String(f.sessionId ?? ""),
-        sessionName: typeof f.sessionName === "string" ? f.sessionName : undefined,
-        authorName: typeof f.userName === "string" ? f.userName : undefined,
-        commentCount: typeof f.commentCount === "number" ? f.commentCount : 0,
-        lastCommentPreview: typeof f.lastCommentPreview === "string" ? f.lastCommentPreview : undefined,
+        sessionId: f.sessionId ?? "",
+        sessionName: sessionTitleMap.get(f.sessionId ?? "") || undefined,
+        authorName: f.creatorName || undefined,
+        authorAvatarUrl: f.creatorAvatarUrl || undefined,
+        commentCount: f.commentCount ?? 0,
+        lastCommentPreview: f.lastCommentPreview,
         status: getTicketStatus({ isResolved }),
-        updatedAt: typeof f.updatedAt === "string" ? f.updatedAt : undefined,
-        createdAt: f.createdAt,
-        lastCommentAt: f.lastCommentAt,
-        isUnread: f.isUnread === true,
-        isMentionedYou: false,
+        updatedAt: undefined,
+        createdAt: f.createdAt ?? undefined,
+        lastCommentAt: f.lastCommentAt ?? undefined,
+        isUnread: false,
+        isMentionedYou: mentionedFeedbackIds.has(f.id),
       };
-    };
-    setItems(allItemsRaw.map(mapRow));
-  }, [allItemsRaw]);
+    });
+  }, [realtimeItems, sessionTitleMap, mentionedFeedbackIds]);
+
+  const assigneeByFeedbackId = useMemo(() => {
+    const m = new Map<string, string | null | undefined>();
+    realtimeItems.forEach((f) => m.set(f.id, f.assigneeId));
+    return m;
+  }, [realtimeItems]);
 
   // Sessions list (derived from inbox, only sessions with threads)
   const sessions: FolderSession[] = useMemo(() => {
@@ -172,12 +128,11 @@ export default function DiscussionPage() {
   const counts = useMemo(() => {
     const openItems = items.filter((i) => i.status !== "resolved");
     const inbox = openItems.length;
-    const assigned = openItems.filter((i) => {
-      const raw = allItemsRaw.find((r) => r.id === i.id);
-      return raw?.assigneeId === authUid;
-    }).length;
-    const mentionsOpen = mentionsRaw.filter(
-      (r) => !(r.status === "resolved" || r.isResolved === true)
+    const assigned = openItems.filter(
+      (i) => assigneeByFeedbackId.get(i.id) === authUid
+    ).length;
+    const mentionsOpen = openItems.filter((i) =>
+      mentionedFeedbackIds.has(i.id)
     ).length;
     return {
       inbox,
@@ -185,7 +140,7 @@ export default function DiscussionPage() {
       assigned,
       saved: 0,
     };
-  }, [items, allItemsRaw, authUid, mentionsRaw]);
+  }, [items, assigneeByFeedbackId, authUid, mentionedFeedbackIds]);
 
   // Filter threads by folder + session. Resolved/archived items are excluded everywhere.
   const visibleItems = useMemo(() => {
@@ -195,42 +150,18 @@ export default function DiscussionPage() {
     }
     switch (selectedFolder) {
       case "assigned":
-        return openList.filter((i) => {
-          const raw = allItemsRaw.find((r) => r.id === i.id);
-          return raw?.assigneeId === authUid;
-        });
-      case "mentions": {
-        return mentionsRaw
-          .map((f) => {
-            const id = String(f.id ?? "");
-            const isResolved =
-              f.status === "resolved" || f.isResolved === true;
-            return {
-              id,
-              title: typeof f.title === "string" ? f.title.trim() : "",
-              sessionId: String(f.sessionId ?? ""),
-              sessionName: typeof f.sessionName === "string" ? f.sessionName : undefined,
-              authorName: typeof f.userName === "string" ? f.userName : undefined,
-              commentCount: typeof f.commentCount === "number" ? f.commentCount : 0,
-              lastCommentPreview:
-                typeof f.lastCommentPreview === "string" ? f.lastCommentPreview : undefined,
-              status: getTicketStatus({ isResolved }),
-              updatedAt: typeof f.updatedAt === "string" ? f.updatedAt : undefined,
-              createdAt: f.createdAt,
-              lastCommentAt: f.lastCommentAt,
-              isUnread: f.isUnread === true,
-              isMentionedYou: true,
-            } satisfies ThreadListItem;
-          })
-          .filter((i) => i.status !== "resolved");
-      }
+        return openList.filter(
+          (i) => assigneeByFeedbackId.get(i.id) === authUid
+        );
+      case "mentions":
+        return openList.filter((i) => mentionedFeedbackIds.has(i.id));
       case "saved":
         return [];
       case "inbox":
       default:
         return openList;
     }
-  }, [items, selectedFolder, selectedSessionId, allItemsRaw, authUid, mentionsRaw]);
+  }, [items, selectedFolder, selectedSessionId, assigneeByFeedbackId, authUid, mentionedFeedbackIds]);
 
   const listTitle = useMemo(() => {
     if (selectedSessionId) {
@@ -250,18 +181,6 @@ export default function DiscussionPage() {
     setSelectedThreadId(null);
   }, []);
 
-  const handleCommentAdded = useCallback(() => {
-    if (!selectedThreadId) return;
-    const id = selectedThreadId;
-    setAllItemsRaw((prev) =>
-      prev.map((r) =>
-        r.id === id
-          ? { ...r, commentCount: (r.commentCount ?? 0) + 1 }
-          : r
-      )
-    );
-  }, [selectedThreadId]);
-
   const handleFolderChange = useCallback((key: FolderKey) => {
     setSelectedFolder(key);
     setSelectedThreadId(null);
@@ -271,6 +190,21 @@ export default function DiscussionPage() {
     setSelectedSessionId(id);
     setSelectedThreadId(null);
   }, []);
+
+  const selectedTicketSeed = useMemo(() => {
+    if (!selectedThreadId) return null;
+    const f = realtimeItems.find((it) => it.id === selectedThreadId);
+    if (!f) return null;
+    return {
+      id: f.id,
+      title: f.title,
+      sessionId: f.sessionId,
+      screenshotId: f.screenshotId,
+      actionSteps: f.actionSteps,
+      status: (f.status === "resolved" ? "resolved" : "open") as "open" | "resolved",
+      isResolved: f.isResolved,
+    };
+  }, [selectedThreadId, realtimeItems]);
 
   if (!user && !loading) {
     return (
@@ -282,8 +216,7 @@ export default function DiscussionPage() {
     );
   }
 
-  const listLoading =
-    selectedFolder === "mentions" ? loadingMentions : loadingItems;
+  const listLoading = loadingItems;
 
   const emptyContext: "inbox" | "mentions" | "assigned" | "session" | "saved" =
     selectedSessionId
@@ -307,6 +240,7 @@ export default function DiscussionPage() {
           sessions={sessions}
           onFolderChange={handleFolderChange}
           onSessionChange={handleSessionChange}
+          loading={loadingItems}
         />
       </div>
 
@@ -327,7 +261,7 @@ export default function DiscussionPage() {
           search={search}
           onSearchChange={setSearch}
           loading={listLoading}
-          error={error}
+          error={storeError ? storeError.message : null}
           emptyContext={emptyContext}
         />
       </div>
@@ -352,15 +286,15 @@ export default function DiscussionPage() {
 
         <Suspense
           fallback={
-            <div className="flex flex-1 items-center justify-center bg-white">
+            <div className="flex flex-1 items-center justify-center bg-[var(--surface-card)]">
               <MinimalLoader />
             </div>
           }
         >
           <DiscussionConversation
             feedbackId={selectedThreadId}
-            onCommentAdded={handleCommentAdded}
             listLoaded={!loadingItems}
+            initialTicket={selectedTicketSeed}
           />
         </Suspense>
       </div>

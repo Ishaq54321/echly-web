@@ -77,7 +77,7 @@ export type AddSessionMemberSource =
   | "invite_redemption";
 
 export type UpdateSessionMemberAccessSource = "access_change_api";
-export type RemoveSessionMemberSource = "remove_api";
+export type RemoveSessionMemberSource = "remove_api" | "leave_self";
 
 export async function addSessionMember(params: {
   sessionId: string;
@@ -167,6 +167,35 @@ export async function addSessionMember(params: {
         accessLevel: params.access ?? null,
       },
     });
+
+    // Notify the recipient that a session has been shared with them.
+    // Only fire on direct invites (existing user added via invite UI). Skip
+    // invite_redemption (recipient is the actor) and access_request (recipient
+    // already gets access_request.approved).
+    if (params.source === "invite_api" && params.userId !== actorId) {
+      try {
+        const { dispatchNotifications } = await import(
+          "@/lib/server/notificationFanOut.server"
+        );
+        await dispatchNotifications({
+          recipientIds: [params.userId],
+          workspaceId,
+          sessionId: params.sessionId,
+          sessionTitle: sessionTitle || null,
+          type: "session.shared",
+          actor: {
+            id: actorId,
+            name: actor.actorName,
+            photoURL: actor.actorPhotoURL ?? null,
+          },
+          title: `${actor.actorName} shared "${sessionTitle || "a session"}" with you`,
+          entityTitle: sessionTitle || null,
+          body: null,
+        });
+      } catch (err) {
+        console.error("[NOTIFICATION] session.shared failed:", err);
+      }
+    }
   }
 }
 

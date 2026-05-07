@@ -7,22 +7,22 @@
 export function ActivitySkeletonRow() {
   return (
     <div
-      className="activity-skeleton-row flex w-full gap-3 py-3 min-h-[4.5rem] items-start"
+      className="flex w-full gap-3 py-3 min-h-[4.5rem] items-start"
       aria-hidden
     >
       <div className="relative z-10 flex w-[52px] shrink-0 justify-center pt-0.5">
-        <div className="h-9 w-9 shrink-0 rounded-full bg-[var(--surface-hover)]" />
+        <div className="h-9 w-9 shrink-0 rounded-full skel-block" />
       </div>
 
       <div className="min-w-0 flex-1 space-y-2.5 pt-0.5">
         <div className="flex w-full min-w-0 items-start justify-between gap-3">
           <div className="flex min-w-0 flex-1 flex-col gap-2">
-            <div className="h-3.5 w-[60%] max-w-md rounded-sm bg-[var(--surface-hover)]-foreground/15" />
-            <div className="h-3 w-[80%] max-w-lg rounded-sm bg-[var(--surface-hover)]-foreground/12" />
+            <div className="h-3.5 w-[60%] max-w-md rounded-sm skel-block" />
+            <div className="h-3 w-[80%] max-w-lg rounded-sm skel-block" />
           </div>
-          <div className="h-3 w-12 shrink-0 rounded-sm bg-[var(--surface-hover)]-foreground/10" />
+          <div className="h-3 w-12 shrink-0 rounded-sm skel-block" />
         </div>
-        <div className="h-3 w-[40%] max-w-xs rounded-sm bg-[var(--surface-hover)]-foreground/[0.11]" />
+        <div className="h-3 w-[40%] max-w-xs rounded-sm skel-block" />
       </div>
     </div>
   );

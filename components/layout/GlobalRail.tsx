@@ -133,7 +133,7 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
     >
       <aside
         className={cn(
-          "relative flex flex-col bg-[var(--surface)] h-full shrink-0 min-h-0 overflow-visible py-4 rounded-[var(--content-card-radius)] shadow-[var(--shadow-card)]",
+          "relative flex flex-col bg-[var(--surface)] h-full shrink-0 min-h-0 overflow-visible py-4 rounded-[var(--content-card-radius)]",
           mounted && "transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
           effectiveCollapsed ? "w-[64px] items-stretch group/rail" : "w-[220px] items-stretch"
         )}
@@ -320,7 +320,13 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
 
         {!effectiveCollapsed && (
           <div className="mx-3 mt-4 rounded-[var(--radius-md)] border border-[var(--border)] overflow-hidden shadow-[0_1px_0_rgba(28,25,23,0.02)]">
-            <div className="px-3 py-2.5 flex items-center gap-2.5 cursor-pointer hover:bg-[var(--surface-hover)] hover:rounded-t-[var(--radius-md)] transition-colors">
+            <div
+              className="px-3 py-2.5 flex items-center gap-2.5 cursor-pointer hover:bg-[var(--surface-hover)] hover:rounded-t-[var(--radius-md)] transition-colors"
+              onClick={() => setWorkspacePopoverOpen((v) => !v)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setWorkspacePopoverOpen((v) => !v); }}
+            >
               <div className="flex flex-col flex-1 min-w-0">
                 <div className="text-[14px] font-semibold text-[var(--text-heading)] truncate">
                   {displayName}

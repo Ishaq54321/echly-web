@@ -36,6 +36,27 @@ const OVERLAY_ROOT_ID = "echly-capture-root";
 const SHADOW_HOST_ID = "echly-shadow-host";
 const SESSION_WAIT_POLL_MS = 120;
 
+type Corner = "tl" | "tr" | "bl" | "br";
+
+function pickCorner(x: number, y: number, width: number, height: number): Corner {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const centerX = x + width / 2;
+  const centerY = y + height / 2;
+  const left = centerX < vw / 2;
+  const top = centerY < vh / 2;
+  return left ? (top ? "tl" : "bl") : top ? "tr" : "br";
+}
+
+function cornerToPosition(corner: Corner, width: number, height: number): Position {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const x = corner === "tl" || corner === "bl" ? SAFE_MARGIN : vw - width - SAFE_MARGIN;
+  const y = corner === "tl" || corner === "tr" ? SAFE_MARGIN : vh - height - SAFE_MARGIN;
+  return { x: Math.max(0, x), y: Math.max(0, y) };
+}
+
+
 export type SentimentGlow = "negative" | "neutral" | "positive";
 
 function getSentimentFromTranscript(transcript: string): SentimentGlow {
@@ -128,6 +149,8 @@ export function useCaptureWidget({
   const [showMenu, setShowMenu] = useState(false);
   const [position, setPosition] = useState<Position | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isSnapping, setIsSnapping] = useState(false);
+  const [trayCorner, setTrayCorner] = useState<Corner | null>(null);
   const [pendingStructured, setPendingStructured] = useState<StructuredFeedback | null>(null);
   const [listeningAudioLevel, setListeningAudioLevel] = useState(0);
   const [audioAnalyser, setAudioAnalyser] = useState<AnalyserNode | null>(null);
@@ -352,10 +375,27 @@ export function useCaptureWidget({
     };
 
     const handleMouseUp = () => {
-      if (isDragging) {
-        setIsDragging(false);
-        document.body.style.userSelect = "";
+      if (!isDragging) return;
+      setIsDragging(false);
+      document.body.style.userSelect = "";
+      const el = widgetRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const corner = pickCorner(rect.left, rect.top, rect.width, rect.height);
+      setIsSnapping(true);
+      setTrayCorner(corner);
+      // Move the shadow host (extension only) to the snapped corner; clear inner viewport
+      // coords so the widget renders at the host's origin instead of fighting it.
+      const updater = (window as Window & {
+        __ECHLY_UPDATE_HOST_POSITION__?: (c: "tl" | "tr" | "bl" | "br") => void;
+      }).__ECHLY_UPDATE_HOST_POSITION__;
+      if (extensionMode && typeof updater === "function") {
+        updater(corner);
+        setPosition(null);
+      } else {
+        setPosition(cornerToPosition(corner, rect.width, rect.height));
       }
+      window.setTimeout(() => setIsSnapping(false), 220);
     };
 
     window.addEventListener("mousemove", handleMouseMove);
@@ -365,6 +405,19 @@ export function useCaptureWidget({
       window.removeEventListener("mouseup", handleMouseUp);
     };
   }, [isDragging]);
+
+  /** Move the shadow host to the persisted/current corner. The host owns positioning so
+   *  it can stay content-sized (a full-viewport host would intercept page clicks and
+   *  break click-to-capture). The inner widget renders at the host's origin. */
+  useEffect(() => {
+    if (!extensionMode || !trayCorner) return;
+    const updater = (window as Window & {
+      __ECHLY_UPDATE_HOST_POSITION__?: (c: "tl" | "tr" | "bl" | "br") => void;
+    }).__ECHLY_UPDATE_HOST_POSITION__;
+    if (typeof updater !== "function") return;
+    updater(trayCorner);
+    setPosition(null);
+  }, [extensionMode, trayCorner, isOpen]);
 
   const startDrag = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0 || !widgetRef.current) return;
@@ -1041,7 +1094,11 @@ export function useCaptureWidget({
     logger.debug("extension", "screenshot_capture_started");
     const hidden = hideEchlyUI();
     await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() =>
+          setTimeout(() => resolve(), 80)
+        )
+      )
     );
     try {
       const screenshot = await environment.captureTabScreenshot();
@@ -1215,7 +1272,14 @@ export function useCaptureWidget({
       echlyLog("SESSION", "pause finalized");
       clearSessionWaitTimeout("pause");
       logSession("pause");
-      onSessionModePause?.();
+      try {
+        onSessionModePause?.();
+      } catch {
+        // silent
+      } finally {
+        isPausingRef.current = false;
+        setPausePending(false);
+      }
     };
 
     if (pipelineActiveRef.current) {
@@ -1707,6 +1771,9 @@ export function useCaptureWidget({
       editedSteps,
       showMenu,
       position,
+      isSnapping,
+      isDragging,
+      trayCorner,
       liveTranscript,
       listeningAudioLevel,
       listeningSentiment,

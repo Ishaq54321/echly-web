@@ -199,7 +199,7 @@ export default function DemoFeedbackDashboard() {
                 <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)]/80 p-4">
                   <div className="flex items-center gap-2 text-[12px] font-semibold text-[var(--text-secondary)] mb-2">
                     <FileText className="h-3.5 w-3.5" />
-                    Action Steps
+                    What to change
                   </div>
                   <ul className="space-y-1.5">
                     {(selected.actionSteps ?? MOCK_ACTION_STEPS).map((step, i) => (

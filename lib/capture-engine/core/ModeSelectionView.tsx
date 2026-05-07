@@ -98,7 +98,7 @@ export default function ModeSelectionView({
           {" "}Echly AI
         </span>
         <div className="mode-prompt-title">How do you want to give feedback?</div>
-        <div className="mode-prompt-sub">Speak it or write it — I'll structure it into tickets with screenshots.</div>
+        <div className="mode-prompt-sub">Describe what needs to change — AI structures it into tickets.</div>
       </div>
 
       {/* Mode cards */}
@@ -122,7 +122,7 @@ export default function ModeSelectionView({
           </span>
           <div>
             <div className="mode-card-title">Voice</div>
-            <div className="mode-card-sub">Talk through the page. Faster.</div>
+            <div className="mode-card-sub">Speak the change. AI cleans and structures it.</div>
           </div>
           <span className="voice-wave" aria-hidden="true">
             <span /><span /><span /><span /><span />
@@ -148,7 +148,7 @@ export default function ModeSelectionView({
           </span>
           <div>
             <div className="mode-card-title">Write</div>
-            <div className="mode-card-sub">Type notes, click to attach.</div>
+            <div className="mode-card-sub">Type in your words. AI structures it into tickets.</div>
           </div>
         </button>
       </div>

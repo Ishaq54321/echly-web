@@ -8,6 +8,7 @@ import { truncateForTokenBudget } from "@/lib/ai/pipelineTokenBudget";
 import { SYSTEM_PROMPT } from "@/lib/ai/prompts/interpreterPrompt";
 import type { PipelineContext } from "@/lib/server/pipelineContext";
 import { generateTicketTitle } from "@/lib/tickets/generateTicketTitle";
+import { whitelistTags, ALL_TAG_KEYS } from "@/lib/constants/ticketTags";
 import { logger } from "@/lib/logger";
 
 /* ===== DOM CONTEXT & TYPES ===== */
@@ -36,6 +37,8 @@ export interface ExtractedAction {
 /** Raw JSON shape returned by the LLM. */
 export interface StructuredFeedbackJSON {
   title?: string;
+  pageArea?: string;
+  suggestedTags?: string[];
   actions: ExtractedAction[];
 }
 
@@ -43,6 +46,8 @@ export interface StructuredFeedbackJSON {
 export interface VoiceTicket {
   title: string;
   actionSteps: string[];
+  suggestedTags: string[];
+  pageArea: string;
 }
 
 function buildDomContextFromPipelineContext(ctx: PipelineContext | null): DomContextForAI {
@@ -159,7 +164,10 @@ function buildUserMessage(
   parts.push("USER INTENT (SOURCE OF TRUTH):");
   parts.push(transcript.trim());
 
-  parts.push("\nREFERENCE CONTEXT (DO NOT USE FOR DECISIONS):");
+  parts.push("\nPAGE URL:");
+  parts.push(domContext.pageURL || "Unknown");
+
+  parts.push("\nREFERENCE CONTEXT (USE FOR NAMING AND IDENTIFICATION ONLY — never generate action steps from DOM content, only use it to identify what element or area the user is referring to):");
 
   parts.push("Selected element:");
   parts.push(domContext.elementHTML || "None");
@@ -187,6 +195,13 @@ const FEEDBACK_JSON_SCHEMA = {
   additionalProperties: false,
   properties: {
     title: { type: "string" },
+    pageArea: { type: "string" },  // e.g., "ClickUp · Pricing"
+    suggestedTags: {
+      type: "array",
+      minItems: 1,
+      maxItems: 3,
+      items: { type: "string", enum: ALL_TAG_KEYS },
+    },
     actions: {
       type: "array",
       items: {
@@ -201,12 +216,15 @@ const FEEDBACK_JSON_SCHEMA = {
       },
     },
   },
-  required: ["title", "actions"],
+  required: ["title", "pageArea", "suggestedTags", "actions"],
 } as const;
 
 /** Fallback when parsing fails or actions array is missing. */
 function fallbackStructuredFeedback(transcript: string): StructuredFeedbackJSON {
   return {
+    title: "",
+    pageArea: "",
+    suggestedTags: [],
     actions: [
       {
         step: 1,
@@ -245,10 +263,21 @@ function parseStructuredResponse(text: string): StructuredFeedbackJSON | null {
       }
     }
     const title = typeof o.title === "string" ? o.title.trim() : "";
-    return { title, actions };
+    const pageArea = typeof o.pageArea === "string" ? o.pageArea.trim() : "";
+    const suggestedTagsRaw = Array.isArray(o.suggestedTags) ? o.suggestedTags : [];
+    const suggestedTags = whitelistTags(suggestedTagsRaw);
+    return { title, pageArea, suggestedTags, actions };
   } catch {
     return null;
   }
+}
+
+/** Truncate page area to max 40 chars, drop empty/placeholder values. */
+function sanitizePageArea(pageArea: string | undefined): string {
+  if (!pageArea) return "";
+  const trimmed = pageArea.trim();
+  if (!trimmed || trimmed.toLowerCase() === "unknown") return "";
+  return trimmed.slice(0, 40);
 }
 
 /** Sanitize AI-generated title: max 5 words, max 60 characters. */
@@ -306,7 +335,8 @@ export async function extractStructuredFeedback(
   logger.debug("ai", "processing_success", {
     title: json?.title,
     actionsCount: json?.actions?.length,
-    firstAction: json?.actions?.[0]?.instruction
+    firstAction: json?.actions?.[0]?.instruction,
+    suggestedTags: json?.suggestedTags
   });
   if (!json || !Array.isArray(json.actions) || json.actions.length === 0) {
     return { json: fallbackStructuredFeedback(transcript), raw };
@@ -331,7 +361,7 @@ export async function runVoiceToTicket(
   if (!transcript || !transcript.trim()) {
     return {
       success: true,
-      ticket: { title: "", actionSteps: [] },
+      ticket: { title: "", actionSteps: [], suggestedTags: [], pageArea: "" },
     };
   }
 
@@ -380,9 +410,14 @@ export async function runVoiceToTicket(
       ? aiTitle
       : generateTicketTitle(actionSteps);
 
+  const suggestedTags = whitelistTags(json.suggestedTags);
+  const pageArea = sanitizePageArea(json.pageArea);
+
   const ticket: VoiceTicket = {
     title,
     actionSteps,
+    suggestedTags,
+    pageArea,
   };
 
   return {

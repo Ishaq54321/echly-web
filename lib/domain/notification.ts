@@ -10,7 +10,8 @@ export type NotificationType =
   | "invite.accepted"
   | "access_request.approved"
   | "access_request.rejected"
-  | "access_request.pending";
+  | "access_request.pending"
+  | "session.shared";
 
 export interface NotificationActor {
   id: string;
@@ -37,6 +38,8 @@ export interface Notification {
   accessRequestId?: string | null;
   requestedAccess?: "view" | "resolve" | null;
   actionStatus?: "pending" | "approved" | "rejected" | null;
+  collapseKey?: string | null;
+  collapseCount?: number | null;
 }
 
 export interface NotificationRow {
@@ -58,4 +61,6 @@ export interface NotificationRow {
   accessRequestId?: string | null;
   requestedAccess?: "view" | "resolve" | null;
   actionStatus?: "pending" | "approved" | "rejected" | null;
+  collapseKey?: string | null;
+  collapseCount?: number | null;
 }

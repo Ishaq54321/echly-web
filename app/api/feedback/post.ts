@@ -18,6 +18,7 @@ import {
   requireAuth,
   toAuthorizationResponse,
 } from "@/lib/server/auth/authorize";
+import { resolveActorForActivityEvent } from "@/lib/repositories/activityEventsRepository.server";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { checkFeedbackTicketLimit } from "@/lib/billing/checkPlanLimit";
 import type { PlanLimitError } from "@/lib/billing/checkPlanLimit";
@@ -47,6 +48,7 @@ export async function POST(req: NextRequest) {
     contextSummary?: string;
     actionSteps?: string[];
     suggestedTags?: string[];
+    pageArea?: string;
     metadata?: {
       url?: string;
       viewportWidth?: number;
@@ -56,6 +58,9 @@ export async function POST(req: NextRequest) {
     };
     screenshotId?: string;
     status?: string;
+    screenWidth?: number;
+    screenHeight?: number;
+    devicePixelRatio?: number;
   } = {};
 
   try {
@@ -136,9 +141,11 @@ export async function POST(req: NextRequest) {
       ? body.actionSteps.filter((s): s is string => typeof s === "string" && s.trim().length > 0).map((s) => s.trim())
       : [];
   const title =
-    actionSteps.length > 0
-      ? generateTicketTitle(actionSteps)
-      : (typeof body.title === "string" ? body.title.trim() : "");
+    typeof body.title === "string" && body.title.trim().length > 0
+      ? body.title.trim().slice(0, 60)
+      : actionSteps.length > 0
+        ? generateTicketTitle(actionSteps)
+        : "";
   if (!title) {
     return apiError({
       code: "INVALID_INPUT",
@@ -274,6 +281,16 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  let resolvedCreatorName: string | null = null;
+  let resolvedCreatorAvatarUrl: string | null = null;
+  try {
+    const actor = await resolveActorForActivityEvent(userId);
+    resolvedCreatorName = actor.actorName || null;
+    resolvedCreatorAvatarUrl = actor.actorPhotoURL ?? null;
+  } catch {
+    // Non-fatal: fallback to null if name unresolvable
+  }
+
   const structuredData = {
     title,
     instruction:
@@ -290,6 +307,10 @@ export async function POST(req: NextRequest) {
     suggestedTags: Array.isArray(body.suggestedTags)
       ? body.suggestedTags
       : undefined,
+    pageArea:
+      typeof body.pageArea === "string" && body.pageArea.trim().length > 0
+        ? body.pageArea.trim().slice(0, 40)
+        : undefined,
     screenshotId: normalizedScreenshotId,
     status: normalizedIncomingStatus,
     screenshotStatus: "attached" as const,
@@ -298,6 +319,11 @@ export async function POST(req: NextRequest) {
     viewportHeight: meta?.viewportHeight,
     userAgent: meta?.userAgent,
     timestamp: meta?.clientTimestamp,
+    screenWidth: typeof body.screenWidth === "number" ? body.screenWidth : undefined,
+    screenHeight: typeof body.screenHeight === "number" ? body.screenHeight : undefined,
+    devicePixelRatio: typeof body.devicePixelRatio === "number" ? body.devicePixelRatio : undefined,
+    creatorName: typeof resolvedCreatorName === "string" ? resolvedCreatorName : null,
+    creatorAvatarUrl: typeof resolvedCreatorAvatarUrl === "string" ? resolvedCreatorAvatarUrl : null,
   };
 
   try {

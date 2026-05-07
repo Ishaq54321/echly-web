@@ -11,6 +11,7 @@ export interface StructuredFeedback {
   contextSummary?: string;
   actionSteps?: string[];
   suggestedTags?: string[];
+  pageArea?: string;
 
   // Metadata
   url?: string;
@@ -18,6 +19,9 @@ export interface StructuredFeedback {
   viewportHeight?: number;
   userAgent?: string;
   timestamp?: number;
+  screenWidth?: number;
+  screenHeight?: number;
+  devicePixelRatio?: number;
 
   // Screenshot
   // 🚨 IMPORTANT:
@@ -26,6 +30,9 @@ export interface StructuredFeedback {
   screenshotId?: string | null;
   screenshotStatus?: "attached" | "pending" | "none" | "failed" | null;
   status?: "open" | "resolved" | "processing";
+
+  creatorName?: string | null;
+  creatorAvatarUrl?: string | null;
 }
 
 /** Derived status for a ticket. Prefer explicit checks over !isResolved. */
@@ -69,6 +76,7 @@ export interface Feedback {
   contextSummary?: string | null;
   actionSteps?: string[] | null;
   suggestedTags?: string[] | null;
+  pageArea?: string | null;
 
   // Metadata
   url?: string | null;
@@ -76,6 +84,9 @@ export interface Feedback {
   viewportHeight?: number | null;
   userAgent?: string | null;
   clientTimestamp?: number | null;
+  screenWidth?: number | null;
+  screenHeight?: number | null;
+  devicePixelRatio?: number | null;
 
   // Screenshot
   // 🚨 IMPORTANT:
@@ -92,6 +103,12 @@ export interface Feedback {
   assigneeName?: string | null;
   assigneeAvatarUrl?: string | null;
   priority?: "high" | "medium" | "low" | null;
+
+  creatorName?: string | null;
+  creatorAvatarUrl?: string | null;
+
+  /** Aggregated set of user IDs who have been @mentioned in any comment on this ticket. */
+  mentionedUserIds?: string[] | null;
 }
 
 /** Returns explicit status for a feedback item. Use instead of !isResolved. */

@@ -1,12 +1,18 @@
 ﻿"use client";
 
 // deep_data_latency_trace_phase3b_v2
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useWorkspaceStore } from "@/lib/client/workspaceStore";
 import type { SessionWithCounts } from "./hooks/useWorkspaceOverview";
-import { SessionsWorkspace } from "@/components/dashboard/SessionsWorkspace";
+import {
+  SessionsWorkspace,
+  SessionWorkspaceRow,
+} from "@/components/dashboard/SessionsWorkspace";
+import { authFetch } from "@/lib/authFetch";
+import type { SharedSessionMembership } from "@/lib/domain/session";
+import { sharedToSessionWithCounts } from "@/lib/utils/sharedSessionAdapter";
 import {
   SessionsListArchiveTabs,
   type SessionsListArchiveTab,
@@ -30,6 +36,11 @@ import { DashboardUpgradeBanner } from "@/components/dashboard/DashboardUpgradeB
 const DeleteSessionModal = dynamic(
   () =>
     import("@/components/dashboard/DeleteSessionModal").then((m) => m.DeleteSessionModal),
+  { ssr: false }
+);
+const LeaveSessionModal = dynamic(
+  () =>
+    import("@/components/dashboard/LeaveSessionModal").then((m) => m.LeaveSessionModal),
   { ssr: false }
 );
 import type { Session } from "@/lib/domain/session";
@@ -89,6 +100,66 @@ function DashboardContent() {
   const [sessionViewMode, setSessionViewMode] = useState<"list" | "grid">("list");
   const [sessionsTimeRange, setSessionsTimeRange] =
     useState<SessionsTimeRange>(DEFAULT_FILTER);
+  const [sharedSessions, setSharedSessions] = useState<SharedSessionMembership[]>([]);
+  const [leaveModalSessionId, setLeaveModalSessionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!authUid) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await authFetch("/api/sessions/shared");
+        if (!res || !res.ok || cancelled) return;
+        const json = (await res.json()) as {
+          success?: boolean;
+          data?: { sessions?: SharedSessionMembership[] };
+        };
+        const list = json?.data?.sessions ?? [];
+        if (!cancelled) {
+          setSharedSessions(list.filter((s) => !s.isArchived));
+        }
+      } catch {
+        // shared sessions are supplementary — silent failure
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authUid]);
+
+  const handleLeaveSession = useCallback((sessionId: string) => {
+    setLeaveModalSessionId(sessionId);
+  }, []);
+
+  const leaveModalSession = useMemo(
+    () =>
+      leaveModalSessionId
+        ? sharedSessions.find((s) => s.sessionId === leaveModalSessionId) ?? null
+        : null,
+    [leaveModalSessionId, sharedSessions]
+  );
+
+  const confirmLeaveSession = useCallback(async () => {
+    if (!leaveModalSessionId) return;
+    const res = await authFetch(
+      `/api/sessions/shared/${leaveModalSessionId}`,
+      { method: "DELETE" }
+    );
+    if (!res || !res.ok) {
+      throw new Error("Failed to leave session");
+    }
+    setSharedSessions((prev) =>
+      prev.filter((s) => s.sessionId !== leaveModalSessionId)
+    );
+    showToast("You left the session");
+  }, [leaveModalSessionId, showToast]);
+
+  const handleViewShared = useCallback(
+    (sessionId: string) => {
+      router.push(`/session/${sessionId}`);
+    },
+    [router]
+  );
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -201,11 +272,9 @@ function DashboardContent() {
                   >
                     <BrandLoader />
                   </div>
-                ) : listArchiveTab === "sessions" && activeSessions.length === 0 ? (
-                  <EmptyDashboardCarousel />
                 ) : listArchiveTab === "archived" && archivedSessions.length === 0 ? (
                   <ArchiveEmptyState />
-                ) : (
+                ) : listArchiveTab === "archived" ? (
                   <>
                     <SessionsWorkspace
                       sections={workspaceSections}
@@ -232,6 +301,59 @@ function DashboardContent() {
                       </div>
                     ) : null}
                   </>
+                ) : (
+                  <>
+                    {activeSessions.length === 0 ? (
+                      <EmptyDashboardCarousel />
+                    ) : (
+                      <>
+                        <SessionsWorkspace
+                          sections={workspaceSections}
+                          onView={handleView}
+                          onRenameSuccess={(session) =>
+                            updateSession(session.id, { title: session.title })
+                          }
+                          onSetArchived={setSessionArchived}
+                          onRequestDelete={(session) => setDeleteTarget(session)}
+                          onDeleteSession={deleteSession}
+                          viewMode={sessionViewMode}
+                          onViewModeChange={setSessionViewMode}
+                        />
+                        {hasMoreSessions && !debouncedSearch.trim() ? (
+                          <div className="mt-6 flex justify-center">
+                            <button
+                              type="button"
+                              onClick={() => void loadMoreSessions()}
+                              disabled={loadingMoreSessions}
+                              className="rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--text-body)] transition-colors hover:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {loadingMoreSessions ? "Loading..." : "Load more sessions"}
+                            </button>
+                          </div>
+                        ) : null}
+                      </>
+                    )}
+
+                    {sharedSessions.length > 0 ? (
+                      <div className="mt-8">
+                        <h3 className="mb-3 px-1 text-[13px] font-medium text-[var(--text-secondary)]">
+                          Shared with me
+                        </h3>
+                        <div className="space-y-3">
+                          {sharedSessions.map((m) => (
+                            <SessionWorkspaceRow
+                              key={m.sessionId}
+                              item={sharedToSessionWithCounts(m)}
+                              onView={handleViewShared}
+                              isSharedSession
+                              sharedByName={m.addedByName ?? undefined}
+                              onLeaveSession={handleLeaveSession}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
                 )}
               </div>
             </div>
@@ -247,6 +369,15 @@ function DashboardContent() {
           onConfirm={async () => {
             await deleteSession(deleteTarget);
           }}
+        />
+      ) : null}
+
+      {leaveModalSessionId ? (
+        <LeaveSessionModal
+          open
+          onClose={() => setLeaveModalSessionId(null)}
+          sessionTitle={leaveModalSession?.sessionName ?? ""}
+          onConfirm={confirmLeaveSession}
         />
       ) : null}
 

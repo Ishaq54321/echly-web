@@ -89,13 +89,13 @@ export function ActionItemsSection({
     if (isReadOnly) {
       return (
         <div className={cardClass}>
-          <h2 className={titleClass}>Action steps</h2>
+          <h2 className={titleClass}>What to change</h2>
           <div className="py-6">
             <CanvasEmptyState
               density="compact"
               illustration={<NoActionStepsIllu />}
-              title="No action steps"
-              description="Action steps will appear here when added."
+              title="Nothing to change"
+              description="Changes will appear here when added."
             />
           </div>
         </div>
@@ -103,7 +103,7 @@ export function ActionItemsSection({
     }
     return (
       <div className={cardClass}>
-        <h2 className={titleClass}>Action steps</h2>
+        <h2 className={titleClass}>What to change</h2>
         {!isAdding ? (
           <button
             type="button"
@@ -111,7 +111,7 @@ export function ActionItemsSection({
             className="flex items-center gap-2 px-1 py-1.5 text-[17px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-heading)] transition-colors duration-150 cursor-pointer"
           >
             <Plus size={14} />
-            Add action step
+            Add a change
           </button>
         ) : (
           <div className="flex items-center gap-2">
@@ -124,10 +124,10 @@ export function ActionItemsSection({
                 if (e.key === "Enter") void saveNew();
                 if (e.key === "Escape") cancelAdd();
               }}
-              placeholder="New action step…"
+              placeholder="New change…"
               className="flex-1 min-w-0 text-[17px] leading-relaxed px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface-card)] focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]/20 transition-colors"
               autoFocus
-              aria-label="New action step"
+              aria-label="New change"
             />
           </div>
         )}
@@ -138,7 +138,7 @@ export function ActionItemsSection({
   const numberClass = "font-sans font-semibold text-[var(--text-tertiary)] text-[17px] tabular-nums min-w-[18px] pt-px";
   return (
     <div className={cardClass}>
-      <h2 className={titleClass}>Action steps</h2>
+      <h2 className={titleClass}>What to change</h2>
       <ul className="list-none space-y-0 p-0 m-0 text-base leading-relaxed text-[var(--text-heading)] w-full">
         {items.map((text, i) => (
           <li key={i} className="group flex items-start gap-3 py-2.5">
@@ -166,7 +166,7 @@ export function ActionItemsSection({
                   }}
                   className="flex-1 min-w-0 text-[17px] leading-relaxed px-2 py-1 rounded border border-[var(--border)] bg-white text-[var(--text-primary-strong)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]/20 transition-[box-shadow] duration-[120ms]"
                   autoFocus
-                  aria-label={`Edit action step ${i + 1}`}
+                  aria-label={`Edit change ${i + 1}`}
                 />
                 <button
                   type="button"
@@ -193,7 +193,7 @@ export function ActionItemsSection({
                   type="button"
                   onClick={() => void removeItem(i)}
                   className="flex-shrink-0 p-1 rounded text-[var(--text-tertiary)] hover:text-[var(--text-secondary-soft)] hover:bg-[var(--layer-2-hover-bg)] opacity-0 group-hover:opacity-100 cursor-pointer"
-                  aria-label={`Remove action step ${i + 1}`}
+                  aria-label={`Remove change ${i + 1}`}
                 >
                   <Trash2 size={14} />
                 </button>
@@ -213,10 +213,10 @@ export function ActionItemsSection({
                 if (e.key === "Enter") void saveNew();
                 if (e.key === "Escape") cancelAdd();
               }}
-              placeholder="New action step…"
+              placeholder="New change…"
               className="flex-1 min-w-0 text-[17px] leading-relaxed px-2 py-1 rounded border border-[var(--border)] bg-white text-[var(--text-primary-strong)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-operational)]/20 transition-[box-shadow] duration-[120ms]"
               autoFocus
-              aria-label="New action step"
+              aria-label="New change"
             />
           </li>
         )}
@@ -228,7 +228,7 @@ export function ActionItemsSection({
           className="mt-3 flex items-center gap-2 px-1 py-1.5 text-[17px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-heading)] cursor-pointer transition-colors"
         >
           <Plus size={14} />
-          Add action step
+          Add a change
         </button>
       )}
     </div>

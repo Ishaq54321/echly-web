@@ -118,6 +118,12 @@ export function FeedbackContent({
                   embeddedInCard
                   animatingPinId={animatingPinId}
                   participants={participants}
+                  pageArea={item.pageArea}
+                  userAgent={item.userAgent}
+                  viewportWidth={item.viewportWidth}
+                  viewportHeight={item.viewportHeight}
+                  devicePixelRatio={item.devicePixelRatio}
+                  createdAt={item.createdAt}
                 />
               ) : (
                 <ScreenshotBlock
@@ -129,6 +135,12 @@ export function FeedbackContent({
                   onEdit={onEdit}
                   canEdit={canEdit}
                   embeddedInCard
+                  pageArea={item.pageArea}
+                  userAgent={item.userAgent}
+                  viewportWidth={item.viewportWidth}
+                  viewportHeight={item.viewportHeight}
+                  devicePixelRatio={item.devicePixelRatio}
+                  createdAt={item.createdAt}
                 />
               )
             ) : null}

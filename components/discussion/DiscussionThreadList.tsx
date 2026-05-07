@@ -2,7 +2,6 @@
 
 import { memo, useMemo, type ComponentType } from "react";
 import { Search, Reply } from "lucide-react";
-import { MinimalLoader } from "@/components/ui/MinimalLoader";
 import { formatRelativeTime } from "@/lib/utils/time";
 import {
   EmptyAssignedIllustration,
@@ -171,13 +170,23 @@ const ThreadCard = memo(function ThreadCard({ item, isSelected, onSelect }: Thre
       )}
 
       <div className="flex items-center gap-2 mb-3">
-        <div
-          className="w-[22px] h-[22px] rounded-full text-white text-[9px] font-semibold flex items-center justify-center shrink-0"
-          style={{ background: avatarBg }}
-          aria-hidden
-        >
-          {getInitials(author)}
-        </div>
+        {item.authorAvatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={item.authorAvatarUrl}
+            alt=""
+            className="w-[22px] h-[22px] rounded-full object-cover shrink-0"
+            aria-hidden
+          />
+        ) : (
+          <div
+            className="w-[22px] h-[22px] rounded-full text-white text-[9px] font-semibold flex items-center justify-center shrink-0"
+            style={{ background: avatarBg }}
+            aria-hidden
+          >
+            {getInitials(author)}
+          </div>
+        )}
         <span
           className={`flex-1 min-w-0 text-[14px] truncate ${
             isUnread ? "font-semibold text-[var(--text-heading)]" : "font-medium text-[var(--text-heading)]"
@@ -185,6 +194,11 @@ const ThreadCard = memo(function ThreadCard({ item, isSelected, onSelect }: Thre
         >
           {author}
         </span>
+        {item.isMentionedYou && (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#FEF0CD] text-[#9B6B1F] shrink-0">
+            @you
+          </span>
+        )}
         <span
           className={`text-[12px] tabular-nums shrink-0 ${
             isUnread ? "text-[var(--brand)] font-medium" : "text-[var(--text-tertiary)]"
@@ -241,7 +255,7 @@ export function DiscussionThreadList({
   }, [items, search]);
 
   return (
-    <div className="flex flex-col h-full bg-white min-h-0">
+    <div className="flex flex-col h-full bg-[var(--surface-card)] min-h-0 shadow-[var(--shadow-panel)]">
       {/* Header */}
       <div className="shrink-0 px-[18px] pt-[14px] pb-3 flex flex-col gap-2.5">
         <div className="flex items-center justify-between">
@@ -265,8 +279,22 @@ export function DiscussionThreadList({
       {/* List */}
       <div className="flex-1 overflow-y-auto min-h-0">
         {loading ? (
-          <div className="flex h-full min-h-[200px] items-center justify-center" aria-busy="true">
-            <MinimalLoader label="Loading discussions…" />
+          <div className="flex flex-col" aria-busy="true">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className={`px-[18px] py-3.5 border-b border-[var(--border)] ${i === 0 ? "bg-[var(--brand-subtle)]/30" : ""}`}
+              >
+                <div className="flex items-center gap-2.5 mb-2.5">
+                  <div className={`w-[22px] h-[22px] rounded-full ${i === 0 ? "skel-blue-strong" : "skel-block"}`} />
+                  <div className={`h-3 rounded-md ${i === 0 ? "skel-blue" : "skel-block"}`} style={{ width: "30%" }} />
+                  <div className="flex-1" />
+                  <div className={`h-2.5 rounded-md ${i === 0 ? "skel-blue" : "skel-block"}`} style={{ width: "12%" }} />
+                </div>
+                <div className={`h-3.5 rounded-md mb-1.5 ${i === 0 ? "skel-blue" : "skel-block"}`} style={{ width: `${70 - i * 5}%` }} />
+                <div className={`h-3 rounded-md ${i === 0 ? "skel-blue" : "skel-block"}`} style={{ width: `${45 - i * 3}%` }} />
+              </div>
+            ))}
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center p-8 text-center">

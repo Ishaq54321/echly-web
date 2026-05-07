@@ -200,7 +200,7 @@ export const PATCH = withAuthorization(
       if (!context.access?.isWorkspaceMember) {
         return apiError({
           code: "FORBIDDEN",
-          message: "Only workspace members can edit action steps",
+          message: "Only workspace members can edit changes",
           status: 403,
         });
       }

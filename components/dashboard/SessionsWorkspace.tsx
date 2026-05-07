@@ -6,10 +6,12 @@ import { UserAvatar } from "@/components/ui/UserAvatar";
 import { getAvatarColor } from "@/lib/utils/getAvatarColor";
 import {
   Archive,
+  Building2,
   Calendar,
   CircleDashed,
   Link,
   Loader2,
+  LogOut,
   RotateCcw,
   Trash2,
   Check,
@@ -89,7 +91,7 @@ function formatSessionDateShort(session: Session): string {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(ms);
 }
 
-function SessionWorkspaceRow({
+export function SessionWorkspaceRow({
   item,
   onView,
   onRenameSuccess,
@@ -99,6 +101,10 @@ function SessionWorkspaceRow({
   isSelectionMode,
   isSelected,
   onToggleSelected,
+  sharedByName,
+  workspaceLabel,
+  isSharedSession,
+  onLeaveSession,
 }: {
   item: SessionWithCounts;
   onView?: (sessionId: string) => void;
@@ -109,6 +115,10 @@ function SessionWorkspaceRow({
   isSelectionMode?: boolean;
   isSelected?: boolean;
   onToggleSelected?: (sessionId: string) => void;
+  sharedByName?: string;
+  workspaceLabel?: string;
+  isSharedSession?: boolean;
+  onLeaveSession?: (sessionId: string) => void;
 }) {
   const { authUid, isIdentityResolved } = useWorkspace();
   const [openingId, setOpeningId] = useState<string | null>(null);
@@ -213,21 +223,23 @@ function SessionWorkspaceRow({
             aria-label={isSelected ? "Deselect session" : "Select session"}
             className={[
               "relative flex h-[38px] w-[38px] items-center justify-center",
-              (hovered || isSelectionMode) ? "cursor-pointer" : "cursor-default",
-              (hovered || isSelectionMode) ? "transition-all duration-150" : "",
+              (!isSharedSession && (hovered || isSelectionMode)) ? "cursor-pointer" : "cursor-default",
+              (!isSharedSession && (hovered || isSelectionMode)) ? "transition-all duration-150" : "",
             ].join(" ")}
             onClick={(e) => {
+              if (isSharedSession) return;
               if (!(hovered || isSelectionMode)) return;
               e.preventDefault();
               e.stopPropagation();
               onToggleSelected?.(sessionId);
             }}
             onMouseDown={(e) => {
+              if (isSharedSession) return;
               if (!(hovered || isSelectionMode)) return;
               e.stopPropagation();
             }}
           >
-            {(hovered || isSelectionMode) ? (
+            {(!isSharedSession && (hovered || isSelectionMode)) ? (
               <div
                 className={[
                   "w-[22px] h-[22px] rounded-[var(--radius-xs)] border flex items-center justify-center transition-all duration-150",
@@ -260,10 +272,45 @@ function SessionWorkspaceRow({
                 {session.title}
               </span>
             ) : null}
+            {(() => {
+              const creatorName = session.creatorName;
+              const commentCount = session.commentCount ?? 0;
+              const showSharedBy = Boolean(sharedByName);
+              const showWorkspace = Boolean(workspaceLabel);
+              if (!showSharedBy && !creatorName && commentCount === 0 && !showWorkspace) return null;
+              return (
+                <div className="flex items-center gap-1.5 text-[13px] text-[var(--text-secondary)] mt-0.5">
+                  {showSharedBy ? (
+                    <span>Shared by {sharedByName}</span>
+                  ) : creatorName ? (
+                    <span>Created by {creatorName}</span>
+                  ) : null}
+                  {showWorkspace && (
+                    <>
+                      {(showSharedBy || creatorName) && (
+                        <span className="text-[var(--text-tertiary)]">·</span>
+                      )}
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-hover)] border border-[var(--border)] px-2 py-0.5 text-[12px] font-medium text-[var(--text-body)]">
+                        <Building2 className="h-3.5 w-3.5" aria-hidden />
+                        {workspaceLabel}
+                      </span>
+                    </>
+                  )}
+                  {!isSharedSession && creatorName && commentCount > 0 && (
+                    <span className="text-[var(--text-tertiary)]">·</span>
+                  )}
+                  {!isSharedSession && commentCount > 0 && (
+                    <span>
+                      {commentCount} {commentCount === 1 ? "comment" : "comments"}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
 
-        <div className="flex min-h-[36px] items-center shrink-0 gap-3.5 transition-[margin] duration-150 group-hover:mr-[86px]">
+        <div className="flex min-h-[36px] items-center shrink-0 gap-10 transition-[margin] duration-150 group-hover:mr-[86px]">
           {(() => {
             const viewers = session.recentViewers ?? [];
             const viewCount = session.viewCount ?? 0;
@@ -314,20 +361,20 @@ function SessionWorkspaceRow({
           })()}
           <>
             {open != null && open > 0 && (
-              <div className="rounded-[var(--radius-sm)] bg-white px-3 py-1.5 text-sm text-[var(--text-body)] inline-flex items-center justify-center gap-1.5">
+              <div className="text-sm text-[var(--text-body)] inline-flex items-center gap-1.5">
                 <CircleDashed className="h-4 w-4 shrink-0 text-[var(--brand)]" aria-hidden />
                 <span className="whitespace-nowrap font-medium tracking-tight">{open} open</span>
               </div>
             )}
             {resolved != null && resolved > 0 && (
-              <div className="rounded-[var(--radius-sm)] bg-white px-3 py-1.5 text-sm text-[var(--text-body)] inline-flex items-center justify-center gap-1.5">
+              <div className="text-sm text-[var(--text-body)] inline-flex items-center gap-1.5">
                 <Check className="h-4 w-4 shrink-0 text-[var(--color-success)]" strokeWidth={2.5} aria-hidden />
                 <span className="whitespace-nowrap font-medium tracking-tight">{resolved} resolved</span>
               </div>
             )}
           </>
           {updatedShort ? (
-            <div className="inline-flex min-h-[36px] min-w-[5.5rem] items-center gap-1.5 rounded-[var(--radius-sm)] bg-white px-3 py-1.5 text-sm">
+            <div className="inline-flex items-center gap-1.5 text-sm">
               <Calendar className="h-4 w-4 shrink-0 text-[var(--color-warning)]" strokeWidth={2.5} aria-hidden />
               <span className="whitespace-nowrap font-medium tracking-tight text-[var(--text-body)]">
                 {updatedShort}
@@ -365,20 +412,36 @@ function SessionWorkspaceRow({
             onClick={handleActionsContainerClick}
             onKeyDown={handleActionsContainerKeyDown}
           >
-            <SessionActionsDropdown
-              session={session}
-              onRenameSuccess={onRenameSuccess}
-              onSetArchived={onSetArchived}
-              onRequestDelete={onRequestDelete}
-              onShareClick={() => onRequestShare?.(session)}
-              onAddMoreTickets={() => triggerAddMoreTickets(session.id)}
-              variant="list"
-              flipPlacement
-              disabled={isOptimistic}
-              triggerClassName="w-8 h-8 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30"
-              triggerIconClassName="h-5 w-5"
-              triggerAriaLabel="Session actions"
-            />
+            {isSharedSession ? (
+              <Tooltip content="Leave session">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onLeaveSession?.(session.id);
+                  }}
+                  className="w-[38px] h-[38px] rounded-[var(--radius-btn)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30"
+                  aria-label="Leave session"
+                >
+                  <LogOut className="h-5 w-5" strokeWidth={2.5} aria-hidden />
+                </button>
+              </Tooltip>
+            ) : (
+              <SessionActionsDropdown
+                session={session}
+                onRenameSuccess={onRenameSuccess}
+                onSetArchived={onSetArchived}
+                onRequestDelete={onRequestDelete}
+                onShareClick={() => onRequestShare?.(session)}
+                onAddMoreTickets={() => triggerAddMoreTickets(session.id)}
+                variant="list"
+                flipPlacement
+                disabled={isOptimistic}
+                triggerClassName="w-8 h-8 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30"
+                triggerIconClassName="h-5 w-5"
+                triggerAriaLabel="Session actions"
+              />
+            )}
           </div>
         </div>
       </div>
