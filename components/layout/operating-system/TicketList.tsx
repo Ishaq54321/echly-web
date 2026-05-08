@@ -369,8 +369,8 @@ function TicketListInner({
       <div
         className="mb-4 p-4 pb-3.5 rounded-[12px] relative overflow-hidden shrink-0"
         style={{
-          background: 'radial-gradient(120% 110% at 100% 0%, rgba(23,117,224,0.10) 0%, rgba(23,117,224,0) 55%), linear-gradient(180deg, var(--brand-subtle) 0%, var(--surface-card) 100%)',
-          border: '1px solid rgba(23,117,224,0.10)',
+          background: 'radial-gradient(120% 110% at 100% 0%, rgba(90,73,191,0.10) 0%, rgba(90,73,191,0) 55%), linear-gradient(180deg, var(--brand-subtle) 0%, var(--surface-card) 100%)',
+          border: '1px solid rgba(90,73,191,0.10)',
         }}
       >
         {sessionLoaded ? (

@@ -190,7 +190,6 @@ export function AssignDropdown({
     setOpen(false);
     onAssigned(member.uid, getMemberDisplayName(member), member.avatarUrl ?? null);
     setIsSaving(true);
-    onSaveStateChange?.('saving');
     try {
       const res = await authFetch(`/api/tickets/${feedbackId}`, {
         method: "PATCH",
@@ -218,7 +217,6 @@ export function AssignDropdown({
         if (ticket && ticket.assigneeName !== undefined) {
           onAssigned(ticket.assigneeId ?? null, ticket.assigneeName ?? null, ticket.assigneeAvatarUrl ?? null);
         }
-        onSaveStateChange?.('saved');
       }
     } catch {
       onAssigned(prevId, prevName, prevAvatar);
@@ -235,7 +233,6 @@ export function AssignDropdown({
     setOpen(false);
     onAssigned(null, null, null);
     setIsSaving(true);
-    onSaveStateChange?.('saving');
     try {
       const res = await authFetch(`/api/tickets/${feedbackId}`, {
         method: "PATCH",
@@ -245,8 +242,6 @@ export function AssignDropdown({
       if (!res?.ok) {
         onAssigned(prevId, prevName, prevAvatar);
         onSaveStateChange?.('error');
-      } else {
-        onSaveStateChange?.('saved');
       }
     } catch {
       onAssigned(prevId, prevName, prevAvatar);
@@ -281,33 +276,9 @@ export function AssignDropdown({
         );
       }
       return (
-        <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            height: '34px',
-            padding: '0 10px',
-            background: 'var(--brand-subtle)',
-            border: '1.5px solid var(--brand-muted)',
-            borderRadius: '9px',
-            fontSize: '14px',
-            fontWeight: '500',
-            color: 'var(--brand)',
-            cursor: 'default',
-            flexShrink: 0,
-          }}>
-          <Avatar
-            name={currentAssigneeName}
-            avatarUrl={currentAssigneeAvatarUrl}
-            size={20}
-          />
-          <span style={{
-            maxWidth: '80px',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}>
+        <div className="inline-flex h-[34px] items-center gap-2 px-3.5 rounded-[7px] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[13px] font-medium" style={{ cursor: 'default', flexShrink: 0 }}>
+          <Avatar name={currentAssigneeName} avatarUrl={currentAssigneeAvatarUrl} size={20} />
+          <span style={{ maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {currentAssigneeName ? currentAssigneeName.split(" ")[0] : "Assigned"}
           </span>
         </div>
@@ -318,23 +289,7 @@ export function AssignDropdown({
 
   const hasAssignee = Boolean(currentAssigneeId);
 
-  const assignedStyle: React.CSSProperties = {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 6,
-    height: 38,
-    padding: "0 16px",
-    background: "var(--brand-subtle)",
-    border: "1.5px solid var(--brand-muted)",
-    borderRadius: 'var(--radius-btn)',
-    cursor: disabled ? "not-allowed" : "pointer",
-    opacity: disabled ? 0.5 : 1,
-    fontSize: 14,
-    fontWeight: '500',
-    color: "var(--brand)",
-  };
-
-  const unassignedCls = `inline-flex items-center gap-1.5 px-4 rounded-[var(--radius-btn)] text-[14px] font-medium border border-[var(--border)] bg-white text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"} h-[38px]`;
+  const baseCls = `inline-flex h-[34px] items-center gap-2 px-3.5 rounded-[7px] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[13px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all ${disabled || isSaving ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`;
 
   const displayName = currentAssigneeName
     ? currentAssigneeName
@@ -348,52 +303,27 @@ export function AssignDropdown({
   return (
     <>
       <div ref={containerRef} style={{ position: "relative", display: "inline-block" }}>
-        {iconOnly ? (
-          hasAssignee ? (
-            <button
-              type="button"
-              className="inline-flex h-[42px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] text-[var(--text-heading)] text-[14px] font-medium hover:bg-[var(--surface-hover)] transition-all cursor-pointer"
-              disabled={disabled || isSaving}
-              onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
-            >
+        <button
+          type="button"
+          className={baseCls}
+          disabled={disabled || isSaving}
+          onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
+        >
+          {hasAssignee ? (
+            <>
               <Avatar name={displayName} avatarUrl={currentAssigneeAvatarUrl} size={20} />
-              <span className="truncate max-w-[80px]">{firstName}</span>
-            </button>
+              <span style={{ maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {firstName}
+              </span>
+              {!iconOnly && <ChevronDown size={12} style={{ flexShrink: 0 }} />}
+            </>
           ) : (
-            <button
-              type="button"
-              className="inline-flex h-[42px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] text-[var(--text-heading)] text-[14px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all cursor-pointer"
-              disabled={disabled || isSaving}
-              onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
-            >
-              <UserPlus size={14} strokeWidth={1.7} className="shrink-0" />
+            <>
+              <UserPlus size={14} strokeWidth={1.7} style={{ flexShrink: 0 }} aria-hidden />
               Assign
-            </button>
-          )
-        ) : (
-          <button
-            type="button"
-            style={hasAssignee ? assignedStyle : undefined}
-            className={!hasAssignee ? unassignedCls : undefined}
-            disabled={disabled || isSaving}
-            onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
-          >
-            {hasAssignee ? (
-              <>
-                <Avatar name={displayName} avatarUrl={currentAssigneeAvatarUrl} size={20} />
-                <span style={{ maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {firstName}
-                </span>
-                <ChevronDown size={12} style={{ flexShrink: 0, color: "var(--brand)" }} />
-              </>
-            ) : (
-              <>
-                <UserPlus size={16} strokeWidth={1.8} style={{ flexShrink: 0 }} aria-hidden />
-                Assign
-              </>
-            )}
-          </button>
-        )}
+            </>
+          )}
+        </button>
 
         {open && (
           <div

@@ -99,8 +99,8 @@ function ResetPasswordContent() {
         <div className="auth-left">
           <header className="auth-head">
             <span className="brand">
-              <span className="brand-mark">E</span>
-              <span>Echly</span>
+              <span className="brand-mark">A</span>
+              <span>Annote</span>
             </span>
             <div className="auth-meta">
               <span>Back to</span>

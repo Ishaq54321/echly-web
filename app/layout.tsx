@@ -10,7 +10,7 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Echly",
+  title: "Annote",
   description: "Structured AI-powered feedback workspace",
 };
 

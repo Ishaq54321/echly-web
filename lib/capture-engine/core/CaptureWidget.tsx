@@ -55,6 +55,8 @@ export default function CaptureWidget({
   ensureAuthenticated,
   globalSessionModeActive,
   globalSessionPaused,
+  editPauseTooltipVisible: editPauseTooltipVisibleProp,
+  onSetEditPauseTooltip,
   onSessionModeStart,
   onSessionModePause,
   onSessionModeResume,
@@ -91,7 +93,7 @@ export default function CaptureWidget({
 }: CaptureWidgetProps) {
   const [resumeModalOpen, setResumeModalOpen] = useState(false);
   const showResumeModal = resumeModalOpen || (openResumeModalProp ?? false);
-  /** V2: when true, show Previous Feedback view instead of home screen. */
+  /** V2: when true, show Previous Sessions view instead of home screen. */
   const [showPreviousFeedback, setShowPreviousFeedback] = useState(false);
   /** Ticket editor overlay: ID of the ticket currently being edited, or null. */
   const [editingTicketId, setEditingTicketId] = useState<string | null>(null);
@@ -119,7 +121,9 @@ export default function CaptureWidget({
   const [copyState, setCopyState] = useState<"idle" | "copying" | "copied">("idle");
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isPrevFeedbackLoading, setIsPrevFeedbackLoading] = useState(false);
-  const [editPauseTooltipVisible, setEditPauseTooltipVisible] = useState(false);
+  const [editPauseTooltipVisible, setEditPauseTooltipVisible] = useState<boolean>(
+    editPauseTooltipVisibleProp ?? false
+  );
 
   const triggerUpgradeShake = useCallback(() => {
     const el = upgradeInlineRef.current;
@@ -190,6 +194,7 @@ export default function CaptureWidget({
     assertIdentityBeforeWorkspaceMutations,
     feedbackLimitReached,
     triggerUpgradeShake,
+    onEditTicket: setEditingTicketId,
   });
 
   /** Session limit: prop (from parent e.g. extension) takes precedence; otherwise use hook state (set when startSession returns limitReached). */
@@ -472,17 +477,18 @@ export default function CaptureWidget({
   }, []);
 
   const handleEditTicket = useCallback((id: string) => {
-    if (globalSessionModeActive && !globalSessionPaused) {
-      handlers.pauseSession();
-      setEditPauseTooltipVisible(true);
-    }
     setEditingTicketId(id);
     handlers.setExpandedId(id);
-  }, [handlers, globalSessionModeActive, globalSessionPaused]);
+  }, [handlers]);
 
   useEffect(() => {
     if (!globalSessionPaused) setEditPauseTooltipVisible(false);
   }, [globalSessionPaused]);
+
+  useEffect(() => {
+    if (editPauseTooltipVisibleProp === undefined) return;
+    setEditPauseTooltipVisible(editPauseTooltipVisibleProp);
+  }, [editPauseTooltipVisibleProp]);
 
   const handleCloseEditor = useCallback(() => {
     setEditingTicketId(null);
@@ -615,7 +621,9 @@ export default function CaptureWidget({
                     pointerEvents: "auto",
                   }
                 : {
-                    position: "relative",
+                    position: "fixed",
+                    bottom: 24,
+                    right: 24,
                     cursor: state.isDragging ? "grabbing" : "grab",
                     pointerEvents: "auto",
                   }
@@ -627,16 +635,16 @@ export default function CaptureWidget({
             id={extensionMode && launcherLogoUrl ? "launcher_container" : undefined}
             onClick={() => (onExpandRequest ? onExpandRequest() : handlers.setIsOpen(true))}
             className={`echly-floating-trigger${extensionMode && launcherLogoUrl ? " echly-launcher" : ""}`}
-            aria-label="Open Echly"
+            aria-label="Open Annote"
           >
             {extensionMode && launcherLogoUrl ? (
               <img
                 src={launcherLogoUrl}
                 className="echly-launcher-logo"
-                alt="Echly"
+                alt="Annote"
               />
             ) : (
-              extensionMode ? "Echly" : "Capture feedback"
+              extensionMode ? "Annote" : "Capture feedback"
             )}
           </button>
         </div>
@@ -715,13 +723,6 @@ export default function CaptureWidget({
                 >
                   <div className="pill upgrade-full">
                     <div className="upgrade-full-head">
-                      <div className="upgrade-full-head-left">
-                        <div className="upgrade-full-mark">
-                          <svg viewBox="0 0 18 18" fill="none" width="14" height="14">
-                            <text x="4" y="13.5" fontSize="12" fontWeight="700" fill="#fff" fontFamily="DM Sans, sans-serif">E</text>
-                          </svg>
-                        </div>
-                      </div>
                       <div className="tl-icon-group">
                         <button
                           type="button"
@@ -800,6 +801,7 @@ export default function CaptureWidget({
                       theme={theme}
                       onThemeToggle={onThemeToggle}
                       onHeaderMouseDown={handleHeaderMouseDown}
+                      logoUrl={launcherLogoUrl ?? (getAssetUrl ? getAssetUrl("assets/annote-logo-icon.svg") : "/annote-logo-icon.svg")}
                     />
                   ) : showModeSelection ? (
                     <ModeSelectionView
@@ -815,6 +817,7 @@ export default function CaptureWidget({
                       theme={theme}
                       onThemeToggle={onThemeToggle}
                       isStarting={isStartingSession}
+                      logoUrl={launcherLogoUrl ?? (getAssetUrl ? getAssetUrl("assets/annote-logo-icon.svg") : "/annote-logo-icon.svg")}
                     />
                   ) : (
                     /* V2 Home Screen */
@@ -852,15 +855,23 @@ export default function CaptureWidget({
                         onMouseDown={handleHeaderMouseDown}
                         style={extensionMode ? { cursor: state.isDragging ? "grabbing" : "grab" } : undefined}
                       >
-                        <span className="pill-mark">E</span>
+                        <span className="pill-mark pill-mark-logo">
+                          <img
+                            src={launcherLogoUrl ?? (getAssetUrl ? getAssetUrl("assets/annote-logo-icon.svg") : "/annote-logo-icon.svg")}
+                            alt="Annote"
+                            style={{ width: 24, height: 30, objectFit: "contain", display: "block" }}
+                          />
+                        </span>
                         <div className="pill-ws">
-                          <span className="pill-ws-name">Echly</span>
-                          {sessionTitleProp && (
-                            <>
-                              <span className="pill-ws-sep">·</span>
-                              <span className="pill-ws-page">{sessionTitleProp}</span>
-                            </>
-                          )}
+                          <span style={{
+                            fontSize: 15,
+                            fontWeight: 700,
+                            color: "var(--ink)",
+                            letterSpacing: "-0.02em",
+                            whiteSpace: "nowrap",
+                          }}>
+                            Annote
+                          </span>
                         </div>
                         <div className="tl-icon-group">
                           <button
@@ -908,7 +919,7 @@ export default function CaptureWidget({
                         <button
                           type="button"
                           className="start-btn"
-                          style={{ backgroundColor: "#1775E0" }}
+                          style={{ backgroundColor: "#5A49BF" }}
                           onClick={async () => {
                             if (isStartingSession) return;
                             if (!(await checkAuthBeforeAction())) return;
@@ -957,7 +968,7 @@ export default function CaptureWidget({
                                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                                   <path d="M3 4.5h10M3 8h10M3 11.5h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                                 </svg>
-                                Previous Feedback
+                                Previous Sessions
                               </>
                             )}
                           </button>
@@ -1023,7 +1034,13 @@ export default function CaptureWidget({
                       onMouseDown={handleHeaderMouseDown}
                       style={extensionMode && !isEditingTitle ? { cursor: state.isDragging ? "grabbing" : "grab" } : undefined}
                     >
-                      <span className="pill-mark">E</span>
+                      <span className="pill-mark pill-mark-logo">
+                        <img
+                          src={launcherLogoUrl ?? (getAssetUrl ? getAssetUrl("assets/annote-logo-icon.svg") : "/annote-logo-icon.svg")}
+                          alt="Annote"
+                          style={{ width: 24, height: 30, objectFit: "contain", display: "block" }}
+                        />
+                      </span>
                       {!showSessionLoading && (
                         <>
                           <div className={`tl-title-block ${isEditingTitle ? "tl-editing" : ""}`}>
@@ -1116,14 +1133,29 @@ export default function CaptureWidget({
                     <div className="pill-rule" />
 
                     {editPauseTooltipVisible && (
-                      <div className="tl-edit-pause-tooltip" role="status">
-                        <span className="tl-edit-pause-text">
+                      <div
+                        className="edit-pause-tooltip"
+                        role="status"
+                        style={{
+                          position: "absolute",
+                          ...(state.trayCorner === "tl" || state.trayCorner === "tr"
+                            ? { top: "calc(100% + 10px)" }
+                            : { bottom: "calc(100% + 10px)" }),
+                          left: "50%",
+                          transform: "translateX(-50%)",
+                          zIndex: 10,
+                        }}
+                      >
+                        <span className="edit-pause-tooltip-text">
                           Session paused. Resume from the controls below when you&apos;re ready.
                         </span>
                         <button
                           type="button"
-                          className="tl-edit-pause-dismiss"
-                          onClick={() => setEditPauseTooltipVisible(false)}
+                          className="edit-pause-tooltip-dismiss"
+                          onClick={() => {
+                            setEditPauseTooltipVisible(false);
+                            onSetEditPauseTooltip?.(false);
+                          }}
                           aria-label="Dismiss"
                         >
                           <X size={11} strokeWidth={2.5} />
@@ -1271,7 +1303,7 @@ export default function CaptureWidget({
                             </div>
                             <div className="tl-empty-title">No feedback yet</div>
                             <div className="tl-empty-sub">
-                              Click any element on the page to capture it — Echly will turn what you say into a ticket.
+                              Click any element on the page to capture it — Annote will turn what you say into a ticket.
                             </div>
                           </div>
                         )}
@@ -1429,6 +1461,13 @@ export default function CaptureWidget({
             sessionId={sessionId}
             onUpdate={onUpdate ?? handlers.updatePointer}
             onClose={handleCloseEditor}
+            onPauseForEditor={async () => {
+              if (globalSessionModeActive && !globalSessionPaused) {
+                handlers.pauseSession();
+                setEditPauseTooltipVisible(true);
+                await onSetEditPauseTooltip?.(true);
+              }
+            }}
           />,
           captureRootEl
         );

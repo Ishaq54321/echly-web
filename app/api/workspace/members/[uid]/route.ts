@@ -6,6 +6,7 @@ import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 import { assertWorkspaceActive } from "@/lib/server/assertWorkspaceActive";
 import {
   getWorkspaceMemberRepo,
+  getWorkspaceMembersRepo,
   removeWorkspaceMemberRepo,
 } from "@/lib/repositories/workspaceMembersRepository.server";
 import { adminDb } from "@/lib/server/firebaseAdmin";
@@ -45,7 +46,15 @@ export async function DELETE(
       return apiError({ code: "NOT_FOUND", message: "Member not found", status: 404 });
     }
     if (targetMember.role === "OWNER") {
-      return apiError({ code: "INVALID_INPUT", message: "CANNOT_REMOVE_OWNER", status: 400 });
+      const allMembers = await getWorkspaceMembersRepo(workspaceId);
+      const ownerCount = allMembers.filter((m) => m.role === "OWNER").length;
+      if (ownerCount <= 1) {
+        return apiError({
+          code: "INVALID_INPUT",
+          message: "LAST_OWNER",
+          status: 400,
+        });
+      }
     }
 
     await removeWorkspaceMemberRepo(workspaceId, targetUid);

@@ -11,6 +11,12 @@ export type StructuredFeedback = {
   suggestedTags?: string[];
   /** AI-detected page/section, e.g. "Pricing Page → Hero Section". */
   pageArea?: string | null;
+  userAgent?: string | null;
+  viewportWidth?: number | null;
+  viewportHeight?: number | null;
+  devicePixelRatio?: number | null;
+  /** ISO string (API) or epoch ms (in-memory). */
+  createdAt?: string | number | null;
 };
 
 /** Element bounding rect (viewport coordinates) for anchoring capture card. */
@@ -101,7 +107,7 @@ export type CaptureWidgetProps = {
   ) => void | Promise<StructuredFeedback | undefined>;
   onDelete: (id: string) => Promise<void>;
   /** Optional: when provided (e.g. extension), ticket updates use this instead of authFetch. */
-  onUpdate?: (id: string, payload: { title: string; actionSteps: string[] }) => Promise<void>;
+  onUpdate?: (id: string, payload: { title: string; actionSteps: string[]; suggestedTags?: string[] }) => Promise<void>;
   /** Optional ref for extension: parent can set a toggle callback to open/close widget via message. */
   widgetToggleRef?: MutableRefObject<(() => void) | null>;
   /** Optional callback when recording starts or stops (for extension global recording state). */
@@ -162,6 +168,10 @@ export type CaptureWidgetProps = {
   globalSessionModeActive?: boolean;
   /** Extension: global session paused from background. Synced to local sessionPaused. */
   globalSessionPaused?: boolean;
+  /** Extension: edit-pause tooltip visibility from background (persists across page navigations). */
+  editPauseTooltipVisible?: boolean;
+  /** Extension: notify background to set/clear the edit-pause tooltip flag. */
+  onSetEditPauseTooltip?: (visible: boolean) => void | Promise<void>;
   /** Extension: notify background that session mode started (after POST /api/sessions succeeds). */
   onSessionModeStart?: () => void;
   /** Extension: called when Start Session succeeds so widget can switch to session view (same as Previous Session). */
@@ -210,6 +220,8 @@ export type CaptureWidgetProps = {
   feedbackLimitReached?: { message: string; upgradePlan: string } | null;
   /** Internal: triggers the inline upgrade-card shake animation; wired by CaptureWidget into the hook. */
   triggerUpgradeShake?: () => void;
+  /** Internal: open the inline ticket editor for a saved ticket. Wired by CaptureWidget; placeholder/pending markers are skipped. */
+  onEditTicket?: (id: string) => void;
   /** Extension: current feedback tickets used this month (from GET_AUTH_STATE usage fetch). */
   feedbackUsage?: number | null;
   /** Extension: max feedback tickets allowed per month for this plan (null = unlimited). */

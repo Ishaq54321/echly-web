@@ -119,9 +119,9 @@ export function WorkspaceCard({
           overflow-hidden
           shadow-sm
           hover:bg-[var(--surface-hover)]
-          hover:!border-[#1775E080]
+          hover:!border-[#5A49BF80]
           hover:ring-1
-          hover:ring-[#1775E040]
+          hover:ring-[#5A49BF40]
           hover:shadow-md
           hover:-translate-y-[1px]
           transition-all
@@ -136,7 +136,7 @@ export function WorkspaceCard({
       <div className="absolute top-0 left-0 right-0 h-[3px] bg-[var(--brand)]/70 rounded-t-xl" aria-hidden />
       {(isOptimistic || isOpening) && (
         <div
-          className="absolute inset-0 rounded-xl ring-2 ring-[#1775E0]/35 pointer-events-none"
+          className="absolute inset-0 rounded-xl ring-2 ring-[#5A49BF]/35 pointer-events-none"
           aria-hidden
         />
       )}

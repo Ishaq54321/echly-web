@@ -119,9 +119,8 @@ export async function POST(req: NextRequest) {
 
     const userId = user.uid;
 
-    const isJpeg = imageDataUrl.startsWith("data:image/jpeg");
-    const contentType = isJpeg ? "image/jpeg" : "image/png";
-    const ext = isJpeg ? "jpg" : "png";
+    const contentType = "image/png";
+    const ext = "png";
     const storagePath = `sessions/${sid}/screenshots/${ssId}.${ext}`;
 
     const uploadStart = Date.now();

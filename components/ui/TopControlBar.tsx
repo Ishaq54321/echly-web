@@ -160,12 +160,12 @@ export function TopControlBar({
           </Tooltip>
           <Link
             href="/dashboard"
-            className="flex items-center gap-2.5 font-bold text-[var(--text-heading)] text-[18px] tracking-[-0.02em] no-underline shrink-0"
+            className="flex items-center gap-2.5 font-bold text-[var(--text-heading)] text-[22px] tracking-[-0.02em] no-underline shrink-0"
           >
-            <div className="w-[32px] h-[32px] rounded-[9px] bg-[var(--brand)] flex items-center justify-center overflow-hidden shrink-0">
-              <Image src="/Echly_logo.svg" alt="" width={32} height={32} sizes="32px" className="object-cover" />
+            <div className="w-[26px] h-[30px] flex items-center justify-center shrink-0">
+              <Image src="/annote-logo-icon.svg" alt="Annote" width={26} height={30} sizes="26px" className="object-contain" />
             </div>
-            Echly
+            Annote
           </Link>
         </div>
 
@@ -190,7 +190,7 @@ export function TopControlBar({
           )}
           {/* Share + Copy link merged pill */}
           <div className="relative">
-            <div className={`flex items-center bg-[var(--brand)] rounded-[var(--radius-btn)] shadow-[0_1px_0_rgba(255,255,255,0.2)_inset,0_1px_2px_rgba(23,117,224,0.3)] overflow-hidden hover:bg-[var(--brand-hover)] transition-colors${!sessionLoaded ? ' opacity-50 pointer-events-none' : ''}`}>
+            <div className={`flex items-center bg-[var(--brand)] rounded-[var(--radius-btn)] shadow-[0_1px_0_rgba(255,255,255,0.2)_inset,0_1px_2px_rgba(90,73,191,0.3)] overflow-hidden hover:bg-[var(--brand-hover)] transition-colors${!sessionLoaded ? ' opacity-50 pointer-events-none' : ''}`}>
               <button
                 type="button"
                 onClick={handleShareOpen}

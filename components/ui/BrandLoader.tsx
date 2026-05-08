@@ -21,7 +21,7 @@ export default function BrandLoader() {
 
         <defs>
         <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-    <stop offset="0%" stopColor="#1775E0">
+    <stop offset="0%" stopColor="#5A49BF">
       <animate
         attributeName="offset"
         values="0;1"
@@ -29,7 +29,7 @@ export default function BrandLoader() {
         repeatCount="indefinite"
       />
     </stop>
-    <stop offset="100%" stopColor="#C3DFFE">
+    <stop offset="100%" stopColor="#DCD5F0">
       <animate
         attributeName="offset"
         values="1;2"

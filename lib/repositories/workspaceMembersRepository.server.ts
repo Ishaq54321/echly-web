@@ -1,5 +1,5 @@
 import "server-only";
-import { adminDb } from "@/lib/server/firebaseAdmin";
+import { adminDb, adminBucket } from "@/lib/server/firebaseAdmin";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import type { WorkspaceMember, WorkspaceMemberRole } from "@/lib/domain/workspaceMember";
 import type { WorkspaceInvitation, WorkspaceInvitationStatus } from "@/lib/domain/workspaceInvitation";
@@ -110,6 +110,37 @@ export async function removeWorkspaceMemberRepo(
   });
   await batch.commit();
   await removeWorkspaceMembershipRepo(uid, workspaceId);
+
+  // BUG-3: cascade sessionAccess + per-session member mirror docs so the
+  // removed user no longer appears in session member lists or receives
+  // session-scoped notifications.
+  try {
+    const sessionAccessSnap = await adminDb
+      .collection("sessionAccess")
+      .where("userId", "==", uid)
+      .where("workspaceId", "==", workspaceId)
+      .get();
+
+    if (!sessionAccessSnap.empty) {
+      const docs = sessionAccessSnap.docs;
+      for (let i = 0; i < docs.length; i += 500) {
+        const cleanupBatch = adminDb.batch();
+        for (const doc of docs.slice(i, i + 500)) {
+          cleanupBatch.delete(doc.ref);
+          const sid = doc.data().sessionId;
+          if (typeof sid === "string" && sid) {
+            cleanupBatch.delete(adminDb.doc(`sessions/${sid}/members/${uid}`));
+          }
+        }
+        await cleanupBatch.commit();
+      }
+    }
+  } catch (err) {
+    console.error(
+      `[removeWorkspaceMemberRepo] sessionAccess cleanup failed for uid=${uid} ws=${workspaceId}:`,
+      err
+    );
+  }
 }
 
 // ── Invitations ────────────────────────────────────────────────────────────
@@ -290,6 +321,24 @@ export async function purgeWorkspaceRepo(
     await batchDelete(invSnap.docs);
   } catch (err) {
     console.error(`[PURGE] deleting invitations failed for workspace ${workspaceId}:`, err);
+  }
+
+  for (const collection of ["comments", "activityEvents", "notifications", "sessionAccess"] as const) {
+    try {
+      const snap = await adminDb
+        .collection(collection)
+        .where("workspaceId", "==", workspaceId)
+        .get();
+      await batchDelete(snap.docs);
+    } catch (err) {
+      console.error(`[PURGE] deleting ${collection} failed for workspace ${workspaceId}:`, err);
+    }
+  }
+
+  try {
+    await adminBucket.deleteFiles({ prefix: `workspaces/${workspaceId}/` });
+  } catch (err) {
+    console.error(`[PURGE] deleting storage files failed for workspace ${workspaceId}:`, err);
   }
 
   try {

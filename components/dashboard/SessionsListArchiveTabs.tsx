@@ -31,7 +31,7 @@ export function SessionsListArchiveTabs({
         onClick={() => onChange(id)}
         className={`
               relative border-0 bg-transparent p-0 pb-3 text-[16px] transition-colors duration-200
-              focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30 focus-visible:ring-offset-2 rounded-sm
+              focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5A49BF]/30 focus-visible:ring-offset-2 rounded-sm
               ${isActive ? "z-10 font-semibold text-[var(--text-heading)]" : "font-medium text-[var(--text-secondary)] hover:text-[var(--text-heading)]"}
             `}
       >

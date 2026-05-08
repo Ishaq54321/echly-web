@@ -35,19 +35,19 @@ export default function AdminLayout({
           <Link
             href="/admin"
             className="flex items-center gap-2 rounded-md py-1 pr-2"
-            aria-label="Echly Admin"
+            aria-label="Annote Admin"
           >
-            <span className="relative block w-8 h-8 bg-[var(--brand)] rounded-md overflow-hidden">
+            <span className="relative block w-[19px] h-[23px]">
               <Image
-                src="/Echly_logo.svg"
-                alt=""
+                src="/annote-logo-icon.svg"
+                alt="Annote"
                 fill
-                sizes="32px"
-                className="object-cover"
+                sizes="19px"
+                className="object-contain"
               />
             </span>
             <span className="text-sm font-semibold text-[var(--text-heading)]">
-              Echly Admin
+              Annote Admin
             </span>
           </Link>
         </div>

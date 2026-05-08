@@ -9,39 +9,69 @@ import type { CaptureContext } from "@/lib/capture-engine/core/types";
 const MIN_SIZE = 24;
 const ECHLY_EASE = "cubic-bezier(0.22, 0.61, 0.36, 1)";
 
+const SEMANTIC_CONTAINERS = new Set([
+  "ARTICLE", "SECTION", "ASIDE", "MAIN", "FORM", "DIALOG", "NAV", "HEADER", "FOOTER",
+]);
+
+const CONTAINER_ROLES = new Set([
+  "dialog", "region", "article", "form", "navigation", "banner", "contentinfo",
+]);
+
+function hasVisualBoundary(style: CSSStyleDeclaration): boolean {
+  const bg = style.backgroundColor;
+  if (bg && bg !== "transparent" && bg !== "rgba(0, 0, 0, 0)") return true;
+
+  const bw = parseFloat(style.borderTopWidth) || 0;
+  if (bw >= 1) return true;
+
+  if (style.boxShadow && style.boxShadow !== "none") return true;
+
+  const br = parseFloat(style.borderRadius) || 0;
+  if (br >= 4) return true;
+
+  return false;
+}
+
+function isSemanticContainer(el: Element): boolean {
+  if (SEMANTIC_CONTAINERS.has(el.tagName)) return true;
+  const role = el.getAttribute("role");
+  if (role && CONTAINER_ROLES.has(role)) return true;
+  return false;
+}
+
 export function detectVisualContainer(el: Element): DOMRect {
   const viewportW = window.innerWidth;
   const viewportH = window.innerHeight;
-
   let node: Element | null = el;
   let bestRect = el.getBoundingClientRect();
+  let found = false;
+  let levels = 0;
 
-  while (node && node !== document.body) {
+  while (node && node !== document.body && levels < 15) {
+    levels++;
     const rect = node.getBoundingClientRect();
     const style = window.getComputedStyle(node);
 
-    const isLayoutContainer =
-      style.display === "flex" ||
-      style.display === "grid" ||
-      style.display === "block";
-
-    const widthRatio = rect.width / viewportW;
-    const heightRatio = rect.height / viewportH;
-
-    const goodContainer =
-      widthRatio > 0.65 ||
-      heightRatio > 0.35 ||
-      isLayoutContainer;
-
-    if (goodContainer) {
-      bestRect = rect;
+    if (rect.width < 2 || rect.height < 2) {
+      node = node.parentElement;
+      continue;
     }
 
-    if (widthRatio > 0.85 || heightRatio > 0.6) {
+    if (rect.width / viewportW > 0.70 || rect.height / viewportH > 0.50) {
+      break;
+    }
+
+    if (hasVisualBoundary(style) || isSemanticContainer(node)) {
+      bestRect = rect;
+      found = true;
       break;
     }
 
     node = node.parentElement;
+  }
+
+  if (!found) {
+    bestRect = el.getBoundingClientRect();
   }
 
   return bestRect;
@@ -50,12 +80,19 @@ export function detectVisualContainer(el: Element): DOMRect {
 export type Region = { x: number; y: number; w: number; h: number };
 
 export function clampRect(rect: { x: number; y: number; w?: number; h?: number; width?: number; height?: number }): Region {
-  const x = Math.max(0, rect.x);
-  const y = Math.max(0, rect.y);
-  const maxWidth = window.innerWidth - x;
-  const maxHeight = window.innerHeight - y;
-  const w = Math.min(rect.width ?? rect.w ?? 0, maxWidth);
-  const h = Math.min(rect.height ?? rect.h ?? 0, maxHeight);
+  let w = rect.w ?? rect.width ?? 0;
+  let h = rect.h ?? rect.height ?? 0;
+  let x = rect.x;
+  let y = rect.y;
+
+  if (x < 0) { x = 0; }
+  if (y < 0) { y = 0; }
+
+  const maxW = window.innerWidth - x;
+  const maxH = window.innerHeight - y;
+  w = Math.min(w, maxW);
+  h = Math.min(h, maxH);
+
   return { x, y, w: Math.max(0, w), h: Math.max(0, h) };
 }
 
@@ -379,7 +416,7 @@ export function RegionCaptureOverlay({
             top: rect.y,
             width: Math.max(rect.w, 1),
             height: Math.max(rect.h, 1),
-            border: `2px solid ${flashBorder ? "#FFFFFF" : "#1775E0"}`,
+            border: `2px solid ${flashBorder ? "#FFFFFF" : "#5A49BF"}`,
             boxShadow: "0 0 0 9999px rgba(0,0,0,0.4)",
             pointerEvents: "none",
             zIndex: 999998,
@@ -427,7 +464,7 @@ export function RegionCaptureOverlay({
             disabled={confirming}
             className="echly-region-confirm-btn"
             style={{
-              background: "#1775E0",
+              background: "#5A49BF",
               color: "#fff",
               fontWeight: 600,
               cursor: confirming ? "not-allowed" : "pointer",

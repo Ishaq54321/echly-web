@@ -98,7 +98,7 @@ export function ReadyStep({
             <div className="ob-loop-step">
               <span className="ob-lp-ico"><ObIcon.Frame size={18} /></span>
               <div>
-                <div className="ob-lp-t">Open Echly &amp; capture</div>
+                <div className="ob-lp-t">Open Annote &amp; capture</div>
                 <div className="ob-lp-s">Drag a region, full page, or record a 30-second clip.</div>
               </div>
               <span className="ob-lp-num">02</span>
@@ -133,7 +133,7 @@ export function ReadyStep({
         Ready{firstName ? `, ${firstName}` : ""}? <span className="accent">Here&apos;s the loop.</span>
       </h1>
       <p className="ob-sub">
-        Echly turns any web page into a feedback canvas. Run a session, capture what&apos;s broken, share with your team — that&apos;s it.
+        Annote turns any web page into a feedback canvas. Run a session, capture what&apos;s broken, share with your team — that&apos;s it.
       </p>
 
       <div className="ob-feat-list">

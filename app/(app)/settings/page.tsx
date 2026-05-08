@@ -661,7 +661,7 @@ function WorkspaceTab({
             onFocus={(e) => {
               e.target.style.borderColor = "var(--brand)";
               e.target.style.background = "white";
-              e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)";
+              e.target.style.boxShadow = "0 0 0 3px rgba(90,73,191,0.10)";
             }}
             onBlur={(e) => {
               e.target.style.borderColor = "var(--border)";
@@ -865,7 +865,7 @@ function ChangeEmailModal({ onClose }: { onClose: () => void }) {
                 onChange={(e) => setNewEmail(e.target.value)}
                 required
                 style={{ height: 42, borderRadius: 9, border: "1.5px solid var(--border)", background: "var(--surface-input)", padding: "0 12px", fontSize: 15, color: "var(--text-heading)", width: "100%", outline: "none", boxSizing: "border-box", marginBottom: 14 }}
-                onFocus={(e) => { e.target.style.borderColor = "var(--brand)"; e.target.style.background = "white"; e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)"; }}
+                onFocus={(e) => { e.target.style.borderColor = "var(--brand)"; e.target.style.background = "white"; e.target.style.boxShadow = "0 0 0 3px rgba(90,73,191,0.10)"; }}
                 onBlur={(e) => { e.target.style.borderColor = "var(--border)"; e.target.style.background = "var(--surface-input)"; e.target.style.boxShadow = "none"; }}
               />
 
@@ -877,7 +877,7 @@ function ChangeEmailModal({ onClose }: { onClose: () => void }) {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   style={{ height: 42, borderRadius: 9, border: "1.5px solid var(--border)", background: "var(--surface-input)", padding: "0 40px 0 12px", fontSize: 15, color: "var(--text-heading)", width: "100%", outline: "none", boxSizing: "border-box" }}
-                  onFocus={(e) => { e.target.style.borderColor = "var(--brand)"; e.target.style.background = "white"; e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)"; }}
+                  onFocus={(e) => { e.target.style.borderColor = "var(--brand)"; e.target.style.background = "white"; e.target.style.boxShadow = "0 0 0 3px rgba(90,73,191,0.10)"; }}
                   onBlur={(e) => { e.target.style.borderColor = "var(--border)"; e.target.style.background = "var(--surface-input)"; e.target.style.boxShadow = "none"; }}
                 />
                 <button
@@ -1282,7 +1282,7 @@ function MyAccountTab() {
                     onChange={(e) => setFirstNameDraft(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") void handleSaveName(); }}
                     style={inputStyle}
-                    onFocus={(e) => { e.target.style.borderColor = "var(--brand)"; e.target.style.background = "white"; e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)"; }}
+                    onFocus={(e) => { e.target.style.borderColor = "var(--brand)"; e.target.style.background = "white"; e.target.style.boxShadow = "0 0 0 3px rgba(90,73,191,0.10)"; }}
                     onBlur={(e) => { e.target.style.borderColor = "var(--border)"; e.target.style.background = "var(--surface-input)"; e.target.style.boxShadow = "none"; }}
                   />
                 </div>
@@ -1295,7 +1295,7 @@ function MyAccountTab() {
                     onChange={(e) => setLastNameDraft(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") void handleSaveName(); }}
                     style={inputStyle}
-                    onFocus={(e) => { e.target.style.borderColor = "var(--brand)"; e.target.style.background = "white"; e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)"; }}
+                    onFocus={(e) => { e.target.style.borderColor = "var(--brand)"; e.target.style.background = "white"; e.target.style.boxShadow = "0 0 0 3px rgba(90,73,191,0.10)"; }}
                     onBlur={(e) => { e.target.style.borderColor = "var(--border)"; e.target.style.background = "var(--surface-input)"; e.target.style.boxShadow = "none"; }}
                   />
                 </div>
@@ -2057,7 +2057,7 @@ function MembersTab({
             }}
             onFocus={(e) => {
               e.target.style.borderColor = "var(--brand)";
-              e.target.style.boxShadow = "0 0 0 3px rgba(23,117,224,0.10)";
+              e.target.style.boxShadow = "0 0 0 3px rgba(90,73,191,0.10)";
             }}
             onBlur={(e) => {
               e.target.style.borderColor = "var(--border)";
@@ -2653,8 +2653,8 @@ function SecurityTab() {
 const INTEGRATIONS: { id: string; name: string; logoSrc: string; description: string; pro: boolean }[] = [
   { id: "slack", name: "Slack", logoSrc: "/assets/integrations/slack.svg", description: "Receive feedback notifications in Slack.", pro: true },
   { id: "linear", name: "Linear", logoSrc: "/assets/integrations/linear.svg", description: "Sync feedback and tickets with Linear.", pro: true },
-  { id: "jira", name: "Jira", logoSrc: "/assets/integrations/jira.svg", description: "Link Echly feedback to Jira issues.", pro: true },
-  { id: "zapier", name: "Zapier", logoSrc: "/assets/integrations/zapier.svg", description: "Connect Echly to thousands of apps with Zapier.", pro: true },
+  { id: "jira", name: "Jira", logoSrc: "/assets/integrations/jira.svg", description: "Link Annote feedback to Jira issues.", pro: true },
+  { id: "zapier", name: "Zapier", logoSrc: "/assets/integrations/zapier.svg", description: "Connect Annote to thousands of apps with Zapier.", pro: true },
 ];
 
 function IntegrationsTab({ onNavigateToBilling }: { onNavigateToBilling: () => void }) {
@@ -2662,7 +2662,7 @@ function IntegrationsTab({ onNavigateToBilling }: { onNavigateToBilling: () => v
     <div className={CARD_GAP}>
       <SectionHeader
         title="Integrations"
-        description="Connect Echly with your existing tools."
+        description="Connect Annote with your existing tools."
       />
       <div className="grid gap-8 sm:grid-cols-2">
         {INTEGRATIONS.map(({ id, name, logoSrc, description, pro }) => (

@@ -177,7 +177,7 @@ export function ExternalShareModal({
                 gap: 6,
                 boxShadow: copied
                   ? "0 1px 3px rgba(24,121,78,0.20)"
-                  : "0 1px 3px rgba(23,117,224,0.20)",
+                  : "0 1px 3px rgba(90,73,191,0.20)",
                 transition: "background 0.15s",
               }}
             >

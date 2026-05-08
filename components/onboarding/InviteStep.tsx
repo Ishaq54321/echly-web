@@ -347,7 +347,7 @@ export function InviteStep({
               <div className="ob-iv-row">
                 <span
                   className="ob-iv-av"
-                  style={{ background: "linear-gradient(135deg, #1775E0, #0F5BB5)" }}
+                  style={{ background: "linear-gradient(135deg, #5A49BF, #3D2F73)" }}
                 >
                   {ownerInitials}
                 </span>
@@ -550,7 +550,7 @@ export function InviteStep({
                       gap: 10,
                       padding: "10px 20px",
                       cursor: "pointer",
-                      borderBottom: "1px solid #F4F1EC",
+                      borderBottom: "1px solid #FAFAF7",
                     }}
                   >
                     <input

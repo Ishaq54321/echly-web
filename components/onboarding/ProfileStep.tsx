@@ -142,7 +142,7 @@ export function ProfileStep({
         </div>
       }
     >
-      <span className="ob-eyebrow"><span className="dot"></span>Welcome to Echly</span>
+      <span className="ob-eyebrow"><span className="dot"></span>Welcome to Annote</span>
       <h1 className="ob-h">Let&apos;s set up your <br /><span className="accent">profile.</span></h1>
       <p className="ob-sub">A few quick details so teammates know who&apos;s leaving feedback. You can change all of this later in settings.</p>
 

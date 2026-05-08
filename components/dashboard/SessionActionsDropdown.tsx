@@ -284,26 +284,30 @@ export function SessionActionsDropdown({
 
   const handleRenameSave = async (title: string) => {
     assertIdentityResolved(isIdentityResolved);
-    const res = await authFetch(`/api/sessions/${session.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title }),
-    });
-    if (!res) throw new Error("Failed to rename");
-    if (!res.ok) throw new Error("Failed to rename");
-    const inner = requireApiSuccessData<{
-      session: { id: string; title: string; updatedAt?: unknown };
-    }>(await res.json());
-    const renamed = inner.session;
-    if (onRenameSuccess) {
-      onRenameSuccess(renamed);
-    }
+    const oldTitle = session.title;
+    onRenameSuccess?.({ id: session.id, title });
+    void (async () => {
+      try {
+        const res = await authFetch(`/api/sessions/${session.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title }),
+        });
+        if (!res || !res.ok) throw new Error("Failed to rename");
+        const inner = requireApiSuccessData<{
+          session: { id: string; title: string; updatedAt?: unknown };
+        }>(await res.json());
+        onRenameSuccess?.(inner.session);
+      } catch {
+        onRenameSuccess?.({ id: session.id, title: oldTitle });
+      }
+    })();
   };
 
   const menuItemClass =
     variant === "card"
       ? "dropdown-item transition-colors duration-[var(--motion-duration)] cursor-pointer flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)]"
-      : "dropdown-item text-[var(--text-heading)] transition-colors cursor-pointer flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30";
+      : "dropdown-item text-[var(--text-heading)] transition-colors cursor-pointer flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5A49BF]/30";
 
   const menuShellClass =
     variant === "card"
@@ -313,7 +317,7 @@ export function SessionActionsDropdown({
   const deleteItemClass =
     variant === "card"
       ? "dropdown-item delete transition-colors duration-[var(--motion-duration)] cursor-pointer flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)]"
-      : "dropdown-item delete flex cursor-pointer items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30";
+      : "dropdown-item delete flex cursor-pointer items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5A49BF]/30";
 
   const separatorClass =
     variant === "card"

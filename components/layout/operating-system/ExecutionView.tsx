@@ -77,7 +77,7 @@ export interface ExecutionViewProps {
 export function ExecutionView({
   item,
   resolveAffirmationKey = 0,
-  onSaveTitle: _onSaveTitle,
+  onSaveTitle,
   onResolvedChange,
   onSaveActionSteps,
   onSaveTags,
@@ -130,6 +130,7 @@ export function ExecutionView({
     <div className="flex-1 min-h-0 flex flex-col min-w-0">
       <SessionFeedbackHeader
         item={displayItem}
+        onSaveTitle={isPublicReadOnly || isShareSurface ? undefined : onSaveTitle}
         resolveAffirmationKey={resolveAffirmationKey}
         impactScore={impactScore}
         onResolvedChange={

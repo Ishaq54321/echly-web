@@ -59,13 +59,13 @@ export function ExtensionStep({ onContinue, onBack }: Props) {
       }
     >
       <span className="ob-eyebrow"><span className="dot"></span>Capture toolbar</span>
-      <h1 className="ob-h">Install the Echly <br />Chrome extension.</h1>
+      <h1 className="ob-h">Install the Annote <br />Chrome extension.</h1>
       <p className="ob-sub">The extension is how you capture screenshots, record clips, and turn them into tickets — right from any tab.</p>
 
       <div className={"ob-ext-banner " + (isInstalled ? "installed" : "")}>
         <div className="icn"><ObIcon.Chrome size={20} /></div>
         <div className="lab">
-          <div className="t">Echly for Chrome</div>
+          <div className="t">Annote for Chrome</div>
           <div className="s">v2.1 · Works in any Chromium browser · ~1.4MB</div>
         </div>
         <span className="stat">
@@ -94,7 +94,7 @@ export function ExtensionStep({ onContinue, onBack }: Props) {
         <div className={"ob-step-item " + (isInstalled ? "done" : "")}>
           <div className="ob-step-num">{isInstalled ? <ObIcon.Check size={9} /> : "3"}</div>
           <div className="ob-step-text">
-            Pin the Echly icon — we&apos;ll detect it automatically.
+            Pin the Annote icon — we&apos;ll detect it automatically.
           </div>
         </div>
       </div>

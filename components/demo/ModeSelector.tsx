@@ -19,7 +19,7 @@ export default function ModeSelector({ selectedMode, onSelect, disabled }: ModeS
         disabled={disabled}
         className={`rounded-xl px-3 py-2.5 flex items-center gap-2 transition-colors ${
           selectedMode === "voice"
-            ? "bg-[var(--brand)] text-white shadow-[0_10px_24px_rgba(23,117,224,0.22)]"
+            ? "bg-[var(--brand)] text-white shadow-[0_10px_24px_rgba(90,73,191,0.22)]"
             : "bg-white border border-[var(--border)] text-[var(--text-heading)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]"
         }`}
       >
@@ -37,7 +37,7 @@ export default function ModeSelector({ selectedMode, onSelect, disabled }: ModeS
         disabled={disabled}
         className={`rounded-xl px-3 py-2.5 flex items-center gap-2 transition-colors ${
           selectedMode === "write"
-            ? "bg-[var(--brand)] text-white shadow-[0_10px_24px_rgba(23,117,224,0.22)]"
+            ? "bg-[var(--brand)] text-white shadow-[0_10px_24px_rgba(90,73,191,0.22)]"
             : "bg-white border border-[var(--border)] text-[var(--text-heading)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]"
         }`}
       >

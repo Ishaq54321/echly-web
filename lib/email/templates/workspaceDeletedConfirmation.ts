@@ -18,27 +18,27 @@ export function workspaceDeletedConfirmationHtml({
       <td align="center">
         <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;max-width:560px;width:100%;">
           <tr>
-            <td style="background:#1775E0;padding:28px 40px;">
-              <span style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.02em;">Echly</span>
+            <td style="background:#5A49BF;padding:28px 40px;">
+              <span style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.02em;">Annote</span>
             </td>
           </tr>
           <tr>
             <td style="padding:40px 40px 32px;">
-              <h1 style="margin:0 0 8px;font-size:24px;font-weight:700;color:#1C1917;line-height:1.3;">
+              <h1 style="margin:0 0 8px;font-size:24px;font-weight:700;color:#15101F;line-height:1.3;">
                 Your workspace <em>${escapeHtml(workspaceName)}</em> has been scheduled for deletion
               </h1>
-              <p style="margin:0 0 16px;font-size:15px;color:#78716C;">
+              <p style="margin:0 0 16px;font-size:15px;color:#54495F;">
                 Your workspace will be permanently deleted on <strong>${escapeHtml(purgeDate)}</strong>.
               </p>
-              <p style="margin:0 0 24px;font-size:15px;color:#78716C;">
+              <p style="margin:0 0 24px;font-size:15px;color:#54495F;">
                 All sessions, feedback, and members will be permanently removed.
                 To cancel, reply to this email or contact support within 30 days.
               </p>
             </td>
           </tr>
           <tr>
-            <td style="padding:20px 40px 32px;border-top:1px solid #F0F1F3;">
-              <p style="margin:0;font-size:13px;color:#A8A29E;">
+            <td style="padding:20px 40px 32px;border-top:1px solid #FAFAF7;">
+              <p style="margin:0;font-size:13px;color:#8A8096;">
                 If you did not request this deletion, please contact support immediately.
               </p>
             </td>

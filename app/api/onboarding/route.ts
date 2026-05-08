@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import {
   requireAuth,
   toAuthorizationResponse,
@@ -13,9 +13,9 @@ import {
   buildOnboardedCookieString,
 } from "@/lib/server/onboardingCookie";
 import { isValidSlug } from "@/lib/utils/slugify";
-import { createWorkspaceRepo } from "@/lib/repositories/workspacesRepository.server";
 import { setWorkspaceClaim } from "@/lib/server/setWorkspaceClaim";
 import { composeFullName } from "@/lib/utils/nameSplit";
+import { defaultWorkspaceDoc } from "@/lib/domain/workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -38,17 +38,6 @@ export async function OPTIONS(req: NextRequest) {
   return new Response(null, { status: 200, headers: corsHeaders(req) });
 }
 
-/**
- * POST /api/onboarding — completion endpoint for the multi-step onboarding flow.
- *
- * The new flow saves profile/workspace data step-by-step via PATCH /api/users
- * and PATCH /api/workspaces. This endpoint is the final commit: it flips
- * onboardingCompleted to true and issues the signed cookie that satisfies
- * the middleware gate.
- *
- * Optional workspaceName is a fallback for any client that didn't update the
- * workspace doc directly.
- */
 export async function POST(req: NextRequest) {
   let user;
   try {
@@ -107,12 +96,28 @@ export async function POST(req: NextRequest) {
       });
     }
     const userData = (userSnap.data() ?? {}) as Record<string, unknown>;
-    let wid =
+    const existingWid =
       typeof userData.workspaceId === "string" ? userData.workspaceId.trim() : "";
 
-    // Fresh signup completing onboarding: workspace doesn't exist yet. Create
-    // it here using the name supplied by WorkspaceStep, write workspaceId on
-    // the user doc, set the workspace claim.
+    // BUG-1: Reject onboarding for already-onboarded users so a replay of this
+    // endpoint cannot overwrite the user's primary workspace. Re-issue cookie.
+    if (userData.onboardingCompleted === true && existingWid) {
+      const wsSnap = await adminDb.doc(`workspaces/${existingWid}`).get();
+      if (wsSnap.exists) {
+        const token = await signOnboardedToken(user.uid);
+        const headers = new Headers(corsHeaders(req));
+        headers.append("Set-Cookie", buildOnboardedCookieString(token));
+        return apiSuccess(
+          { workspaceId: existingWid, alreadyOnboarded: true },
+          null,
+          { headers }
+        );
+      }
+    }
+
+    let wid = existingWid;
+    let createdNewWorkspace = false;
+
     if (!wid) {
       if (!workspaceName) {
         return apiError({
@@ -122,65 +127,31 @@ export async function POST(req: NextRequest) {
           init: { headers: corsHeaders(req) },
         });
       }
+
       const firstName =
         typeof userData.firstName === "string" ? userData.firstName : null;
       const lastName =
         typeof userData.lastName === "string" ? userData.lastName : null;
       const ownerName = composeFullName(firstName, lastName) || null;
       const ownerEmail =
-        typeof userData.email === "string" ? userData.email : (user.email ?? null);
+        typeof userData.email === "string"
+          ? userData.email
+          : (user.email ?? "");
       const ownerPhotoUrl =
         typeof userData.photoURL === "string" ? userData.photoURL : null;
-      await createWorkspaceRepo({
-        userId: user.uid,
-        ownerId: user.uid,
-        name: workspaceName,
-        logoUrl: ownerPhotoUrl,
-        ownerEmail,
-        ownerName,
-      });
+      const ownerAvatarUrl =
+        typeof userData.avatarUrl === "string"
+          ? userData.avatarUrl
+          : ownerPhotoUrl;
+
       wid = user.uid;
-      await userRef.set(
-        {
-          workspaceId: wid,
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
-      await setWorkspaceClaim(user.uid, wid);
-    }
 
-    await userRef.set(
-      {
-        onboardingCompleted: true,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
-
-    const workspaceRef = adminDb.doc(`workspaces/${wid}`);
-    const workspaceSnap = await workspaceRef.get();
-    if (workspaceSnap.exists) {
-      const updates: Record<string, unknown> = {
-        updatedAt: FieldValue.serverTimestamp(),
-      };
-      if (workspaceName) updates.name = workspaceName;
-
-      // Reserve the slug atomically (transaction in slugs/{slug}). On
-      // collision we silently skip — the frontend already validated via
-      // /check-slug, so a race collision here is unlikely and non-fatal
-      // for completing onboarding.
+      // Reserve slug first (transaction). If it fails non-fatally, we proceed
+      // without slug — the rest of onboarding shouldn't be blocked.
+      let reservedSlug: string | null = null;
       if (workspaceSlug) {
-        const prevSlug =
-          typeof workspaceSnap.data()?.slug === "string"
-            ? (workspaceSnap.data()!.slug as string)
-            : null;
         try {
           const newRef = adminDb.doc(`slugs/${workspaceSlug}`);
-          const prevRef =
-            prevSlug && prevSlug !== workspaceSlug
-              ? adminDb.doc(`slugs/${prevSlug}`)
-              : null;
           await adminDb.runTransaction(async (tx) => {
             const newSnap = await tx.get(newRef);
             if (newSnap.exists) {
@@ -192,16 +163,125 @@ export async function POST(req: NextRequest) {
               workspaceId: wid,
               createdAt: FieldValue.serverTimestamp(),
             });
-            if (prevRef) tx.delete(prevRef);
           });
-          updates.slug = workspaceSlug;
+          reservedSlug = workspaceSlug;
         } catch (slugErr) {
           console.warn("POST /api/onboarding: slug reservation failed", slugErr);
         }
       }
 
-      await workspaceRef.set(updates, { merge: true });
+      const payload = defaultWorkspaceDoc({
+        ownerId: user.uid,
+        name: workspaceName,
+        logoUrl: ownerPhotoUrl,
+        ...(reservedSlug ? { slug: reservedSlug } : {}),
+      });
+
+      // INT-1: All Firestore writes for onboarding go in a single batch so they
+      // succeed or fail together. Auth claim is set after the commit (idempotent
+      // on retry).
+      const workspaceRef = adminDb.doc(`workspaces/${wid}`);
+      const memberRef = adminDb.doc(`workspaces/${wid}/members/${user.uid}`);
+
+      const batch = adminDb.batch();
+      batch.create(workspaceRef, {
+        ...payload,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      batch.set(memberRef, {
+        uid: user.uid,
+        email: ownerEmail,
+        displayName: ownerName,
+        avatarUrl: ownerAvatarUrl,
+        role: "OWNER",
+        joinedAt: Timestamp.now(),
+        invitedBy: null,
+      });
+      batch.set(
+        userRef,
+        {
+          workspaceId: wid,
+          onboardingCompleted: true,
+          workspaceMemberships: FieldValue.arrayUnion(wid),
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      try {
+        await batch.commit();
+        createdNewWorkspace = true;
+      } catch (err: unknown) {
+        const code = (err as { code?: number })?.code;
+        if (code === 6 /* ALREADY_EXISTS */) {
+          // Workspace already exists (concurrent retry). Fall through to the
+          // "existing workspace" branch below and re-set the claim.
+        } else {
+          throw err;
+        }
+      }
     }
+
+    // For existing workspaces (or losing-race retries), apply name/slug updates
+    // and ensure onboardingCompleted is set. Skip when we just created in the
+    // batch above (already set there).
+    if (!createdNewWorkspace) {
+      const workspaceRef = adminDb.doc(`workspaces/${wid}`);
+      const workspaceSnap = await workspaceRef.get();
+      if (workspaceSnap.exists) {
+        const wsData = workspaceSnap.data() ?? {};
+        const updates: Record<string, unknown> = {
+          updatedAt: FieldValue.serverTimestamp(),
+        };
+        if (workspaceName) updates.name = workspaceName;
+
+        if (workspaceSlug) {
+          const prevSlug =
+            typeof wsData.slug === "string" ? (wsData.slug as string) : null;
+          try {
+            const newRef = adminDb.doc(`slugs/${workspaceSlug}`);
+            const prevRef =
+              prevSlug && prevSlug !== workspaceSlug
+                ? adminDb.doc(`slugs/${prevSlug}`)
+                : null;
+            await adminDb.runTransaction(async (tx) => {
+              const newSnap = await tx.get(newRef);
+              if (newSnap.exists) {
+                const data = (newSnap.data() ?? {}) as Record<string, unknown>;
+                if (data.workspaceId !== wid) throw new Error("SLUG_TAKEN");
+                return;
+              }
+              tx.set(newRef, {
+                workspaceId: wid,
+                createdAt: FieldValue.serverTimestamp(),
+              });
+              if (prevRef) tx.delete(prevRef);
+            });
+            updates.slug = workspaceSlug;
+          } catch (slugErr) {
+            console.warn("POST /api/onboarding: slug reservation failed", slugErr);
+          }
+        }
+
+        const batch = adminDb.batch();
+        batch.set(workspaceRef, updates, { merge: true });
+        batch.set(
+          userRef,
+          {
+            workspaceId: wid,
+            onboardingCompleted: true,
+            workspaceMemberships: FieldValue.arrayUnion(wid),
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+        await batch.commit();
+      }
+    }
+
+    // Auth claim — non-Firestore, can't batch. Idempotent on retry.
+    await setWorkspaceClaim(user.uid, wid);
 
     const token = await signOnboardedToken(user.uid);
     const headers = new Headers(corsHeaders(req));

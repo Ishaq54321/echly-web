@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Info, X, PencilLine } from "lucide-react";
 import type { StructuredFeedback } from "./types";
 import { getTicketIconFromTags } from "@/lib/utils/getTicketIconFromTags";
+import { parseDeviceInfo, formatLocalDateTime } from "@/lib/utils/captureInfo";
 
 function priorityFromType(type: string | undefined): "critical" | "high" | "medium" | "low" {
   const t = (type ?? "").toLowerCase();
@@ -88,48 +90,34 @@ function FeedbackItem({
         </div>
       </div>
 
-      {highlighted ? (
-        <span className="ticket-check" aria-hidden>
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-            <path
-              d="M3.5 8L6.5 11L12.5 5"
-              stroke="currentColor"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+      <div className="ticket-actions">
+        <button
+          type="button"
+          onClick={() => onEditRequest(ticket.id)}
+          className="ticket-action-btn"
+          aria-label="Edit"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
           </svg>
-        </span>
-      ) : (
-        <div className="ticket-actions">
-          <button
-            type="button"
-            onClick={() => onEditRequest(ticket.id)}
-            className="ticket-action-btn"
-            aria-label="Edit"
-          >
+        </button>
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={isDeleting}
+          className="ticket-action-btn ticket-action-btn--danger"
+          aria-label={isDeleting ? "Deleting…" : "Delete"}
+        >
+          {isDeleting ? (
+            <span className="echly-spinner" aria-hidden />
+          ) : (
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
             </svg>
-          </button>
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={isDeleting}
-            className="ticket-action-btn ticket-action-btn--danger"
-            aria-label={isDeleting ? "Deleting…" : "Delete"}
-          >
-            {isDeleting ? (
-              <span className="echly-spinner" aria-hidden />
-            ) : (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-              </svg>
-            )}
-          </button>
-        </div>
-      )}
+          )}
+        </button>
+      </div>
     </div>
   );
 }
@@ -148,6 +136,7 @@ export type TicketEditorOverlayProps = {
   sessionId: string;
   onUpdate: (id: string, payload: { title: string; actionSteps: string[]; suggestedTags?: string[] }) => Promise<void>;
   onClose: () => void;
+  onPauseForEditor?: () => void | Promise<void>;
 };
 
 export function TicketEditorOverlay({
@@ -155,6 +144,7 @@ export function TicketEditorOverlay({
   sessionId,
   onUpdate,
   onClose,
+  onPauseForEditor,
 }: TicketEditorOverlayProps) {
   const [editedTitle, setEditedTitle] = useState(ticket.title);
   const [editedSteps, setEditedSteps] = useState<string[]>(ticket.actionSteps ?? []);
@@ -171,6 +161,16 @@ export function TicketEditorOverlay({
   const IconComponent = getTicketIconFromTags(ticket.suggestedTags ?? null, ticket.title);
   const screenshotUrl =
     ticket.screenshotId ? tryBuildScreenshotUrl(sessionId, ticket.screenshotId) : null;
+
+  const trimmedPageArea = ticket.pageArea?.trim() || "";
+  const deviceLine = parseDeviceInfo(
+    ticket.userAgent,
+    ticket.viewportWidth,
+    ticket.viewportHeight,
+    ticket.devicePixelRatio
+  );
+  const dateLine = ticket.createdAt ? formatLocalDateTime(ticket.createdAt) : null;
+  const screenshotInfoTooltip = [trimmedPageArea, deviceLine, dateLine].filter(Boolean).join("\n");
 
   useEffect(() => {
     setScreenshotLoaded(false);
@@ -283,13 +283,16 @@ export function TicketEditorOverlay({
         <div className="editor-overlay-body">
 
           {/* Title */}
-          <input
-            type="text"
-            className="editor-title-input"
-            value={editedTitle}
-            onChange={(e) => setEditedTitle(e.target.value)}
-            placeholder="Ticket title..."
-          />
+          <div className="editor-title-row">
+            <PencilLine className="editor-title-pencil" size={16} strokeWidth={2} />
+            <input
+              type="text"
+              className="editor-title-input"
+              value={editedTitle}
+              onChange={(e) => setEditedTitle(e.target.value)}
+              placeholder="Ticket title..."
+            />
+          </div>
 
           {/* Screenshot (only when URL can be built) */}
           {screenshotUrl && (
@@ -301,12 +304,23 @@ export function TicketEditorOverlay({
                 className={screenshotLoaded ? "loaded" : ""}
                 onLoad={() => setScreenshotLoaded(true)}
               />
+              {screenshotInfoTooltip && (
+                <div
+                  className="editor-screenshot-info"
+                  tabIndex={0}
+                  aria-label={trimmedPageArea ? `Page area: ${trimmedPageArea}` : "Screenshot info"}
+                >
+                  <Info size={13} strokeWidth={1.8} />
+                  <span className="echly-tooltip echly-tooltip--multiline">{screenshotInfoTooltip}</span>
+                </div>
+              )}
               <div className="editor-screenshot-actions">
                 <button
                   type="button"
                   className="editor-screenshot-btn"
                   title="Edit in dashboard"
-                  onClick={() => {
+                  onClick={async () => {
+                    await onPauseForEditor?.();
                     const base = (typeof process !== "undefined" ? process.env.ECHLY_WEB_APP_URL : "") || "http://localhost:3000";
                     window.open(`${base}/session/${sessionId}?ticket=${ticket.id}&edit=true`, "_blank");
                   }}
@@ -343,7 +357,7 @@ export function TicketEditorOverlay({
                     setEditedTags((prev) => prev.filter((_, j) => j !== i))
                   }
                 >
-                  ×
+                  <X size={10} strokeWidth={3} />
                 </span>
               </span>
             ))}

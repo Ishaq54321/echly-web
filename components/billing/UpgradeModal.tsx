@@ -148,7 +148,7 @@ export function UpgradeModal({ open, onClose, message }: UpgradeModalProps) {
                 <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-hover)]">
                   <motion.div
                     className="h-full rounded-full"
-                    style={{ background: isFull ? "#1775E0" : "rgba(21, 93, 252, 0.5)" }}
+                    style={{ background: isFull ? "#5A49BF" : "rgba(21, 93, 252, 0.5)" }}
                     initial={{ width: 0 }}
                     animate={{ width: `${progressPct}%` }}
                     transition={{ duration: 0.3, ease: "easeOut" }}

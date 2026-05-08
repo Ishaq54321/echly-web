@@ -6,8 +6,8 @@ export function StepHeader({ step, total = 5 }: { step: number; total?: number }
   return (
     <header className="ob-head">
       <span className="ob-brand">
-        <span className="ob-brand-mark">E</span>
-        <span>Echly</span>
+        <span className="ob-brand-mark">A</span>
+        <span>Annote</span>
       </span>
       <div className="ob-stepwrap">
         <div className="ob-progress">

@@ -48,7 +48,7 @@ interface MainFolderItem {
 }
 
 const MAIN_FOLDERS: MainFolderItem[] = [
-  { key: "inbox", label: "Inbox", Icon: Inbox, countKey: "inbox", alwaysShowCount: true, iconColor: "text-[#1775E0]" },
+  { key: "inbox", label: "Inbox", Icon: Inbox, countKey: "inbox", alwaysShowCount: true, iconColor: "text-[#5A49BF]" },
   { key: "mentions", label: "Mentions", Icon: AtSign, countKey: "mentions", iconColor: "text-[#6049E7]" },
   { key: "assigned", label: "Assigned to me", Icon: UserRound, countKey: "assigned", iconColor: "text-[#E5484D]" },
 ];

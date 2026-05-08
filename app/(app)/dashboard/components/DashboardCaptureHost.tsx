@@ -41,17 +41,17 @@ export default function DashboardCaptureHost({ open, onClose }: DashboardCapture
     <div
       className={`fixed bottom-6 right-6 z-[2147483647] w-[340px] rounded-2xl p-5 bg-white dark:bg-[var(--text-heading)] border border-[var(--border)] dark:border-[var(--border)] shadow-[var(--shadow-lg)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] ${isClosing ? "animate-extension-tray-out" : "animate-extension-tray-in"}`}
       role="dialog"
-      aria-label="Install Echly extension"
+      aria-label="Install Annote extension"
     >
       {/* Header: logo + close */}
       <div className="flex items-center justify-between mb-4">
         <Image
-          src="/Echly_logo.svg"
-          alt="Echly"
-          width={96}
-          height={24}
-          sizes="96px"
-          className="h-6 w-auto dark:invert"
+          src="/annote-logo-full.svg"
+          alt="Annote"
+          width={69}
+          height={17}
+          sizes="69px"
+          className="h-[17px] w-auto object-contain"
         />
         <button
           type="button"
@@ -81,7 +81,7 @@ export default function DashboardCaptureHost({ open, onClose }: DashboardCapture
 
       {/* Description */}
       <p className="text-sm text-[var(--text-secondary)] dark:text-[var(--text-tertiary)] mb-4 leading-relaxed">
-        Install the Echly extension to capture feedback across any website, with pixel-perfect screenshots and real-time annotations.
+        Install the Annote extension to capture feedback across any website, with pixel-perfect screenshots and real-time annotations.
       </p>
 
       {/* Bullets */}
@@ -102,7 +102,7 @@ export default function DashboardCaptureHost({ open, onClose }: DashboardCapture
       <button
         type="button"
         onClick={handleInstall}
-        className="w-full h-11 rounded-[var(--radius-sm)] font-medium text-white bg-gradient-to-r from-[#1775E0] to-[#1462C4] hover:from-[#1775E0] hover:to-[#1775E0] active:scale-[0.98] transition-all duration-150 shadow-sm"
+        className="w-full h-11 rounded-[var(--radius-sm)] font-medium text-white bg-gradient-to-r from-[#5A49BF] to-[#4A3BA0] hover:from-[#5A49BF] hover:to-[#5A49BF] active:scale-[0.98] transition-all duration-150 shadow-sm"
       >
         Install Chrome Extension
       </button>

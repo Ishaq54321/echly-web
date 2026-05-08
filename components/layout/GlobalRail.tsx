@@ -52,8 +52,8 @@ function isActive(href: string, pathname: string): boolean {
   return pathname === href || (href !== "/dashboard" && pathname.startsWith(href + "/"));
 }
 
-const RAIL_ICON_CLASS = "h-[22px] w-[22px] shrink-0 text-current" as const;
-const RAIL_ICON_STROKE = 2.2 as const;
+const RAIL_ICON_CLASS = "h-[18px] w-[18px] shrink-0 text-current" as const;
+const RAIL_ICON_STROKE = 2 as const;
 
 function WorkspaceInitialsAvatar({ name }: { name: string }) {
   const initial = name.trim().charAt(0).toUpperCase() || "W";
@@ -151,7 +151,7 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
           )}
         >
           {effectiveCollapsed ? (
-            <div className="relative group/logo flex items-center justify-center h-10 w-10 shrink-0">
+            <div className="relative group/logo flex items-center justify-center h-[38px] w-[38px] shrink-0">
               <div
                 className={cn(
                   "transition-opacity duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
@@ -160,15 +160,15 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
               >
                 <Link
                   href="/dashboard"
-                  className="relative w-10 h-10 bg-[var(--brand)] rounded-md flex items-center justify-center overflow-hidden shrink-0 block"
-                  aria-label="Echly home"
+                  className="relative w-[38px] h-[38px] flex items-center justify-center shrink-0 block"
+                  aria-label="Annote home"
                 >
                   <Image
-                    src="/Echly_logo.svg"
-                    alt=""
+                    src="/annote-logo-icon.svg"
+                    alt="Annote"
                     fill
-                    sizes="40px"
-                    className="object-cover"
+                    sizes="38px"
+                    className="object-contain"
                   />
                 </Link>
               </div>
@@ -180,7 +180,7 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
                   "transition-opacity duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
                   "opacity-0 pointer-events-none group-hover/rail:pointer-events-auto group-hover/rail:opacity-100",
                   "text-[var(--text-heading)]",
-                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0] focus-visible:ring-offset-2"
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5A49BF] focus-visible:ring-offset-2"
                 )}
                 aria-label="Expand sidebar"
               >
@@ -193,24 +193,22 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
             </div>
           ) : (
             <div className="flex items-center justify-between w-full px-3 py-2">
-              <Link href="/dashboard" className="flex items-center gap-2.5" aria-label="Echly home">
-                <div className="relative w-10 h-10 rounded-[var(--radius-sm)] bg-[var(--brand)] flex items-center justify-center overflow-hidden shrink-0">
-                  <Image
-                    src="/Echly_logo.svg"
-                    alt=""
-                    fill
-                    sizes="40px"
-                    className="object-cover"
-                  />
-                </div>
-                <span className="text-[17px] font-semibold text-[var(--text-heading)] tracking-[-0.01em]">Echly</span>
+              <Link href="/dashboard" className="flex items-center" aria-label="Annote home">
+                <Image
+                  src="/annote-logo-full.svg"
+                  alt="Annote"
+                  width={110}
+                  height={26}
+                  sizes="110px"
+                  className="h-[26px] w-auto object-contain"
+                />
               </Link>
               {!forceExpanded && (
                 <button
                   type="button"
                   onClick={() => setIsCollapsed(true)}
                   aria-label="Collapse sidebar"
-                  className="w-9 h-9 flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-heading)] hover:bg-[var(--surface-hover)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0] focus-visible:ring-offset-2"
+                  className="w-9 h-9 flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-heading)] hover:bg-[var(--surface-hover)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5A49BF] focus-visible:ring-offset-2"
                 >
                   <PanelLeftClose size={20} strokeWidth={2.2} />
                 </button>
@@ -242,7 +240,7 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
                   type="button"
                   aria-label="Invite teammate"
                   onClick={() => setInviteModalOpen(true)}
-                  className="group hover:[background:var(--surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]"
+                  className="group hover:[background:var(--surface-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5A49BF]"
                   style={{
                     width: 32,
                     height: 32,
@@ -274,7 +272,7 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
                 type="button"
                 aria-label={displayName}
                 onClick={() => setWorkspacePopoverOpen((v) => !v)}
-                className="hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]"
+                className="hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5A49BF]"
                 style={{
                   width: 32,
                   height: 32,
@@ -365,7 +363,7 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
               <Link
                 href={href}
                 className={cn(
-                  "flex items-center transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0] focus-visible:ring-offset-2",
+                  "flex items-center transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5A49BF] focus-visible:ring-offset-2",
                   effectiveCollapsed
                     ? "mx-auto w-11 h-10 justify-center rounded-[var(--radius-sm)]"
                     : "w-full gap-3 px-3 py-3 rounded-[var(--radius-sm)]",
@@ -382,7 +380,7 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
                 />
                 <span
                   className={cn(
-                    "text-[15px] font-semibold text-current whitespace-nowrap",
+                    "text-[13px] font-medium text-current whitespace-nowrap",
                     "transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
                     effectiveCollapsed
                       ? "opacity-0 translate-x-[-6px] w-0 overflow-hidden pointer-events-none delay-0"
@@ -585,7 +583,7 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
               placeholder="email@example.com"
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
-              className="mt-4 w-full px-3 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text-heading)] placeholder:text-[#C4BFBB] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:border-transparent"
+              className="mt-4 w-full px-3 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text-heading)] placeholder:text-[#B5AEBE] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:border-transparent"
             />
             {inviteError && (
               <p className="mt-2 text-sm text-[var(--color-danger)]">{inviteError}</p>
@@ -662,7 +660,7 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
               value={createWorkspaceName}
               maxLength={80}
               onChange={(e) => setCreateWorkspaceName(e.target.value)}
-              className="mt-4 w-full px-3 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text-heading)] placeholder:text-[#C4BFBB] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:border-transparent"
+              className="mt-4 w-full px-3 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text-heading)] placeholder:text-[#B5AEBE] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:border-transparent"
               autoFocus
             />
             {createWorkspaceError && (

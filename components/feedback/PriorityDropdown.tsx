@@ -103,7 +103,6 @@ export function PriorityDropdown({
     setOpen(false);
     onPriorityChanged(priority);
     setIsSaving(true);
-    onSaveStateChange?.('saving');
     try {
       const res = await authFetch(`/api/tickets/${feedbackId}`, {
         method: "PATCH",
@@ -119,7 +118,6 @@ export function PriorityDropdown({
         if (serverPriority !== priority) {
           onPriorityChanged(serverPriority);
         }
-        onSaveStateChange?.('saved');
       }
     } catch {
       onPriorityChanged(prev);
@@ -153,96 +151,37 @@ export function PriorityDropdown({
         );
       }
       return (
-        <div style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '5px',
-          height: '34px',
-          padding: '0 10px',
-          background: activePriorityRO.bg,
-          border: `1.5px solid ${activePriorityRO.border}`,
-          borderRadius: '9px',
-          fontSize: '14px',
-          fontWeight: '500',
-          color: activePriorityRO.color,
-          cursor: 'default',
-          flexShrink: 0,
-        }}>
+        <div className="inline-flex h-[34px] items-center gap-2 px-3.5 rounded-[7px] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[13px] font-medium" style={{ cursor: 'default', flexShrink: 0 }}>
           {activePriorityRO.icon}
-          {activePriorityRO.label} Priority
+          {activePriorityRO.label}
         </div>
       );
     }
     return null;
   }
 
-  const activeStyle: React.CSSProperties = activePriority
-    ? {
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 5,
-        height: 34,
-        padding: "0 10px",
-        background: activePriority.bg,
-        border: `1.5px solid ${activePriority.border}`,
-        borderRadius: 9,
-        cursor: disabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.5 : 1,
-        fontSize: 14,
-        fontWeight: '500',
-        color: activePriority.color,
-      }
-    : {};
-
-  const noPriorityCls = `inline-flex h-[38px] items-center gap-1.5 px-4 rounded-[var(--radius-btn)] text-[14px] font-medium border border-[var(--border)] bg-white text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200 transition-all duration-150 ease ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`;
+  const baseCls = `inline-flex h-[34px] items-center gap-2 px-3.5 rounded-[7px] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[13px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all ${disabled || isSaving ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`;
 
   return (
     <div ref={containerRef} style={{ position: "relative", display: "inline-block" }}>
-      {iconOnly ? (
-        activePriority ? (
-          <button
-            type="button"
-            className="inline-flex h-[42px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] text-[var(--text-heading)] text-[14px] font-medium transition-all cursor-pointer"
-            disabled={disabled || isSaving}
-            onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
-          >
-            <Flag size={14} strokeWidth={1.7} className="shrink-0" fill={activePriority.color} style={{ color: activePriority.color }} />
+      <button
+        type="button"
+        className={baseCls}
+        disabled={disabled || isSaving}
+        onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
+      >
+        {activePriority ? (
+          <>
+            <Flag size={14} strokeWidth={1.7} style={{ flexShrink: 0, fill: activePriority.color, color: activePriority.color }} />
             {activePriority.label}
-          </button>
+          </>
         ) : (
-          <button
-            type="button"
-            className="inline-flex h-[42px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] text-[var(--text-heading)] text-[14px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all cursor-pointer"
-            disabled={disabled || isSaving}
-            onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
-          >
-            <Flag size={14} strokeWidth={1.7} className="shrink-0" />
+          <>
+            <Flag size={14} strokeWidth={1.7} style={{ flexShrink: 0 }} aria-hidden />
             Priority
-          </button>
-        )
-      ) : (
-        <button
-          type="button"
-          style={activePriority ? activeStyle : undefined}
-          className={!activePriority ? noPriorityCls : undefined}
-          disabled={disabled || isSaving}
-          onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
-        >
-          {activePriority ? (
-            <>
-              <span style={{ color: activePriority.color, display: "flex", alignItems: "center", flexShrink: 0 }}>
-                {activePriority.icon}
-              </span>
-              {activePriority.label} Priority
-            </>
-          ) : (
-            <>
-              <Flag size={16} style={{ flexShrink: 0 }} aria-hidden />
-              Priority
-            </>
-          )}
-        </button>
-      )}
+          </>
+        )}
+      </button>
 
       {open && (
         <div

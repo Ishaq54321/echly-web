@@ -124,7 +124,7 @@ chrome.action.onClicked.addListener(() => {
 });
 
 type StoredUser = { uid: string; name: string | null; email: string | null; photoURL: string | null };
-type FeedbackApiItem = { id: string; title?: string; actionSteps?: string[]; type?: string; screenshotId?: string | null; suggestedTags?: string[] };
+type FeedbackApiItem = { id: string; title?: string; actionSteps?: string[]; type?: string; screenshotId?: string | null; suggestedTags?: string[]; pageArea?: string | null; userAgent?: string | null; viewportWidth?: number | null; viewportHeight?: number | null; devicePixelRatio?: number | null; createdAt?: string | null };
 type FeedbackListResponse = {
   feedback?: FeedbackApiItem[];
   nextCursor?: string | null;
@@ -198,7 +198,7 @@ const BILLING_USAGE_CACHE_TTL = 5 * 60 * 1000;
 let trayOpen = false;
 
 /** Minimal ticket shape for global tray; matches StructuredFeedback. */
-type StructuredFeedback = { id: string; title: string; actionSteps: string[]; type?: string; screenshotId?: string | null; suggestedTags?: string[] };
+type StructuredFeedback = { id: string; title: string; actionSteps: string[]; type?: string; screenshotId?: string | null; suggestedTags?: string[]; pageArea?: string | null; userAgent?: string | null; viewportWidth?: number | null; viewportHeight?: number | null; devicePixelRatio?: number | null; createdAt?: string | number | null };
 type CanonicalGlobalState = {
   visible: boolean;
   expanded: boolean;
@@ -230,6 +230,7 @@ type CanonicalGlobalState = {
   feedbackLimitMessage: string | null;
   feedbackUpgradePlan: string | null;
   feedbackJobs: Array<{ id: string; status: string; createdAt: number; errorMessage?: string }>;
+  editPauseTooltipVisible: boolean;
 };
 
 const globalUIState: {
@@ -257,6 +258,7 @@ const globalUIState: {
   feedbackLimitMessage: string | null;
   feedbackUpgradePlan: string | null;
   feedbackJobs: Array<{ id: string; status: string; createdAt: number; errorMessage?: string }>;
+  editPauseTooltipVisible: boolean;
 } = {
   visible: false,
   expanded: false,
@@ -282,6 +284,7 @@ const globalUIState: {
   feedbackLimitMessage: null,
   feedbackUpgradePlan: null,
   feedbackJobs: [],
+  editPauseTooltipVisible: false,
 };
 
 function mapFeedbackToPointers(feedback: FeedbackApiItem[]): StructuredFeedback[] {
@@ -292,6 +295,12 @@ function mapFeedbackToPointers(feedback: FeedbackApiItem[]): StructuredFeedback[
     type: item.type ?? "Feedback",
     screenshotId: item.screenshotId ?? null,
     suggestedTags: item.suggestedTags ?? [],
+    pageArea: item.pageArea ?? null,
+    userAgent: item.userAgent ?? null,
+    viewportWidth: item.viewportWidth ?? null,
+    viewportHeight: item.viewportHeight ?? null,
+    devicePixelRatio: item.devicePixelRatio ?? null,
+    createdAt: item.createdAt ?? null,
   }));
 }
 
@@ -978,6 +987,7 @@ function getCanonicalGlobalState(): CanonicalGlobalState {
     feedbackLimitMessage: globalUIState.feedbackLimitMessage,
     feedbackUpgradePlan: globalUIState.feedbackUpgradePlan,
     feedbackJobs: [...globalUIState.feedbackJobs],
+    editPauseTooltipVisible: globalUIState.editPauseTooltipVisible,
   };
 }
 
@@ -1402,7 +1412,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "ECHLY_FEEDBACK_CREATED") {
-    const ticket = (request as { ticket?: { id: string; title: string; actionSteps?: string[]; type?: string; screenshotId?: string | null; suggestedTags?: string[] } }).ticket;
+    const ticket = (request as { ticket?: { id: string; title: string; actionSteps?: string[]; type?: string; screenshotId?: string | null; suggestedTags?: string[]; pageArea?: string | null; userAgent?: string | null; viewportWidth?: number | null; viewportHeight?: number | null; devicePixelRatio?: number | null; createdAt?: string | number | null } }).ticket;
     if (ticket?.id && ticket?.title) {
       const pointer: StructuredFeedback = {
         id: ticket.id,
@@ -1411,6 +1421,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         type: ticket.type ?? "Feedback",
         screenshotId: ticket.screenshotId ?? null,
         suggestedTags: ticket.suggestedTags ?? [],
+        pageArea: ticket.pageArea ?? null,
+        userAgent: ticket.userAgent ?? null,
+        viewportWidth: ticket.viewportWidth ?? null,
+        viewportHeight: ticket.viewportHeight ?? null,
+        devicePixelRatio: ticket.devicePixelRatio ?? null,
+        createdAt: ticket.createdAt ?? null,
       };
       globalUIState.pointers = [pointer, ...globalUIState.pointers];
       resetSessionIdleTimer();
@@ -1486,6 +1502,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       globalUIState.pointers = globalUIState.pointers.map((p) =>
         p.id === ticket.id
           ? {
+              ...p,
               id: ticket.id,
               title: ticket.title,
               actionSteps: ticket.actionSteps ?? [],
@@ -1643,11 +1660,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return false;
   }
 
+  if (request.type === "ECHLY_SET_EDIT_PAUSE_TOOLTIP") {
+    globalUIState.editPauseTooltipVisible = request.visible === true;
+    broadcastUIState(true);
+    if (pendingBroadcastTimer != null) {
+      clearTimeout(pendingBroadcastTimer);
+      pendingBroadcastTimer = null;
+    }
+    void flushBroadcastUIState();
+    sendResponse({ ok: true });
+    return false;
+  }
+
   if (request.type === "ECHLY_SESSION_MODE_RESUME") {
     echlyLog("BACKGROUND", "session resume broadcast");
     globalUIState.sessionModeActive = true;
     globalUIState.sessionPaused = false;
     globalUIState.sessionId = activeSessionId;
+    globalUIState.editPauseTooltipVisible = false;
     persistSessionLifecycleState();
     broadcastUIState(true);
     resetSessionIdleTimer();
@@ -1665,6 +1695,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     globalUIState.sessionModeActive = false;
     globalUIState.sessionPaused = false;
     globalUIState.sessionLoading = false;
+    globalUIState.editPauseTooltipVisible = false;
     globalUIState.totalCount = 0;
     globalUIState.openCount = 0;
     globalUIState.resolvedCount = 0;
@@ -1707,6 +1738,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     globalUIState.sessionModeActive = false;
     globalUIState.sessionPaused = false;
     globalUIState.sessionLoading = false;
+    globalUIState.editPauseTooltipVisible = false;
     globalUIState.totalCount = 0;
     globalUIState.openCount = 0;
     globalUIState.resolvedCount = 0;
@@ -1889,7 +1921,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     (async () => {
       try {
         const dataUrl = await new Promise<string>((resolve, reject) => {
-          chrome.tabs.captureVisibleTab(sender.tab!.windowId, { format: "jpeg", quality: 80 }, (result) => {
+          chrome.tabs.captureVisibleTab(sender.tab!.windowId, { format: "png" }, (result) => {
             if (chrome.runtime.lastError) {
               reject(new Error(chrome.runtime.lastError?.message ?? "Capture failed"));
               return;

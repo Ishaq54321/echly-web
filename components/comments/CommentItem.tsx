@@ -74,12 +74,21 @@ function CommentItemBase({
   const reactionButtonRef = useRef<HTMLButtonElement>(null);
   const reactionPickerRef = useRef<HTMLDivElement>(null);
 
-  const canEditDelete = comment.userId === currentUserId;
+  const isPending = comment.id.startsWith("temp-") || comment.id.startsWith("temp_");
+  const canEditDelete = comment.userId === currentUserId && !isPending;
   const showActionBar = (canEditDelete && (onUpdate || onDelete)) || Boolean(additionalMenuItems) || Boolean(onResolveToggle) || Boolean(onReactionsChanged);
 
   useEffect(() => {
     setEditDraft(comment.message);
   }, [comment.message]);
+
+  useEffect(() => {
+    if (editing && editRef.current) {
+      const el = editRef.current;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    }
+  }, [editing]);
 
   useEffect(() => {
     if (!reactionPickerOpen) return;
@@ -249,11 +258,11 @@ function CommentItemBase({
                 value={editDraft}
                 onChange={(e) => setEditDraft(e.target.value)}
                 onKeyDown={(e) => {
+                  e.stopPropagation();
                   if (e.key === "Escape") { setEditing(false); setEditDraft(comment.message); }
                   if (e.key === "Enter" && !e.shiftKey && editDraft.trim()) { e.preventDefault(); handleSaveEdit(); }
                 }}
                 className="block w-full min-h-[60px] px-3 pt-2.5 pb-10 text-[14px] leading-relaxed text-[var(--text-body)] placeholder:text-[var(--text-tertiary)] bg-transparent border-none outline-none resize-none"
-                autoFocus
               />
               <div className="absolute bottom-2 right-2 flex items-center gap-2">
                 <button
@@ -266,7 +275,7 @@ function CommentItemBase({
                 <button
                   type="button"
                   onClick={handleSaveEdit}
-                  disabled={!editDraft.trim() || editDraft.trim() === comment.message}
+                  disabled={!editDraft.trim()}
                   className="text-[12px] font-medium text-white bg-[var(--brand)] hover:bg-[var(--brand-hover)] px-3 py-1 rounded-md disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer"
                 >
                   Save

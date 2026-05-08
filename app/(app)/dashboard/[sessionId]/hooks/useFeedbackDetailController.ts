@@ -96,6 +96,7 @@ export function useFeedbackDetailController(args: {
     authUid,
     displayName,
     authPhotoUrl,
+    avatarUrl,
     isIdentityResolved,
     authReady,
   } = useWorkspace();
@@ -117,10 +118,9 @@ export function useFeedbackDetailController(args: {
   const pendingDeletedCommentIdsRef = useRef(new Set<string>());
   /** Overlay in-flight PATCH fields until success; merge uses the server list as base and would otherwise wipe local edits. */
   const pendingCommentPatchesRef = useRef(new Map<string, PendingCommentPatch>());
-  const deleteRevertSnapshotRef = useRef<{
-    comment: LocalComment;
-    index: number;
-  } | null>(null);
+  const deleteRevertSnapshotRef = useRef(
+    new Map<string, { comment: LocalComment; index: number }>()
+  );
 
   const commentThreadCounts = useMemo(
     () => threadCountsFromRoots(comments),
@@ -138,14 +138,14 @@ export function useFeedbackDetailController(args: {
   useEffect(() => {
     pendingDeletedCommentIdsRef.current.clear();
     pendingCommentPatchesRef.current.clear();
-    deleteRevertSnapshotRef.current = null;
+    deleteRevertSnapshotRef.current.clear();
   }, [sessionId, feedbackId]);
 
   useEffect(() => {
     if (authReady && !authUid?.trim()) {
       pendingDeletedCommentIdsRef.current.clear();
       pendingCommentPatchesRef.current.clear();
-      deleteRevertSnapshotRef.current = null;
+      deleteRevertSnapshotRef.current.clear();
       setComments([]);
       setLoadingComments(false);
     }
@@ -190,13 +190,13 @@ export function useFeedbackDetailController(args: {
     mentionedUserIds?: string[]
   ): Promise<string> => {
     if (!authUid || !feedbackId) return "";
-    if (!isIdentityResolved) return "";
+    if (!isIdentityResolved || !authUid?.trim()) return "";
     const trimmed = message.trim();
     if (!trimmed && !attachment && (!attachments || attachments.length === 0)) return "";
     const payload: AddCommentOptions = {
       userId: authUid,
       userName: displayName || "User",
-      userAvatar: authPhotoUrl || "",
+      userAvatar: avatarUrl || authPhotoUrl || "",
       message: trimmed,
       ...(attachments && attachments.length > 0 ? { attachments } : {}),
       ...(attachment ? { attachment } : {}),
@@ -236,7 +236,7 @@ export function useFeedbackDetailController(args: {
     const payload: AddCommentOptions = {
       userId: authUid,
       userName: displayName || "User",
-      userAvatar: authPhotoUrl || "",
+      userAvatar: avatarUrl || authPhotoUrl || "",
       message: trimmed,
       threadId,
       ...(attachments && attachments.length > 0 ? { attachments } : {}),
@@ -273,7 +273,7 @@ export function useFeedbackDetailController(args: {
     const payload: AddCommentOptions = {
       userId: authUid,
       userName: displayName || "User",
-      userAvatar: authPhotoUrl || "",
+      userAvatar: avatarUrl || authPhotoUrl || "",
       message: trimmed,
       type: "pin",
       position,
@@ -321,7 +321,7 @@ export function useFeedbackDetailController(args: {
     const payload: AddCommentOptions = {
       userId: authUid,
       userName: displayName || "User",
-      userAvatar: authPhotoUrl || "",
+      userAvatar: avatarUrl || authPhotoUrl || "",
       message: trimmed,
       type: "text",
       textRange,
@@ -486,26 +486,30 @@ export function useFeedbackDetailController(args: {
   const deleteCommentHandler = async (commentId: string) => {
     if (!isIdentityResolved) return;
 
+    if (commentId.startsWith("temp-") || commentId.startsWith("temp_")) {
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+      return;
+    }
+
     pendingDeletedCommentIdsRef.current.add(commentId);
-    deleteRevertSnapshotRef.current = null;
     setComments((prev) => {
       const idx = prev.findIndex((c) => c.id === commentId);
       if (idx === -1) {
         pendingDeletedCommentIdsRef.current.delete(commentId);
         return prev;
       }
-      deleteRevertSnapshotRef.current = { comment: prev[idx], index: idx };
+      deleteRevertSnapshotRef.current.set(commentId, { comment: prev[idx], index: idx });
       return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
     });
 
     try {
       await deleteComment(commentId);
-      deleteRevertSnapshotRef.current = null;
+      deleteRevertSnapshotRef.current.delete(commentId);
     } catch (err) {
       console.error("[ECHLY] deleteComment failed", err);
       pendingDeletedCommentIdsRef.current.delete(commentId);
-      const maybeSnap = deleteRevertSnapshotRef.current;
-      deleteRevertSnapshotRef.current = null;
+      const maybeSnap = deleteRevertSnapshotRef.current.get(commentId) ?? null;
+      deleteRevertSnapshotRef.current.delete(commentId);
       if (maybeSnap != null) {
         const { index: revertIndex, comment: revertComment } = maybeSnap;
         setComments((prev) => {

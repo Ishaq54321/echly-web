@@ -126,6 +126,7 @@ export function useCaptureWidget({
   assertIdentityBeforeWorkspaceMutations,
   feedbackLimitReached,
   triggerUpgradeShake,
+  onEditTicket,
 }: CaptureWidgetProps) {
   if (typeof window !== "undefined" && !(window as Window & { __ECHLY_CAPTURE_STATE__?: { pending: SessionFeedbackPending | null } }).__ECHLY_CAPTURE_STATE__) {
     (window as Window & { __ECHLY_CAPTURE_STATE__?: { pending: SessionFeedbackPending | null } }).__ECHLY_CAPTURE_STATE__ = {
@@ -793,8 +794,14 @@ export function useCaptureWidget({
                 {
                   getSessionPaused: () => sessionPausedRef.current,
                   onMarkerClick: (marker) => {
+                    if (marker.id.startsWith("pending-")) {
+                      setHighlightTicketId(marker.id);
+                      setExpandedId(marker.id);
+                      return;
+                    }
                     setHighlightTicketId(marker.id);
                     setExpandedId(marker.id);
+                    onEditTicket?.(marker.id);
                   },
                 }
               );
@@ -1447,14 +1454,46 @@ export function useCaptureWidget({
         fullImage = null;
       }
       let screenshot: string | undefined = undefined;
+      let safeRect: { x: number; y: number; w: number; h: number } | null = null;
+      const clickedRect = element.getBoundingClientRect();
       if (fullImage) {
+        const viewportW = window.innerWidth;
+        const viewportH = window.innerHeight;
         const containerRect = detectVisualContainer(element);
-        const safeRect = clampRect({
-          x: containerRect.x,
-          y: containerRect.y,
-          w: containerRect.width,
-          h: containerRect.height,
-        });
+
+        let cropX = containerRect.x;
+        let cropY = containerRect.y;
+        let cropW = containerRect.width;
+        let cropH = containerRect.height;
+
+        if (cropW / viewportW > 0.70 || cropH / viewportH > 0.50) {
+          const fallbackW = Math.max(200, clickedRect.width + 200);
+          const fallbackH = Math.max(150, clickedRect.height + 150);
+          cropX = clickedRect.left + clickedRect.width / 2 - fallbackW / 2;
+          cropY = clickedRect.top + clickedRect.height / 2 - fallbackH / 2;
+          cropW = fallbackW;
+          cropH = fallbackH;
+        }
+
+        const PADDING = 24;
+        cropX -= PADDING;
+        cropY -= PADDING;
+        cropW += PADDING * 2;
+        cropH += PADDING * 2;
+
+        const MIN_W = 500;
+        const MIN_H = 500;
+        if (cropW < MIN_W) {
+          cropX -= (MIN_W - cropW) / 2;
+          cropW = MIN_W;
+        }
+        if (cropH < MIN_H) {
+          cropY -= (MIN_H - cropH) / 2;
+          cropH = MIN_H;
+        }
+
+        safeRect = clampRect({ x: cropX, y: cropY, w: cropW, h: cropH });
+
         try {
           const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
           screenshot = await cropImageToRegion(fullImage, safeRect, dpr);
@@ -1463,14 +1502,18 @@ export function useCaptureWidget({
         }
       }
       const context = buildCaptureContext(window, element);
-      const rect = element.getBoundingClientRect();
+      if (context && safeRect && safeRect.w > 0 && safeRect.h > 0) {
+        const xPercent = ((clickedRect.left + clickedRect.width / 2 - safeRect.x) / safeRect.w) * 100;
+        const yPercent = ((clickedRect.top + clickedRect.height / 2 - safeRect.y) / safeRect.h) * 100;
+        context.pinPosition = { xPercent, yPercent };
+      }
       const elementRect = {
-        top: rect.top,
-        left: rect.left,
-        right: rect.right,
-        bottom: rect.bottom,
-        width: rect.width,
-        height: rect.height,
+        top: clickedRect.top,
+        left: clickedRect.left,
+        right: clickedRect.right,
+        bottom: clickedRect.bottom,
+        width: clickedRect.width,
+        height: clickedRect.height,
       };
       lastSessionClickedElementRef.current = element instanceof HTMLElement ? element : null;
       sessionFeedbackPendingRef.current = true;
@@ -1510,8 +1553,14 @@ export function useCaptureWidget({
           {
             getSessionPaused: () => sessionPausedRef.current,
             onMarkerClick: (marker) => {
+              if (marker.id.startsWith("pending-")) {
+                setHighlightTicketId(marker.id);
+                setExpandedId(marker.id);
+                return;
+              }
               setHighlightTicketId(marker.id);
               setExpandedId(marker.id);
+              onEditTicket?.(marker.id);
             },
           }
         );

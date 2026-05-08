@@ -134,6 +134,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const retryCountRef = useRef(0);
   const authUidRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
+  // UX-1: how many times we've seen the active workspace missing from the
+  // memberships list. After the first retry we escalate to switching.
+  const missingActiveRetriesRef = useRef(0);
+  // UX-1: late-bound ref for switchWorkspace — used in the memberships effect
+  // which runs before the switchWorkspace useCallback is declared.
+  const switchWorkspaceRef = useRef<((wid: string) => Promise<void>) | null>(null);
 
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
@@ -445,18 +451,35 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         if (body?.success && body.data?.memberships) {
           const list = body.data.memberships;
           setAllWorkspaces(list);
-          // If the active workspaceId isn't represented in the response, the
-          // server-side self-heal write may still be propagating. Retry once.
           const currentWid = workspaceIdRef.current;
+          // UX-1: if the user has been removed from the active workspace,
+          // redirect to a remaining workspace or onboarding so they don't
+          // sit on a blank dashboard with no error.
+          if (currentWid && list.length === 0) {
+            missingActiveRetriesRef.current = 0;
+            window.location.href = "/onboarding";
+            return;
+          }
           if (
             currentWid &&
             list.length > 0 &&
             !list.some((w) => w.workspaceId === currentWid)
           ) {
-            retryTimer = setTimeout(() => {
-              if (cancelled) return;
-              setMembershipsRefreshTick((n) => n + 1);
-            }, 1500);
+            if (missingActiveRetriesRef.current === 0) {
+              // Server self-heal write may still be propagating — retry once.
+              missingActiveRetriesRef.current += 1;
+              retryTimer = setTimeout(() => {
+                if (cancelled) return;
+                setMembershipsRefreshTick((n) => n + 1);
+              }, 1500);
+            } else {
+              // Confirmed: the user was removed from the active workspace.
+              // Switch to a remaining one (switchWorkspace navigates).
+              missingActiveRetriesRef.current = 0;
+              void switchWorkspaceRef.current?.(list[0].workspaceId);
+            }
+          } else {
+            missingActiveRetriesRef.current = 0;
           }
         }
       })
@@ -566,6 +589,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       console.error("[switchWorkspace] Error:", err);
     }
   }, [authUid]);
+
+  useEffect(() => {
+    switchWorkspaceRef.current = switchWorkspace;
+  }, [switchWorkspace]);
 
   const updateAvatarUrl = useCallback((url: string | null) => {
     setAvatarUrl(url);

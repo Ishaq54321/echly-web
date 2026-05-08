@@ -29,7 +29,7 @@ function cn(...classes: (string | false | undefined | null)[]): string {
 const PALETTE_COLORS = [
   "#000000", "#FFFFFF", "#9CA3AF", "#6B7280", "#4B5563", "#374151",
   "#EC4899", "#EF4444", "#F97316", "#F59E0B", "#EAB308", "#84CC16",
-  "#22C55E", "#10B981", "#14B8A6", "#06B6D4", "#1775E0", "#6366F1",
+  "#22C55E", "#10B981", "#14B8A6", "#06B6D4", "#5A49BF", "#6366F1",
   "#8B5CF6", "#A855F7", "#D946EF", "#F43F5E", "#FB7185", "#FCA5A5",
   "#FED7AA", "#FEF08A", "#BBF7D0", "#BAE6FD", "#C7D2FE", "#DDD6FE",
 ];
@@ -135,7 +135,7 @@ function ToolButton({ tool, activeTool, setActiveTool, icon, label }: ToolButton
         className={cn(
           "w-12 h-12 rounded-xl flex items-center justify-center transition-all",
           activeTool === tool
-            ? "bg-white text-[#1C1C1E]"
+            ? "bg-white text-[#15101F]"
             : "text-white/70 hover:text-white hover:bg-white/10"
         )}
       >
@@ -154,7 +154,7 @@ function NoFillSwatch({ active }: { active: boolean }) {
     <span
       className={cn(
         "w-5 h-5 rounded-full flex-shrink-0 relative overflow-hidden border border-white/30",
-        active && "ring-2 ring-white ring-offset-1 ring-offset-[#2C2C2E]"
+        active && "ring-2 ring-white ring-offset-1 ring-offset-[#54495F]"
       )}
     >
       <span className="absolute inset-0 bg-white" />
@@ -174,7 +174,7 @@ function NoOutlineSwatch({ active }: { active: boolean }) {
     <span
       className={cn(
         "w-5 h-5 rounded-full flex-shrink-0 relative overflow-hidden border border-white/30",
-        active && "ring-2 ring-white ring-offset-1 ring-offset-[#2C2C2E]"
+        active && "ring-2 ring-white ring-offset-1 ring-offset-[#54495F]"
       )}
     >
       <span className="absolute inset-0 bg-white" />
@@ -300,7 +300,7 @@ export function EditorToolbar({
 
   if (activeTool === "crop") {
     return (
-      <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 bg-[#1C1C1E] rounded-2xl shadow-2xl border border-white/10">
+      <div className="fixed bottom-[60px] left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 bg-[#15101F] rounded-2xl shadow-2xl border border-white/10">
         <button
           type="button"
           onClick={onApplyCrop}
@@ -328,7 +328,7 @@ export function EditorToolbar({
       {shapesMenuOpen && (
         <div
           ref={shapesMenuRef}
-          className="fixed bottom-[8.5rem] left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-4 py-3 bg-[#1C1C1E] rounded-2xl shadow-xl border border-white/10 z-50"
+          className="fixed bottom-[9.75rem] left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-4 py-3 bg-[#15101F] rounded-2xl shadow-xl border border-white/10 z-50"
         >
           <ToolButton tool="rect" activeTool={activeTool} setActiveTool={setActiveTool} label="Rectangle" icon={<Square {...iconProps} />} />
           <ToolButton tool="ellipse" activeTool={activeTool} setActiveTool={setActiveTool} label="Ellipse" icon={<Circle {...iconProps} />} />
@@ -356,7 +356,7 @@ export function EditorToolbar({
               <ChevronDown className="h-3 w-3" />
             </button>
             {fillPickerOpen && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-5 bg-[#2C2C2E] border border-white/10 rounded-2xl p-5 shadow-2xl z-[60] w-[360px]">
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-5 bg-[#54495F] border border-white/10 rounded-2xl p-5 shadow-2xl z-[60] w-[360px]">
                 <p className="text-white/50 text-[14px] font-semibold tracking-wider uppercase mb-2">Colors</p>
                 <button
                   onClick={() => { onFillColorChange("transparent"); setFillPickerOpen(false); }}
@@ -373,7 +373,7 @@ export function EditorToolbar({
                       onClick={() => { onFillColorChange(c); setFillPickerOpen(false); }}
                       className={cn(
                         "w-8 h-8 rounded-full hover:scale-110 transition-transform",
-                        fillColor === c && "ring-2 ring-white ring-offset-1 ring-offset-[#2C2C2E]"
+                        fillColor === c && "ring-2 ring-white ring-offset-1 ring-offset-[#54495F]"
                       )}
                       style={{ background: c }}
                     />
@@ -406,7 +406,7 @@ export function EditorToolbar({
               <ChevronDown className="h-3 w-3" />
             </button>
             {outlinePickerOpen && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-5 bg-[#2C2C2E] border border-white/10 rounded-2xl p-5 shadow-2xl z-[60] w-[380px]">
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-5 bg-[#54495F] border border-white/10 rounded-2xl p-5 shadow-2xl z-[60] w-[380px]">
                 <p className="text-white/50 text-[14px] font-semibold tracking-wider uppercase mb-2">Colors</p>
                 <button
                   onClick={() => { onOutlineColorChange("transparent"); setOutlinePickerOpen(false); }}
@@ -423,7 +423,7 @@ export function EditorToolbar({
                       onClick={() => { onOutlineColorChange(c); setOutlinePickerOpen(false); }}
                       className={cn(
                         "w-8 h-8 rounded-full hover:scale-110 transition-transform",
-                        outlineColor === c && "ring-2 ring-white ring-offset-1 ring-offset-[#2C2C2E]"
+                        outlineColor === c && "ring-2 ring-white ring-offset-1 ring-offset-[#54495F]"
                       )}
                       style={{ background: c }}
                     />
@@ -446,7 +446,7 @@ export function EditorToolbar({
       )}
 
       {/* Main toolbar pill */}
-      <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 px-4 py-3.5 bg-[#1C1C1E] rounded-2xl shadow-2xl border border-white/10">
+      <div className="fixed bottom-[60px] left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 px-4 py-3.5 bg-[#15101F] rounded-2xl shadow-2xl border border-white/10">
         <ToolButton tool="select" activeTool={activeTool} setActiveTool={setActiveTool} label="Select" icon={<MousePointer2 {...iconProps} />} />
 
         {/* Pen tool with Draw popover on second click */}
@@ -466,7 +466,7 @@ export function EditorToolbar({
             icon={<Pencil {...iconProps} />}
           />
           {drawPopoverOpen && (
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-5 w-[400px] bg-[#2C2C2E] rounded-2xl p-5 shadow-2xl border border-white/10 z-[60]">
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-5 w-[400px] bg-[#54495F] rounded-2xl p-5 shadow-2xl border border-white/10 z-[60]">
               <p className="text-white/50 text-[14px] font-semibold tracking-wider uppercase mb-3">Colors</p>
               <div className="grid grid-cols-6 gap-2.5 mb-4">
                 {PALETTE_COLORS.map(c => (
@@ -476,7 +476,7 @@ export function EditorToolbar({
                     onClick={() => { onColorChange(c); setDrawPopoverOpen(false); }}
                     className={cn(
                       "w-10 h-10 rounded-full cursor-pointer hover:scale-110 transition-transform",
-                      color === c && "ring-2 ring-white ring-offset-2 ring-offset-[#2C2C2E]"
+                      color === c && "ring-2 ring-white ring-offset-2 ring-offset-[#54495F]"
                     )}
                     style={{ background: c }}
                   />
@@ -506,7 +506,7 @@ export function EditorToolbar({
             className={cn(
               "w-12 h-12 rounded-xl flex items-center justify-center transition-all",
               isShapeActive || shapesMenuOpen
-                ? "bg-white text-[#1C1C1E]"
+                ? "bg-white text-[#15101F]"
                 : "text-white/70 hover:text-white hover:bg-white/10"
             )}
           >

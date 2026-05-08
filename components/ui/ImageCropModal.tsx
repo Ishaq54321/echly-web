@@ -376,7 +376,7 @@ export function ImageCropModal({
                 setImgY(clamped.y);
               }
             }}
-            style={{ flex: 1, accentColor: "#1775E0" }}
+            style={{ flex: 1, accentColor: "#5A49BF" }}
           />
         </div>
 
@@ -415,7 +415,7 @@ export function ImageCropModal({
               height: 40,
               borderRadius: 10,
               border: "none",
-              background: "#1775E0",
+              background: "#5A49BF",
               color: "white",
               fontSize: 14,
               fontWeight: 600,

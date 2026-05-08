@@ -47,7 +47,7 @@ export default function ChatGPTWaveform({ analyser }: ChatGPTWaveformProps) {
   const barCountRef = useRef(110);
   const cssWidthRef = useRef(0);
   const cssHeightRef = useRef(CANVAS_HEIGHT);
-  const fillColorRef = useRef("rgba(23, 117, 224, 0.6)");
+  const fillColorRef = useRef("rgba(90, 73, 191, 0.6)");
 
   // Resize observer to handle DPR + container width
   useEffect(() => {
@@ -90,7 +90,7 @@ export default function ChatGPTWaveform({ analyser }: ChatGPTWaveformProps) {
     const fill =
       style.getPropertyValue("--echly-waveform-fill").trim() ||
       style.getPropertyValue("--color-primary").trim() ||
-      "rgba(23, 117, 224, 0.6)";
+      "rgba(90, 73, 191, 0.6)";
     fillColorRef.current = fill;
   }, [analyser]);
 

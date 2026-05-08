@@ -4,14 +4,14 @@
    styles/tokens.css (--brand, --hair, --hair-strong, etc).
    ============================================================= */
 .ob-host {
-  --ob-brand: #1775E0;
+  --ob-brand: #5A49BF;
   --ob-brand-soft: #EAF2FD;
   --ob-brand-tint: #F5F9FE;
-  --ob-brand-ink: #0F5BB5;
-  --ob-ink: #1C1917;
-  --ob-body: #44403C;
-  --ob-muted: #78716C;
-  --ob-soft: #A8A29E;
+  --ob-brand-ink: #3D2F73;
+  --ob-ink: #15101F;
+  --ob-body: #54495F;
+  --ob-muted: #8A8096;
+  --ob-soft: #B5AEBE;
   --ob-hair: #EFEBE6;
   --ob-hair-strong: #E5E0D9;
   --ob-bg: #F6F3EE;
@@ -205,7 +205,7 @@
 .ob-input:focus {
   border-color: var(--ob-brand);
   background: #fff;
-  box-shadow: 0 0 0 4px rgba(23, 117, 224, 0.10);
+  box-shadow: 0 0 0 4px rgba(90, 73, 191, 0.10);
 }
 
 .ob-helper {
@@ -259,7 +259,7 @@
   color: var(--ob-muted);
   background: transparent;
 }
-.ob-btn-ghost:hover { color: var(--ob-ink); background: #F4F1EC; }
+.ob-btn-ghost:hover { color: var(--ob-ink); background: #FAFAF7; }
 .ob-btn-secondary {
   background: #fff;
   color: var(--ob-ink);
@@ -294,7 +294,7 @@
   cursor: pointer;
   font-family: inherit;
 }
-.ob-back:hover { color: var(--ob-ink); background: #F4F1EC; }
+.ob-back:hover { color: var(--ob-ink); background: #FAFAF7; }
 .ob-kbd-hint {
   display: inline-flex;
   align-items: center;
@@ -307,7 +307,7 @@
   font-size: 10px;
   padding: 2px 5px;
   border-radius: 4px;
-  background: #F4F1EC;
+  background: #FAFAF7;
   color: var(--ob-muted);
   border: 1px solid var(--ob-hair);
   line-height: 1;
@@ -319,8 +319,8 @@
   inset: 0;
   overflow: hidden;
   background:
-    radial-gradient(1200px 600px at 110% 20%, rgba(23, 117, 224, 0.07), transparent 60%),
-    radial-gradient(900px 500px at -10% 110%, rgba(23, 117, 224, 0.05), transparent 65%),
+    radial-gradient(1200px 600px at 110% 20%, rgba(90, 73, 191, 0.07), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(90, 73, 191, 0.05), transparent 65%),
     var(--ob-bg);
 }
 .ob-stage::before {
@@ -403,7 +403,7 @@
 .ob-role-chip.active {
   border-color: var(--ob-brand);
   background: var(--ob-brand-tint);
-  box-shadow: 0 0 0 3px rgba(23, 117, 224, 0.10);
+  box-shadow: 0 0 0 3px rgba(90, 73, 191, 0.10);
 }
 .ob-role-chip.active .role-ico,
 .ob-role-chip.active .role-name { color: var(--ob-brand-ink); }
@@ -445,7 +445,7 @@
   overflow: hidden;
 }
 .ob-avatar-slot.has-photo {
-  background: linear-gradient(135deg, #1775E0, #0F5BB5);
+  background: linear-gradient(135deg, #5A49BF, #3D2F73);
   color: #fff;
   border: 0;
 }
@@ -482,7 +482,7 @@
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #1775E0, #0F5BB5);
+  background: linear-gradient(135deg, #5A49BF, #3D2F73);
   color: #fff;
   display: grid;
   place-items: center;
@@ -703,7 +703,7 @@
 .ob-email-chips:focus-within {
   border-color: var(--ob-brand);
   background: #fff;
-  box-shadow: 0 0 0 4px rgba(23, 117, 224, 0.10);
+  box-shadow: 0 0 0 4px rgba(90, 73, 191, 0.10);
 }
 .ob-email-chip {
   display: inline-flex;
@@ -776,7 +776,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: #F4F1EC;
+  background: #FAFAF7;
   border-bottom: 1px solid var(--ob-hair);
 }
 .ob-bb-dots { display: inline-flex; gap: 5px; }
@@ -814,7 +814,7 @@
   box-shadow:
     0 0 0 2px #fff,
     0 0 0 3px var(--ob-brand-soft),
-    0 0 0 6px rgba(23, 117, 224, 0.18);
+    0 0 0 6px rgba(90, 73, 191, 0.18);
   animation: ob-ext-pulse 2.4s ease-out infinite;
   position: relative;
 }
@@ -823,13 +823,13 @@
     box-shadow:
       0 0 0 2px #fff,
       0 0 0 3px var(--ob-brand-soft),
-      0 0 0 6px rgba(23, 117, 224, 0.18);
+      0 0 0 6px rgba(90, 73, 191, 0.18);
   }
   50% {
     box-shadow:
       0 0 0 2px #fff,
       0 0 0 3px var(--ob-brand-soft),
-      0 0 0 12px rgba(23, 117, 224, 0.04);
+      0 0 0 12px rgba(90, 73, 191, 0.04);
   }
 }
 .ob-browser-page {
@@ -859,7 +859,7 @@
   content: "";
   position: absolute;
   inset: 12px;
-  border: 1px dashed rgba(23, 117, 224, 0.25);
+  border: 1px dashed rgba(90, 73, 191, 0.25);
   border-radius: 4px;
 }
 .ob-ph-grid {
@@ -902,7 +902,7 @@
 .ob-capture-box {
   position: absolute;
   border: 2px solid var(--ob-brand);
-  background: rgba(23, 117, 224, 0.08);
+  background: rgba(90, 73, 191, 0.08);
   border-radius: 4px;
   box-shadow: 0 0 0 9999px rgba(28, 25, 23, 0.04);
 }

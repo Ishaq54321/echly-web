@@ -141,7 +141,7 @@ export default function EmptyDashboardCarousel() {
               </div>
               <h2 className={styles.slideTitle}>Click. Speak. Done.</h2>
               <p className={styles.lede}>
-                Tap anywhere on the page, describe the issue by voice or text — Echly&apos;s
+                Tap anywhere on the page, describe the issue by voice or text — Annote&apos;s
                 AI turns it into a detailed ticket automatically.
               </p>
               <CtaRow cta={cta} />
@@ -393,7 +393,7 @@ function CaptureIllustration() {
         </h4>
         <div className={styles.c1TicketMeta}>
           <span className={styles.c1Chip}>
-            <span className={styles.c1Cdot} style={{ background: "#1775E0" }} />
+            <span className={styles.c1Cdot} style={{ background: "#5A49BF" }} />
             Checkout
           </span>
           <span className={styles.c1Chip}>
@@ -469,9 +469,9 @@ function ShareIllustration() {
       >
         <defs>
           <linearGradient id="rayGrad" x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0%" stopColor="#1775E0" stopOpacity="0" />
-            <stop offset="40%" stopColor="#1775E0" stopOpacity="0.5" />
-            <stop offset="100%" stopColor="#1775E0" stopOpacity="0" />
+            <stop offset="0%" stopColor="#5A49BF" stopOpacity="0" />
+            <stop offset="40%" stopColor="#5A49BF" stopOpacity="0.5" />
+            <stop offset="100%" stopColor="#5A49BF" stopOpacity="0" />
           </linearGradient>
         </defs>
         <path
@@ -521,10 +521,10 @@ function ShareIllustration() {
               width="11"
               height="9"
               rx="2"
-              stroke="#1775E0"
+              stroke="#5A49BF"
               strokeWidth="1.5"
             />
-            <path d="M2.5 6.5h11" stroke="#1775E0" strokeWidth="1.5" />
+            <path d="M2.5 6.5h11" stroke="#5A49BF" strokeWidth="1.5" />
           </svg>
           <span className={styles.c2SessionTtl}>Checkout v2 — feedback</span>
           <span className={styles.c2Stack}>
@@ -561,10 +561,10 @@ function ShareIllustration() {
         </div>
         <div className={styles.c2SessionFoot}>
           <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
-            <circle cx="8" cy="8" r="6" stroke="#78716C" strokeWidth="1.4" />
+            <circle cx="8" cy="8" r="6" stroke="#54495F" strokeWidth="1.4" />
             <path
               d="M5 8l2 2 4-4"
-              stroke="#78716C"
+              stroke="#54495F"
               strokeWidth="1.4"
               strokeLinecap="round"
               strokeLinejoin="round"

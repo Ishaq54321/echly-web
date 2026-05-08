@@ -59,14 +59,14 @@ export function GlobalNavBar() {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-[56px] w-full bg-[var(--layer-1-bg)] border-b border-[var(--layer-1-border)] shadow-[var(--shadow-level-1)] flex items-center justify-between px-6">
-      <Link href="/dashboard" className="flex items-center cursor-pointer hover:underline" aria-label="Echly home">
+      <Link href="/dashboard" className="flex items-center cursor-pointer hover:underline" aria-label="Annote home">
         <Image
-          src="/Echly_logo.svg"
-          alt="Echly"
-          width={28}
-          height={26}
-          sizes="28px"
-          className="h-[26px] w-auto"
+          src="/annote-logo-icon.svg"
+          alt="Annote"
+          width={19}
+          height={23}
+          sizes="19px"
+          className="h-[23px] w-auto"
         />
       </Link>
 

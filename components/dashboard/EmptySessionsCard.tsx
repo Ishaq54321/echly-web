@@ -47,7 +47,7 @@ export default function EmptySessionsCard() {
           </div>
           {showFallbackHint && (
             <p className="mt-3 text-[14px] text-[var(--text-tertiary)]" role="status" aria-live="polite">
-              Click the Echly extension in your browser toolbar
+              Click the Annote extension in your browser toolbar
             </p>
           )}
         </div>
@@ -56,7 +56,7 @@ export default function EmptySessionsCard() {
         <div className="flex-1 min-w-0 flex items-center justify-center">
           <Image
             src="/illustrations/Welcome_Card.png"
-            alt="Echly product preview"
+            alt="Annote product preview"
             width={408}
             height={306}
             className="w-[50%] h-auto object-contain"

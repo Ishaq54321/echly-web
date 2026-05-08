@@ -186,7 +186,7 @@ export function WorkspaceStep({ initialName, initialLogoUrl, initialLogoFile, on
                   logoUrl
                     ? {}
                     : !name.trim()
-                    ? { background: "#F4F1EC", color: "var(--ob-soft)" }
+                    ? { background: "#FAFAF7", color: "var(--ob-soft)" }
                     : {}
                 }
               >
@@ -302,7 +302,7 @@ export function WorkspaceStep({ initialName, initialLogoUrl, initialLogoFile, on
               style={
                 logoUrl
                   ? {}
-                  : { background: "#F4F1EC", color: "var(--ob-soft)", border: "1px dashed var(--ob-hair-strong)" }
+                  : { background: "#FAFAF7", color: "var(--ob-soft)", border: "1px dashed var(--ob-hair-strong)" }
               }
             >
               {logoUrl ? <img src={logoUrl} alt="" /> : <ObIcon.Upload size={16} />}

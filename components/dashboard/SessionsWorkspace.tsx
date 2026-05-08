@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { getAvatarColor } from "@/lib/utils/getAvatarColor";
 import {
@@ -91,7 +91,7 @@ function formatSessionDateShort(session: Session): string {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(ms);
 }
 
-export function SessionWorkspaceRow({
+export const SessionWorkspaceRow = memo(function SessionWorkspaceRow({
   item,
   onView,
   onRenameSuccess,
@@ -393,7 +393,7 @@ export function SessionWorkspaceRow({
               type="button"
               disabled={isOptimistic || copyLinkBusy}
               onClick={handleCopyLinkClick}
-              className="w-[38px] h-[38px] rounded-[var(--radius-btn)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30 disabled:opacity-50 disabled:pointer-events-none"
+              className="w-[38px] h-[38px] rounded-[var(--radius-btn)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5A49BF]/30 disabled:opacity-50 disabled:pointer-events-none"
               aria-label={
                 copyLinkBusy ? "Generating link…" : copied ? "Copied" : "Copy link"
               }
@@ -420,7 +420,7 @@ export function SessionWorkspaceRow({
                     e.stopPropagation();
                     onLeaveSession?.(session.id);
                   }}
-                  className="w-[38px] h-[38px] rounded-[var(--radius-btn)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30"
+                  className="w-[38px] h-[38px] rounded-[var(--radius-btn)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5A49BF]/30"
                   aria-label="Leave session"
                 >
                   <LogOut className="h-5 w-5" strokeWidth={2.5} aria-hidden />
@@ -437,7 +437,7 @@ export function SessionWorkspaceRow({
                 variant="list"
                 flipPlacement
                 disabled={isOptimistic}
-                triggerClassName="w-8 h-8 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1775E0]/30"
+                triggerClassName="w-8 h-8 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5A49BF]/30"
                 triggerIconClassName="h-5 w-5"
                 triggerAriaLabel="Session actions"
               />
@@ -446,6 +446,87 @@ export function SessionWorkspaceRow({
         </div>
       </div>
     </>
+  );
+});
+
+interface ShareModalForSessionProps {
+  session: Session;
+  onClose: () => void;
+  authUid: string | null;
+}
+
+function ShareModalForSession({ session, onClose, authUid }: ShareModalForSessionProps) {
+  const share = useShareController(session.id, {
+    initialGeneralAccess: session.generalAccess as ShareGeneralAccess | undefined,
+  });
+  const { setOpen, load } = share;
+
+  useEffect(() => {
+    setOpen(true);
+  }, [setOpen]);
+
+  useEffect(() => {
+    if (!share.open) return;
+    void load().catch(() => {});
+  }, [share.open, load]);
+
+  const handleClose = useCallback(() => {
+    setOpen(false);
+    onClose();
+  }, [setOpen, onClose]);
+
+  if (!share.open) return null;
+
+  return (
+    <ShareModal
+      open
+      onClose={handleClose}
+      canManageShare
+      canManageAccess
+      isWorkspaceMember
+      sessionId={session.id}
+      sessionName={session.title ?? null}
+      inviteEmail={share.inviteEmail}
+      setInviteEmail={share.setInviteEmail}
+      inviteAccess={share.inviteAccess}
+      setInviteAccess={share.setInviteAccess}
+      generalAccess={share.generalAccess}
+      updatingGeneralAccess={share.updatingGeneralAccess}
+      items={share.items}
+      initialLoading={share.initialLoading}
+      inviting={share.inviting}
+      updatingId={share.updatingId}
+      removingId={share.removingId}
+      inviteError={share.inviteError}
+      listError={share.listError}
+      onInvite={() => {
+        void share.invite().catch(() => {});
+      }}
+      onUpdateGeneralAccess={(value) => {
+        void share.updateGeneralAccess(value).catch(() => {});
+      }}
+      onUpdateRole={(item, access) => {
+        void share.updateRole(item, access).catch(() => {});
+      }}
+      onRemove={(item) => {
+        void share.removeAccess(item).catch(() => {});
+      }}
+      accessRequests={share.accessRequests}
+      patchingAccessRequestId={share.patchingAccessRequestId}
+      onApproveAccessRequest={(id, access) => {
+        void share.patchAccessRequest(id, "approve", access).catch(() => {});
+      }}
+      onRejectAccessRequest={(id) => {
+        void share.patchAccessRequest(id, "reject").catch(() => {});
+      }}
+      canResolve
+      linkCopied={share.linkCopied}
+      onCopyShareLink={() => void share.copyShareLink().catch(() => {})}
+      refetchingAfterApproval={share.refetchingAfterApproval}
+      workspaceMembers={share.workspaceMembers}
+      loadingWorkspaceMembers={share.loadingWorkspaceMembers}
+      currentUserUid={authUid ?? undefined}
+    />
   );
 }
 
@@ -463,27 +544,15 @@ export function SessionsWorkspace({
   const { setSearch } = useSessionsSearch();
   const [internalViewMode, setInternalViewMode] = useState<"list" | "grid">("list");
   const [shareSession, setShareSession] = useState<Session | null>(null);
-  const share = useShareController(shareSession?.id ?? "", {
-    initialGeneralAccess: shareSession?.generalAccess as ShareGeneralAccess | undefined,
-  });
 
-  const handleRequestShare = useCallback(
-    (session: Session) => {
-      setShareSession(session);
-      share.setOpen(true);
-    },
-    [share]
-  );
+  const handleRequestShare = useCallback((session: Session) => {
+    setShareSession(session);
+  }, []);
 
   const handleCloseShare = useCallback(() => {
-    share.setOpen(false);
     setShareSession(null);
-  }, [share]);
+  }, []);
 
-  useEffect(() => {
-    if (!share.open) return;
-    void share.load().catch(() => {});
-  }, [share.open, share.load]);
   const isControlled = viewModeProp !== undefined && typeof onViewModeChange === "function";
   const viewMode = isControlled ? viewModeProp! : internalViewMode;
   const setViewMode = isControlled ? onViewModeChange! : setInternalViewMode;
@@ -692,7 +761,7 @@ export function SessionsWorkspace({
         >
           <div
             className={[
-              "flex items-center justify-between bg-[#1C1C1E] text-white px-5 py-3 rounded-xl shadow-2xl backdrop-blur-sm min-w-[420px] max-w-[600px]",
+              "flex items-center justify-between bg-[#15101F] text-white px-5 py-3 rounded-xl shadow-2xl backdrop-blur-sm min-w-[420px] max-w-[600px]",
               "select-none",
             ].join(" ")}
           >
@@ -789,55 +858,11 @@ export function SessionsWorkspace({
         </Modal>
       ) : null}
 
-      {share.open && shareSession ? (
-        <ShareModal
-          open
+      {shareSession ? (
+        <ShareModalForSession
+          session={shareSession}
           onClose={handleCloseShare}
-          canManageShare
-          canManageAccess
-          isWorkspaceMember
-          sessionId={shareSession.id}
-          sessionName={shareSession.title ?? null}
-          inviteEmail={share.inviteEmail}
-          setInviteEmail={share.setInviteEmail}
-          inviteAccess={share.inviteAccess}
-          setInviteAccess={share.setInviteAccess}
-          generalAccess={share.generalAccess}
-          updatingGeneralAccess={share.updatingGeneralAccess}
-          items={share.items}
-          initialLoading={share.initialLoading}
-          inviting={share.inviting}
-          updatingId={share.updatingId}
-          removingId={share.removingId}
-          inviteError={share.inviteError}
-          listError={share.listError}
-          onInvite={() => {
-            void share.invite().catch(() => {});
-          }}
-          onUpdateGeneralAccess={(value) => {
-            void share.updateGeneralAccess(value).catch(() => {});
-          }}
-          onUpdateRole={(item, access) => {
-            void share.updateRole(item, access).catch(() => {});
-          }}
-          onRemove={(item) => {
-            void share.removeAccess(item).catch(() => {});
-          }}
-          accessRequests={share.accessRequests}
-          patchingAccessRequestId={share.patchingAccessRequestId}
-          onApproveAccessRequest={(id, access) => {
-            void share.patchAccessRequest(id, "approve", access).catch(() => {});
-          }}
-          onRejectAccessRequest={(id) => {
-            void share.patchAccessRequest(id, "reject").catch(() => {});
-          }}
-          canResolve
-          linkCopied={share.linkCopied}
-          onCopyShareLink={() => void share.copyShareLink().catch(() => {})}
-          refetchingAfterApproval={share.refetchingAfterApproval}
-          workspaceMembers={share.workspaceMembers}
-          loadingWorkspaceMembers={share.loadingWorkspaceMembers}
-          currentUserUid={authUid ?? undefined}
+          authUid={authUid ?? null}
         />
       ) : null}
     </div>

@@ -13,6 +13,7 @@ type ModeSelectionViewProps = {
   theme?: "light" | "dark";
   onThemeToggle?: () => void;
   isStarting?: boolean;
+  logoUrl?: string;
 };
 
 export default function ModeSelectionView({
@@ -23,6 +24,7 @@ export default function ModeSelectionView({
   onClose,
   pageUrl,
   isStarting = false,
+  logoUrl,
 }: ModeSelectionViewProps) {
   const rawUrl = pageUrl ?? (typeof window !== "undefined" ? window.location.href : "");
   let host = "";
@@ -50,10 +52,18 @@ export default function ModeSelectionView({
 
       {/* Header */}
       <div className="pill-head">
-        <span className="pill-mark">E</span>
-        <div className="pill-ws">
-          <span className="pill-ws-name">Echly</span>
-        </div>
+        <span className="pill-mark pill-mark-logo">
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt="Annote"
+              style={{ width: 24, height: 30, objectFit: "contain", display: "block" }}
+            />
+          ) : (
+            "A"
+          )}
+        </span>
+        <div className="pill-ws" />
         <div className="tl-icon-group">
           <button
             type="button"
@@ -95,7 +105,7 @@ export default function ModeSelectionView({
       <div className="mode-prompt">
         <span className="mode-prompt-eyebrow">
           <span className="ai-dot" aria-hidden />
-          {" "}Echly AI
+          {" "}Annote AI
         </span>
         <div className="mode-prompt-title">How do you want to give feedback?</div>
         <div className="mode-prompt-sub">Describe what needs to change — AI structures it into tickets.</div>
@@ -174,7 +184,7 @@ export default function ModeSelectionView({
         <button
           type="button"
           className="begin-btn"
-          style={{ backgroundColor: "#1775E0" }}
+          style={{ backgroundColor: "#5A49BF" }}
           onClick={onBegin}
           disabled={isStarting}
         >

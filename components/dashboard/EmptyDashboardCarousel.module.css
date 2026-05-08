@@ -3,14 +3,14 @@
 }
 
 .carousel {
-  --brand: #1775E0;
+  --brand: #5A49BF;
   --brand-soft: #EAF2FD;
   --brand-tint: #F5F9FE;
-  --brand-ink: #0F5BB5;
-  --ink: #1C1917;
-  --body: #44403C;
-  --muted: #78716C;
-  --soft: #A8A29E;
+  --brand-ink: #3D2F73;
+  --ink: #15101F;
+  --body: #54495F;
+  --muted: #54495F;
+  --soft: #8A8096;
   --hair: #EFEBE6;
   --hair-strong: #E5E0D9;
   --good: #15803D;
@@ -131,7 +131,7 @@
   font-family: inherit;
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.18) inset,
-    0 6px 14px -6px rgba(23, 117, 224, 0.55),
+    0 6px 14px -6px rgba(90, 73, 191, 0.55),
     0 1px 2px rgba(15, 91, 181, 0.18);
   transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
 }
@@ -141,7 +141,7 @@
   transform: translateY(-1px);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.18) inset,
-    0 10px 20px -8px rgba(23, 117, 224, 0.6),
+    0 10px 20px -8px rgba(90, 73, 191, 0.6),
     0 1px 2px rgba(15, 91, 181, 0.2);
 }
 
@@ -193,7 +193,7 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(60% 80% at 70% 50%, rgba(23, 117, 224, 0.04), transparent 70%),
+    radial-gradient(60% 80% at 70% 50%, rgba(90, 73, 191, 0.04), transparent 70%),
     linear-gradient(135deg, #FBFAF7 0%, #F4F0E8 100%);
   z-index: 0;
 }
@@ -267,7 +267,7 @@
   top: 0;
   bottom: 0;
   width: 0;
-  background: #A8A29E;
+  background: #8A8096;
   border-radius: 999px;
   transition: width 0.15s linear;
 }
@@ -426,7 +426,7 @@
   width: 110px;
   height: 68px;
   border: 1.5px dashed var(--brand);
-  background: rgba(23, 117, 224, 0.08);
+  background: rgba(90, 73, 191, 0.08);
   border-radius: 4px;
   box-shadow: 0 0 0 9999px rgba(28, 25, 23, 0.32);
   animation: selectPulse 3.2s ease-in-out infinite;
@@ -483,9 +483,9 @@
   display: grid;
   place-items: center;
   box-shadow:
-    0 8px 18px -6px rgba(23, 117, 224, 0.55),
-    0 0 0 6px rgba(23, 117, 224, 0.14),
-    0 0 0 14px rgba(23, 117, 224, 0.05);
+    0 8px 18px -6px rgba(90, 73, 191, 0.55),
+    0 0 0 6px rgba(90, 73, 191, 0.14),
+    0 0 0 14px rgba(90, 73, 191, 0.05);
   z-index: 4;
 }
 
@@ -626,7 +626,7 @@
   height: 18px;
   padding: 0 7px;
   border-radius: 999px;
-  background: #F4F1EC;
+  background: #FAFAF7;
   border: 1px solid var(--hair);
   font-size: 9.5px;
   color: var(--body);
@@ -656,7 +656,7 @@
   width: 30%;
   height: 38%;
   border: 1.2px dashed var(--brand);
-  background: rgba(23, 117, 224, 0.12);
+  background: rgba(90, 73, 191, 0.12);
   border-radius: 2px;
 }
 
@@ -670,7 +670,7 @@
   display: grid;
   place-items: center;
   color: #fff;
-  box-shadow: 0 6px 14px -4px rgba(23, 117, 224, 0.5);
+  box-shadow: 0 6px 14px -4px rgba(90, 73, 191, 0.5);
 }
 
 .aiBadgeC1 {
@@ -912,7 +912,7 @@
   align-items: center;
   gap: 6px;
   box-shadow:
-    0 6px 14px -6px rgba(23, 117, 224, 0.3),
+    0 6px 14px -6px rgba(90, 73, 191, 0.3),
     0 1px 3px rgba(28, 25, 23, 0.06);
   animation: bob 3.4s ease-in-out infinite;
 }
@@ -1084,7 +1084,7 @@
 
 .c3MsgMine .c3Mention {
   color: var(--brand-ink);
-  background: rgba(23, 117, 224, 0.18);
+  background: rgba(90, 73, 191, 0.18);
 }
 
 .c3MsgMine .c3MsgTime {
@@ -1094,7 +1094,7 @@
 .c3InlineCode {
   font-family: var(--mono);
   font-size: 9.5px;
-  background: #F4F1EC;
+  background: #FAFAF7;
   padding: 0 3px;
   border-radius: 3px;
 }
@@ -1147,7 +1147,7 @@
 }
 
 .c3TeamAvMore {
-  background: #F4F1EC;
+  background: #FAFAF7;
   color: var(--muted);
   box-shadow: 0 0 0 1px var(--hair-strong);
 }
@@ -1188,7 +1188,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  box-shadow: 0 8px 18px -8px rgba(23, 117, 224, 0.5);
+  box-shadow: 0 8px 18px -8px rgba(90, 73, 191, 0.5);
   animation: slideIn 4s ease-in-out infinite;
 }
 
@@ -1223,7 +1223,7 @@
   background: linear-gradient(135deg, #6D49C9, #4F2EA8);
 }
 .avB {
-  background: linear-gradient(135deg, #1775E0, #0F5BB5);
+  background: linear-gradient(135deg, #5A49BF, #3D2F73);
 }
 .avC {
   background: linear-gradient(135deg, #C2410C, #9A2F03);

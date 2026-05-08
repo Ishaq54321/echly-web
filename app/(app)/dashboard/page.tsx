@@ -26,7 +26,10 @@ import {
 } from "@/lib/utils/sessionTimeRange";
 import type { SessionsTimeRange } from "@/lib/utils/sessionTimeRange";
 import { useSessionsSearch } from "@/components/dashboard/context/SessionsSearchContext";
-import EmptyDashboardCarousel from "@/components/dashboard/EmptyDashboardCarousel";
+const EmptyDashboardCarousel = dynamic(
+  () => import("@/components/dashboard/EmptyDashboardCarousel"),
+  { ssr: false }
+);
 import { ArchiveEmptyState } from "@/components/empty/ArchiveEmptyState";
 import { ToastProvider, useToast } from "@/components/dashboard/context/ToastContext";
 import { SessionsSearchProvider } from "@/components/dashboard/context/SessionsSearchContext";
@@ -141,18 +144,27 @@ function DashboardContent() {
 
   const confirmLeaveSession = useCallback(async () => {
     if (!leaveModalSessionId) return;
-    const res = await authFetch(
-      `/api/sessions/shared/${leaveModalSessionId}`,
-      { method: "DELETE" }
-    );
-    if (!res || !res.ok) {
-      throw new Error("Failed to leave session");
-    }
-    setSharedSessions((prev) =>
-      prev.filter((s) => s.sessionId !== leaveModalSessionId)
-    );
+    const sessionId = leaveModalSessionId;
+    const removed = sharedSessions.find((s) => s.sessionId === sessionId);
+
+    setSharedSessions((prev) => prev.filter((s) => s.sessionId !== sessionId));
+    setLeaveModalSessionId(null);
     showToast("You left the session");
-  }, [leaveModalSessionId, showToast]);
+
+    void (async () => {
+      try {
+        const res = await authFetch(`/api/sessions/shared/${sessionId}`, {
+          method: "DELETE",
+        });
+        if (!res || !res.ok) throw new Error("Failed to leave session");
+      } catch {
+        if (removed) {
+          setSharedSessions((prev) => [...prev, removed]);
+        }
+        showToast("Couldn't leave the session");
+      }
+    })();
+  }, [leaveModalSessionId, sharedSessions, showToast]);
 
   const handleViewShared = useCallback(
     (sessionId: string) => {
@@ -218,9 +230,20 @@ function DashboardContent() {
     [tabFilteredSessions]
   );
 
-  const handleView = (sessionId: string) => {
+  const handleView = useCallback((sessionId: string) => {
     router.push(`${SESSION_FEEDBACK_PATH}/${sessionId}`);
-  };
+  }, [router]);
+
+  const handleRenameSuccess = useCallback(
+    (session: { id: string; title: string; updatedAt?: unknown }) => {
+      updateSession(session.id, { title: session.title });
+    },
+    [updateSession]
+  );
+
+  const handleRequestDelete = useCallback((session: Session) => {
+    setDeleteTarget(session);
+  }, []);
 
   return (
     <div className="relative flex min-h-0 w-full flex-1 flex-col">
@@ -279,11 +302,9 @@ function DashboardContent() {
                     <SessionsWorkspace
                       sections={workspaceSections}
                       onView={handleView}
-                      onRenameSuccess={(session) =>
-                        updateSession(session.id, { title: session.title })
-                      }
+                      onRenameSuccess={handleRenameSuccess}
                       onSetArchived={setSessionArchived}
-                      onRequestDelete={(session) => setDeleteTarget(session)}
+                      onRequestDelete={handleRequestDelete}
                       onDeleteSession={deleteSession}
                       viewMode={sessionViewMode}
                       onViewModeChange={setSessionViewMode}

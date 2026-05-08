@@ -24,6 +24,8 @@ export type FeedbackMarkerOptions = {
 type MarkerEntry = FeedbackMarkerData & {
   index: number;
   domElement: HTMLDivElement;
+  offsetX: number;
+  offsetY: number;
 };
 
 let container: HTMLElement | null = null;
@@ -91,30 +93,91 @@ export function createMarker(
     y = center.y;
   }
 
+  // Collision nudge — offset if within 28px of any existing marker
+  let offsetX = 0;
+  let offsetY = 0;
+  const MIN_DISTANCE = 28;
+  const NUDGE_STEP = 22;
+  let attempts = 0;
+  while (
+    attempts < 12 &&
+    markers.some(
+      (m) =>
+        Math.hypot(m.x + m.offsetX - (x + offsetX), m.y + m.offsetY - (y + offsetY)) < MIN_DISTANCE
+    )
+  ) {
+    const angle = (attempts * Math.PI) / 3;
+    offsetX = Math.round(Math.cos(angle) * NUDGE_STEP * (1 + Math.floor(attempts / 6)));
+    offsetY = Math.round(Math.sin(angle) * NUDGE_STEP * (1 + Math.floor(attempts / 6)));
+    attempts++;
+  }
+
   const marker = document.createElement("div");
   marker.className = "echly-marker";
   marker.setAttribute("data-echly-ui", "true");
   marker.setAttribute("aria-label", `Feedback ${index}`);
   marker.textContent = String(index);
-  marker.title = data.title ?? `Feedback #${index}`;
-
   marker.style.cssText = [
     "position:absolute",
-    "width:24px",
-    "height:24px",
-    "border-radius:999px",
-    "font-size:12px",
-    "font-weight:600",
+    "width:26px",
+    "height:26px",
+    "border-radius:50%",
+    "background:#5A49BF",
+    "color:#fff",
+    "font-size:11px",
+    "font-weight:700",
+    "font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif",
     "display:flex",
     "align-items:center",
     "justify-content:center",
-    "box-shadow:0 2px 6px rgba(0,0,0,.35)",
-    "cursor:pointer",
+    "box-shadow:0 2px 8px rgba(90,73,191,0.35),0 0 0 2px #fff",
     "pointer-events:auto",
     "box-sizing:border-box",
+    "z-index:1",
+    "transition:transform 0.15s ease,box-shadow 0.15s ease",
   ].join(";");
+  marker.style.setProperty("cursor", "pointer", "important");
 
-  applyPosition(marker, x, y);
+  const tooltip = document.createElement("span");
+  tooltip.className = "echly-marker-tooltip";
+  tooltip.setAttribute("data-echly-ui", "true");
+  tooltip.style.cssText = [
+    "position:absolute",
+    "bottom:calc(100% + 8px)",
+    "left:50%",
+    "transform:translateX(-50%)",
+    "padding:6px 10px",
+    "border-radius:8px",
+    "background:#15101F",
+    "color:#fff",
+    "font-size:12px",
+    "font-weight:500",
+    "font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif",
+    "white-space:nowrap",
+    "max-width:200px",
+    "overflow:hidden",
+    "text-overflow:ellipsis",
+    "pointer-events:none",
+    "opacity:0",
+    "transition:opacity 0.15s ease",
+    "z-index:10",
+    "box-shadow:0 4px 12px rgba(0,0,0,0.15)",
+  ].join(";");
+  tooltip.textContent = data.title ?? `Feedback #${index}`;
+  marker.appendChild(tooltip);
+
+  marker.addEventListener("mouseenter", () => {
+    marker.style.transform = "translate(-50%,-50%) scale(1.12)";
+    marker.style.boxShadow = "0 4px 12px rgba(90,73,191,0.45),0 0 0 2px #fff";
+    tooltip.style.opacity = "1";
+  });
+  marker.addEventListener("mouseleave", () => {
+    marker.style.transform = "translate(-50%,-50%) scale(1)";
+    marker.style.boxShadow = "0 2px 8px rgba(90,73,191,0.35),0 0 0 2px #fff";
+    tooltip.style.opacity = "0";
+  });
+
+  applyPosition(marker, x + offsetX, y + offsetY);
 
   const entry: MarkerEntry = {
     ...data,
@@ -122,6 +185,8 @@ export function createMarker(
     y,
     index,
     domElement: marker,
+    offsetX,
+    offsetY,
   };
   markers.push(entry);
 
@@ -150,7 +215,8 @@ export function updateMarker(
   if (!entry) return;
   if (updates.id != null) entry.id = updates.id;
   if (updates.title != null) entry.title = updates.title;
-  entry.domElement.title = entry.title ?? `Feedback #${entry.index}`;
+  const tooltipEl = entry.domElement.querySelector(".echly-marker-tooltip");
+  if (tooltipEl) tooltipEl.textContent = entry.title ?? `Feedback #${entry.index}`;
 }
 
 /**
@@ -175,7 +241,7 @@ export function updateMarkerPositions(): void {
       const { x, y } = getCenterFromElement(entry.element);
       entry.x = x;
       entry.y = y;
-      applyPosition(entry.domElement, x, y);
+      applyPosition(entry.domElement, x + (entry.offsetX || 0), y + (entry.offsetY || 0));
     }
     // If no element, keep existing position (fixed viewport coords at creation time)
   }

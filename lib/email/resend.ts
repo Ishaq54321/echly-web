@@ -41,7 +41,7 @@ export async function sendEmailOrLog(params: {
     return;
   }
   const { error } = await resend.emails.send({
-    from: "Echly <noreply@echly.com>",
+    from: "Annote <noreply@echly.com>",
     to: params.to,
     subject: params.subject,
     html: params.html,

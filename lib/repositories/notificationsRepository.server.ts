@@ -339,3 +339,44 @@ export async function markAllRead(userId: string): Promise<number> {
   await batch.commit();
   return snap.size;
 }
+
+/**
+ * When an access request is approved/denied, update ALL other recipients'
+ * pending notifications to show the resolved status and auto-mark as read.
+ * Skips the actor's own notification (they already see their own update).
+ */
+export async function resolveAccessRequestNotifications(args: {
+  accessRequestId: string;
+  sessionId: string;
+  actorUserId: string;
+  newStatus: "approved" | "rejected";
+  resolvedByName: string;
+}): Promise<number> {
+  const snap = await adminDb
+    .collection(COLLECTION)
+    .where("accessRequestId", "==", args.accessRequestId)
+    .where("sessionId", "==", args.sessionId)
+    .where("type", "==", "access_request.pending")
+    .get();
+
+  if (snap.empty) return 0;
+
+  let updated = 0;
+  for (let i = 0; i < snap.docs.length; i += 500) {
+    const batch = adminDb.batch();
+    for (const doc of snap.docs.slice(i, i + 500)) {
+      const data = doc.data();
+      if (data.userId === args.actorUserId) continue;
+
+      batch.update(doc.ref, {
+        actionStatus: args.newStatus,
+        read: true,
+        readAt: FieldValue.serverTimestamp(),
+        title: `Access request ${args.newStatus} by ${args.resolvedByName}`,
+      });
+      updated++;
+    }
+    await batch.commit();
+  }
+  return updated;
+}

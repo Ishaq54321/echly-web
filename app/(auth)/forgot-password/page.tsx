@@ -56,8 +56,8 @@ export default function ForgotPasswordPage() {
         <div className="auth-left">
           <header className="auth-head">
             <span className="brand">
-              <span className="brand-mark">E</span>
-              <span>Echly</span>
+              <span className="brand-mark">A</span>
+              <span>Annote</span>
             </span>
             <div className="auth-meta">
               <span>Remembered it?</span>
@@ -78,7 +78,7 @@ export default function ForgotPasswordPage() {
               Let&apos;s get you <span className="accent">back in.</span>
             </h1>
             <p className="auth-sub">
-              Enter the email tied to your Echly account. We&apos;ll send a single-use link to
+              Enter the email tied to your Annote account. We&apos;ll send a single-use link to
               choose a new password — it expires in 30 minutes.
             </p>
 
@@ -96,7 +96,7 @@ export default function ForgotPasswordPage() {
                   required
                 />
                 <div className="helper">
-                  We&apos;ll only send to addresses with a registered Echly account.
+                  We&apos;ll only send to addresses with a registered Annote account.
                 </div>
               </div>
 

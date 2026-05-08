@@ -304,6 +304,7 @@ export default function SessionPageClient({
    * provides instant feedback and is cleared after the listener catches up.
    */
   const [optimisticSession, setSession] = useState<Session | null>(null);
+  const pendingSessionTitleRef = useRef<string | null>(null);
   // Realtime store snapshot for this session id — listener-driven source of truth.
   const sessionStoreState = useSessionStore(sessionId);
   // Subscribe to comments + presence stores so the accessRevoked watcher below
@@ -316,7 +317,25 @@ export default function SessionPageClient({
    * Listener wins because it's the authoritative server state; overlay covers the
    * window between a local mutation and the listener tick that reflects it.
    */
-  const session: Session | null = sessionStoreState.session ?? optimisticSession;
+  const session: Session | null = (() => {
+    const base = sessionStoreState.session ?? optimisticSession;
+    if (!base) return null;
+    if (pendingSessionTitleRef.current !== null) {
+      return { ...base, title: pendingSessionTitleRef.current };
+    }
+    if (optimisticSession) {
+      return { ...(sessionStoreState.session ?? {}), ...optimisticSession } as Session;
+    }
+    return base;
+  })();
+  useEffect(() => {
+    if (
+      pendingSessionTitleRef.current &&
+      sessionStoreState.session?.title === pendingSessionTitleRef.current
+    ) {
+      pendingSessionTitleRef.current = null;
+    }
+  }, [sessionStoreState.session?.title]);
   /** General-access gate (restricted mode + anonymous): server returned access with canView false. */
   const [accessBlocked, setAccessBlocked] = useState(false);
   /** Set when GET /api/sessions/:id fails after auth is known (anonymous-friendly). */
@@ -385,6 +404,7 @@ export default function SessionPageClient({
     workspaceName,
     authEmail,
     authPhotoUrl,
+    avatarUrl,
   } = useWorkspace();
 
   const presenceUser = useMemo(
@@ -413,7 +433,9 @@ export default function SessionPageClient({
    */
   useEffect(() => {
     if (!sessionStoreState.session || !optimisticSession) return;
-    const t = setTimeout(() => setSession(null), 500);
+    const t = setTimeout(() => {
+      setSession(null);
+    }, 500);
     return () => clearTimeout(t);
   }, [sessionStoreState.version, optimisticSession]);
   const authUidRef = useRef<string | null>(null);
@@ -618,11 +640,31 @@ export default function SessionPageClient({
   const pendingOptimisticActionStepsRef = useRef(
     new Map<string, { steps: string[] | null }>()
   );
+  const pendingOptimisticTitleRef = useRef(
+    new Map<string, { title: string }>()
+  );
+  const pendingOptimisticResolvedRef = useRef(
+    new Map<string, { isResolved: boolean }>()
+  );
+  const pendingOptimisticAssigneeRef = useRef(
+    new Map<string, { assigneeId: string | null; assigneeName: string | null; assigneeAvatarUrl: string | null }>()
+  );
+  const pendingOptimisticPriorityRef = useRef(
+    new Map<string, { priority: "high" | "medium" | "low" | null }>()
+  );
+  const pendingOptimisticTagsRef = useRef(
+    new Map<string, { suggestedTags: string[] | null }>()
+  );
   /** Monotonic save generation per ticket; stale PATCH responses must not overwrite UI. */
   const actionStepsSaveLatestGenRef = useRef(new Map<string, number>());
 
   useLayoutEffect(() => {
     pendingOptimisticActionStepsRef.current.clear();
+    pendingOptimisticTitleRef.current.clear();
+    pendingOptimisticResolvedRef.current.clear();
+    pendingOptimisticAssigneeRef.current.clear();
+    pendingOptimisticPriorityRef.current.clear();
+    pendingOptimisticTagsRef.current.clear();
     actionStepsSaveLatestGenRef.current.clear();
   }, [sessionId]);
 
@@ -679,6 +721,84 @@ export default function SessionPageClient({
     };
   }, []);
 
+  useEffect(() => {
+    if (pendingOptimisticTitleRef.current.size === 0) return;
+    const base = feedbackStoreState?.feedback;
+    if (!base) return;
+    for (const [id, entry] of pendingOptimisticTitleRef.current) {
+      const listenerItem = base.find((f: Feedback) => f.id === id);
+      if (listenerItem && listenerItem.title === entry.title) {
+        pendingOptimisticTitleRef.current.delete(id);
+      }
+    }
+  }, [feedbackStoreState?.feedback]);
+
+  useEffect(() => {
+    if (pendingOptimisticResolvedRef.current.size === 0) return;
+    const base = feedbackStoreState?.feedback;
+    if (!base) return;
+    for (const [id, entry] of pendingOptimisticResolvedRef.current) {
+      const listenerItem = base.find((f: Feedback) => f.id === id);
+      if (listenerItem && listenerItem.isResolved === entry.isResolved) {
+        pendingOptimisticResolvedRef.current.delete(id);
+      }
+    }
+  }, [feedbackStoreState?.feedback]);
+
+  useEffect(() => {
+    if (pendingOptimisticAssigneeRef.current.size === 0) return;
+    const base = feedbackStoreState?.feedback;
+    if (!base) return;
+    for (const [id, entry] of pendingOptimisticAssigneeRef.current) {
+      const listenerItem = base.find((f: Feedback) => f.id === id);
+      if (listenerItem && listenerItem.assigneeId === entry.assigneeId) {
+        pendingOptimisticAssigneeRef.current.delete(id);
+      }
+    }
+  }, [feedbackStoreState?.feedback]);
+
+  useEffect(() => {
+    if (pendingOptimisticPriorityRef.current.size === 0) return;
+    const base = feedbackStoreState?.feedback;
+    if (!base) return;
+    for (const [id, entry] of pendingOptimisticPriorityRef.current) {
+      const listenerItem = base.find((f: Feedback) => f.id === id);
+      if (listenerItem && listenerItem.priority === entry.priority) {
+        pendingOptimisticPriorityRef.current.delete(id);
+      }
+    }
+  }, [feedbackStoreState?.feedback]);
+
+  useEffect(() => {
+    if (pendingOptimisticTagsRef.current.size === 0) return;
+    const base = feedbackStoreState?.feedback;
+    if (!base) return;
+    for (const [id, entry] of pendingOptimisticTagsRef.current) {
+      const listenerItem = base.find((f: Feedback) => f.id === id);
+      if (
+        listenerItem &&
+        JSON.stringify(listenerItem.suggestedTags ?? null) === JSON.stringify(entry.suggestedTags)
+      ) {
+        pendingOptimisticTagsRef.current.delete(id);
+      }
+    }
+  }, [feedbackStoreState?.feedback]);
+
+  useEffect(() => {
+    if (pendingOptimisticActionStepsRef.current.size === 0) return;
+    const base = feedbackStoreState?.feedback;
+    if (!base) return;
+    for (const [id, entry] of pendingOptimisticActionStepsRef.current) {
+      const listenerItem = base.find((f: Feedback) => f.id === id);
+      if (
+        listenerItem &&
+        JSON.stringify(listenerItem.actionSteps ?? null) === JSON.stringify(entry.steps)
+      ) {
+        pendingOptimisticActionStepsRef.current.delete(id);
+      }
+    }
+  }, [feedbackStoreState?.feedback]);
+
   const scheduleOptimisticClear = useCallback((id: string) => {
     const existing = optimisticTimersRef.current.get(id);
     if (existing) clearTimeout(existing);
@@ -734,6 +854,16 @@ export default function SessionPageClient({
       let next = ov ? { ...item, ...ov } : item;
       const stepRow = actionStepsOverlay.get(item.id);
       if (stepRow) next = { ...next, actionSteps: stepRow.steps };
+      const titleRow = pendingOptimisticTitleRef.current.get(item.id);
+      if (titleRow) next = { ...next, title: titleRow.title };
+      const resolvedRow = pendingOptimisticResolvedRef.current.get(item.id);
+      if (resolvedRow) next = { ...next, isResolved: resolvedRow.isResolved, status: resolvedRow.isResolved ? "resolved" : "open" };
+      const assignRow = pendingOptimisticAssigneeRef.current.get(item.id);
+      if (assignRow) next = { ...next, assigneeId: assignRow.assigneeId, assigneeName: assignRow.assigneeName, assigneeAvatarUrl: assignRow.assigneeAvatarUrl };
+      const priorityRow = pendingOptimisticPriorityRef.current.get(item.id);
+      if (priorityRow) next = { ...next, priority: priorityRow.priority };
+      const tagsRow = pendingOptimisticTagsRef.current.get(item.id);
+      if (tagsRow) next = { ...next, suggestedTags: tagsRow.suggestedTags };
       merged.push(next);
     };
     for (const ins of insertedFeedback) {
@@ -1055,7 +1185,6 @@ export default function SessionPageClient({
   const [deleteSessionModalOpen, setDeleteSessionModalOpen] = useState(false);
   const [isEditingSessionTitle, setIsEditingSessionTitle] = useState(false);
   const [sessionTitleDraft, setSessionTitleDraft] = useState("");
-  const [saveSessionTitleSuccess, setSaveSessionTitleSuccess] = useState(false);
 
   const preloadedScreenshotUrlsRef = useRef<Set<string>>(new Set());
 
@@ -1892,7 +2021,6 @@ export default function SessionPageClient({
     comments,
     loadingComments,
     displayCommentThreadCounts,
-    refetchComments,
     sendComment,
     sendReply,
     sendPinComment,
@@ -1948,6 +2076,7 @@ export default function SessionPageClient({
         item.id === effectiveSelectedId ? { ...item, title: trimmed } : item
       )
     );
+    pendingOptimisticTitleRef.current.set(effectiveSelectedId, { title: trimmed });
     try {
       const res = await authFetch(`/api/tickets/${effectiveSelectedId}`, {
         method: "PATCH",
@@ -1955,6 +2084,7 @@ export default function SessionPageClient({
         body: JSON.stringify({ title: trimmed }),
       });
       if (!res) {
+        pendingOptimisticTitleRef.current.delete(effectiveSelectedId);
         setFeedback((prev) =>
           prev.map((item) =>
             item.id === effectiveSelectedId
@@ -1967,6 +2097,7 @@ export default function SessionPageClient({
       }
       const raw = await res.json();
       if (!res.ok) {
+        pendingOptimisticTitleRef.current.delete(effectiveSelectedId);
         setFeedback((prev) =>
           prev.map((item) =>
             item.id === effectiveSelectedId
@@ -1982,6 +2113,7 @@ export default function SessionPageClient({
       try {
         ticketPayload = requireApiSuccessData<{ ticket: TicketFromApi }>(raw).ticket;
       } catch {
+        pendingOptimisticTitleRef.current.delete(effectiveSelectedId);
         setFeedback((prev) =>
           prev.map((item) =>
             item.id === effectiveSelectedId
@@ -1993,14 +2125,17 @@ export default function SessionPageClient({
         return;
       }
       setFeedback((prev) =>
-        prev.map((item) =>
-          item.id === effectiveSelectedId ? { ...item, ...ticketPayload } : item
-        )
+        prev.map((item) => {
+          if (item.id !== effectiveSelectedId) return item;
+          const { createdAt, updatedAt, ...safePayload } = ticketPayload as Record<string, unknown>;
+          return { ...item, ...safePayload };
+        })
       );
       broadcastTicketUpdated(ticketPayload);
     } catch (err) {
       console.error("[ECHLY] saveTitle failed", err);
       showToast("Could not save title");
+      pendingOptimisticTitleRef.current.delete(effectiveSelectedId);
       setFeedback((prev) =>
         prev.map((item) =>
           item.id === effectiveSelectedId
@@ -2082,9 +2217,11 @@ export default function SessionPageClient({
         }
         pendingOptimisticActionStepsRef.current.delete(ticketId);
         setFeedback((prev) =>
-          prev.map((item) =>
-            item.id === ticketId ? { ...item, ...ticketPayload } : item
-          )
+          prev.map((item) => {
+            if (item.id !== ticketId) return item;
+            const { createdAt, updatedAt, ...safePayload } = ticketPayload as Record<string, unknown>;
+            return { ...item, ...safePayload };
+          })
         );
         broadcastTicketUpdated(ticketPayload);
       } catch (err) {
@@ -2100,23 +2237,26 @@ export default function SessionPageClient({
   const saveTags = async (suggestedTags: string[]) => {
     if (!effectiveSelectedId) return;
     if (!isIdentityResolved) return;
+    const ticketId = effectiveSelectedId;
     const nextTags = Array.isArray(suggestedTags) ? suggestedTags : null;
     const previous = selectedItem?.suggestedTags ?? null;
     setFeedback((prev) =>
       prev.map((item) =>
-        item.id === effectiveSelectedId ? { ...item, suggestedTags: nextTags } : item
+        item.id === ticketId ? { ...item, suggestedTags: nextTags } : item
       )
     );
+    pendingOptimisticTagsRef.current.set(ticketId, { suggestedTags: nextTags });
     try {
-      const res = await authFetch(`/api/tickets/${effectiveSelectedId}`, {
+      const res = await authFetch(`/api/tickets/${ticketId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ suggestedTags }),
       });
       if (!res) {
+        pendingOptimisticTagsRef.current.delete(ticketId);
         setFeedback((prev) =>
           prev.map((item) =>
-            item.id === effectiveSelectedId ? { ...item, suggestedTags: previous } : item
+            item.id === ticketId ? { ...item, suggestedTags: previous } : item
           )
         );
         showToast("Could not save tags");
@@ -2124,9 +2264,10 @@ export default function SessionPageClient({
       }
       const rawTags = await res.json();
       if (!res.ok) {
+        pendingOptimisticTagsRef.current.delete(ticketId);
         setFeedback((prev) =>
           prev.map((item) =>
-            item.id === effectiveSelectedId ? { ...item, suggestedTags: previous } : item
+            item.id === ticketId ? { ...item, suggestedTags: previous } : item
           )
         );
         if (responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
@@ -2137,9 +2278,10 @@ export default function SessionPageClient({
       try {
         ticketPayload = requireApiSuccessData<{ ticket: TicketFromApi }>(rawTags).ticket;
       } catch {
+        pendingOptimisticTagsRef.current.delete(ticketId);
         setFeedback((prev) =>
           prev.map((item) =>
-            item.id === effectiveSelectedId ? { ...item, suggestedTags: previous } : item
+            item.id === ticketId ? { ...item, suggestedTags: previous } : item
           )
         );
         showToast("Could not save tags");
@@ -2147,18 +2289,19 @@ export default function SessionPageClient({
       }
       setFeedback((prev) =>
         prev.map((item) => {
-          if (item.id !== effectiveSelectedId) return item;
-          const { suggestedTags, ...rest } = ticketPayload;
-          return { ...item, ...rest };
+          if (item.id !== ticketId) return item;
+          const { createdAt, updatedAt, ...safePayload } = ticketPayload as Record<string, unknown>;
+          return { ...item, ...safePayload };
         })
       );
       broadcastTicketUpdated(ticketPayload);
     } catch (err) {
       console.error("[ECHLY] saveTags failed", err);
       showToast("Could not save tags");
+      pendingOptimisticTagsRef.current.delete(ticketId);
       setFeedback((prev) =>
         prev.map((item) =>
-          item.id === effectiveSelectedId ? { ...item, suggestedTags: previous } : item
+          item.id === ticketId ? { ...item, suggestedTags: previous } : item
         )
       );
     }
@@ -2183,6 +2326,7 @@ export default function SessionPageClient({
 
         addResolving(ticketId);
         setOptimistic(ticketId, isResolved);
+        pendingOptimisticResolvedRef.current.set(ticketId, { isResolved });
         if (isResolved) {
           setResolveAffirmationKey((k) => k + 1);
         }
@@ -2208,6 +2352,7 @@ export default function SessionPageClient({
           const rollbackResolved = () => {
             clearOptimistic(ticketId);
             removeResolving(ticketId);
+            pendingOptimisticResolvedRef.current.delete(ticketId);
             if (countsTransition) {
               setSessionCountsDelta((prev) => ({
                 open: prev.open + (isResolved ? 1 : -1),
@@ -2264,9 +2409,11 @@ export default function SessionPageClient({
             clearOptimistic(ticketId);
             removeResolving(ticketId);
             setFeedback((prev) =>
-              prev.map((item) =>
-                item.id === ticketId ? { ...item, ...ticketPayload } : item
-              )
+              prev.map((item) => {
+                if (item.id !== ticketId) return item;
+                const { createdAt, updatedAt, ...safePayload } = ticketPayload as Record<string, unknown>;
+                return { ...item, ...safePayload };
+              })
             );
             broadcastTicketUpdated(ticketPayload);
             onSuccess?.();
@@ -2313,14 +2460,10 @@ export default function SessionPageClient({
       showToast("No more feedback");
     }
 
-    // Show saving toast immediately
-    setResolveToastState("saving");
-
     saveResolved(
       true,
       () => {
-        // PATCH succeeded — toast moves to 'saved'
-        setResolveToastState("saved");
+        // PATCH succeeded — silent (no toast)
       },
       () => {
         // PATCH failed — show error toast and navigate back to original ticket
@@ -2345,6 +2488,11 @@ export default function SessionPageClient({
             : item
         )
       );
+      pendingOptimisticAssigneeRef.current.set(ticketId, {
+        assigneeId: assigneeId ?? null,
+        assigneeName: assigneeName ?? null,
+        assigneeAvatarUrl: assigneeAvatarUrl ?? null,
+      });
     },
     [effectiveSelectedId, setFeedback]
   );
@@ -2358,6 +2506,7 @@ export default function SessionPageClient({
           item.id === ticketId ? { ...item, priority } : item
         )
       );
+      pendingOptimisticPriorityRef.current.set(ticketId, { priority: priority ?? null });
     },
     [effectiveSelectedId, setFeedback]
   );
@@ -2375,13 +2524,14 @@ export default function SessionPageClient({
     }
     if (!isIdentityResolved) return;
     const previousTitle = s.title ?? "";
-    setSession((prev: Session | null) =>
-      prev ? ({ ...prev, title: safeTitle } as Session) : prev
-    );
+    setSession((prev: Session | null) => {
+      const base = prev ?? sessionStoreState.session;
+      if (!base) return prev;
+      return { ...base, title: safeTitle } as Session;
+    });
+    pendingSessionTitleRef.current = safeTitle;
     setSessionTitleDraft(safeTitle);
     setIsEditingSessionTitle(false);
-    setSaveSessionTitleSuccess(true);
-    setTimeout(() => setSaveSessionTitleSuccess(false), 1200);
     try {
       const res = await authFetch(`/api/sessions/${sessionId}`, {
         method: "PATCH",
@@ -2389,9 +2539,12 @@ export default function SessionPageClient({
         body: JSON.stringify({ title: safeTitle }),
       });
       if (!res) {
-        setSession((prev: Session | null) =>
-          prev ? ({ ...prev, title: previousTitle } as Session) : prev
-        );
+        setSession((prev: Session | null) => {
+          const base = prev ?? sessionStoreState.session;
+          if (!base) return prev;
+          return { ...base, title: previousTitle } as Session;
+        });
+        pendingSessionTitleRef.current = null;
         setSessionTitleDraft((previousTitle || "").trim());
         showToast("Could not save session name");
         return;
@@ -2400,9 +2553,12 @@ export default function SessionPageClient({
       if (!res.ok) {
         if (responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
         else showToast("Could not save session name");
-        setSession((prev: Session | null) =>
-          prev ? ({ ...prev, title: previousTitle } as Session) : prev
-        );
+        setSession((prev: Session | null) => {
+          const base = prev ?? sessionStoreState.session;
+          if (!base) return prev;
+          return { ...base, title: previousTitle } as Session;
+        });
+        pendingSessionTitleRef.current = null;
         setSessionTitleDraft((previousTitle || "").trim());
         return;
       }
@@ -2413,15 +2569,20 @@ export default function SessionPageClient({
         ).session;
       } catch {
         showToast("Could not save session name");
-        setSession((prev: Session | null) =>
-          prev ? ({ ...prev, title: previousTitle } as Session) : prev
-        );
+        setSession((prev: Session | null) => {
+          const base = prev ?? sessionStoreState.session;
+          if (!base) return prev;
+          return { ...base, title: previousTitle } as Session;
+        });
+        pendingSessionTitleRef.current = null;
         setSessionTitleDraft((previousTitle || "").trim());
         return;
       }
-      setSession((prev: Session | null) =>
-        prev ? ({ ...prev, ...patchSession } as Session) : prev
-      );
+      setSession((prev: Session | null) => {
+        if (!prev) return prev;
+        const { createdAt, updatedAt, ...safePayload } = patchSession as Record<string, unknown>;
+        return { ...prev, ...safePayload } as Session;
+      });
       const apiTitle = ((patchSession.title as string) ?? safeTitle).trim();
       setSessionTitleDraft(apiTitle);
       if (typeof window !== "undefined" && "chrome" in window) {
@@ -2438,18 +2599,26 @@ export default function SessionPageClient({
     } catch (err) {
       console.error("[ECHLY] handleSessionTitleBlur PATCH failed", err);
       showToast("Could not save session name");
-      setSession((prev: Session | null) =>
-        prev ? ({ ...prev, title: previousTitle } as Session) : prev
-      );
+      setSession((prev: Session | null) => {
+        const base = prev ?? sessionStoreState.session;
+        if (!base) return prev;
+        return { ...base, title: previousTitle } as Session;
+      });
+      pendingSessionTitleRef.current = null;
       setSessionTitleDraft((previousTitle || "").trim());
     }
-  }, [sessionId, sessionTitleDraft, isIdentityResolved, showToast]);
+  }, [sessionId, sessionTitleDraft, isIdentityResolved, showToast, sessionStoreState.session]);
 
   const handleSidebarRenameTitle = useCallback(async (newTitle: string) => {
     const safeTitle = newTitle.trim();
     if (!safeTitle || safeTitle === session?.title) return;
     const previousTitle = session?.title ?? '';
-    setSession((prev: Session | null) => prev ? ({ ...prev, title: safeTitle } as Session) : prev);
+    setSession((prev: Session | null) => {
+      const base = prev ?? sessionStoreState.session;
+      if (!base) return prev;
+      return { ...base, title: safeTitle } as Session;
+    });
+    pendingSessionTitleRef.current = safeTitle;
     try {
       const res = await authFetch(`/api/sessions/${sessionId}`, {
         method: 'PATCH',
@@ -2457,18 +2626,32 @@ export default function SessionPageClient({
         body: JSON.stringify({ title: safeTitle }),
       });
       if (!res || !res.ok) {
-        setSession((prev: Session | null) => prev ? ({ ...prev, title: previousTitle } as Session) : prev);
+        pendingSessionTitleRef.current = null;
+        setSession((prev: Session | null) => {
+          const base = prev ?? sessionStoreState.session;
+          if (!base) return prev;
+          return { ...base, title: previousTitle } as Session;
+        });
         showToast('Could not save session name');
         return;
       }
       const raw = await res.json();
       const apiTitle = (raw?.data?.session?.title ?? raw?.session?.title ?? safeTitle) as string;
-      setSession((prev: Session | null) => prev ? ({ ...prev, title: apiTitle } as Session) : prev);
+      setSession((prev: Session | null) => {
+        const base = prev ?? sessionStoreState.session;
+        if (!base) return prev;
+        return { ...base, title: apiTitle } as Session;
+      });
     } catch {
-      setSession((prev: Session | null) => prev ? ({ ...prev, title: previousTitle } as Session) : prev);
+      pendingSessionTitleRef.current = null;
+      setSession((prev: Session | null) => {
+        const base = prev ?? sessionStoreState.session;
+        if (!base) return prev;
+        return { ...base, title: previousTitle } as Session;
+      });
       showToast('Could not save session name');
     }
-  }, [sessionId, session?.title, showToast]);
+  }, [sessionId, session?.title, showToast, sessionStoreState.session]);
 
   const handleMarkAllResolved = useCallback(() => {
     safeResolveAction({
@@ -2789,7 +2972,7 @@ export default function SessionPageClient({
       <ExecutionView
         item={selectedItem}
         resolveAffirmationKey={resolveAffirmationKey}
-        onSaveTitle={saveTitle}
+        onSaveTitle={isWorkspaceMember ? saveTitle : undefined}
         onResolvedChange={handleResolvedChange}
         resolveSubmitting={resolvingSet.has(effectiveSelectedId ?? "")}
         onSaveActionSteps={isWorkspaceMember ? saveActionSteps : undefined}
@@ -3027,7 +3210,6 @@ export default function SessionPageClient({
                   comments={comments}
                   loading={loadingComments}
                   threadCounts={displayCommentThreadCounts}
-                  onRefreshComments={() => void refetchComments()}
                   sendReply={sendReply}
                   sendComment={sendComment}
                   activeThreadId={activeThreadId}
@@ -3035,7 +3217,7 @@ export default function SessionPageClient({
                   currentUserId={authUid}
                   currentUserInitial={firstName ? firstName.charAt(0).toUpperCase() : "?"}
                   currentUserName={displayName || undefined}
-                  currentUserAvatarUrl={authPhotoUrl || undefined}
+                  currentUserAvatarUrl={avatarUrl || authPhotoUrl || undefined}
                   updateComment={updateComment}
                   deleteComment={deleteComment}
                   onReactionsChanged={handleReactionsChanged}

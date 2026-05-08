@@ -217,7 +217,11 @@ export function createOptimisticComment(args: {
     userName: data.userName,
     userAvatar: data.userAvatar,
     message: data.message,
-    createdAt: { toDate: () => optimisticDate } as Comment["createdAt"],
+    createdAt: {
+      seconds: Math.floor(optimisticCreatedAtMs / 1000),
+      nanoseconds: (optimisticCreatedAtMs % 1000) * 1_000_000,
+      toDate: () => optimisticDate,
+    } as Comment["createdAt"],
     type: data.type ?? "general",
     position: data.position,
     textRange: data.textRange,

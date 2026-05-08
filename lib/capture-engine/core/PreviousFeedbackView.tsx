@@ -58,6 +58,7 @@ type PreviousFeedbackViewProps = {
   theme?: "light" | "dark";
   onThemeToggle?: () => void;
   onHeaderMouseDown?: (e: ReactMouseEvent) => void;
+  logoUrl?: string;
 };
 
 export default function PreviousFeedbackView({
@@ -68,6 +69,7 @@ export default function PreviousFeedbackView({
   captureMode = "voice",
   onModeChange,
   onHeaderMouseDown,
+  logoUrl,
 }: PreviousFeedbackViewProps) {
   const [sessions, setSessions] = useState<SessionOption[]>([]);
   const [loading, setLoading] = useState(false);
@@ -128,9 +130,19 @@ export default function PreviousFeedbackView({
         }}
         style={{ cursor: onHeaderMouseDown ? "grab" : undefined }}
       >
-        <span className="pill-mark">E</span>
+        <span className="pill-mark pill-mark-logo">
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt="Annote"
+              style={{ width: 24, height: 30, objectFit: "contain", display: "block" }}
+            />
+          ) : (
+            "A"
+          )}
+        </span>
         <div className="pill-ws">
-          <span className="pill-ws-name">Previous Feedback</span>
+          <span className="pill-ws-name">Previous Sessions</span>
         </div>
         <div className="tl-icon-group">
           <button
@@ -216,7 +228,7 @@ export default function PreviousFeedbackView({
               </div>
               <div className="ps-empty-sub">
                 {sessions.length === 0
-                  ? "Start a session on any page to capture voice or written feedback. Echly will save it here."
+                  ? "Start a session on any page to capture voice or written feedback. Annote will save it here."
                   : "Try a different search term or filter."}
               </div>
             </div>

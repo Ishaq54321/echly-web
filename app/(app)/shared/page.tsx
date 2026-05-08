@@ -241,17 +241,23 @@ export default function SharedPage() {
 
   const confirmLeaveSession = useCallback(async () => {
     if (!leaveModalSessionId) return;
-    const res = await authFetch(
-      `/api/sessions/shared/${leaveModalSessionId}`,
-      { method: "DELETE" }
-    );
-    if (!res || !res.ok) {
-      throw new Error("Failed to leave session");
-    }
+    const previousSessions = sessions;
     setSessions((prev) =>
       prev.filter((s) => s.sessionId !== leaveModalSessionId)
     );
-  }, [leaveModalSessionId]);
+    try {
+      const res = await authFetch(
+        `/api/sessions/shared/${leaveModalSessionId}`,
+        { method: "DELETE" }
+      );
+      if (!res || !res.ok) {
+        throw new Error("Failed to leave session");
+      }
+    } catch (err) {
+      setSessions(previousSessions);
+      throw err;
+    }
+  }, [leaveModalSessionId, sessions]);
 
   return (
     <>

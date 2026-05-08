@@ -140,7 +140,7 @@ export default function CaptureHeader({
             type="button"
             className={`echly-header-home-wrap${theme === "dark" ? " dark" : ""}`}
             onClick={() => onOpenDashboard?.()}
-            aria-label="Open Echly dashboard"
+            aria-label="Open Annote dashboard"
           >
             <div className="header-home-btn">
               <Home size={20} />
@@ -148,7 +148,7 @@ export default function CaptureHeader({
           </button>
         ) : (
           <>
-            <span className="echly-sidebar-title">{title ?? "Echly"}</span>
+            <span className="echly-sidebar-title">{title ?? "Annote"}</span>
             {summary && (
               <span className="echly-sidebar-summary">{summary}</span>
             )}

@@ -14,7 +14,7 @@ export function FloatingCommandButton({
   label,
   expanded,
   onClick,
-  "aria-label": ariaLabel = "Open Echly",
+  "aria-label": ariaLabel = "Open Annote",
 }: FloatingCommandButtonProps) {
   return (
     <div className="echly-floating-trigger-wrapper">

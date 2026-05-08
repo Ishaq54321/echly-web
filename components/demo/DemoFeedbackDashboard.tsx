@@ -27,7 +27,7 @@ function UITicketPreview({ ticketId }: { ticketId: string }) {
         <div className="flex-1 p-3 flex flex-col items-center justify-center gap-2 min-h-0">
           <div className="h-2.5 w-[75%] max-w-[120px] bg-[var(--surface-hover)] rounded shrink-0" />
           <div className="h-1.5 w-full max-w-[90%] bg-[var(--surface-hover)] rounded shrink-0" />
-          <div className="rounded-md border-2 border-[var(--brand)] bg-[var(--brand-subtle)]/80 px-3 py-1.5 shadow-[0_0_0_2px_rgba(23,117,224,0.2)]">
+          <div className="rounded-md border-2 border-[var(--brand)] bg-[var(--brand-subtle)]/80 px-3 py-1.5 shadow-[0_0_0_2px_rgba(90,73,191,0.2)]">
             <span className="text-[9px] font-semibold text-[var(--brand-text)]">Get started</span>
           </div>
         </div>
@@ -151,7 +151,7 @@ export default function DemoFeedbackDashboard() {
           <div className="w-3 h-3 bg-yellow-400 rounded-full" />
           <div className="w-3 h-3 bg-green-400 rounded-full" />
         </div>
-        <div className="ml-4 text-xs text-[var(--text-tertiary)] select-none">Echly · Feedback</div>
+        <div className="ml-4 text-xs text-[var(--text-tertiary)] select-none">Annote · Feedback</div>
       </div>
 
       <div className="flex h-[440px]">

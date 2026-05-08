@@ -15,7 +15,7 @@ export default function ProgressPie({
 }: ProgressPieProps) {
   const radius = size / 2;
   const normalizedValue = Math.max(0, Math.min(100, value));
-  const brandBlue = "#1775E0"; // blue-500
+  const brandBlue = "#5A49BF"; // blue-500
 
   // Convert percentage to angle
   const angle = (normalizedValue / 100) * 360;

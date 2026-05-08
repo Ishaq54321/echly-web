@@ -31,6 +31,9 @@ const UI_SELECTORS = [
   ".echly-voice-pill-wrapper",
   ".echly-voice-pill",
   ".echly-sc-root",
+  ".echly-capture-tooltip",
+  "#echly-marker-layer",
+  ".echly-marker-tooltip",
 ];
 
 export function hideEchlyUI(): Element[] {

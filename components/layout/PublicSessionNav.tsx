@@ -35,30 +35,27 @@ export default function PublicSessionNav() {
           onKeyDown={(e) => {
             if (e.key === "Enter") window.location.href = "/";
           }}
-          aria-label="Go to Echly home"
+          aria-label="Go to Annote home"
         >
           <div
             style={{
               position: "relative",
-              width: 32,
-              height: 32,
-              background: "var(--brand)",
-              borderRadius: 8,
-              overflow: "hidden",
+              width: 23,
+              height: 28,
               flexShrink: 0,
             }}
           >
-            <Image src="/Echly_logo.svg" alt="" fill sizes="32px" style={{ objectFit: "cover" }} />
+            <Image src="/annote-logo-icon.svg" alt="Annote" fill sizes="23px" style={{ objectFit: "contain" }} />
           </div>
           <span
             className="font-bold"
             style={{
-              fontSize: 20,
+              fontSize: 24,
               color: "var(--text-heading)",
               letterSpacing: "-0.4px",
             }}
           >
-            Echly
+            Annote
           </span>
         </div>
 
@@ -169,7 +166,7 @@ function GetStartedButton() {
         fontSize: 14,
         color: "#FFFFFF",
         cursor: "pointer",
-        boxShadow: "0 1px 3px rgba(23,117,224,0.25)",
+        boxShadow: "0 1px 3px rgba(90,73,191,0.25)",
         transition: "all 140ms ease",
       }}
       onClick={() => {
@@ -178,12 +175,12 @@ function GetStartedButton() {
       onMouseEnter={(e) => {
         const btn = e.currentTarget;
         btn.style.background = "var(--brand-hover)";
-        btn.style.boxShadow = "0 2px 10px rgba(23,117,224,0.30)";
+        btn.style.boxShadow = "0 2px 10px rgba(90,73,191,0.30)";
       }}
       onMouseLeave={(e) => {
         const btn = e.currentTarget;
         btn.style.background = "var(--brand)";
-        btn.style.boxShadow = "0 1px 3px rgba(23,117,224,0.25)";
+        btn.style.boxShadow = "0 1px 3px rgba(90,73,191,0.25)";
       }}
     >
       Get started free

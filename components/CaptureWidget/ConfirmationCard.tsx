@@ -54,7 +54,7 @@ export function ConfirmationCard({ ticket, onConfirm, onEdit }: ConfirmationCard
             fontSize: 14,
             fontWeight: 600,
             border: "none",
-            background: "#1775E0",
+            background: "#5A49BF",
             color: "#fff",
             cursor: "pointer",
             boxShadow: "0 4px 12px rgba(21, 93, 252, 0.25)",

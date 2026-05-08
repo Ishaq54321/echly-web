@@ -222,6 +222,24 @@ export async function PATCH(
           });
         });
       }
+
+      fireAndForget("cleanup:access_request_notifications", async () => {
+        try {
+          const { resolveAccessRequestNotifications } = await import(
+            "@/lib/repositories/notificationsRepository.server"
+          );
+          await resolveAccessRequestNotifications({
+            accessRequestId: requestId,
+            sessionId,
+            actorUserId: approverId,
+            newStatus: "rejected",
+            resolvedByName: actor.actorName || "Someone",
+          });
+        } catch (err) {
+          console.error("[NOTIFICATION] access request cleanup failed:", err);
+        }
+      });
+
       void sendAccessRequestResultEmail({
         to: accessRequest.requesterEmail,
         approved: false,
@@ -318,6 +336,24 @@ export async function PATCH(
         });
       });
     }
+
+    fireAndForget("cleanup:access_request_notifications", async () => {
+      try {
+        const { resolveAccessRequestNotifications } = await import(
+          "@/lib/repositories/notificationsRepository.server"
+        );
+        await resolveAccessRequestNotifications({
+          accessRequestId: requestId,
+          sessionId,
+          actorUserId: approverId,
+          newStatus: "approved",
+          resolvedByName: actor.actorName || "Someone",
+        });
+      } catch (err) {
+        console.error("[NOTIFICATION] access request cleanup failed:", err);
+      }
+    });
+
     void sendAccessRequestResultEmail({
       to: accessRequest.requesterEmail,
       approved: true,

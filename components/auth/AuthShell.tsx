@@ -191,7 +191,7 @@ export function AuthFoot() {
   return (
     <div className="auth-foot">
       <div className="legal">
-        <span>© 2026 Echly, Inc.</span>
+        <span>© 2026 Annote, Inc.</span>
         <a href="#">Terms</a>
         <a href="#">Privacy</a>
         <a href="#">Security</a>

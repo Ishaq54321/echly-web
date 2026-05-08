@@ -138,6 +138,7 @@ type GlobalUIState = {
   feedbackLimitMessage?: string | null;
   feedbackUpgradePlan?: string | null;
   feedbackJobs?: Array<{ id: string; status: string; createdAt: number; errorMessage?: string }>;
+  editPauseTooltipVisible?: boolean;
 };
 
 /** Generate a unique id for a feedback job (used for concurrent job queue). */
@@ -227,7 +228,7 @@ function ensureAuthenticated(): Promise<boolean> {
 
 /** Notify background when content creates a ticket via apiFetch so globalUIState stays in sync. */
 function notifyFeedbackCreated(
-  ticket: { id: string; title: string; actionSteps?: string[]; type?: string; screenshotId?: string | null; suggestedTags?: string[] },
+  ticket: { id: string; title: string; actionSteps?: string[]; type?: string; screenshotId?: string | null; suggestedTags?: string[]; pageArea?: string | null; userAgent?: string | null; viewportWidth?: number | null; viewportHeight?: number | null; devicePixelRatio?: number | null; createdAt?: string | number | null },
   sessionId?: string | null
 ): void {
   chrome.runtime.sendMessage({
@@ -240,6 +241,12 @@ function notifyFeedbackCreated(
       type: ticket.type ?? "Feedback",
       screenshotId: ticket.screenshotId ?? null,
       suggestedTags: ticket.suggestedTags ?? [],
+      pageArea: ticket.pageArea ?? null,
+      userAgent: ticket.userAgent ?? null,
+      viewportWidth: ticket.viewportWidth ?? null,
+      viewportHeight: ticket.viewportHeight ?? null,
+      devicePixelRatio: ticket.devicePixelRatio ?? null,
+      createdAt: ticket.createdAt ?? null,
     },
   }).catch((err) => logSendMessageRejection("ECHLY_FEEDBACK_CREATED", err));
 }
@@ -303,6 +310,7 @@ const BOOTSTRAP_GLOBAL_UI: GlobalUIState = {
   resolvedCount: 0,
   captureMode: "voice",
   feedbackJobs: [],
+  editPauseTooltipVisible: false,
 };
 
 type ContentAppProps = {
@@ -461,7 +469,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     return `/${path.replace(/^assets\//, "")}`;
   }, []);
 
-  const launcherLogoUrl = getAssetUrl("assets/Echly_logo_launcher.svg");
+  const launcherLogoUrl = getAssetUrl("assets/annote-logo-icon.svg");
 
   React.useEffect(() => {
     logger.debug("extension", "content_app_mounted");
@@ -938,6 +946,23 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           screenshotId: finalScreenshotId,
           suggestedTags: normalized.suggestedTags ?? [],
           pageArea: normalized.pageArea ?? null,
+          userAgent:
+            typeof navigator !== "undefined" && typeof navigator.userAgent === "string"
+              ? navigator.userAgent
+              : null,
+          viewportWidth:
+            typeof enrichedContext.viewportWidth === "number"
+              ? enrichedContext.viewportWidth
+              : null,
+          viewportHeight:
+            typeof enrichedContext.viewportHeight === "number"
+              ? enrichedContext.viewportHeight
+              : null,
+          devicePixelRatio:
+            typeof enrichedContext.devicePixelRatio === "number"
+              ? enrichedContext.devicePixelRatio
+              : (typeof window !== "undefined" ? (window.devicePixelRatio || 1) : null),
+          createdAt: Date.now(),
         };
         notifyFeedbackCreated(created, effectiveSessionId);
         return created;
@@ -1090,7 +1115,12 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         }
         return list.map((p) =>
           p.id === id
-            ? { ...p, title: payload.title, actionSteps: payload.actionSteps }
+            ? {
+                ...p,
+                title: payload.title,
+                actionSteps: payload.actionSteps,
+                suggestedTags: payload.suggestedTags ?? p.suggestedTags,
+              }
             : p
         );
       });
@@ -1101,6 +1131,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             id,
             title: payload.title,
             actionSteps: payload.actionSteps,
+            suggestedTags: payload.suggestedTags,
             type: typeForMessage,
           },
         })
@@ -1121,7 +1152,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         throwIfHttpError(res, "PATCH ticket");
         const rawPatch = await res.json();
         const ticket = requireApiSuccessData<{
-          ticket: { id: string; title: string; actionSteps?: string[]; type?: string };
+          ticket: { id: string; title: string; actionSteps?: string[]; type?: string; suggestedTags?: string[] };
         }>(rawPatch).ticket;
         editRollbackRef.current.delete(id);
         chrome.runtime
@@ -1131,6 +1162,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               id: ticket.id,
               title: ticket.title,
               actionSteps: ticket.actionSteps ?? [],
+              suggestedTags: ticket.suggestedTags ?? payload.suggestedTags,
               type: ticket.type ?? "Feedback",
             },
           })
@@ -1322,14 +1354,16 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         <div className="pill auth-check-pill">
           <div className="auth-check-body">
             <div className="auth-check-logo">
-              <svg viewBox="0 0 18 18" fill="none">
-                <text x="4" y="13.5" fontSize="12" fontWeight="700" fill="#fff" fontFamily="DM Sans, sans-serif">E</text>
-              </svg>
+              <img
+                src={chrome.runtime.getURL("assets/annote-logo-icon.svg")}
+                alt="Annote"
+                style={{ width: "100%", height: "100%", objectFit: "contain" }}
+              />
             </div>
             <div className="auth-check-bar-wrap">
               <div className="auth-check-bar" />
             </div>
-            <span className="auth-check-text">Connecting to Echly…</span>
+            <span className="auth-check-text">Connecting to Annote…</span>
           </div>
         </div>
       </div>
@@ -1357,7 +1391,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               borderRadius: 8,
               border: "none",
               background: "transparent",
-              color: "#78716C",
+              color: "#54495F",
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
@@ -1365,15 +1399,15 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               transition: "background 0.12s, color 0.12s",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = "#F0F1F3";
-              e.currentTarget.style.color = "#1C1917";
+              e.currentTarget.style.background = "var(--surface-hover)";
+              e.currentTarget.style.color = "#15101F";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.color = "#78716C";
+              e.currentTarget.style.color = "#54495F";
             }}
             title="Close"
-            aria-label="Close Echly"
+            aria-label="Close Annote"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -1388,9 +1422,9 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                 <circle cx="8" cy="10" r="1" fill="currentColor"/>
               </svg>
             </div>
-            <div className="auth-title">Sign in to use Echly</div>
+            <div className="auth-title">Sign in to use Annote</div>
             <div className="auth-sub">
-              Capture voice or written feedback on any page — Echly will sync it to your workspace.
+              Capture voice or written feedback on any page — Annote will sync it to your workspace.
             </div>
             <button type="button" className="auth-cta" onClick={onTriggerLogin}>
               Open Login
@@ -1399,7 +1433,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               </svg>
             </button>
             <div className="auth-foot">
-              New to Echly?{" "}
+              New to Annote?{" "}
               <a
                 href="#"
                 onClick={(e) => { e.preventDefault(); onTriggerLogin(); }}
@@ -1455,7 +1489,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             left: 0,
             right: 0,
             height: 2,
-            background: "linear-gradient(90deg, #C3DFFE, #1775E0)",
+            background: "linear-gradient(90deg, #DCD5F0, #5A49BF)",
             opacity: 0.9,
             pointerEvents: "none",
             zIndex: 5,
@@ -1505,6 +1539,12 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           onTriggerLogin={onTriggerLogin}
           globalSessionModeActive={uiGlobal.session.status !== "idle"}
           globalSessionPaused={uiGlobal.session.status === "paused"}
+          editPauseTooltipVisible={uiGlobal.editPauseTooltipVisible ?? false}
+          onSetEditPauseTooltip={(visible) =>
+            chrome.runtime.sendMessage({ type: "ECHLY_SET_EDIT_PAUSE_TOOLTIP", visible }).catch((err) =>
+              logSendMessageRejection("ECHLY_SET_EDIT_PAUSE_TOOLTIP", err)
+            )
+          }
           onSessionModeStart={() => {
             window.__ECHLY_ENSURE_KEEPALIVE__?.();
             chrome.runtime.sendMessage({ type: "ECHLY_SESSION_MODE_START" }).catch((err) =>
@@ -1694,6 +1734,7 @@ function normalizeGlobalState(state: GlobalUIState | undefined): GlobalUIState |
     feedbackLimitMessage: typeof state.feedbackLimitMessage === "string" ? state.feedbackLimitMessage : null,
     feedbackUpgradePlan: typeof state.feedbackUpgradePlan === "string" ? state.feedbackUpgradePlan : null,
     feedbackJobs: Array.isArray(state.feedbackJobs) ? state.feedbackJobs : [],
+    editPauseTooltipVisible: state.editPauseTooltipVisible === true,
   };
 }
 

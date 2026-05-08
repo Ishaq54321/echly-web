@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Echly",
+  "name": "Annote",
   "version": "1.0",
   "description": "Capture screenshots and submit feedback",
   "icons": {
@@ -12,7 +12,7 @@
   "permissions": ["activeTab", "storage", "scripting", "alarms"],
   "host_permissions": ["<all_urls>"],
   "action": {
-    "default_title": "Echly",
+    "default_title": "Annote",
     "default_icon": {
       "16": "assets/icon16.png",
       "32": "assets/icon32.png"

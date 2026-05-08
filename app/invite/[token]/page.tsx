@@ -185,7 +185,7 @@ function PrimaryButton({
         fontSize: 16,
         fontWeight: 600,
         letterSpacing: "-0.2px",
-        boxShadow: "0 2px 8px rgba(23,117,224,0.25), 0 1px 3px rgba(23,117,224,0.15)",
+        boxShadow: "0 2px 8px rgba(90,73,191,0.25), 0 1px 3px rgba(90,73,191,0.15)",
         cursor: loading || disabled ? "not-allowed" : "pointer",
         opacity: loading || disabled ? 0.65 : 1,
         display: "flex",
@@ -291,7 +291,7 @@ function PasswordInput({
             ...inputStyle,
             paddingRight: '44px',
             border: focused ? '1.5px solid var(--brand)' : '1.5px solid var(--border)',
-            boxShadow: focused ? '0 0 0 3px rgba(23,117,224,0.12)' : 'none',
+            boxShadow: focused ? '0 0 0 3px rgba(90,73,191,0.12)' : 'none',
           }}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
@@ -733,11 +733,11 @@ export default function InviteAcceptPage() {
             textDecoration: "none",
           }}
         >
-          <div style={{ position: "relative", width: 36, height: 36, flexShrink: 0 }}>
-            <Image src="/Echly_logo.svg" alt="" fill sizes="36px" style={{ objectFit: "contain" }} />
+          <div style={{ position: "relative", width: 21, height: 26, flexShrink: 0 }}>
+            <Image src="/annote-logo-icon.svg" alt="Annote" fill sizes="21px" style={{ objectFit: "contain" }} />
           </div>
           <span style={{ fontSize: 22, fontWeight: 600, color: "var(--text-heading)", whiteSpace: "nowrap" }}>
-            Echly
+            Annote
           </span>
         </Link>
 
@@ -972,7 +972,7 @@ export default function InviteAcceptPage() {
                       alignItems: "center",
                       justifyContent: "center",
                       gap: "8px",
-                      boxShadow: "0 2px 8px rgba(23,117,224,0.25)",
+                      boxShadow: "0 2px 8px rgba(90,73,191,0.25)",
                       transition: "all 160ms ease",
                       outline: "none",
                       fontFamily: "inherit",

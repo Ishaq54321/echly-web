@@ -25,7 +25,7 @@ function CheckEmailContent() {
     : "/api/auth/forgot-password";
   const resendBody = isVerification ? undefined : JSON.stringify({ email });
   const subjectLine = isVerification
-    ? "Verify your email — Echly"
+    ? "Verify your email — Annote"
     : "Reset your password — single-use link";
   const expiryLabel = isVerification ? "1 hour" : "30 min";
   const stageSub = isVerification
@@ -112,8 +112,8 @@ function CheckEmailContent() {
         <div className="auth-left">
           <header className="auth-head">
             <span className="brand">
-              <span className="brand-mark">E</span>
-              <span>Echly</span>
+              <span className="brand-mark">A</span>
+              <span>Annote</span>
             </span>
             <div className="auth-meta">
               <span>Wrong email?</span>
@@ -237,7 +237,7 @@ function CheckEmailStage({
             <MailIcon size={16} />
           </span>
           <div className="label">
-            <b>Echly &lt;no-reply@echly.app&gt;</b>
+            <b>Annote &lt;no-reply@echly.app&gt;</b>
             <div className="sub">{stageSub}</div>
           </div>
         </div>
@@ -260,12 +260,12 @@ function CheckEmailStage({
             <div className="mb-row fresh">
               <span
                 className="av"
-                style={{ background: "linear-gradient(135deg, #1775E0, #0F5BB5)" }}
+                style={{ background: "linear-gradient(135deg, #FF6A3D, #D81E5B)" }}
               >
-                E
+                A
               </span>
               <div>
-                <div className="from">Echly</div>
+                <div className="from">Annote</div>
                 <div className="subj">{subjectLine}</div>
               </div>
               <span className="time">now</span>

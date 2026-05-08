@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #1C1917;
-  --color-active: #78716C;
-  --color-brand-primary: #1C1917;
-  --color-brand-accent: #1775E0;
+  --color-primary: #15101F;
+  --color-active: #54495F;
+  --color-brand-primary: #15101F;
+  --color-brand-accent: #5A49BF;
   --color-brand-soft: #F8F8F8;
-  --color-semantic-system: #1775E0;
+  --color-semantic-system: #5A49BF;
   --color-semantic-insight: #6049E7;
   --color-semantic-success: #18794E;
   --color-semantic-attention: #F77E2C;
@@ -15,6 +15,6 @@
 }
 
 :root {
-  --brand-primary: #1C1917;
+  --brand-primary: #15101F;
   --brand-primary-rgb: 28, 25, 23;
 }

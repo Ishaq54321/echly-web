@@ -33,7 +33,6 @@ export function KeepRecordingPill({ onDismiss, fading, placement }: KeepRecordin
           <svg viewBox="0 0 16 16" fill="none">
             <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
-          <span className="echly-tooltip">Dismiss</span>
         </button>
       </div>
     </div>

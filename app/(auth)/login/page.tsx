@@ -92,18 +92,18 @@ function LoginPageContent() {
         <div className="auth-left">
           <header className="auth-head">
             <span className="brand">
-              <span className="brand-mark">E</span>
-              <span>Echly</span>
+              <span className="brand-mark">A</span>
+              <span>Annote</span>
             </span>
           </header>
 
           <div className="auth-body">
             <div className="auth-meta" style={{ marginBottom: 14 }}>
-              <span>New to Echly?</span>
+              <span>New to Annote?</span>
               <Link href="/signup">Sign up</Link>
             </div>
             <h1 className="auth-h">
-              Log in to <span className="accent">Echly.</span>
+              Log in to <span className="accent">Annote.</span>
             </h1>
             <p className="auth-sub">
               Pick up your sessions, tickets, and reviews — exactly where the team left off.
@@ -231,7 +231,7 @@ function LogInStage() {
               <div className="sr-stack">
                 <span
                   className="av"
-                  style={{ background: "linear-gradient(135deg, #1775E0, #0F5BB5)" }}
+                  style={{ background: "linear-gradient(135deg, #5A49BF, #3D2F73)" }}
                 >
                   IM
                 </span>
@@ -300,7 +300,7 @@ function LogInStage() {
                 </span>
                 <span
                   className="av"
-                  style={{ background: "linear-gradient(135deg, #1775E0, #0F5BB5)" }}
+                  style={{ background: "linear-gradient(135deg, #5A49BF, #3D2F73)" }}
                 >
                   IM
                 </span>

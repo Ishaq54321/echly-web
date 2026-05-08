@@ -102,8 +102,8 @@ function AuthActionContent() {
         <div className="auth-left">
           <header className="auth-head">
             <span className="brand">
-              <span className="brand-mark">E</span>
-              <span>Echly</span>
+              <span className="brand-mark">A</span>
+              <span>Annote</span>
             </span>
           </header>
 

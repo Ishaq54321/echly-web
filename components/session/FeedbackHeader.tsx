@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   statusFromResolved,
   type FeedbackStatus,
@@ -15,6 +15,7 @@ import {
   Lock,
   Trash2,
   RotateCcw,
+  PencilLine,
 } from "lucide-react";
 import { AssignDropdown } from "@/components/feedback/AssignDropdown";
 import { PriorityDropdown } from "@/components/feedback/PriorityDropdown";
@@ -31,10 +32,6 @@ const actionBtnActive =
 
 const actionBtnDelete =
   "inline-flex h-[34px] w-[34px] items-center justify-center rounded-[7px] border border-[var(--border)] bg-transparent text-[var(--text-secondary)] hover:text-[var(--color-danger)] hover:border-[var(--color-danger)]/30 hover:bg-[var(--color-danger-bg)] transition-all cursor-pointer";
-
-// Resize AssignDropdown/PriorityDropdown trigger buttons to match action row height
-const dropdownBtnOverride =
-  "[&>div>button]:!h-[34px] [&>div>button]:!rounded-[7px] [&>div>button]:!text-[13px] [&>div>button]:!font-medium [&>div>button]:!px-3.5 [&>div>button]:!gap-2 [&>div>button]:!border [&>div>button]:!border-[var(--border)]";
 
 function StatusBadge({ status }: { status: FeedbackStatus }) {
   const base =
@@ -99,6 +96,7 @@ export interface SessionFeedbackHeaderProps {
   onSaveStateChange?: (state: 'saving' | 'saved' | 'error' | 'hidden') => void;
   canAssignTicket?: boolean;
   isWorkspaceMember?: boolean;
+  onSaveTitle?: (newTitle: string) => Promise<void>;
 }
 
 export function SessionFeedbackHeader({
@@ -126,6 +124,7 @@ export function SessionFeedbackHeader({
   onSaveStateChange,
   canAssignTicket = false,
   isWorkspaceMember = false,
+  onSaveTitle,
 }: SessionFeedbackHeaderProps) {
   const [resolveFlash, setResolveFlash] = useState(false);
   useEffect(() => {
@@ -134,6 +133,10 @@ export function SessionFeedbackHeader({
     const t = window.setTimeout(() => setResolveFlash(false), 420);
     return () => window.clearTimeout(t);
   }, [resolveAffirmationKey]);
+
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   const isResolved = item?.isResolved === true;
   const status = statusFromResolved(item?.isResolved);
@@ -195,10 +198,68 @@ export function SessionFeedbackHeader({
         </div>
 
         {/* Row 2: Title */}
-        {titleTrim ? (
-          <h1 className="text-[21px] font-semibold text-[var(--text-heading)] tracking-[-0.018em] leading-[1.25] m-0 mb-4">
-            {titleTrim}
-          </h1>
+        {titleTrim || isEditingTitle ? (
+          isEditingTitle && onSaveTitle ? (
+            <input
+              ref={titleInputRef}
+              type="text"
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  (e.target as HTMLInputElement).blur();
+                }
+                if (e.key === "Escape") {
+                  setIsEditingTitle(false);
+                  setTitleDraft("");
+                }
+              }}
+              onBlur={async () => {
+                const trimmed = titleDraft.trim();
+                if (trimmed && trimmed !== titleTrim) {
+                  try {
+                    await onSaveTitle(trimmed);
+                  } catch {
+                    // rollback handled by saveTitle in SessionPageClient
+                  }
+                }
+                setIsEditingTitle(false);
+              }}
+              className="w-full text-[21px] font-semibold text-[var(--text-heading)] tracking-[-0.018em] leading-[1.25] m-0 mb-4 bg-transparent border-none outline-none ring-0 focus:ring-2 focus:ring-[var(--brand)] focus:ring-offset-1 rounded-md px-1 -ml-1"
+              autoFocus
+            />
+          ) : (
+            <div
+              className="group flex items-start gap-0 hover:gap-3 mb-4 transition-all duration-150"
+              onClick={() => {
+                if (!onSaveTitle) return;
+                setTitleDraft(titleTrim);
+                setIsEditingTitle(true);
+                requestAnimationFrame(() => {
+                  titleInputRef.current?.focus();
+                  titleInputRef.current?.select();
+                });
+              }}
+              role={onSaveTitle ? "button" : undefined}
+              style={onSaveTitle ? { cursor: "pointer" } : undefined}
+            >
+              {onSaveTitle && (
+                <PencilLine
+                  size={16}
+                  strokeWidth={2}
+                  className="mt-[5px] shrink-0 text-[var(--brand)] opacity-0 group-hover:opacity-60 w-0 group-hover:w-4 overflow-hidden transition-all duration-150"
+                />
+              )}
+              <h1
+                className={`text-[21px] font-semibold tracking-[-0.018em] leading-[1.25] m-0 transition-colors duration-150 ${
+                  onSaveTitle ? "group-hover:text-[var(--brand)] text-[var(--text-heading)]" : "text-[var(--text-heading)]"
+                }`}
+              >
+                {titleTrim}
+              </h1>
+            </div>
+          )
         ) : null}
 
         {/* Row 3: Action buttons */}
@@ -252,7 +313,7 @@ export function SessionFeedbackHeader({
                 )}
                 {/* Assign — only when set, read-only for view/resolve viewers */}
                 {item && assigneeId ? (
-                  <div className={dropdownBtnOverride}>
+                  <div>
                     <AssignDropdown
                       feedbackId={item.id}
                       sessionId={""}
@@ -268,7 +329,7 @@ export function SessionFeedbackHeader({
                 ) : null}
                 {/* Priority — only when set, read-only for view/resolve viewers */}
                 {item && priority ? (
-                  <div className={dropdownBtnOverride}>
+                  <div>
                     <PriorityDropdown
                       feedbackId={item.id}
                       currentPriority={priority}
@@ -348,7 +409,7 @@ export function SessionFeedbackHeader({
                 ) : null}
                 {/* Assign (read-only dropdown) */}
                 {item && assigneeId && (
-                  <div className={dropdownBtnOverride}>
+                  <div>
                     <AssignDropdown
                       feedbackId={item.id}
                       sessionId={""}
@@ -364,7 +425,7 @@ export function SessionFeedbackHeader({
                 )}
                 {/* Priority (read-only dropdown) */}
                 {item && priority && (
-                  <div className={dropdownBtnOverride}>
+                  <div>
                     <PriorityDropdown
                       feedbackId={item.id}
                       currentPriority={priority}
@@ -427,7 +488,7 @@ export function SessionFeedbackHeader({
               ) : null}
               {/* Assign — manage when workspace member, read-only fallback for cross-workspace authed viewers */}
               {item && !isAnonymousViewer && canAssignTicket && isWorkspaceMember && onAssigned ? (
-                <div className={dropdownBtnOverride}>
+                <div>
                   <AssignDropdown
                     key={`assign-${item.id}`}
                     feedbackId={item.id}
@@ -441,7 +502,7 @@ export function SessionFeedbackHeader({
                   />
                 </div>
               ) : item && !isAnonymousViewer && !isWorkspaceMember && assigneeId ? (
-                <div className={dropdownBtnOverride}>
+                <div>
                   <AssignDropdown
                     feedbackId={item.id}
                     sessionId={""}
@@ -457,7 +518,7 @@ export function SessionFeedbackHeader({
               ) : null}
               {/* Priority — manage when workspace member, read-only fallback for cross-workspace authed viewers */}
               {item && !isAnonymousViewer && isWorkspaceMember && onPriorityChanged ? (
-                <div className={dropdownBtnOverride}>
+                <div>
                   <PriorityDropdown
                     key={`priority-${item.id}`}
                     feedbackId={item.id}
@@ -468,7 +529,7 @@ export function SessionFeedbackHeader({
                   />
                 </div>
               ) : item && !isAnonymousViewer && !isWorkspaceMember && priority ? (
-                <div className={dropdownBtnOverride}>
+                <div>
                   <PriorityDropdown
                     feedbackId={item.id}
                     currentPriority={priority}

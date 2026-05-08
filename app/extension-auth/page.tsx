@@ -60,7 +60,7 @@ export default function ExtensionAuthPage() {
 
   return (
     <div className="flex h-full items-center justify-center bg-[var(--surface-subtle)]">
-      <p className="text-[var(--text-secondary)]">Completing sign-in for Echly extension…</p>
+      <p className="text-[var(--text-secondary)]">Completing sign-in for Annote extension…</p>
     </div>
   );
 }

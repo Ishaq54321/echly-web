@@ -183,7 +183,7 @@ export async function sendPasswordResetEmail({
 }): Promise<void> {
   await sendEmailOrLog({
     to,
-    subject: "Reset your Echly password",
+    subject: "Reset your Annote password",
     html: passwordResetEmailHtml({ resetUrl, userName }),
   });
 }
@@ -199,7 +199,7 @@ export async function sendEmailVerification({
 }): Promise<void> {
   await sendEmailOrLog({
     to,
-    subject: "Verify your email — Echly",
+    subject: "Verify your email — Annote",
     html: emailVerificationHtml({ verifyUrl, userName }),
   });
 }

@@ -70,16 +70,16 @@ export function SystemNavigationRail({ onOpenCommandPalette }: SystemNavigationR
       <div className="flex-shrink-0 mb-3">
         <Link
           href="/dashboard"
-          className="w-[34px] h-[34px] rounded-full bg-[var(--brand)] flex items-center justify-center overflow-hidden flex-shrink-0"
-          aria-label="Echly home"
+          className="w-[24px] h-[24px] flex items-center justify-center flex-shrink-0"
+          aria-label="Annote home"
         >
           <Image
-            src="/Echly_logo.svg"
-            alt=""
-            width={18}
-            height={18}
-            sizes="18px"
-            className="w-[18px] h-[18px]"
+            src="/annote-logo-icon.svg"
+            alt="Annote"
+            width={24}
+            height={24}
+            sizes="24px"
+            className="w-[24px] h-[24px] object-contain"
           />
         </Link>
       </div>

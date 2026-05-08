@@ -1,6 +1,6 @@
 "use client";
 
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { collection, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 interface Entry {
@@ -41,7 +41,12 @@ export function retainSessionsListTickle(
   entry.callbacks.add(onChange);
 
   if (!entry.unsubscribe) {
-    const q = query(collection(db, "sessions"), where("workspaceId", "==", wid));
+    const q = query(
+      collection(db, "sessions"),
+      where("workspaceId", "==", wid),
+      orderBy("updatedAt", "desc"),
+      limit(50)
+    );
     entry.unsubscribe = onSnapshot(
       q,
       (snap) => {

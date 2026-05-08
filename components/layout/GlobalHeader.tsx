@@ -32,7 +32,7 @@ export function GlobalHeader() {
           <Link href="/settings?tab=billing">
             <button
               type="button"
-              className="inline-flex items-center h-[34px] px-4 rounded-[var(--radius-btn)] bg-[var(--brand)] text-white text-[13px] font-semibold tracking-[-0.005em] border-0 cursor-pointer hover:bg-[var(--brand-hover)] transition-colors shadow-[0_1px_0_rgba(255,255,255,0.2)_inset,0_1px_2px_rgba(23,117,224,0.3)]"
+              className="inline-flex items-center h-[34px] px-4 rounded-[var(--radius-btn)] bg-[var(--brand)] text-white text-[13px] font-semibold tracking-[-0.005em] border-0 cursor-pointer hover:bg-[var(--brand-hover)] transition-colors shadow-[0_1px_0_rgba(255,255,255,0.2)_inset,0_1px_2px_rgba(90,73,191,0.3)]"
             >
               Upgrade
             </button>

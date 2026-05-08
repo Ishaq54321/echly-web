@@ -3,11 +3,16 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
-import { X, Check, RotateCcw, RefreshCw, Paperclip, Smile, AtSign, PanelRightClose } from "lucide-react";
-import EmojiPicker from "emoji-picker-react";
+import { X, Check, RotateCcw, Paperclip, Smile, AtSign, PanelRightClose } from "lucide-react";
 import type { Comment, CommentAttachment, CommentPosition } from "@/lib/domain/comment";
 import { CommentItem } from "@/components/comments/CommentItem";
-import { TiptapCommentEditor, extractFromDoc } from "@/components/comments/TiptapCommentEditor";
+import { extractFromDoc } from "@/components/comments/TiptapCommentEditor";
+
+const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
+const TiptapCommentEditor = dynamic(
+  () => import("@/components/comments/TiptapCommentEditor").then((m) => m.TiptapCommentEditor),
+  { ssr: false }
+);
 import { Tooltip } from "@/components/ui/Tooltip";
 import { CanvasEmptyState } from "@/components/empty/CanvasEmptyState";
 import { NoCommentsIllu } from "@/components/empty/canvasIllustrations";
@@ -54,7 +59,6 @@ export interface CommentPanelProps {
   deleteComment?: (commentId: string) => Promise<void>;
   onReactionsChanged?: (commentId: string, reactions: Record<string, { userIds: string[]; userNames: string[] }>) => void;
   threadCounts?: CommentPanelThreadCounts | null;
-  onRefreshComments?: () => void;
   participants?: { uid: string; displayName: string; email: string; avatarUrl: string | null }[];
   showToast?: (message: string) => void;
   ticketTitleMap?: Map<string, string>;
@@ -167,6 +171,8 @@ const ThreadBlock = memo(function ThreadBlock({
   const [pulseActive, setPulseActive] = useState(false);
   const [replyPendingAttachments, setReplyPendingAttachments] = useState<CommentAttachment[]>([]);
   const [attachmentModalOpen, setAttachmentModalOpen] = useState(false);
+  const [replyAvatarError, setReplyAvatarError] = useState(false);
+  useEffect(() => setReplyAvatarError(false), [currentUserAvatarUrl]);
   const replyFileInputRef = useRef<HTMLInputElement>(null);
   const [replyEmojiOpen, setReplyEmojiOpen] = useState(false);
   const [replyHasContent, setReplyHasContent] = useState(false);
@@ -302,8 +308,13 @@ const ThreadBlock = memo(function ThreadBlock({
                 {/* Row 1: Avatar + Tiptap Editor */}
                 <div className="flex items-start gap-3 px-4 pt-4">
                   <div className="w-[24px] h-[24px] rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold text-[12px] flex items-center justify-center shrink-0 overflow-hidden mt-0.5">
-                    {currentUserAvatarUrl ? (
-                      <img src={currentUserAvatarUrl} alt="" className="w-full h-full object-cover" />
+                    {currentUserAvatarUrl && !replyAvatarError ? (
+                      <img
+                        src={currentUserAvatarUrl}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        onError={() => setReplyAvatarError(true)}
+                      />
                     ) : (
                       currentUserInitial || "?"
                     )}
@@ -764,7 +775,6 @@ export function CommentPanel({
   deleteComment,
   onReactionsChanged,
   threadCounts: threadCountsProp,
-  onRefreshComments,
   participants,
   showToast,
   ticketTitleMap,
@@ -776,6 +786,8 @@ export function CommentPanel({
   const [filterTab, setFilterTab] = useState<CommentFilterTab>("all");
   const [highlightThreadId, setHighlightThreadId] = useState<string | null>(null);
   const [composeEmojiOpen, setComposeEmojiOpen] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
+  useEffect(() => setAvatarError(false), [currentUserAvatarUrl]);
   const threadRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const composeEmojiButtonRef = useRef<HTMLButtonElement>(null);
@@ -886,8 +898,13 @@ export function CommentPanel({
             onClick={() => setComposeExpanded(true)}
           >
             <div className="w-[26px] h-[26px] rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold text-[10.5px] flex items-center justify-center shrink-0 overflow-hidden">
-              {currentUserAvatarUrl ? (
-                <img src={currentUserAvatarUrl} alt="" className="w-full h-full object-cover" />
+              {currentUserAvatarUrl && !avatarError ? (
+                <img
+                  src={currentUserAvatarUrl}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  onError={() => setAvatarError(true)}
+                />
               ) : (
                 currentUserInitial || "?"
               )}
@@ -907,8 +924,13 @@ export function CommentPanel({
             {/* Row 1: Avatar + Tiptap editor */}
             <div className="flex items-start gap-3 px-4 pt-4">
               <div className="w-[26px] h-[26px] rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold text-[10.5px] flex items-center justify-center shrink-0 overflow-hidden mt-0.5">
-                {currentUserAvatarUrl ? (
-                  <img src={currentUserAvatarUrl} alt="" className="w-full h-full object-cover" />
+                {currentUserAvatarUrl && !avatarError ? (
+                  <img
+                    src={currentUserAvatarUrl}
+                    alt=""
+                    className="w-full h-full object-cover"
+                    onError={() => setAvatarError(true)}
+                  />
                 ) : (
                   currentUserInitial || "?"
                 )}
@@ -1179,18 +1201,6 @@ export function CommentPanel({
       <div className="shrink-0 px-5 pt-4 pb-2.5 text-[var(--text-secondary)] text-[13px] font-medium">
         <b className="text-[var(--text-heading)] font-semibold">{commentRootCount} Comment{commentRootCount !== 1 ? 's' : ''}</b>
         <div className="float-right flex items-center gap-1">
-          {onRefreshComments ? (
-            <Tooltip content="Refresh">
-              <button
-                type="button"
-                onClick={onRefreshComments}
-                className="p-1.5 rounded-lg text-[var(--text-body)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)] transition-colors cursor-pointer border-0 bg-transparent"
-                aria-label="Refresh comments"
-              >
-                <RefreshCw className="h-4 w-4" strokeWidth={1.5} />
-              </button>
-            </Tooltip>
-          ) : null}
           <Tooltip content="Collapse">
             <button
               type="button"

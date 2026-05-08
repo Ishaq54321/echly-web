@@ -16,7 +16,7 @@ export async function sendSubscriptionConfirmationEmail(params: {
   try {
     await sendEmailOrLog({
       to: params.to,
-      subject: "Welcome to Echly Business!",
+      subject: "Welcome to Annote Business!",
       html: subscriptionConfirmationEmailHtml({
         workspaceName: params.workspaceName,
         seatCount: params.seatCount,
@@ -37,7 +37,7 @@ export async function sendSubscriptionCancelledEmail(params: {
   try {
     await sendEmailOrLog({
       to: params.to,
-      subject: "Your Echly Business subscription has ended",
+      subject: "Your Annote Business subscription has ended",
       html: subscriptionCancelledEmailHtml({
         workspaceName: params.workspaceName,
         upgradeUrl: `${APP_URL}/settings?tab=billing`,
@@ -56,7 +56,7 @@ export async function sendPaymentFailedEmail(params: {
   try {
     await sendEmailOrLog({
       to: params.to,
-      subject: "Action needed: Payment failed for Echly",
+      subject: "Action needed: Payment failed for Annote",
       html: paymentFailedEmailHtml({
         workspaceName: params.workspaceName,
         portalUrl: params.portalUrl,

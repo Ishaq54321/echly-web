@@ -101,19 +101,19 @@ export default function PublicViewerBanner(_props: PublicViewerBannerProps) {
             display: "inline-flex",
             alignItems: "center",
             gap: 7,
-            boxShadow: "0 1px 3px rgba(23,117,224,0.25)",
+            boxShadow: "0 1px 3px rgba(90,73,191,0.25)",
             transition: "all 140ms ease",
           }}
           onClick={handleSignIn}
           onMouseEnter={(e) => {
             const btn = e.currentTarget;
             btn.style.background = "var(--brand-hover)";
-            btn.style.boxShadow = "0 2px 10px rgba(23,117,224,0.30)";
+            btn.style.boxShadow = "0 2px 10px rgba(90,73,191,0.30)";
           }}
           onMouseLeave={(e) => {
             const btn = e.currentTarget;
             btn.style.background = "var(--brand)";
-            btn.style.boxShadow = "0 1px 3px rgba(23,117,224,0.25)";
+            btn.style.boxShadow = "0 1px 3px rgba(90,73,191,0.25)";
           }}
         >
           <LogIn size={15} color="rgba(255,255,255,0.9)" aria-hidden />

@@ -43,6 +43,7 @@ type GlobalUIState = {
   feedbackLimitMessage?: string | null;
   feedbackUpgradePlan?: string | null;
   feedbackJobs?: Array<{ id: string; status: string; createdAt: number; errorMessage?: string }>;
+  editPauseTooltipVisible?: boolean;
 };
 
 type RuntimeMessage = {
@@ -150,6 +151,7 @@ if (window.__ECHLY_BOOTSTRAP_LOADED__) {
       feedbackLimitMessage: typeof state.feedbackLimitMessage === "string" ? state.feedbackLimitMessage : null,
       feedbackUpgradePlan: typeof state.feedbackUpgradePlan === "string" ? state.feedbackUpgradePlan : null,
       feedbackJobs: Array.isArray(state.feedbackJobs) ? state.feedbackJobs : [],
+      editPauseTooltipVisible: state.editPauseTooltipVisible === true,
     };
   }
 

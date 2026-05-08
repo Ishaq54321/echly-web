@@ -109,6 +109,7 @@ export function SessionOverlay({
   const captureTooltipShownRef = useRef(false);
   const [tooltipVisible, setTooltipVisible] = useState(false);
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
+  const [hoveringEchlyUi, setHoveringEchlyUi] = useState(false);
 
   useEffect(() => {
     if (sessionMode) {
@@ -131,16 +132,20 @@ export function SessionOverlay({
     tooltipVisible &&
     sessionCursorActive &&
     !sessionFeedbackPending &&
-    !captureTooltipShownRef.current;
+    !captureTooltipShownRef.current &&
+    !hoveringEchlyUi;
 
   useEffect(() => {
-    if (!showCaptureTooltip) return;
+    if (!sessionCursorActive || !tooltipVisible || captureTooltipShownRef.current) return;
     const handleMove = (e: MouseEvent) => {
       setCursorPos({ x: e.clientX, y: e.clientY });
+      const target = e.target as Element | null;
+      const overEchly = !!target?.closest?.("[data-echly-ui]");
+      setHoveringEchlyUi(overEchly);
     };
     document.addEventListener("mousemove", handleMove, { passive: true });
     return () => document.removeEventListener("mousemove", handleMove);
-  }, [showCaptureTooltip]);
+  }, [sessionCursorActive, tooltipVisible]);
 
   /**
    * Local captureMode override: when the user switches from text → voice inside the panel,
@@ -286,6 +291,7 @@ export function SessionOverlay({
         return (
           <div
             aria-hidden
+            className="echly-capture-tooltip"
             style={{
               position: "fixed",
               left,

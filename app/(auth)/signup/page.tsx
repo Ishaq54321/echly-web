@@ -115,8 +115,8 @@ function SignupPageContent() {
         <div className="auth-left">
           <header className="auth-head">
             <span className="brand">
-              <span className="brand-mark">E</span>
-              <span>Echly</span>
+              <span className="brand-mark">A</span>
+              <span>Annote</span>
             </span>
           </header>
 
@@ -129,7 +129,7 @@ function SignupPageContent() {
               Start finding bugs <span className="accent">faster.</span>
             </h1>
             <p className="auth-sub">
-              Join the teams using Echly to turn web feedback into shipped fixes. Free for 14 days, no card required.
+              Join the teams using Annote to turn web feedback into shipped fixes. Free for 14 days, no card required.
             </p>
 
             <button
@@ -214,7 +214,7 @@ function SignupPageContent() {
             </form>
 
             <p className="auth-terms">
-              By creating an account you agree to Echly&apos;s{" "}
+              By creating an account you agree to Annote&apos;s{" "}
               <a href="#" className="ilink">Terms of Service</a> and{" "}
               <a href="#" className="ilink">Privacy Policy</a>. We&apos;ll send you product updates — you can opt out anytime.
             </p>
@@ -284,7 +284,7 @@ function SignUpStage() {
                 <div className="tc-stack">
                   <span
                     className="av"
-                    style={{ background: "linear-gradient(135deg, #1775E0, #0F5BB5)" }}
+                    style={{ background: "linear-gradient(135deg, #5A49BF, #3D2F73)" }}
                   >
                     IM
                   </span>
@@ -319,7 +319,7 @@ function SignUpStage() {
           </div>
         </div>
 
-        <div className="stage-caption">A real session ticket from a real Echly team.</div>
+        <div className="stage-caption">A real session ticket from a real Annote team.</div>
       </div>
     </div>
   );

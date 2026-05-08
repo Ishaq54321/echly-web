@@ -85,7 +85,7 @@ export function ImageViewer({
             <button
               type="button"
               onClick={() => setEditMode(true)}
-              className="flex items-center gap-2 px-5 py-3 bg-[#1C1C1E] hover:bg-[#2C2C2E] text-white text-[14px] font-medium rounded-2xl shadow-2xl border border-white/10 transition-colors"
+              className="flex items-center gap-2 px-5 py-3 bg-[#15101F] hover:bg-[#54495F] text-white text-[14px] font-medium rounded-2xl shadow-2xl border border-white/10 transition-colors"
             >
               <Pencil className="h-4 w-4" strokeWidth={2} />
               Edit

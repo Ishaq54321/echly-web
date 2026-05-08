@@ -246,30 +246,33 @@ export async function markRead(notificationId: string): Promise<void> {
   const user = auth.currentUser;
   if (!user) return;
 
+  const prevNotifications = snapshot.notifications;
+  const prevUnreadCount = snapshot.unreadCount;
+  const target = prevNotifications.find((n) => n.id === id);
+  if (target?.read) return;
+
   // Optimistic local update.
-  const prev = snapshot.notifications;
-  const target = prev.find((n) => n.id === id);
-  if (target && !target.read) {
-    setSnapshot({
-      notifications: prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
-      unreadCount: Math.max(0, snapshot.unreadCount - 1),
-    });
-  } else if (target?.read) {
-    return;
-  } else {
-    setSnapshot({
-      notifications: prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
-    });
-  }
+  setSnapshot({
+    notifications: prevNotifications.map((n) =>
+      n.id === id ? { ...n, read: true } : n
+    ),
+    unreadCount: target ? Math.max(0, prevUnreadCount - 1) : prevUnreadCount,
+  });
 
   try {
-    await fetch(`/api/notifications`, {
+    const res = await fetch(`/api/notifications`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ notificationId: id }),
     });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
   } catch (err) {
     console.error("[notifications] markRead failed", err);
+    setSnapshot({
+      notifications: prevNotifications,
+      unreadCount: prevUnreadCount,
+      error: "Failed to mark notification as read",
+    });
   }
 }
 
@@ -290,19 +293,25 @@ export async function markAllRead(): Promise<void> {
   const user = auth.currentUser;
   if (!user) return;
 
+  const prevNotifications = snapshot.notifications;
+  const prevUnreadCount = snapshot.unreadCount;
+
   // Optimistic local update.
-  const prev = snapshot.notifications;
   setSnapshot({
-    notifications: prev.map((n) => (n.read ? n : { ...n, read: true })),
+    notifications: prevNotifications.map((n) => (n.read ? n : { ...n, read: true })),
     unreadCount: 0,
   });
 
   try {
-    await fetch(`/api/notifications/read-all`, {
-      method: "POST",
-    });
+    const res = await fetch(`/api/notifications/read-all`, { method: "POST" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
   } catch (err) {
     console.error("[notifications] markAllRead failed", err);
+    setSnapshot({
+      notifications: prevNotifications,
+      unreadCount: prevUnreadCount,
+      error: "Failed to mark all as read",
+    });
   }
 }
 
