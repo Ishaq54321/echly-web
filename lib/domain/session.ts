@@ -77,6 +77,11 @@ export interface Session {
    * Not persisted/returned by the backend.
    */
   isOptimistic?: boolean;
+
+  /** Hydrated server-side from owner workspace; not stored on session doc. */
+  ownerBrandLogoUrl?: string | null;
+  /** Hydrated server-side; true when owner workspace plan/entitlement allows custom branding. */
+  ownerBrandingEnabled?: boolean;
 }
 
 /** Counts by status for one session (aligned with session denormalized count fields). */
@@ -210,6 +215,15 @@ export function sessionFromApiItem(item: unknown): Session {
   if (fc !== undefined) session.feedbackCount = fc;
   const vc = readCount("viewCount");
   if (vc !== undefined) session.viewCount = vc;
+
+  const ownerBrandLogoUrl = Reflect.get(item, "ownerBrandLogoUrl");
+  if (typeof ownerBrandLogoUrl === "string" || ownerBrandLogoUrl === null) {
+    session.ownerBrandLogoUrl = ownerBrandLogoUrl;
+  }
+  const ownerBrandingEnabled = Reflect.get(item, "ownerBrandingEnabled");
+  if (typeof ownerBrandingEnabled === "boolean") {
+    session.ownerBrandingEnabled = ownerBrandingEnabled;
+  }
 
   const rvRaw = Reflect.get(item, "recentViewers");
   if (Array.isArray(rvRaw)) {

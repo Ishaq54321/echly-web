@@ -64,6 +64,18 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Reject oversized data URLs before decoding to avoid wasted memory.
+    // Base64 expands ~33%, so 14MB string ≈ 10MB binary.
+    const MAX_DATA_URL_LENGTH = 14 * 1024 * 1024;
+    if (imageDataUrl.length > MAX_DATA_URL_LENGTH) {
+      return apiError({
+        code: "INVALID_INPUT",
+        message: "Screenshot too large. Maximum 10MB.",
+        status: 413,
+        init: { headers: corsHeaders(req) },
+      });
+    }
+
     const sid = sessionId.trim();
     const screenshotIdRaw =
       typeof screenshotId === "string" ? screenshotId.trim() : "";

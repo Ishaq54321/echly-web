@@ -286,11 +286,14 @@ export default function SessionPageClient({
   isPublicRoute = false,
   onSessionLoaded,
   onAccessBlocked,
+  onBrandingResolved,
 }: {
   sessionId: string;
   isPublicRoute?: boolean;
   onSessionLoaded?: (info: SessionLoadedInfo) => void;
   onAccessBlocked?: () => void;
+  /** Fired once the bundle resolves with the session-owner's whitelabel branding info. */
+  onBrandingResolved?: (info: { brandLogoUrl: string | null; brandingEnabled: boolean }) => void;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -360,6 +363,14 @@ export default function SessionPageClient({
    * link_view viewers without an explicit grant get false here and use the bundle path.
    */
   const [hasDirectSessionGrant, setHasDirectSessionGrant] = useState(false);
+  /**
+   * Session-owner whitelabel branding hydrated from the bundle/REST GET. Held separately
+   * from `session` because the realtime Firestore listener overwrites `session` with a
+   * doc-derived object that lacks these server-hydrated fields.
+   */
+  const [ownerBrandLogoUrl, setOwnerBrandLogoUrl] = useState<string | null>(null);
+  const [ownerBrandingEnabled, setOwnerBrandingEnabled] = useState<boolean>(false);
+  const [brandingResolved, setBrandingResolved] = useState(false);
   /** Pagination state for bundle-mode viewers (anon + authed link_view). */
   const [feedbackCursor, setFeedbackCursor] = useState<string | null>(null);
   const [hasMoreFeedbackPaginated, setHasMoreFeedbackPaginated] = useState(false);
@@ -1492,6 +1503,19 @@ export default function SessionPageClient({
         // so the next render shows session data without waiting for the onSnapshot tick.
         hydrateSessionFromBundle(sessionId.trim(), assembledSession);
 
+        // Whitelabel branding: server-hydrated, kept in dedicated state because the
+        // realtime listener will overwrite `session` without these fields.
+        const resolvedBrandUrl =
+          typeof (assembledSession as { ownerBrandLogoUrl?: unknown }).ownerBrandLogoUrl === "string"
+            ? ((assembledSession as { ownerBrandLogoUrl: string }).ownerBrandLogoUrl)
+            : null;
+        const resolvedBrandEnabled =
+          (assembledSession as { ownerBrandingEnabled?: unknown }).ownerBrandingEnabled === true;
+        setOwnerBrandLogoUrl(resolvedBrandUrl);
+        setOwnerBrandingEnabled(resolvedBrandEnabled);
+        setBrandingResolved(true);
+        onBrandingResolved?.({ brandLogoUrl: resolvedBrandUrl, brandingEnabled: resolvedBrandEnabled });
+
         /* View count: recorded server-side in GET /api/session-page-bundle (see recordSessionViewIfNewRepo). */
       } else {
         const url = `/api/sessions/${encodeURIComponent(sessionId)}`;
@@ -1581,6 +1605,15 @@ export default function SessionPageClient({
         } as Session;
         setSession(assembledLegacySession);
         hydrateSessionFromBundle(sessionId, assembledLegacySession);
+        const resolvedBrandUrlLegacy =
+          typeof (assembledLegacySession as { ownerBrandLogoUrl?: unknown }).ownerBrandLogoUrl === "string"
+            ? ((assembledLegacySession as { ownerBrandLogoUrl: string }).ownerBrandLogoUrl)
+            : null;
+        const resolvedBrandEnabledLegacy =
+          (assembledLegacySession as { ownerBrandingEnabled?: unknown }).ownerBrandingEnabled === true;
+        setOwnerBrandLogoUrl(resolvedBrandUrlLegacy);
+        setOwnerBrandingEnabled(resolvedBrandEnabledLegacy);
+        onBrandingResolved?.({ brandLogoUrl: resolvedBrandUrlLegacy, brandingEnabled: resolvedBrandEnabledLegacy });
         const cap = accessRoot.access?.capabilities;
         setSessionAccess(
           cap
@@ -2856,6 +2889,8 @@ export default function SessionPageClient({
             )}`
           )
         }
+        brandLogoUrl={ownerBrandLogoUrl}
+        brandingEnabled={ownerBrandingEnabled}
       />
     );
   }
@@ -3090,6 +3125,9 @@ export default function SessionPageClient({
             sessionId={sessionId}
             sessionTitle={session ? (session.title ?? "").trim() : ""}
             session={session}
+            ownerBrandLogoUrl={ownerBrandLogoUrl}
+            ownerBrandingEnabled={ownerBrandingEnabled}
+            brandingResolved={brandingResolved}
             onSessionRenameSuccess={handleSessionRenameFromMenu}
             onSetSessionArchived={handleSetSessionArchivedFromMenu}
             onRequestDeleteSession={handleRequestDeleteSessionFromMenu}
@@ -3117,7 +3155,7 @@ export default function SessionPageClient({
           style={{
             gridTemplateColumns: (isCommentPanelOpen || activeThreadId != null) ? '346px 1fr 360px' : '346px 1fr',
             gap: '14px',
-            padding: '14px 14px 14px',
+            padding: '0px 14px 14px',
             transition: 'grid-template-columns 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
@@ -3324,8 +3362,12 @@ export default function SessionPageClient({
             className="fixed inset-0 z-[60] bg-black/15 backdrop-blur-[1px]"
             onClick={() => setNavPanelOpen(false)}
           />
-          <div className="fixed top-0 left-0 bottom-0 z-[61] w-[220px] bg-[var(--surface)] animate-in slide-in-from-left duration-200">
-            <GlobalRail forceExpanded />
+          <div className="fixed top-0 left-0 bottom-0 z-[61] w-[290px] bg-[var(--surface)] animate-in slide-in-from-left duration-200 flex justify-center">
+            <GlobalRail
+              forceExpanded
+              expandedWidthClass="w-[260px]"
+              onForceClose={() => setNavPanelOpen(false)}
+            />
           </div>
         </>
       )}

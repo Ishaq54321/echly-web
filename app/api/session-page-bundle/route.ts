@@ -10,6 +10,7 @@ import {
 import { listPendingAccessRequests } from "@/lib/repositories/accessRequestsRepository.server";
 import { serializeFeedback } from "@/lib/server/serializeFeedback";
 import { serializeSession } from "@/lib/server/serializeSession";
+import { hydrateOwnerBranding } from "@/lib/server/hydrateOwnerBranding";
 import { corsHeaders } from "@/lib/server/cors";
 import { fireAndForget } from "@/lib/server/fireAndForget";
 import { checkRateLimit, clientKeyFromRequest } from "@/lib/server/rateLimit";
@@ -160,34 +161,42 @@ export async function GET(req: NextRequest) {
         });
       }
     }
-    const sessionJson = serializeSession(session, access);
-    const requestPayload = ctx.accessRequest ?? ({ pendingResolve: false } as const);
-
     // Bundle includes feedback whenever the viewer cannot use Firestore listeners:
     //   - anonymous viewers (no auth)
     //   - authed link_view viewers (no member doc, no sessionAccess mirror — rules
     //     would deny their listener attach, so they need bundle feedback)
     // Workspace members and explicit session-members skip — they use realtime listeners.
     const needsBundleFeedback = !access.hasDirectSessionGrant;
+    const canResolveAccess = !!access?.capabilities.canResolve;
+
+    const [sessionWithBranding, feedbackPageResult, pendingAccessList] = await Promise.all([
+      hydrateOwnerBranding(session),
+      needsBundleFeedback
+        ? getSessionFeedbackPageForUserWithStringCursorRepo({
+            sessionId: trimmedSid,
+            limit: BUNDLE_FEEDBACK_LIMIT,
+            cursor: undefined,
+            session,
+          })
+        : Promise.resolve(null),
+      canResolveAccess
+        ? listPendingAccessRequests(trimmedSid)
+        : Promise.resolve([] as Awaited<ReturnType<typeof listPendingAccessRequests>>),
+    ]);
+
+    const sessionJson = serializeSession(sessionWithBranding, access);
+    const requestPayload = ctx.accessRequest ?? ({ pendingResolve: false } as const);
+
     let feedbackPayload: Record<string, unknown>[] | undefined;
     let nextCursor: string | null | undefined;
     let hasMore: boolean | undefined;
-    if (needsBundleFeedback) {
-      const pageResult = await getSessionFeedbackPageForUserWithStringCursorRepo({
-        sessionId: trimmedSid,
-        limit: BUNDLE_FEEDBACK_LIMIT,
-        cursor: undefined,
-      });
-      feedbackPayload = pageResult.feedback.map((f) => serializeFeedback(f, access));
-      nextCursor = pageResult.nextCursor;
-      hasMore = pageResult.hasMore;
+    if (feedbackPageResult) {
+      feedbackPayload = feedbackPageResult.feedback.map((f) => serializeFeedback(f, access));
+      nextCursor = feedbackPageResult.nextCursor;
+      hasMore = feedbackPageResult.hasMore;
     }
 
-    let pendingAccessRequestsCount = 0;
-    if (access?.capabilities.canResolve) {
-      const pending = await listPendingAccessRequests(trimmedSid);
-      pendingAccessRequestsCount = pending.length;
-    }
+    const pendingAccessRequestsCount = pendingAccessList.length;
 
     return apiSuccess(
       {

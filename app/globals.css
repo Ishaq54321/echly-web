@@ -8328,6 +8328,11 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
   100% { background-position: -200% 0; }
 }
 
+@keyframes brand-logo-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 /* ─── Session page skeletons ─── */
 .skel-block {
   background: linear-gradient(

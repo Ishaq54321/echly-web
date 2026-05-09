@@ -45,6 +45,13 @@ export function serializeSession(session: Session, access: AccessContext): Recor
     accessLevel,
     generalAccess: session.generalAccess,
     hasConfiguredShare: session.hasConfiguredShare === true,
+    /**
+     * Whitelabel branding from the session owner's workspace. Always sent (no canResolve gate)
+     * because guest viewers must see the brand logo on the public session view. Server reads
+     * the workspace doc and computes entitlement; nothing sensitive is leaked.
+     */
+    ownerBrandLogoUrl: typeof session.ownerBrandLogoUrl === "string" ? session.ownerBrandLogoUrl : null,
+    ownerBrandingEnabled: session.ownerBrandingEnabled === true,
     workspaceId: can ? session.workspaceId : null,
     createdByUserId: can ? session.createdByUserId : null,
     archived,

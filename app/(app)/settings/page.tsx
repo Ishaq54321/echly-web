@@ -22,6 +22,7 @@ import {
   Eye,
   EyeOff,
   Gem,
+  Upload,
 } from "lucide-react";
 import { ImageCropModal } from "@/components/ui/ImageCropModal";
 import { InviteMemberModal } from "@/components/workspace/InviteMemberModal";
@@ -46,6 +47,7 @@ import { MinimalLoader } from "@/components/ui/MinimalLoader";
 import { authFetch } from "@/lib/authFetch";
 import { useBillingStore } from "@/lib/store/billingStore";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { PLANS, type PlanId } from "@/lib/billing/plans";
 
 /* Premium workspace settings: wide layout, strong hierarchy */
 const SETTINGS_CARD =
@@ -320,6 +322,11 @@ function WorkspaceTab({
   const lastWorkspaceIdRef = useRef<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [brandLogoUrl, setBrandLogoUrl] = useState<string | null>(null);
+  const [uploadingBrandLogo, setUploadingBrandLogo] = useState(false);
+  const [brandLogoUpgradeOpen, setBrandLogoUpgradeOpen] = useState(false);
+  const brandLogoCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const brandLogoInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [savedOk, setSavedOk] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -331,6 +338,10 @@ function WorkspaceTab({
   useEffect(() => {
     setLogoUrl(workspace?.logoUrl ?? null);
   }, [workspace?.logoUrl]);
+
+  useEffect(() => {
+    setBrandLogoUrl(workspace?.brandLogoUrl ?? null);
+  }, [workspace?.brandLogoUrl]);
 
   // Refresh logo signed URL on mount (Phase 7)
   useEffect(() => {
@@ -430,6 +441,91 @@ function WorkspaceTab({
     }
   }
 
+  const planId = (workspace?.billing?.plan ?? "starter") as PlanId;
+  const canUseCustomBranding =
+    workspace?.entitlements?.customBranding ?? PLANS[planId]?.customBranding ?? false;
+
+  function handleBrandLogoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    const isHeic =
+      file.type === "image/heic" ||
+      file.type === "image/heif" ||
+      file.name.toLowerCase().endsWith(".heic") ||
+      file.name.toLowerCase().endsWith(".heif");
+    const isValidType = ["image/jpeg", "image/png", "image/webp"].includes(file.type) || isHeic;
+    if (!isValidType) {
+      showToast("Please use PNG, JPEG, or WebP");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("Image must be under 5MB");
+      return;
+    }
+    const objectUrl = URL.createObjectURL(file);
+    const img = new window.Image();
+    img.onload = () => {
+      if (img.naturalHeight / img.naturalWidth > 1.2) {
+        showToast("Tip: wide logos display best — yours may appear small");
+      }
+      URL.revokeObjectURL(objectUrl);
+      void uploadBrandLogo(file);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      void uploadBrandLogo(file);
+    };
+    img.src = objectUrl;
+  }
+
+  async function uploadBrandLogo(file: File) {
+    setUploadingBrandLogo(true);
+    try {
+      const fd = new FormData();
+      fd.append("logo", file, file.name);
+      const res = await authFetch("/api/workspace/brand-logo", { method: "POST", body: fd });
+      if (!res) { showToast("Upload failed. Try again."); return; }
+      if (res.status === 403) {
+        const json = await res.json().catch(() => null) as { error?: { message?: string } } | null;
+        if (json?.error?.message === "PLAN_REQUIRED") {
+          showToast("Brand logo requires a paid plan.");
+        } else {
+          showToast("Only the workspace owner can update the brand logo.");
+        }
+        return;
+      }
+      const json = await res.json() as { success: boolean; data?: { brandLogoUrl: string }; error?: { message: string } };
+      if (!res.ok || !json.success) {
+        const msg = json.error?.message;
+        if (msg === "FILE_TOO_LARGE") showToast("Image must be under 5MB");
+        else if (msg === "INVALID_FILE_TYPE") showToast("Please use PNG, JPEG, or WebP");
+        else showToast("Upload failed. Try again.");
+        return;
+      }
+      setBrandLogoUrl(json.data?.brandLogoUrl ?? null);
+      showToast("Brand logo updated");
+    } catch {
+      showToast("Upload failed. Try again.");
+    } finally {
+      setUploadingBrandLogo(false);
+    }
+  }
+
+  async function handleRemoveBrandLogo() {
+    setUploadingBrandLogo(true);
+    try {
+      const res = await authFetch("/api/workspace/brand-logo", { method: "DELETE" });
+      if (!res?.ok) { showToast("Failed to remove brand logo."); return; }
+      setBrandLogoUrl(null);
+      showToast("Brand logo removed");
+    } catch {
+      showToast("Failed to remove brand logo.");
+    } finally {
+      setUploadingBrandLogo(false);
+    }
+  }
+
   async function handleSave() {
     assertIdentityResolved(isIdentityResolved);
     const wid = workspaceId?.trim();
@@ -523,6 +619,206 @@ function WorkspaceTab({
         <p style={{ fontSize: 14, color: "var(--text-secondary)", margin: 0 }}>
           Manage your workspace identity and members
         </p>
+      </div>
+
+      {/* Brand Logo card (whitelabel, paid plans) */}
+      <div
+        style={{
+          background: "white",
+          border: "1px solid var(--border)",
+          borderRadius: 16,
+          padding: "28px 32px",
+          marginBottom: 16,
+          position: "relative",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 24 }}>
+          <div style={{ flex: 1 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-heading)", margin: 0 }}>Brand Logo</h3>
+            <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "4px 0 0 0" }}>
+              Your logo appears on session pages and shared links instead of Annote.
+            </p>
+            {!canUseCustomBranding && (
+              <div style={{ marginTop: 12 }}>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "4px 10px",
+                    borderRadius: 999,
+                    background: "var(--brand-subtle)",
+                    color: "var(--brand)",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <Gem size={12} aria-hidden />
+                  Business
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <div
+              role="button"
+              tabIndex={canUseCustomBranding ? 0 : -1}
+              aria-label={brandLogoUrl ? "Replace brand logo" : "Upload brand logo"}
+              aria-disabled={!canUseCustomBranding}
+              onClick={() => {
+                if (!canUseCustomBranding) {
+                  setBrandLogoUpgradeOpen((v) => !v);
+                  return;
+                }
+                if (uploadingBrandLogo || !isWorkspaceOwner) return;
+                brandLogoInputRef.current?.click();
+              }}
+              onMouseEnter={() => { if (!canUseCustomBranding) setBrandLogoUpgradeOpen(true); }}
+              onMouseLeave={() => {
+                if (!canUseCustomBranding) {
+                  if (brandLogoCloseTimeoutRef.current) clearTimeout(brandLogoCloseTimeoutRef.current);
+                  brandLogoCloseTimeoutRef.current = setTimeout(() => setBrandLogoUpgradeOpen(false), 200);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  if (!canUseCustomBranding) { setBrandLogoUpgradeOpen((v) => !v); return; }
+                  if (!uploadingBrandLogo && isWorkspaceOwner) brandLogoInputRef.current?.click();
+                }
+              }}
+              style={{
+                borderRadius: 12,
+                border: "2px dashed var(--border)",
+                background: "var(--surface-subtle)",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: canUseCustomBranding && isWorkspaceOwner ? "pointer" : "not-allowed",
+                opacity: canUseCustomBranding ? 1 : 0.6,
+                position: "relative",
+                transition: "border-color 150ms",
+                ...(brandLogoUrl
+                  ? { padding: 8 }
+                  : { width: 160, height: 72 }
+                ),
+              }}
+            >
+              {uploadingBrandLogo && (
+                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.7)", borderRadius: 12 }}>
+                  <span style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid var(--brand)", borderTopColor: "transparent", animation: "spin 0.7s linear infinite" }} />
+                </div>
+              )}
+              {brandLogoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={brandLogoUrl}
+                  alt="Brand logo"
+                  style={{ height: 40, width: "auto", display: "block" }}
+                />
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", color: "var(--text-tertiary)", gap: 4 }}>
+                  <Upload size={20} aria-hidden />
+                  <span style={{ fontSize: 12 }}>Click to upload</span>
+                </div>
+              )}
+            </div>
+            <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: "8px 0 0 0", textAlign: "center" }}>
+              Upload your logomark or full wordmark.<br />
+              PNG with transparent background works best.
+            </p>
+
+            {!canUseCustomBranding && brandLogoUpgradeOpen && (
+              <div
+                role="dialog"
+                onMouseEnter={() => {
+                  if (brandLogoCloseTimeoutRef.current) {
+                    clearTimeout(brandLogoCloseTimeoutRef.current);
+                    brandLogoCloseTimeoutRef.current = null;
+                  }
+                  setBrandLogoUpgradeOpen(true);
+                }}
+                onMouseLeave={() => {
+                  if (brandLogoCloseTimeoutRef.current) clearTimeout(brandLogoCloseTimeoutRef.current);
+                  brandLogoCloseTimeoutRef.current = setTimeout(() => setBrandLogoUpgradeOpen(false), 200);
+                }}
+                style={{
+                  position: "absolute",
+                  zIndex: 50,
+                  right: "calc(100% + 12px)",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  width: 320,
+                  background: "white",
+                  borderRadius: 14,
+                  border: "1px solid var(--border)",
+                  boxShadow: "0 12px 32px rgba(0,0,0,0.12)",
+                  padding: 20,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                  <Gem size={16} color="var(--brand)" aria-hidden />
+                  <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-heading)" }}>Business Feature</span>
+                </div>
+                <h4 style={{ fontSize: 15, fontWeight: 600, color: "var(--text-heading)", margin: "0 0 8px 0" }}>Add your brand logo</h4>
+                <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "0 0 16px 0" }}>
+                  Replace Annote branding with your own logo on session pages.
+                </p>
+                <div style={{ background: "var(--surface-subtle)", borderRadius: 10, padding: 12, marginBottom: 16, border: "1px solid var(--border)" }}>
+                  <div style={{ background: "white", borderRadius: 8, border: "1px solid var(--border)", padding: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ width: 60, height: 20, borderRadius: 4, background: "var(--brand-subtle)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: "var(--brand)", letterSpacing: 0.5 }}>
+                      YOUR LOGO
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <div style={{ width: 18, height: 18, borderRadius: "50%", background: "var(--surface-hover)" }} />
+                      <div style={{ width: 18, height: 18, borderRadius: "50%", background: "var(--surface-hover)" }} />
+                    </div>
+                  </div>
+                </div>
+                <a href="/settings?tab=billing" style={{ textDecoration: "none", display: "block" }}>
+                  <button
+                    type="button"
+                    style={{ width: "100%", height: 36, borderRadius: 8, background: "var(--brand)", color: "white", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}
+                  >
+                    Upgrade to Business
+                  </button>
+                </a>
+              </div>
+            )}
+
+            {brandLogoUrl && canUseCustomBranding && isWorkspaceOwner && (
+              <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => brandLogoInputRef.current?.click()}
+                  disabled={uploadingBrandLogo}
+                  style={{ height: 32, padding: "0 12px", borderRadius: 8, border: "1px solid var(--border)", background: "white", color: "var(--text-heading)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+                >
+                  Replace
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleRemoveBrandLogo()}
+                  disabled={uploadingBrandLogo}
+                  style={{ height: 32, padding: "0 12px", borderRadius: 8, border: "1px solid var(--border)", background: "white", color: "var(--color-danger)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+
+            <input
+              ref={brandLogoInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/heic,.heic,.HEIC"
+              className="hidden"
+              onChange={handleBrandLogoFileChange}
+              aria-label="Upload brand logo"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Card */}

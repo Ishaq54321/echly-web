@@ -66,9 +66,11 @@ function WorkspaceInitialsAvatar({ name }: { name: string }) {
 
 interface GlobalRailProps {
   forceExpanded?: boolean;
+  expandedWidthClass?: string;
+  onForceClose?: () => void;
 }
 
-export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = {}) {
+export default function GlobalRail({ forceExpanded = false, expandedWidthClass = "w-[248px]", onForceClose }: GlobalRailProps = {}) {
   const pathname = usePathname();
   const router = useRouter();
   useAuthGuard({ router });
@@ -135,7 +137,7 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
         className={cn(
           "relative flex flex-col bg-[var(--surface)] h-full shrink-0 min-h-0 overflow-visible py-4 rounded-[var(--content-card-radius)]",
           mounted && "transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
-          effectiveCollapsed ? "w-[64px] items-stretch group/rail" : "w-[220px] items-stretch"
+          effectiveCollapsed ? "w-[64px] items-stretch group/rail" : cn(expandedWidthClass, "items-stretch")
         )}
         aria-label="Global navigation"
       >
@@ -192,8 +194,8 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
               </button>
             </div>
           ) : (
-            <div className="flex items-center justify-between w-full px-3 py-2">
-              <Link href="/dashboard" className="flex items-center" aria-label="Annote home">
+            <div className="flex items-center justify-between w-full py-2">
+              <Link href="/dashboard" className="flex items-center pl-1.5" aria-label="Annote home">
                 <Image
                   src="/annote-logo-full.svg"
                   alt="Annote"
@@ -203,14 +205,25 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
                   className="h-[26px] w-auto object-contain"
                 />
               </Link>
-              {!forceExpanded && (
+              {forceExpanded ? (
+                onForceClose ? (
+                  <button
+                    type="button"
+                    onClick={onForceClose}
+                    aria-label="Close navigation"
+                    className="w-9 h-9 flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-heading)] hover:bg-[var(--surface-hover)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5A49BF] focus-visible:ring-offset-2"
+                  >
+                    <PanelLeftClose size={18} strokeWidth={2} />
+                  </button>
+                ) : null
+              ) : (
                 <button
                   type="button"
                   onClick={() => setIsCollapsed(true)}
                   aria-label="Collapse sidebar"
                   className="w-9 h-9 flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-heading)] hover:bg-[var(--surface-hover)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5A49BF] focus-visible:ring-offset-2"
                 >
-                  <PanelLeftClose size={20} strokeWidth={2.2} />
+                  <PanelLeftClose size={18} strokeWidth={2} />
                 </button>
               )}
             </div>
@@ -414,7 +427,7 @@ export default function GlobalRail({ forceExpanded = false }: GlobalRailProps = 
         <div
           className={cn(
             "absolute top-[5.5rem] w-64 rounded-xl border bg-white shadow-lg p-4 z-50",
-            effectiveCollapsed ? "left-[64px]" : "left-[220px]"
+            effectiveCollapsed ? "left-[64px]" : "left-[248px]"
           )}
           role="dialog"
           aria-label="Workspace"

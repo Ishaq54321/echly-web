@@ -40,7 +40,8 @@ function transcribeCorsHeaders(request: NextRequest): Record<string, string> {
   ) {
     allowOrigin = origin;
   }
-  // Allow any HTTPS origin (extension runs on websites).
+  // Allow any HTTPS origin — content scripts inherit the page's origin when posting FormData.
+  // Auth (Bearer token + per-uid rate limit) is the real gate; CORS here is defense-in-depth.
   else if (origin?.startsWith("https://")) {
     allowOrigin = origin;
   }

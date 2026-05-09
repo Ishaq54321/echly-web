@@ -1,0 +1,235 @@
+import type { NextRequest } from "next/server";
+import { requireAuth, toAuthorizationResponse } from "@/lib/server/auth/authorize";
+import { apiError, apiSuccess } from "@/lib/server/apiResponse";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
+import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
+import { assertWorkspaceActive } from "@/lib/server/assertWorkspaceActive";
+import { getWorkspaceMemberRepo } from "@/lib/repositories/workspaceMembersRepository.server";
+import { adminDb, adminBucket } from "@/lib/server/firebaseAdmin";
+import { FieldValue } from "firebase-admin/firestore";
+import { getSignedStorageUrl, extractStoragePathFromUrl } from "@/lib/server/storage/getSignedUrl";
+import { PLANS, type PlanId } from "@/lib/billing/plans";
+import { invalidateBrandingCache } from "@/lib/server/hydrateOwnerBranding";
+// @ts-ignore
+import heicConvert from "heic-convert";
+import sharp from "sharp";
+
+export const dynamic = "force-dynamic";
+
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+
+function extensionForType(type: string): string {
+  if (type === "image/png") return "png";
+  if (type === "image/webp") return "webp";
+  return "jpg";
+}
+
+function extractStoragePath(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === "firebasestorage.googleapis.com") {
+      const match = parsed.pathname.match(/\/v0\/b\/[^/]+\/o\/(.+)/);
+      if (match) return decodeURIComponent(match[1]);
+    }
+    const bucketName = adminBucket.name;
+    const prefix = `/${bucketName}/`;
+    const idx = parsed.pathname.indexOf(prefix);
+    if (idx === -1) return null;
+    return decodeURIComponent(parsed.pathname.slice(idx + prefix.length));
+  } catch {
+    return null;
+  }
+}
+
+/** GET /api/workspace/brand-logo — refresh signed URL for existing brand logo. */
+export async function GET(req: NextRequest) {
+  let user;
+  try {
+    user = await requireAuth(req);
+  } catch (err) {
+    return toAuthorizationResponse(err);
+  }
+
+  try {
+    const workspaceId = await getUserWorkspaceIdRepo(user.uid);
+    const workspace = await getWorkspace(workspaceId);
+    assertWorkspaceActive(workspace);
+    if (!workspace) {
+      return apiError({ code: "NOT_FOUND", message: "Workspace not found", status: 404 });
+    }
+
+    if (!workspace.brandLogoUrl) {
+      return apiSuccess({ brandLogoUrl: null });
+    }
+
+    const storagePath =
+      extractStoragePathFromUrl(workspace.brandLogoUrl) ?? extractStoragePath(workspace.brandLogoUrl);
+
+    if (!storagePath) {
+      return apiSuccess({ brandLogoUrl: workspace.brandLogoUrl });
+    }
+
+    const signedUrl = await getSignedStorageUrl(storagePath);
+
+    await adminDb.doc(`workspaces/${workspaceId}`).update({
+      brandLogoUrl: signedUrl,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    invalidateBrandingCache(workspaceId);
+
+    return apiSuccess({ brandLogoUrl: signedUrl });
+  } catch (err) {
+    console.error("GET /api/workspace/brand-logo:", err);
+    return apiError({ code: "INTERNAL_ERROR", message: "Failed to refresh brand logo URL", status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  let user;
+  try {
+    user = await requireAuth(req);
+  } catch (err) {
+    return toAuthorizationResponse(err);
+  }
+
+  try {
+    const workspaceId = await getUserWorkspaceIdRepo(user.uid);
+    const workspace = await getWorkspace(workspaceId);
+    assertWorkspaceActive(workspace);
+    if (!workspace) {
+      return apiError({ code: "NOT_FOUND", message: "Workspace not found", status: 404 });
+    }
+
+    const callerMember = await getWorkspaceMemberRepo(workspaceId, user.uid);
+    if (callerMember?.role !== "OWNER") {
+      return apiError({ code: "FORBIDDEN", message: "Only the workspace owner can update the brand logo", status: 403 });
+    }
+
+    const planId = (workspace.billing?.plan ?? "starter") as PlanId;
+    const customBrandingAllowed =
+      workspace.entitlements?.customBranding ?? PLANS[planId]?.customBranding ?? false;
+    if (!customBrandingAllowed) {
+      return apiError({
+        code: "FORBIDDEN",
+        message: "PLAN_REQUIRED",
+        status: 403,
+      });
+    }
+
+    let formData: FormData;
+    try {
+      formData = await req.formData();
+    } catch {
+      return apiError({ code: "INVALID_INPUT", message: "Invalid form data", status: 400 });
+    }
+
+    const file = formData.get("logo") as File | null;
+    if (!file) {
+      return apiError({ code: "INVALID_INPUT", message: "No file provided", status: 400 });
+    }
+
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      return apiError({ code: "INVALID_INPUT", message: "INVALID_FILE_TYPE", status: 400 });
+    }
+
+    if (file.size > MAX_SIZE) {
+      return apiError({ code: "INVALID_INPUT", message: "FILE_TOO_LARGE", status: 400 });
+    }
+
+    let fileBuffer = Buffer.from(await file.arrayBuffer());
+    let mimeType = file.type;
+
+    if (mimeType === "image/heic" || mimeType === "image/heif") {
+      fileBuffer = await heicConvert({ buffer: fileBuffer, format: "JPEG", quality: 0.92 });
+      mimeType = "image/jpeg";
+    }
+
+    // Auto-trim whitespace/transparent padding from brand logos
+    try {
+      const trimmed = await sharp(fileBuffer).trim().toBuffer();
+      fileBuffer = Buffer.from(trimmed);
+    } catch (trimErr) {
+      console.warn("brand-logo trim failed, uploading original:", trimErr);
+    }
+
+    const ext = extensionForType(mimeType);
+
+    // Delete all possible existing brand-logo extensions
+    const extensions = ["jpg", "jpeg", "png", "webp"];
+    await Promise.allSettled(
+      extensions.map(e =>
+        adminBucket
+          .file(`workspaces/${workspaceId}/brand-logo.${e}`)
+          .delete()
+          .catch(() => {})
+      )
+    );
+
+    const filePath = `workspaces/${workspaceId}/brand-logo.${ext}`;
+    const fileRef = adminBucket.file(filePath);
+
+    await fileRef.save(fileBuffer, {
+      metadata: { contentType: mimeType },
+    });
+
+    const signedUrl = await getSignedStorageUrl(filePath);
+
+    await adminDb.doc(`workspaces/${workspaceId}`).update({
+      brandLogoUrl: signedUrl,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    invalidateBrandingCache(workspaceId);
+
+    return apiSuccess({ brandLogoUrl: signedUrl });
+  } catch (err) {
+    console.error("POST /api/workspace/brand-logo:", err);
+    return apiError({ code: "INTERNAL_ERROR", message: "Failed to upload brand logo", status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  let user;
+  try {
+    user = await requireAuth(req);
+  } catch (err) {
+    return toAuthorizationResponse(err);
+  }
+
+  try {
+    const workspaceId = await getUserWorkspaceIdRepo(user.uid);
+    const workspace = await getWorkspace(workspaceId);
+    assertWorkspaceActive(workspace);
+    if (!workspace) {
+      return apiError({ code: "NOT_FOUND", message: "Workspace not found", status: 404 });
+    }
+
+    const callerMember = await getWorkspaceMemberRepo(workspaceId, user.uid);
+    if (callerMember?.role !== "OWNER") {
+      return apiError({ code: "FORBIDDEN", message: "Only the workspace owner can remove the brand logo", status: 403 });
+    }
+
+    if (!workspace.brandLogoUrl) {
+      return apiError({ code: "INVALID_INPUT", message: "NO_LOGO", status: 400 });
+    }
+
+    try {
+      const storagePath =
+        extractStoragePathFromUrl(workspace.brandLogoUrl) ?? extractStoragePath(workspace.brandLogoUrl);
+      if (storagePath) await adminBucket.file(storagePath).delete({ ignoreNotFound: true });
+    } catch (storageErr) {
+      console.error("DELETE /api/workspace/brand-logo: storage delete failed:", storageErr);
+    }
+
+    await adminDb.doc(`workspaces/${workspaceId}`).update({
+      brandLogoUrl: null,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    invalidateBrandingCache(workspaceId);
+
+    return apiSuccess({ success: true });
+  } catch (err) {
+    console.error("DELETE /api/workspace/brand-logo:", err);
+    return apiError({ code: "INTERNAL_ERROR", message: "Failed to remove brand logo", status: 500 });
+  }
+}

@@ -24,6 +24,7 @@ import {
   clearUidHint,
 } from "@/lib/client/workspaceBootstrap";
 import type { Workspace } from "@/lib/domain/workspace";
+import { PLANS, type PlanId } from "@/lib/billing/plans";
 import { composeFullName } from "@/lib/utils/nameSplit";
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -78,6 +79,12 @@ export type WorkspaceContextValue = {
   workspaceName: string | null;
   /** Workspace logo URL from the workspace document. */
   workspaceLogoUrl: string | null;
+  /** Whitelabel brand logo URL of the *viewer's own* workspace. Used in settings UI only — display surfaces (TopControlBar, PublicSessionNav) use bundle session-owner branding instead. */
+  brandLogoUrl: string | null;
+  /** Workspace plan id of viewer's workspace. */
+  plan: string;
+  /** True when viewer's plan + entitlement allows custom branding. Used in settings UI only. */
+  customBrandingEntitled: boolean;
   /** Workspace owner UID from the workspace document. */
   workspaceOwnerId: string | null;
   /** True when the signed-in user is the workspace owner. */
@@ -645,6 +652,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       // Derived from workspace document — zero additional Firestore reads
       workspaceName: workspaceDoc?.name ?? null,
       workspaceLogoUrl: workspaceDoc?.logoUrl ?? null,
+      brandLogoUrl: workspaceDoc?.brandLogoUrl ?? null,
+      plan: workspaceDoc?.billing?.plan ?? "starter",
+      customBrandingEntitled:
+        workspaceDoc?.entitlements?.customBranding
+          ?? PLANS[(workspaceDoc?.billing?.plan ?? "starter") as PlanId]?.customBranding
+          ?? false,
       workspaceOwnerId: workspaceDoc?.ownerId ?? null,
       isWorkspaceOwner: !!authUid && !!workspaceDoc?.ownerId && authUid === workspaceDoc.ownerId,
       isWorkspaceDeleted: workspaceDoc?.deletedAt != null,

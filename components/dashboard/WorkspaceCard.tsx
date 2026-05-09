@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Eye, MessageCircle, FileText, Loader2 } from "lucide-react";
+import { Eye, MessageCircle, Loader2 } from "lucide-react";
+import ProgressPie from "@/components/ui/ProgressPie";
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
 import type { Session } from "@/lib/domain/session";
 import type { Timestamp } from "firebase/firestore";
@@ -42,6 +43,10 @@ export function WorkspaceCard({
 }: WorkspaceCardProps) {
   const { session, counts } = item;
   const isOptimistic = Boolean(session.isOptimistic);
+  const total = (counts.open ?? 0) + (counts.resolved ?? 0);
+  const resolvedForPie = counts.resolved ?? 0;
+  let progress = total === 0 ? 0 : (resolvedForPie / total) * 100;
+  if (progress >= 100) progress = 99.999;
   const updatedAtDate = sessionUpdatedToDate(session.updatedAt);
   const updatedAtLabel =
     updatedAtDate && !Number.isNaN(updatedAtDate.getTime())
@@ -191,19 +196,8 @@ export function WorkspaceCard({
       <div className="flex h-full flex-col justify-between">
         <div>
           <div className="flex items-center gap-3 mb-5 pr-10 min-w-0">
-            <div
-              className="
-                  flex items-center justify-center
-                  w-10 h-10
-                  rounded-xl
-                  bg-gradient-to-br from-blue-100 to-blue-50
-                  text-[var(--brand)]
-                  ring-1 ring-blue-200
-                  shadow-inner
-                  shrink-0
-                "
-            >
-              <FileText size={20} aria-hidden />
+            <div className="flex items-center justify-center shrink-0">
+              <ProgressPie value={progress} size={36} />
             </div>
             <div className="flex flex-col min-w-0 flex-1">
               {session.title?.trim() ? (

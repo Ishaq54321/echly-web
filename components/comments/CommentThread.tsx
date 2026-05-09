@@ -18,8 +18,8 @@ interface Props {
 
 function buildThreadSummary(comments: CommentDisplay[]): string {
   const count = comments.length;
-  const first = comments[0]?.name?.trim() || "Unknown";
-  const last = comments[count - 1]?.name?.trim() || "Unknown";
+  const first = comments[0]?.name?.trim() || "Anonymous";
+  const last = comments[count - 1]?.name?.trim() || "Anonymous";
   const samePerson = first === last;
   const participantLabel = samePerson ? first : `${first} and ${last}`;
   const timeNote =

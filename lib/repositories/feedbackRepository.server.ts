@@ -1081,9 +1081,11 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
     cursor?: string;
     /** When set, only returns tickets with this Firestore `status` bucket. */
     statusFilter?: "open" | "resolved";
+    /** Pre-loaded session (skips redundant sessions/{id} read when caller already has it). */
+    session?: { workspaceId?: string } | null;
   }
 ): Promise<{ feedback: Feedback[]; nextCursor: string | null; hasMore: boolean }> {
-  const { sessionId: sidRaw, limit: pageSize, cursor, statusFilter } = args;
+  const { sessionId: sidRaw, limit: pageSize, cursor, statusFilter, session: preloadedSession } = args;
   const sessionId = sidRaw.trim();
   assertQueryLimit(pageSize, "getSessionFeedbackPageForUserWithStringCursorRepo");
   const trimmed = cursor?.trim();
@@ -1105,9 +1107,14 @@ export async function getSessionFeedbackPageForUserWithStringCursorRepo(
   const collected: QueryDocumentSnapshot[] = [];
   let hasMore = false;
 
-  const sessionDocSnap = await adminDb.doc(`sessions/${sessionId}`).get();
-  const sessionDocData = sessionDocSnap.data() as { workspaceId?: string } | undefined;
-  const workspaceId = typeof sessionDocData?.workspaceId === "string" ? sessionDocData.workspaceId.trim() : "";
+  let workspaceId = "";
+  if (preloadedSession && typeof preloadedSession.workspaceId === "string") {
+    workspaceId = preloadedSession.workspaceId.trim();
+  } else {
+    const sessionDocSnap = await adminDb.doc(`sessions/${sessionId}`).get();
+    const sessionDocData = sessionDocSnap.data() as { workspaceId?: string } | undefined;
+    workspaceId = typeof sessionDocData?.workspaceId === "string" ? sessionDocData.workspaceId.trim() : "";
+  }
 
   const indexHint =
     statusFilter != null

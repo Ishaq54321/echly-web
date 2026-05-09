@@ -9,6 +9,50 @@ import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15 MB
 const STORAGE_PREFIX = "discussion-attachments";
 
+// Slack/Loom-style coverage. Excludes SVG, HTML, JS, executables (XSS / malware risk).
+const ALLOWED_ATTACHMENT_TYPES = new Set<string>([
+  // Images
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/webp",
+  "image/gif",
+  "image/heic",
+  "image/heif",
+  // Documents
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
+  "text/csv",
+  "application/rtf",
+  // Archives
+  "application/zip",
+  "application/x-zip-compressed",
+  // Audio
+  "audio/mpeg",
+  "audio/wav",
+  "audio/webm",
+  "audio/mp4",
+  "audio/ogg",
+  // Video
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+  "video/x-msvideo",
+]);
+
+const ALLOWED_ATTACHMENT_EXTENSIONS = new Set<string>([
+  "png", "jpg", "jpeg", "webp", "gif", "heic", "heif",
+  "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+  "txt", "csv", "rtf", "zip",
+  "mp3", "wav", "webm", "mp4", "ogg", "mov", "avi",
+]);
+
 /**
  * POST /api/upload-attachment
  * multipart/form-data with field "file"
@@ -33,6 +77,26 @@ export async function POST(req: Request) {
       return apiError({
         code: "INVALID_INPUT",
         message: "No file provided",
+        status: 400,
+      });
+    }
+
+    const fileMime = (file.type ?? "").trim().toLowerCase();
+    if (!ALLOWED_ATTACHMENT_TYPES.has(fileMime)) {
+      return apiError({
+        code: "INVALID_INPUT",
+        message:
+          "File type not supported. Allowed: images, PDF, Office docs, audio, video, ZIP.",
+        status: 400,
+      });
+    }
+
+    // Defense-in-depth: file.type can be spoofed, also check extension.
+    const ext = (file.name || "").split(".").pop()?.toLowerCase() ?? "";
+    if (!ALLOWED_ATTACHMENT_EXTENSIONS.has(ext)) {
+      return apiError({
+        code: "INVALID_INPUT",
+        message: "File extension not supported.",
         status: 400,
       });
     }

@@ -141,7 +141,7 @@ const ThreadCard = memo(function ThreadCard({ item, isSelected, onSelect }: Thre
   const isUnread = item.isUnread === true;
   const ts = parseUpdatedAt(item);
   const timeLabel = ts > 0 ? formatRelativeTime(new Date(ts)) : "Just now";
-  const author = item.authorName || "Unknown";
+  const author = item.authorName || "Anonymous";
   const avatarBg = getAvatarBg(item.id || author);
   const replyCount = item.commentCount ?? 0;
 

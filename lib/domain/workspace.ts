@@ -20,6 +20,8 @@ export interface Workspace {
   /** Vanity URL slug — unique, lowercase, alphanumeric + hyphens. May be missing on legacy docs. */
   slug?: string | null;
   logoUrl: string | null;
+  /** Whitelabel brand logo (rectangular, ~30px tall) shown on session top bars. Paid plans only. */
+  brandLogoUrl: string | null;
   ownerId: string;
   // WORKSPACE-MEMBER: member list moved to workspaces/{id}/members subcollection
   members?: string[];
@@ -125,6 +127,7 @@ export function defaultWorkspaceDoc(params: {
     name: (params.name ?? "My Workspace").trim() || "My Workspace",
     slug: params.slug ?? null,
     logoUrl: params.logoUrl ?? null,
+    brandLogoUrl: null,
     ownerId: params.ownerId,
     // WORKSPACE-MEMBER: member list moved to workspaces/{id}/members subcollection
     createdAt: null,

@@ -8,6 +8,7 @@ import {
 import type { AccessLevel } from "@/lib/domain/accessLevel";
 import { parseAccessLevelStrict } from "@/lib/domain/accessLevel";
 import { serializeSession } from "@/lib/server/serializeSession";
+import { hydrateOwnerBranding } from "@/lib/server/hydrateOwnerBranding";
 import { log } from "@/lib/utils/logger";
 import {
   withAuthorization,
@@ -73,7 +74,8 @@ export async function GET(req: Request, ctx: HandlerContext) {
     return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
   }
 
-  const sessionJson = serializeSession(session, access);
+  const sessionWithBranding = await hydrateOwnerBranding(session);
+  const sessionJson = serializeSession(sessionWithBranding, access);
   const request =
     context.accessRequest ?? ({ pendingResolve: false } as const);
   return apiSuccess({ session: sessionJson, request }, access);

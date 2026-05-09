@@ -13,6 +13,9 @@ function PublicSessionView({ sessionId }: { sessionId: string }) {
   const { authReady, authUid } = useWorkspace();
 
   const [uidHint, setUidHint] = useState<string | null>(null);
+  const [brandLogoUrl, setBrandLogoUrl] = useState<string | null>(null);
+  const [brandingEnabled, setBrandingEnabled] = useState<boolean>(false);
+  const [brandingResolved, setBrandingResolved] = useState(false);
 
   useEffect(() => {
     setUidHint(getUidHint());
@@ -43,13 +46,18 @@ function PublicSessionView({ sessionId }: { sessionId: string }) {
       <SessionPageClient
         sessionId={sessionId}
         onAccessBlocked={() => {}}
+        onBrandingResolved={({ brandLogoUrl: url, brandingEnabled: enabled }) => {
+          setBrandLogoUrl(url);
+          setBrandingEnabled(enabled);
+          setBrandingResolved(true);
+        }}
       />
     );
   }
 
   return (
     <div suppressHydrationWarning style={{ height: "100dvh", overflow: "hidden", position: "relative" }}>
-      <PublicSessionNav />
+      <PublicSessionNav brandLogoUrl={brandLogoUrl} brandingEnabled={brandingEnabled} brandingResolved={brandingResolved} />
       <div
         style={{
           marginTop: `${PUBLIC_NAV_HEIGHT}px`,
@@ -63,6 +71,11 @@ function PublicSessionView({ sessionId }: { sessionId: string }) {
           sessionId={sessionId}
           isPublicRoute
           onAccessBlocked={() => {}}
+          onBrandingResolved={({ brandLogoUrl: url, brandingEnabled: enabled }) => {
+            setBrandLogoUrl(url);
+            setBrandingEnabled(enabled);
+            setBrandingResolved(true);
+          }}
         />
       </div>
       <PublicViewerBanner

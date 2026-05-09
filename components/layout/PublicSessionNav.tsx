@@ -4,7 +4,22 @@ import Image from "next/image";
 
 export const PUBLIC_NAV_HEIGHT = 60;
 
-export default function PublicSessionNav() {
+export interface PublicSessionNavProps {
+  /** Session-owner's brand logo. Server-side entitlement-checked (always safe to render when set with brandingEnabled). */
+  brandLogoUrl?: string | null;
+  /** True when owner's plan allows custom branding. */
+  brandingEnabled?: boolean;
+  /** True once the bundle fetch has resolved branding fields — gates logo + Annote nav links to prevent FOUC. */
+  brandingResolved?: boolean;
+}
+
+export default function PublicSessionNav({
+  brandLogoUrl = null,
+  brandingEnabled = false,
+  brandingResolved = false,
+}: PublicSessionNavProps = {}) {
+  const whitelabel = Boolean(brandLogoUrl && brandingEnabled);
+
   return (
     <>
       <div
@@ -25,54 +40,82 @@ export default function PublicSessionNav() {
         }}
       >
         {/* Left: Logo + wordmark */}
-        <div
-          style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
-          onClick={() => {
-            window.location.href = "/";
-          }}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") window.location.href = "/";
-          }}
-          aria-label="Go to Annote home"
-        >
-          <div
-            style={{
-              position: "relative",
-              width: 23,
-              height: 28,
-              flexShrink: 0,
-            }}
-          >
-            <Image src="/annote-logo-icon.svg" alt="Annote" fill sizes="23px" style={{ objectFit: "contain" }} />
+        {!brandingResolved ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div
+              style={{
+                width: 100,
+                height: 28,
+                borderRadius: 8,
+                background: "linear-gradient(90deg, rgba(0,0,0,0.03) 25%, rgba(0,0,0,0.06) 50%, rgba(0,0,0,0.03) 75%)",
+                backgroundSize: "200% 100%",
+                animation: "brand-logo-shimmer 1.5s ease-in-out infinite",
+              }}
+            />
           </div>
-          <span
-            className="font-bold"
-            style={{
-              fontSize: 24,
-              color: "var(--text-heading)",
-              letterSpacing: "-0.4px",
+        ) : whitelabel ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={brandLogoUrl!}
+              alt="Brand"
+              style={{ height: 28, width: "auto", display: "block" }}
+              fetchPriority="high"
+              loading="eager"
+            />
+          </div>
+        ) : (
+          <div
+            style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
+            onClick={() => {
+              window.location.href = "/";
             }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") window.location.href = "/";
+            }}
+            aria-label="Go to Annote home"
           >
-            Annote
-          </span>
-        </div>
+            <div
+              style={{
+                position: "relative",
+                width: 23,
+                height: 28,
+                flexShrink: 0,
+              }}
+            >
+              <Image src="/annote-logo-icon.svg" alt="Annote" fill sizes="23px" style={{ objectFit: "contain" }} />
+            </div>
+            <span
+              className="font-bold"
+              style={{
+                fontSize: 24,
+                color: "var(--text-heading)",
+                letterSpacing: "-0.4px",
+              }}
+            >
+              Annote
+            </span>
+          </div>
+        )}
 
         {/* Right: Nav links + Sign in + Get started */}
         <div
           className="public-nav-right"
           style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}
         >
-          <div
-            className="public-nav-links"
-            style={{ display: "flex", alignItems: "center", gap: 8 }}
-          >
-            <NavLink href="#">Learn</NavLink>
-            <NavLink href="#">Pricing</NavLink>
-          </div>
+          {brandingResolved && !whitelabel && (
+            <div
+              className="public-nav-links"
+              style={{ display: "flex", alignItems: "center", gap: 8 }}
+            >
+              <NavLink href="#">Learn</NavLink>
+              <NavLink href="#">Pricing</NavLink>
+            </div>
+          )}
           <SignInButton />
-          <GetStartedButton />
+          {brandingResolved && !whitelabel && <GetStartedButton />}
         </div>
       </div>
 

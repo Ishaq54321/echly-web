@@ -21,6 +21,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="h-full" suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://firebasestorage.googleapis.com" crossOrigin="anonymous" />
+      </head>
       <body
         className={`${dmSans.className} font-sans antialiased h-full overflow-y-auto`}
         suppressHydrationWarning

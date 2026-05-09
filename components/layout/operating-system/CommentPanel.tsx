@@ -660,6 +660,22 @@ const CommentThreadList = memo(function CommentThreadList({
       byThreadId.set(c.threadId, list);
     }
   });
+  // Sort each thread's replies chronologically (oldest first)
+  byThreadId.forEach((list) => {
+    list.sort((a, b) => {
+      const aTime = a.createdAt
+        ? typeof a.createdAt === "object" && "seconds" in a.createdAt
+          ? (a.createdAt as { seconds: number }).seconds * 1000
+          : new Date(a.createdAt as never).getTime()
+        : 0;
+      const bTime = b.createdAt
+        ? typeof b.createdAt === "object" && "seconds" in b.createdAt
+          ? (b.createdAt as { seconds: number }).seconds * 1000
+          : new Date(b.createdAt as never).getTime()
+        : 0;
+      return aTime - bTime;
+    });
+  });
 
   const unresolvedRoots = roots.filter((r) => !r.resolved);
   const resolvedRoots = roots.filter((r) => r.resolved);
@@ -909,7 +925,7 @@ export function CommentPanel({
                 currentUserInitial || "?"
               )}
             </div>
-            <span className="text-[13.5px] text-[var(--text-tertiary)] min-w-0 truncate">Leave a comment…</span>
+            <span className="text-[13.5px] text-[var(--text-tertiary)] min-w-0 truncate">Leave a comment...</span>
             <span className="flex items-center gap-[2px]">
               <button type="button" onClick={(e) => e.stopPropagation()} className="w-[26px] h-[26px] rounded-lg grid place-items-center text-[var(--text-secondary)] border-0 bg-transparent cursor-pointer hover:bg-black/[0.04]">
                 <Smile className="h-3.5 w-3.5" strokeWidth={1.4} />

@@ -50,6 +50,9 @@ export function TopControlBar({
   titleDraft,
   canEditTitle,
   onToggleNavPanel,
+  ownerBrandLogoUrl = null,
+  ownerBrandingEnabled = false,
+  brandingResolved = false,
 }: {
   sessionId: string;
   sessionTitle?: string;
@@ -85,6 +88,12 @@ export function TopControlBar({
   titleDraft?: string;
   canEditTitle?: boolean;
   onToggleNavPanel?: () => void;
+  /** Session-owner's brand logo URL (already entitlement-checked by server). */
+  ownerBrandLogoUrl?: string | null;
+  /** True when owner's plan allows custom branding. */
+  ownerBrandingEnabled?: boolean;
+  /** True once the bundle fetch has resolved branding fields — gates logo render to prevent FOUC. */
+  brandingResolved?: boolean;
 }) {
   const { authUid, isIdentityResolved } = useWorkspace();
   const copyTimerRef = useRef<number | null>(null);
@@ -145,7 +154,7 @@ export function TopControlBar({
     <>
       <header
         className="shrink-0 bg-[var(--surface-subtle)] grid items-center px-5"
-        style={{ height: '60px', gridTemplateColumns: 'auto 1fr auto', gap: '24px' }}
+        style={{ height: '72px', gridTemplateColumns: '1fr auto 1fr', gap: '24px' }}
       >
         {/* Left: Panel Toggle + Logo */}
         <div className="flex items-center gap-3.5">
@@ -158,33 +167,59 @@ export function TopControlBar({
               <PanelLeftOpen size={22} strokeWidth={2.2} />
             </button>
           </Tooltip>
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-2.5 font-bold text-[var(--text-heading)] text-[22px] tracking-[-0.02em] no-underline shrink-0"
-          >
-            <div className="w-[26px] h-[30px] flex items-center justify-center shrink-0">
-              <Image src="/annote-logo-icon.svg" alt="Annote" width={26} height={30} sizes="26px" className="object-contain" />
+          {!brandingResolved ? (
+            <div className="flex items-center gap-2.5 shrink-0">
+              <div
+                style={{
+                  width: 100,
+                  height: 30,
+                  borderRadius: 8,
+                  background: "linear-gradient(90deg, rgba(0,0,0,0.03) 25%, rgba(0,0,0,0.06) 50%, rgba(0,0,0,0.03) 75%)",
+                  backgroundSize: "200% 100%",
+                  animation: "brand-logo-shimmer 1.5s ease-in-out infinite",
+                }}
+              />
             </div>
-            Annote
-          </Link>
+          ) : ownerBrandLogoUrl && ownerBrandingEnabled ? (
+            <div className="flex items-center gap-2.5 shrink-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={ownerBrandLogoUrl}
+                alt="Brand"
+                style={{ height: 30, width: "auto", display: "block" }}
+                fetchPriority="high"
+                loading="eager"
+              />
+            </div>
+          ) : (
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-2.5 font-bold text-[var(--text-heading)] text-[22px] tracking-[-0.02em] no-underline shrink-0"
+            >
+              <div className="w-[26px] h-[30px] flex items-center justify-center shrink-0">
+                <Image src="/annote-logo-icon.svg" alt="Annote" width={26} height={30} sizes="26px" className="object-contain" />
+              </div>
+              Annote
+            </Link>
+          )}
         </div>
 
         {/* Center: Search */}
-        <div className="justify-self-center w-full max-w-[420px] relative">
+        <div className="w-full max-w-[420px] relative" style={{ visibility: sessionLoaded ? "visible" : "hidden" }}>
           <div className="h-[34px] bg-white/70 border border-[var(--hair)] rounded-[9px] flex items-center gap-2.5 px-3 cursor-text hover:bg-white hover:border-[var(--hair-strong)] transition-all">
             <Search size={16} strokeWidth={2} className="shrink-0 text-[var(--text-body)]" />
             <input
               type="text"
               value={searchQuery ?? ""}
               onChange={(e) => onSearchChange?.(e.target.value)}
-              placeholder="Search ticket title..."
+              placeholder="Search tickets..."
               className="flex-1 border-0 outline-0 bg-transparent text-[14px] text-[var(--text-heading)] placeholder:text-[var(--text-tertiary)] font-[inherit] min-w-0"
             />
           </div>
         </div>
 
         {/* Right: Actions */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 justify-self-end">
           {authUid && (
             <PresenceAvatarRow sessionId={sessionId} currentUserId={authUid} />
           )}

@@ -13,6 +13,8 @@ export interface RequestSessionAccessPageProps {
   requestStatus: "idle" | "pending" | "submitted" | "already_requested" | "rejected";
   onRequestAccess: () => Promise<void>;
   onSignIn: () => void;
+  brandLogoUrl?: string | null;
+  brandingEnabled?: boolean;
 }
 
 export function RequestSessionAccessPage({
@@ -23,6 +25,8 @@ export function RequestSessionAccessPage({
   requestStatus,
   onRequestAccess,
   onSignIn,
+  brandLogoUrl = null,
+  brandingEnabled = false,
 }: RequestSessionAccessPageProps) {
   const iconBg =
     requestStatus === "submitted"
@@ -76,7 +80,9 @@ export function RequestSessionAccessPage({
         background: "var(--surface-subtle)",
       }}
     >
-      {isPublicRoute !== false && <PublicSessionNav />}
+      {isPublicRoute !== false && (
+        <PublicSessionNav brandLogoUrl={brandLogoUrl} brandingEnabled={brandingEnabled} />
+      )}
 
       <div
         style={{

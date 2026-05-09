@@ -248,7 +248,7 @@ export function useFeedbackDetailController(args: {
       feedbackId,
       data: payload,
     });
-    setComments((prev) => [optimistic, ...prev]);
+    setComments((prev) => [...prev, optimistic]);
     void (async () => {
       try {
         await addComment(sessionId, feedbackId, payload);
