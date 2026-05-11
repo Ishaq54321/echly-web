@@ -9,7 +9,6 @@ import type { Feedback } from "@/lib/domain/feedback";
 import {
   getScreenshotByIdRepo,
 } from "@/lib/repositories/screenshotsRepository";
-import { generateTicketTitle } from "@/lib/tickets/generateTicketTitle";
 import { corsHeaders } from "@/lib/server/cors";
 import "@/lib/server/firebaseAdmin";
 import { assert, ECHLY_STRICT_MODE } from "@/lib/guardrails";
@@ -43,11 +42,8 @@ export async function POST(req: NextRequest) {
     sessionId?: string;
     feedbackId?: string;
     title?: string;
-    instruction?: string;
-    suggestion?: string;
-    contextSummary?: string;
-    actionSteps?: string[];
-    suggestedTags?: string[];
+    description?: string;
+    tags?: string[];
     pageArea?: string;
     metadata?: {
       url?: string;
@@ -136,24 +132,23 @@ export async function POST(req: NextRequest) {
       init: { headers: corsHeaders(req) },
     });
   }
-  const actionSteps =
-    Array.isArray(body.actionSteps)
-      ? body.actionSteps.filter((s): s is string => typeof s === "string" && s.trim().length > 0).map((s) => s.trim())
-      : [];
   const title =
     typeof body.title === "string" && body.title.trim().length > 0
-      ? body.title.trim().slice(0, 60)
-      : actionSteps.length > 0
-        ? generateTicketTitle(actionSteps)
-        : "";
+      ? body.title.trim().slice(0, 100)
+      : "";
   if (!title) {
     return apiError({
       code: "INVALID_INPUT",
-      message: "title is required (or provide actionSteps)",
+      message: "title is required",
       status: 400,
       init: { headers: corsHeaders(req) },
     });
   }
+  const description =
+    typeof body.description === "string" ? body.description.trim().slice(0, 2000) : "";
+  const tags = Array.isArray(body.tags)
+    ? body.tags.filter((t): t is string => typeof t === "string" && t.trim().length > 0)
+    : [];
 
   const screenshotIdRaw =
     typeof body.screenshotId === "string" ? body.screenshotId.trim() : "";
@@ -293,20 +288,12 @@ export async function POST(req: NextRequest) {
 
   const structuredData = {
     title,
-    instruction:
-      typeof body.instruction === "string"
-        ? body.instruction
-        : typeof (body as { description?: unknown }).description === "string"
-          ? ((body as { description?: string }).description ?? undefined)
-        : undefined,
-    suggestion: typeof body.suggestion === "string" ? body.suggestion : undefined,
-    type: "general" as const,
-    contextSummary:
-      typeof body.contextSummary === "string" ? body.contextSummary : undefined,
-    actionSteps: actionSteps.length > 0 ? actionSteps : undefined,
-    suggestedTags: Array.isArray(body.suggestedTags)
-      ? body.suggestedTags
-      : undefined,
+    description,
+    type:
+      Array.isArray(tags) && tags.length > 0 && typeof tags[0] === "string"
+        ? tags[0]
+        : "feedback",
+    tags: tags.length > 0 ? tags : undefined,
     pageArea:
       typeof body.pageArea === "string" && body.pageArea.trim().length > 0
         ? body.pageArea.trim().slice(0, 40)

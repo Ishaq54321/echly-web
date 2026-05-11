@@ -2,15 +2,10 @@ import type { Timestamp } from "firebase/firestore";
 
 export interface StructuredFeedback {
   title: string;
-  instruction?: string;
-  description?: string;
-  suggestion?: string;
   type: string;
 
-  // Structuring (V2)
-  contextSummary?: string;
-  actionSteps?: string[];
-  suggestedTags?: string[];
+  description: string;
+  tags?: string[];
   pageArea?: string;
 
   // Metadata
@@ -59,9 +54,6 @@ export interface Feedback {
   /** Legacy scope (pre-workspaces). */
   userId?: string;
   title: string;
-  instruction?: string;
-  description?: string;
-  suggestion?: string;
   type: string;
   isResolved: boolean;
   createdAt: Timestamp | null;
@@ -72,10 +64,8 @@ export interface Feedback {
   /** Timestamp of last comment. */
   lastCommentAt?: Timestamp | null;
 
-  // Structuring (V2)
-  contextSummary?: string | null;
-  actionSteps?: string[] | null;
-  suggestedTags?: string[] | null;
+  description?: string | null;
+  tags?: string[] | null;
   pageArea?: string | null;
 
   // Metadata

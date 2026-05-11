@@ -4,11 +4,10 @@ import type { CaptureEnvironment } from "../CaptureEnvironment";
 export type StructuredFeedback = {
   id: string;
   title: string;
-  instruction?: string;
-  actionSteps: string[];
+  description?: string;
   type?: string;
   screenshotId?: string | null;
-  suggestedTags?: string[];
+  tags?: string[];
   /** AI-detected page/section, e.g. "Pricing Page → Hero Section". */
   pageArea?: string | null;
   userAgent?: string | null;
@@ -36,7 +35,7 @@ export type SessionFeedbackPending = {
   elementRect?: ElementRect | null;
 };
 
-/** Context captured with the region (URL, scroll, viewport, DOM path, nearby text). */
+/** Context captured with the region (URL, scroll, viewport, selected-element subtree). */
 export type CaptureContext = {
   url: string;
   scrollX: number;
@@ -46,14 +45,28 @@ export type CaptureContext = {
   devicePixelRatio: number;
   screenWidth?: number;
   screenHeight?: number;
-  domPath: string | null;
-  nearbyText: string | null;
-  /** Visible text from the DOM subtree at domPath (for spatial scope). */
+  /** Visible text from the DOM subtree of the selected element (Ring 1). */
   subtreeText?: string | null;
-  /** Visible viewport text (readable text in viewport). */
-  visibleText?: string | null;
   /** Weak reference hint for selected element kind; never a decision input. */
   elementType?: string | null;
+  /** Best human-readable name for the clicked element (aria-label, alt, title, placeholder, or innerText). */
+  semanticIdentifier?: string | null;
+  /** Computed styles (color, background, font-size, padding, size) for the clicked element. */
+  computedStyles?: string | null;
+  /** Structured list of meaningful direct children of the clicked element (tag, name, brief styles). */
+  childrenList?: string | null;
+  /** ARIA state of the clicked element (checked, expanded, selected, pressed, current). */
+  elementState?: string | null;
+  /** Semantic type of the clicked element (button, link, input, heading, paragraph, image, icon, card, section). */
+  semanticType?: "button" | "link" | "input" | "heading" | "paragraph" | "image" | "icon" | "card" | "section" | null;
+  /** "disabled" if element has disabled or aria-disabled, otherwise empty. */
+  disabledState?: string | null;
+  /** Modal/dialog/popover context when element is inside one. */
+  modalContext?: string | null;
+  /** Current value of the input element (with privacy filtering). */
+  inputValue?: string | null;
+  /** Iframe context when element is inside an embedded frame. */
+  iframeContext?: string | null;
   capturedAt: number;
   /** When set, OCR should run on this image (e.g. selection crop) instead of the UI screenshot. */
   ocrImageDataUrl?: string | null;
@@ -107,7 +120,7 @@ export type CaptureWidgetProps = {
   ) => void | Promise<StructuredFeedback | undefined>;
   onDelete: (id: string) => Promise<void>;
   /** Optional: when provided (e.g. extension), ticket updates use this instead of authFetch. */
-  onUpdate?: (id: string, payload: { title: string; actionSteps: string[]; suggestedTags?: string[] }) => Promise<void>;
+  onUpdate?: (id: string, payload: { title: string; description?: string; tags?: string[] }) => Promise<void>;
   /** Optional ref for extension: parent can set a toggle callback to open/close widget via message. */
   widgetToggleRef?: MutableRefObject<(() => void) | null>;
   /** Optional callback when recording starts or stops (for extension global recording state). */

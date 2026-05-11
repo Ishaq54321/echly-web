@@ -68,7 +68,7 @@ function countsFromSession(session: Session | null): SessionFeedbackCounts {
 function extractTagCounts(feedback: Feedback[]): { tag: string; count: number }[] {
   const map = new Map<string, number>();
   for (const f of feedback) {
-    const tags = f.suggestedTags ?? [];
+    const tags = f.tags ?? [];
     for (const t of tags) {
       if (typeof t === "string" && t.trim()) {
         map.set(t, (map.get(t) ?? 0) + 1);
@@ -100,20 +100,11 @@ function parseOverviewFeedback(row: Record<string, unknown>, sid: string): Feedb
     sessionId: typeof row.sessionId === "string" ? row.sessionId : sid,
     userId: typeof row.userId === "string" ? row.userId : "",
     title,
-    instruction:
-      typeof row.instruction === "string"
-        ? row.instruction
-        : typeof row.description === "string"
-          ? row.description
-          : undefined,
-    description: typeof row.description === "string" ? row.description : undefined,
-    suggestion: typeof row.suggestion === "string" ? row.suggestion : "",
+    description: typeof row.description === "string" ? row.description : null,
     type: typeof row.type === "string" ? row.type : "Feedback",
     isResolved: normalizedStatus === "resolved",
     createdAt,
-    suggestedTags: Array.isArray(row.suggestedTags)
-      ? (row.suggestedTags as string[])
-      : null,
+    tags: Array.isArray(row.tags) ? (row.tags as string[]) : null,
     screenshotId: typeof row.screenshotId === "string" ? row.screenshotId : null,
     commentCount: typeof row.commentCount === "number" ? row.commentCount : 0,
     status: normalizedStatus,

@@ -1,15 +1,107 @@
 /**
  * Minimal voice → ticket pipeline: one transcript, one GPT-4o-mini call, one ticket.
- * No instruction graph, no refinement, no verification.
+ * The AI refines what the recorder said into a clean ticket — no prescription, no invention.
  */
 
 import type OpenAI from "openai";
 import { truncateForTokenBudget } from "@/lib/ai/pipelineTokenBudget";
 import { SYSTEM_PROMPT } from "@/lib/ai/prompts/interpreterPrompt";
 import type { PipelineContext } from "@/lib/server/pipelineContext";
-import { generateTicketTitle } from "@/lib/tickets/generateTicketTitle";
 import { whitelistTags, ALL_TAG_KEYS } from "@/lib/constants/ticketTags";
+import { parsePageInfo } from "@/lib/utils/urlParsing";
 import { logger } from "@/lib/logger";
+
+/**
+ * TEMPORARY DEBUG LOGGER — delete after testing.
+ * Logs the exact DOM context and full user message sent to OpenAI
+ * for every ticket. Helps debug AI behavior on real recordings.
+ */
+function logDomContextToAI(
+  transcript: string,
+  domContext: DomContextForAI,
+  finalUserMessage: string
+): void {
+  const sep = "═".repeat(80);
+  const subSep = "─".repeat(80);
+
+  console.log("\n");
+  console.log(sep);
+  console.log("  AI INPUT DEBUG — exact data sent to the model");
+  console.log(sep);
+
+  console.log("\n📝 TRANSCRIPT:");
+  console.log(`   "${transcript.trim()}"`);
+  console.log(`   [${transcript.trim().length} chars]`);
+
+  console.log(`\n${subSep}`);
+  console.log("🌐 PAGE IDENTIFICATION (deterministic from URL parsing):");
+  console.log(subSep);
+  console.log(`   pageURL:  "${domContext.pageURL}"`);
+  console.log(`   pageName: "${domContext.pageName}"`);
+  console.log(`   siteName: "${domContext.siteName}"`);
+  console.log(`   pageArea: "${domContext.pageArea}"`);
+
+  console.log(`\n${subSep}`);
+  console.log("🎯 RING 1 — SELECTED ELEMENT");
+  console.log(subSep);
+
+  console.log("\n   ► Selected element text (subtree):");
+  const elText = domContext.elementHTML || "(empty)";
+  console.log(`     "${elText}"`);
+  console.log(`     [${elText.length} chars]`);
+
+  console.log("\n   ► Element name (semantic identifier):");
+  const semId = domContext.semanticIdentifier || "(empty)";
+  console.log(`     "${semId}"`);
+  console.log(`     [${semId.length} chars]`);
+
+  console.log("\n   ► Element computed styles:");
+  const styles = domContext.computedStyles || "(empty)";
+  console.log(`     "${styles}"`);
+  console.log(`     [${styles.length} chars]`);
+
+  console.log("\n   ► Semantic type:");
+  console.log(`     "${domContext.semanticType || "None"}"`);
+
+  console.log("\n   ► Children of clicked element:");
+  const children = domContext.childrenList || "(empty - clicked element has < 2 meaningful children)";
+  console.log(`     "${children}"`);
+  console.log(`     [${children.length} chars]`);
+
+  console.log(`\n${subSep}`);
+  console.log("💰 BUDGET USAGE:");
+  console.log(subSep);
+
+  const ring1Total = (domContext.elementHTML?.length || 0) +
+                     (domContext.semanticIdentifier?.length || 0) +
+                     (domContext.computedStyles?.length || 0) +
+                     (domContext.childrenList?.length || 0);
+
+  const overhead = (domContext.pageURL?.length || 0) +
+                   (domContext.pageName?.length || 0) +
+                   (domContext.siteName?.length || 0) +
+                   (domContext.pageArea?.length || 0);
+
+  console.log(`   Page identification:           ${overhead} chars`);
+  console.log(`   Ring 1 (selected element):     ${ring1Total} chars`);
+  console.log(`   ────────────────────────────────────────`);
+  console.log(`   Total:                         ${ring1Total + overhead} chars`);
+  console.log(`   Approximate tokens:            ~${Math.round((ring1Total + overhead) / 4)} tokens`);
+  console.log(`   Budget cap:                    ~1000 tokens (~4000 chars)`);
+
+  const utilization = ((ring1Total + overhead) / 4000) * 100;
+  console.log(`   Budget utilization:            ${utilization.toFixed(1)}%`);
+
+  console.log(`\n${subSep}`);
+  console.log("📤 FULL USER MESSAGE SENT TO OPENAI:");
+  console.log(subSep);
+  console.log(finalUserMessage);
+
+  console.log(`\n${sep}`);
+  console.log("  END OF AI INPUT DEBUG");
+  console.log(sep);
+  console.log("\n");
+}
 
 /* ===== DOM CONTEXT & TYPES ===== */
 
@@ -17,89 +109,142 @@ import { logger } from "@/lib/logger";
 export interface DomContextForAI {
   elementHTML: string | null;
   elementType: string | null;
-  nearbyText: string | null;
-  visibleText: string | null;
-  domPath: string | null;
+  semanticType?: "button" | "link" | "input" | "heading" | "paragraph" | "image" | "icon" | "card" | "section" | null;
   pageURL: string;
+  pageName: string;
+  siteName: string;
+  pageArea: string;
+  /** Best human-readable name for the clicked element (aria-label/alt/title/placeholder/innerText). */
+  semanticIdentifier?: string;
+  /** Computed styles (color, background, font-size, padding, size) for the clicked element. */
+  computedStyles?: string;
+  /** Structured list of meaningful direct children of the clicked element (tag, name, brief styles). */
+  childrenList?: string;
+  /** ARIA state of the clicked element (checked, expanded, selected, pressed, current). */
+  elementState?: string;
+  /** "disabled" if element has disabled or aria-disabled, otherwise empty. */
+  disabledState?: string;
+  /** Modal/dialog/popover context when element is inside one. */
+  modalContext?: string;
+  /** Current value of the input element (with privacy filtering). */
+  inputValue?: string;
+  /** Iframe context when element is inside an embedded frame. */
+  iframeContext?: string;
 }
 
-/** Max tokens for combined DOM context (element + nearby + visible + path). */
+/** Max tokens for combined DOM context (element subtree + page identification). */
 const DOM_CONTEXT_MAX_TOKENS = 1000;
 const CHARS_PER_TOKEN = 4;
-
-/** One action from the LLM. */
-export interface ExtractedAction {
-  step: number;
-  instruction: string;
-  entity: string;
-}
 
 /** Raw JSON shape returned by the LLM. */
 export interface StructuredFeedbackJSON {
   title?: string;
+  description?: string;
   pageArea?: string;
-  suggestedTags?: string[];
-  actions: ExtractedAction[];
+  tags?: string[];
 }
 
 /** Normalized ticket for API response. */
 export interface VoiceTicket {
   title: string;
-  actionSteps: string[];
-  suggestedTags: string[];
+  description: string;
   pageArea: string;
+  tags: string[];
 }
 
 function buildDomContextFromPipelineContext(ctx: PipelineContext | null): DomContextForAI {
   if (!ctx) {
-    return { elementHTML: null, elementType: null, nearbyText: null, visibleText: null, domPath: null, pageURL: "" };
+    return {
+      elementHTML: null,
+      elementType: null,
+      semanticType: null,
+      pageURL: "",
+      pageName: "",
+      siteName: "",
+      pageArea: "",
+      semanticIdentifier: "",
+      computedStyles: "",
+      childrenList: "",
+      elementState: "",
+      disabledState: "",
+      modalContext: "",
+      inputValue: "",
+      iframeContext: "",
+    };
   }
-  const url = typeof ctx.url === "string" ? ctx.url : "";
-  const domPath = ctx.domPath ?? null;
+  const rawUrl = (typeof ctx.url === "string" ? ctx.url : "").split("#")[0];
+  const pageInfo = parsePageInfo(rawUrl);
   const elementType = ctx.elementType ?? null;
-  const nearbyText = ctx.nearbyText ?? null;
-  const visibleText = ctx.visibleText ?? ctx.screenshotOCRText ?? null;
+  const semanticType = ctx.semanticType ?? null;
   const subtreeText = ctx.subtreeText ?? null;
   const elementHTML = subtreeText ?? null;
+  const semanticIdentifier = ctx.semanticIdentifier ?? "";
+  const computedStyles = ctx.computedStyles ?? "";
+  const childrenList = typeof ctx.childrenList === "string" ? ctx.childrenList : "";
+  const elementState = typeof ctx.elementState === "string" ? ctx.elementState : "";
+  const disabledState = typeof ctx.disabledState === "string" ? ctx.disabledState : "";
+  const modalContext = typeof ctx.modalContext === "string" ? ctx.modalContext : "";
+  const inputValue = typeof ctx.inputValue === "string" ? ctx.inputValue : "";
+  const iframeContext = typeof ctx.iframeContext === "string" ? ctx.iframeContext : "";
   return {
     elementHTML,
     elementType,
-    nearbyText,
-    visibleText,
-    domPath,
-    pageURL: url,
+    semanticType,
+    pageURL: pageInfo.sanitizedUrl,
+    pageName: pageInfo.pageName,
+    siteName: pageInfo.siteName,
+    pageArea: pageInfo.pageArea,
+    semanticIdentifier,
+    computedStyles,
+    childrenList,
+    elementState,
+    disabledState,
+    modalContext,
+    inputValue,
+    iframeContext,
   };
 }
 
 /**
  * Truncate DOM context so total size is under DOM_CONTEXT_MAX_TOKENS (1000 tokens).
- * Uses truncateForTokenBudget on elementHTML, nearbyText, visibleText before building the prompt.
- * domPath and pageURL are kept as-is (small).
+ * Fixed overhead is kept as-is; remaining budget goes to elementHTML (Ring 1 subtree text).
  */
 function truncateDomContextToBudget(ctx: DomContextForAI): DomContextForAI {
   const maxChars = DOM_CONTEXT_MAX_TOKENS * CHARS_PER_TOKEN;
-  const fixedChars = (ctx.pageURL?.length ?? 0) + (ctx.domPath?.length ?? 0);
-  const remaining = maxChars - fixedChars;
-  if (remaining <= 0) {
-    return { ...ctx, elementHTML: null, nearbyText: null, visibleText: null };
-  }
-  const budgetElement = Math.floor(remaining * 0.4);
-  const budgetNearby = Math.floor(remaining * 0.35);
-  const budgetVisible = Math.floor(remaining * 0.25);
+  const fixedChars =
+    (ctx.pageURL?.length ?? 0) +
+    (ctx.pageName?.length ?? 0) +
+    (ctx.siteName?.length ?? 0) +
+    (ctx.pageArea?.length ?? 0) +
+    (ctx.semanticIdentifier?.length ?? 0) +
+    (ctx.computedStyles?.length ?? 0) +
+    (ctx.childrenList?.length ?? 0) +
+    (ctx.elementState?.length ?? 0) +
+    (ctx.disabledState?.length ?? 0) +
+    (ctx.modalContext?.length ?? 0) +
+    (ctx.inputValue?.length ?? 0) +
+    (ctx.iframeContext?.length ?? 0);
+  const remaining = Math.max(0, maxChars - fixedChars);
 
   return {
-    elementHTML: ctx.elementHTML
-      ? truncateForTokenBudget(ctx.elementHTML, budgetElement)
-      : null,
+    elementHTML:
+      ctx.elementHTML && remaining > 0
+        ? truncateForTokenBudget(ctx.elementHTML, remaining)
+        : null,
     elementType: ctx.elementType ?? null,
-    nearbyText: ctx.nearbyText
-      ? truncateForTokenBudget(ctx.nearbyText, budgetNearby)
-      : null,
-    visibleText: ctx.visibleText
-      ? truncateForTokenBudget(ctx.visibleText, budgetVisible)
-      : null,
-    domPath: ctx.domPath,
+    semanticType: ctx.semanticType ?? null,
     pageURL: ctx.pageURL,
+    pageName: ctx.pageName,
+    siteName: ctx.siteName,
+    pageArea: ctx.pageArea,
+    semanticIdentifier: ctx.semanticIdentifier ?? "",
+    computedStyles: ctx.computedStyles ?? "",
+    childrenList: ctx.childrenList ?? "",
+    elementState: ctx.elementState ?? "",
+    disabledState: ctx.disabledState ?? "",
+    modalContext: ctx.modalContext ?? "",
+    inputValue: ctx.inputValue ?? "",
+    iframeContext: ctx.iframeContext ?? "",
   };
 }
 
@@ -118,17 +263,30 @@ function normalizeRawContext(raw: unknown): PipelineContext | null {
   const o = raw as Record<string, unknown>;
   return {
     url: typeof o.url === "string" ? o.url : undefined,
-    domPath: o.domPath != null && typeof o.domPath === "string" ? o.domPath : null,
-    nearbyText:
-      Array.isArray(o.nearbyText) && o.nearbyText.length > 0
-        ? (o.nearbyText as unknown[]).filter((x): x is string => typeof x === "string").join("\n")
-        : o.nearbyText != null && typeof o.nearbyText === "string"
-          ? o.nearbyText
-          : null,
-    visibleText: o.visibleText != null && typeof o.visibleText === "string" ? o.visibleText : null,
     screenshotOCRText: o.screenshotOCRText != null && typeof o.screenshotOCRText === "string" ? o.screenshotOCRText : null,
     subtreeText: o.subtreeText != null && typeof o.subtreeText === "string" ? o.subtreeText : null,
     elementType: o.elementType != null && typeof o.elementType === "string" ? o.elementType : null,
+    semanticType:
+      o.semanticType != null && typeof o.semanticType === "string"
+        ? (o.semanticType as PipelineContext["semanticType"])
+        : null,
+    semanticIdentifier:
+      o.semanticIdentifier != null && typeof o.semanticIdentifier === "string"
+        ? o.semanticIdentifier
+        : null,
+    computedStyles:
+      o.computedStyles != null && typeof o.computedStyles === "string"
+        ? o.computedStyles
+        : null,
+    childrenList:
+      o.childrenList != null && typeof o.childrenList === "string"
+        ? o.childrenList
+        : null,
+    elementState: typeof o.elementState === "string" ? o.elementState : undefined,
+    disabledState: typeof o.disabledState === "string" ? o.disabledState : undefined,
+    modalContext: typeof o.modalContext === "string" ? o.modalContext : undefined,
+    inputValue: typeof o.inputValue === "string" ? o.inputValue : undefined,
+    iframeContext: typeof o.iframeContext === "string" ? o.iframeContext : undefined,
   };
 }
 
@@ -138,26 +296,9 @@ function dedupeLines(text: string | null): string | null {
   return [...new Set(lines)].join("\n");
 }
 
-function cleanVisibleText(text: string | null): string | null {
-  if (!text) return text;
-
-  return text
-    .replace(/[^\x20-\x7E\n]/g, " ")
-    .replace(/\b[a-zA-Z]{1,2}\b/g, " ")
-    .replace(/(.)\1{3,}/g, "$1")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function limitText(text: string | null, max = 1500): string | null {
-  if (!text) return text;
-  return text.slice(0, max);
-}
-
 function buildUserMessage(
   transcript: string,
   domContext: DomContextForAI,
-  shouldUseOCR: boolean
 ): string {
   const parts: string[] = [];
 
@@ -167,22 +308,59 @@ function buildUserMessage(
   parts.push("\nPAGE URL:");
   parts.push(domContext.pageURL || "Unknown");
 
-  parts.push("\nREFERENCE CONTEXT (USE FOR NAMING AND IDENTIFICATION ONLY — never generate action steps from DOM content, only use it to identify what element or area the user is referring to):");
+  parts.push("\nPAGE NAME (use this for [Page Name] bracket prefix in title):");
+  parts.push(domContext.pageName || "Unknown");
+
+  parts.push("\nSITE NAME:");
+  parts.push(domContext.siteName || "Unknown");
+
+  parts.push("\nPAGE AREA (use this verbatim for the pageArea JSON field):");
+  parts.push(domContext.pageArea || "Unknown");
+
+  parts.push("\nREFERENCE CONTEXT (USE FOR NAMING AND IDENTIFICATION ONLY — never generate description content from DOM, only use it to identify what element or area the recorder is referring to):");
 
   parts.push("Selected element:");
   parts.push(domContext.elementHTML || "None");
 
-  parts.push("\nElement type:");
-  parts.push(domContext.elementType || "None");
+  parts.push("\nElement name (semantic identifier):");
+  parts.push(domContext.semanticIdentifier || "None");
 
-  parts.push("\nNearby text:");
-  parts.push(domContext.nearbyText || "None");
+  parts.push("\nElement computed styles:");
+  parts.push(domContext.computedStyles || "None");
 
-  parts.push("\nVisible text:");
-  if (shouldUseOCR) {
-    parts.push("(Includes screenshot OCR — reference only; may be noisy.)");
+  parts.push("\nChildren of clicked element (for disambiguation when recorder mentions specific children):");
+  parts.push(domContext.childrenList || "None (clicked element has no meaningful children)");
+
+  if (domContext.semanticType) {
+    parts.push("\nSemantic type:");
+    parts.push(domContext.semanticType);
+    parts.push("(This is what the recorder clicked — use type-specific rules from the prompt to interpret feedback.)");
   }
-  parts.push(domContext.visibleText || "None");
+
+  if (domContext.elementState) {
+    parts.push("\nElement state:");
+    parts.push(domContext.elementState);
+  }
+
+  if (domContext.disabledState) {
+    parts.push("\nElement is:");
+    parts.push(domContext.disabledState);
+  }
+
+  if (domContext.modalContext) {
+    parts.push("\nElement is inside:");
+    parts.push(domContext.modalContext);
+  }
+
+  if (domContext.inputValue) {
+    parts.push("\nInput field current value:");
+    parts.push(`"${domContext.inputValue}"`);
+  }
+
+  if (domContext.iframeContext) {
+    parts.push("\nFrame context:");
+    parts.push(domContext.iframeContext);
+  }
 
   return parts.join("\n");
 }
@@ -195,43 +373,26 @@ const FEEDBACK_JSON_SCHEMA = {
   additionalProperties: false,
   properties: {
     title: { type: "string" },
-    pageArea: { type: "string" },  // e.g., "ClickUp · Pricing"
-    suggestedTags: {
+    description: { type: "string" },
+    pageArea: { type: "string" },
+    tags: {
       type: "array",
       minItems: 1,
       maxItems: 3,
       items: { type: "string", enum: ALL_TAG_KEYS },
     },
-    actions: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          step: { type: "number" },
-          description: { type: "string" },
-          entity: { type: "string" },
-        },
-        required: ["step", "description", "entity"],
-      },
-    },
   },
-  required: ["title", "pageArea", "suggestedTags", "actions"],
+  required: ["title", "description", "pageArea", "tags"],
 } as const;
 
-/** Fallback when parsing fails or actions array is missing. */
+/** Fallback when parsing fails or the model returned no description. */
 function fallbackStructuredFeedback(transcript: string): StructuredFeedbackJSON {
+  const cleaned = transcript.trim().replace(/\s+/g, " ");
   return {
     title: "",
+    description: cleaned || "Feedback recorded but could not be processed.",
     pageArea: "",
-    suggestedTags: [],
-    actions: [
-      {
-        step: 1,
-        instruction: transcript.trim() || "Update UI element",
-        entity: "general",
-      },
-    ],
+    tags: ["feedback"],
   };
 }
 
@@ -244,48 +405,37 @@ function parseStructuredResponse(text: string): StructuredFeedbackJSON | null {
     const parsed = JSON.parse(jsonStr) as unknown;
     if (!parsed || typeof parsed !== "object") return null;
     const o = parsed as Record<string, unknown>;
-    if (!Array.isArray(o.actions)) return null;
-    const actions: ExtractedAction[] = [];
-    for (const item of o.actions) {
-      if (item && typeof item === "object") {
-        const a = item as Record<string, unknown>;
-        const instruction =
-          typeof a.description === "string"
-            ? a.description
-            : typeof a.instruction === "string"
-              ? a.instruction
-              : String(a.description ?? a.instruction ?? "");
-        actions.push({
-          step: typeof a.step === "number" ? a.step : actions.length + 1,
-          instruction,
-          entity: typeof a.entity === "string" ? a.entity : "",
-        });
-      }
-    }
     const title = typeof o.title === "string" ? o.title.trim() : "";
+    const description = typeof o.description === "string" ? o.description.trim() : "";
     const pageArea = typeof o.pageArea === "string" ? o.pageArea.trim() : "";
-    const suggestedTagsRaw = Array.isArray(o.suggestedTags) ? o.suggestedTags : [];
-    const suggestedTags = whitelistTags(suggestedTagsRaw);
-    return { title, pageArea, suggestedTags, actions };
+    const tagsRaw = Array.isArray(o.tags) ? o.tags : [];
+    const tags = whitelistTags(tagsRaw);
+    if (!description) return null;
+    return { title, description, pageArea, tags };
   } catch {
     return null;
   }
 }
 
-/** Truncate page area to max 40 chars, drop empty/placeholder values. */
-function sanitizePageArea(pageArea: string | undefined): string {
-  if (!pageArea) return "";
+/** Truncate page area to max 40 chars; fall back to deterministic value when AI returns empty/placeholder. */
+function sanitizePageArea(pageArea: string | undefined, fallback: string): string {
+  if (!pageArea) return fallback;
   const trimmed = pageArea.trim();
-  if (!trimmed || trimmed.toLowerCase() === "unknown") return "";
+  if (!trimmed || trimmed.toLowerCase() === "unknown") return fallback;
   return trimmed.slice(0, 40);
 }
 
-/** Sanitize AI-generated title: max 5 words, max 60 characters. */
+/** Sanitize AI-generated title: max 100 characters. */
 function sanitizeTitle(title: string): string {
   if (!title) return "";
-  const words = title.split(/\s+/).slice(0, 5);
-  const cleaned = words.join(" ");
-  return cleaned.slice(0, 60);
+  const trimmed = title.trim();
+  return trimmed.slice(0, 100);
+}
+
+/** Sanitize AI-generated description: max 2000 characters. */
+function sanitizeDescription(description: string): string {
+  if (!description) return "";
+  return description.trim().slice(0, 2000);
 }
 
 /* ===== GPT CALLS ===== */
@@ -293,37 +443,34 @@ function sanitizeTitle(title: string): string {
 /**
  * Single GPT-4o-mini call: transcript + domContext → structured JSON.
  * Uses response_format json_schema so output is always valid JSON matching the schema.
- * On parse failure or missing actions, returns fallback (transcript as single action).
+ * On parse failure or missing description, returns fallback (transcript as description).
  */
 export async function extractStructuredFeedback(
   client: OpenAI,
   transcript: string,
   domContext: DomContextForAI
 ): Promise<{ json: StructuredFeedbackJSON; raw: string }> {
-  const vt = domContext.visibleText;
-  const shouldUseOCR =
-    (!domContext.elementHTML || domContext.elementHTML.length < 10) &&
-    !!vt &&
-    vt.length > 20;
   logger.debug("ai", "processing_started", {
     hasElement: !!domContext.elementHTML,
     elementLength: domContext.elementHTML?.length || 0,
-    visibleTextLength: vt?.length || 0,
-    shouldUseOCR
   });
-  const userMessage = buildUserMessage(transcript, domContext, shouldUseOCR);
+  const userMessage = buildUserMessage(transcript, domContext);
+
+  // TEMPORARY DEBUG — delete after testing
+  logDomContextToAI(transcript, domContext, userMessage);
+
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: SYSTEM_PROMPT },
     { role: "user", content: userMessage },
   ];
   const completion = await client.chat.completions.create({
     model: "gpt-4o-mini",
-    temperature: 0.2,
-    max_tokens: 300,
+    temperature: 0.0, // Deterministic output for reliable Ring 1 reliance
+    max_tokens: 500,
     response_format: {
       type: "json_schema",
       json_schema: {
-        name: "feedback_actions",
+        name: "feedback_ticket",
         schema: FEEDBACK_JSON_SCHEMA as Record<string, unknown>,
         strict: true,
       },
@@ -334,11 +481,10 @@ export async function extractStructuredFeedback(
   const json = parseStructuredResponse(raw);
   logger.debug("ai", "processing_success", {
     title: json?.title,
-    actionsCount: json?.actions?.length,
-    firstAction: json?.actions?.[0]?.instruction,
-    suggestedTags: json?.suggestedTags
+    descriptionLength: json?.description?.length ?? 0,
+    tags: json?.tags
   });
-  if (!json || !Array.isArray(json.actions) || json.actions.length === 0) {
+  if (!json || !json.description) {
     return { json: fallbackStructuredFeedback(transcript), raw };
   }
   return { json, raw };
@@ -348,80 +494,43 @@ export async function extractStructuredFeedback(
 
 /**
  * Run the minimal pipeline: transcript + context → one ticket.
- * One transcript → one ticket. Multiple actions become actionSteps on that ticket; never multiple tickets.
+ * One transcript → one ticket with title, description, pageArea, tags.
  */
 export async function runVoiceToTicket(
   client: OpenAI,
   transcript: string,
   rawContext: unknown
-): Promise<{
-  success: boolean;
-  ticket: VoiceTicket;
-}> {
+): Promise<{ success: boolean; ticket: VoiceTicket }> {
   if (!transcript || !transcript.trim()) {
     return {
       success: true,
-      ticket: { title: "", actionSteps: [], suggestedTags: [], pageArea: "" },
+      ticket: { title: "", description: "", pageArea: "", tags: [] },
     };
   }
 
   const domContext = buildDomContextForPipeline(rawContext);
-  const normalizedInput = {
-    transcript: transcript || "",
-    elementText: domContext?.elementHTML || null,
-    nearbyText: domContext?.nearbyText || null,
-    visibleText: domContext?.visibleText || "",
-  };
-
-  normalizedInput.elementText = dedupeLines(normalizedInput.elementText);
-  normalizedInput.nearbyText = dedupeLines(normalizedInput.nearbyText);
-  normalizedInput.visibleText = dedupeLines(normalizedInput.visibleText) ?? "";
-  normalizedInput.visibleText = cleanVisibleText(normalizedInput.visibleText) ?? "";
-  normalizedInput.visibleText = limitText(normalizedInput.visibleText, 1500) ?? "";
-  normalizedInput.nearbyText = limitText(normalizedInput.nearbyText, 1500);
-
-  if (!normalizedInput.elementText) {
-    normalizedInput.elementText = null;
-  }
-
-  if (!normalizedInput.nearbyText) {
-    normalizedInput.nearbyText = null;
-  }
+  const elementText = dedupeLines(domContext?.elementHTML || null);
 
   const aiContext: DomContextForAI = {
     ...domContext,
-    elementHTML: normalizedInput.elementText,
-    nearbyText: normalizedInput.nearbyText,
-    visibleText: normalizedInput.visibleText || null,
+    elementHTML: elementText && elementText.length > 0 ? elementText : null,
   };
-  const { json } = await extractStructuredFeedback(client, normalizedInput.transcript, aiContext);
+  const { json } = await extractStructuredFeedback(
+    client,
+    transcript,
+    aiContext
+  );
 
-  const actionSteps = json.actions
-    .sort((a, b) => a.step - b.step)
-    .map((a) => a.instruction.trim())
-    .filter(Boolean);
-
-  const aiTitle =
-    typeof json.title === "string"
-      ? sanitizeTitle(json.title)
-      : "";
-  const title =
-    aiTitle.length > 0
-      ? aiTitle
-      : generateTicketTitle(actionSteps);
-
-  const suggestedTags = whitelistTags(json.suggestedTags);
-  const pageArea = sanitizePageArea(json.pageArea);
+  const title = sanitizeTitle(json.title ?? "");
+  const description = sanitizeDescription(json.description ?? "");
+  const pageArea = sanitizePageArea(json.pageArea, domContext.pageArea);
+  const tags = whitelistTags(json.tags);
 
   const ticket: VoiceTicket = {
-    title,
-    actionSteps,
-    suggestedTags,
+    title: title || "Untitled feedback",
+    description,
     pageArea,
+    tags: tags.length > 0 ? tags : ["feedback"],
   };
-
-  return {
-    success: true,
-    ticket,
-  };
+  return { success: true, ticket };
 }

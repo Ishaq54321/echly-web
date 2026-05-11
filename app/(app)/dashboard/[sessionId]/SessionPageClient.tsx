@@ -109,7 +109,7 @@ import { Modal } from "@/components/ui/Modal";
 const USE_BUNDLE = true;
 
 /** Broadcast ticket update to extension tray so tray stays in sync. */
-function broadcastTicketUpdated(ticket: { id: string; title: string; actionSteps?: string[] | null; type?: string }) {
+function broadcastTicketUpdated(ticket: { id: string; title: string; description?: string | null; type?: string }) {
   if (typeof window === "undefined" || !("chrome" in window)) return;
   try {
     (
@@ -119,7 +119,7 @@ function broadcastTicketUpdated(ticket: { id: string; title: string; actionSteps
       ticket: {
         id: ticket.id,
         title: ticket.title,
-        actionSteps: ticket.actionSteps ?? [],
+        description: ticket.description ?? "",
         type: ticket.type ?? "Feedback",
       },
     });
@@ -132,12 +132,10 @@ function broadcastTicketUpdated(ticket: { id: string; title: string; actionSteps
 type TicketFromApi = {
   id: string;
   title: string;
-  instruction?: string;
   description?: string;
   type: string;
   isResolved?: boolean;
-  actionSteps?: string[] | null;
-  suggestedTags?: string[] | null;
+  tags?: string[] | null;
   screenshotId?: string | null;
   [key: string]: unknown;
 };
@@ -209,21 +207,12 @@ function bundleFeedbackRowToFeedback(
     id,
     sessionId,
     title: typeof row.title === "string" ? row.title : "",
-    instruction:
-      (typeof row.instruction === "string" ? row.instruction : "") ||
-      (typeof row.description === "string" ? row.description : "") ||
-      "",
-    description: typeof row.description === "string" ? row.description : "",
-    suggestion: "",
+    description: typeof row.description === "string" ? row.description : null,
     type: typeof row.type === "string" ? row.type : "Feedback",
     isResolved: normalizedStatus === "resolved",
     createdAt,
-    contextSummary: null,
-    actionSteps: Array.isArray(row.actionSteps)
-      ? (row.actionSteps as unknown[]).filter((s): s is string => typeof s === "string")
-      : null,
-    suggestedTags: Array.isArray(row.suggestedTags)
-      ? (row.suggestedTags as unknown[]).filter((s): s is string => typeof s === "string")
+    tags: Array.isArray(row.tags)
+      ? (row.tags as unknown[]).filter((s): s is string => typeof s === "string")
       : null,
     pageArea: typeof row.pageArea === "string" ? row.pageArea : null,
     url: null,
@@ -260,19 +249,6 @@ function bundleFeedbackRowToFeedback(
     creatorAvatarUrl:
       typeof row.creatorAvatarUrl === "string" ? row.creatorAvatarUrl : null,
   };
-}
-
-function sameStringArrayContent(
-  a: string[] | null | undefined,
-  b: string[] | null | undefined
-): boolean {
-  const aa = Array.isArray(a) ? a : [];
-  const bb = Array.isArray(b) ? b : [];
-  if (aa.length !== bb.length) return false;
-  for (let i = 0; i < aa.length; i++) {
-    if (aa[i] !== bb[i]) return false;
-  }
-  return true;
 }
 
 type SessionLoadedInfo = {
@@ -647,15 +623,15 @@ export default function SessionPageClient({
     };
   }, [searchQuery, feedbackSessionId]);
 
-  /** In-flight action steps per ticket — merged into the listener-derived list to avoid flicker. */
-  const pendingOptimisticActionStepsRef = useRef(
-    new Map<string, { steps: string[] | null }>()
+  /** In-flight description per ticket — merged into the listener-derived list to avoid flicker. */
+  const pendingOptimisticDescriptionRef = useRef(
+    new Map<string, { description: string | null }>()
   );
   const pendingOptimisticTitleRef = useRef(
     new Map<string, { title: string }>()
   );
   const pendingOptimisticResolvedRef = useRef(
-    new Map<string, { isResolved: boolean }>()
+    new Map<string, { isResolved: boolean; generation: number }>()
   );
   const pendingOptimisticAssigneeRef = useRef(
     new Map<string, { assigneeId: string | null; assigneeName: string | null; assigneeAvatarUrl: string | null }>()
@@ -664,19 +640,50 @@ export default function SessionPageClient({
     new Map<string, { priority: "high" | "medium" | "low" | null }>()
   );
   const pendingOptimisticTagsRef = useRef(
-    new Map<string, { suggestedTags: string[] | null }>()
+    new Map<string, { tags: string[] | null }>()
   );
   /** Monotonic save generation per ticket; stale PATCH responses must not overwrite UI. */
-  const actionStepsSaveLatestGenRef = useRef(new Map<string, number>());
+  const descriptionSaveLatestGenRef = useRef(new Map<string, number>());
+  const resolveSaveLatestGenRef = useRef(new Map<string, number>());
+
+  // Forward ref so the resolve reconciliation effect (declared above
+  // removeResolving) can release the in-flight button lock when the
+  // Firestore listener wins the race against the PATCH response.
+  const removeResolvingRef = useRef<(id: string) => void>(() => {});
+
+  // Ticket IDs currently being deleted (or just deleted, awaiting listener confirmation).
+  // Suppresses listener re-emission of a deleted ticket until the server confirms removal.
+  const pendingDeletedTicketIdsRef = useRef(new Set<string>());
+
+  // Per-ID rollback snapshots — preserves the single deleted ticket for restoration.
+  const deleteRevertSnapshotsRef = useRef(new Map<string, { ticket: Feedback; index: number }>());
+
+  // Tracks tickets whose deletion has been confirmed by the server (2xx response).
+  // Combined with listener absence, gates suppression-set release so we never
+  // release based on listener absence alone (which could be a transient blip).
+  const confirmedDeletedTicketIdsRef = useRef(new Set<string>());
+
+  // Optimistic-overlay version counter. Refs don't trigger re-renders, so the
+  // feedback memo can't observe ref mutations directly. Every ref write that
+  // should affect display bumps this counter; the memo lists it as a dep.
+  const [optimisticOverlayVersion, setOptimisticOverlayVersion] = useState(0);
+  const bumpOverlayVersion = useCallback(() => {
+    setOptimisticOverlayVersion((v) => v + 1);
+  }, []);
 
   useLayoutEffect(() => {
-    pendingOptimisticActionStepsRef.current.clear();
+    pendingOptimisticDescriptionRef.current.clear();
     pendingOptimisticTitleRef.current.clear();
     pendingOptimisticResolvedRef.current.clear();
     pendingOptimisticAssigneeRef.current.clear();
     pendingOptimisticPriorityRef.current.clear();
     pendingOptimisticTagsRef.current.clear();
-    actionStepsSaveLatestGenRef.current.clear();
+    descriptionSaveLatestGenRef.current.clear();
+    resolveSaveLatestGenRef.current.clear();
+    pendingDeletedTicketIdsRef.current.clear();
+    deleteRevertSnapshotsRef.current.clear();
+    confirmedDeletedTicketIdsRef.current.clear();
+    setOptimisticOverlayVersion((v) => v + 1);
   }, [sessionId]);
 
   useLayoutEffect(() => {
@@ -736,79 +743,139 @@ export default function SessionPageClient({
     if (pendingOptimisticTitleRef.current.size === 0) return;
     const base = feedbackStoreState?.feedback;
     if (!base) return;
+    let didCleanup = false;
     for (const [id, entry] of pendingOptimisticTitleRef.current) {
       const listenerItem = base.find((f: Feedback) => f.id === id);
       if (listenerItem && listenerItem.title === entry.title) {
         pendingOptimisticTitleRef.current.delete(id);
+        didCleanup = true;
       }
     }
-  }, [feedbackStoreState?.feedback]);
+    if (didCleanup) bumpOverlayVersion();
+  }, [feedbackStoreState?.feedback, bumpOverlayVersion]);
+
+  // Release per-ID delete suppression only when BOTH (a) the server confirmed
+  // the deletion (2xx response) and (b) the listener no longer has the item.
+  // Either alone is insufficient: server-only could race a listener tick still
+  // emitting the doc; listener-only could be a transient blip.
+  useEffect(() => {
+    if (pendingDeletedTicketIdsRef.current.size === 0) return;
+    const listenerIds = new Set(
+      (feedbackStoreState?.feedback ?? []).map((f: Feedback) => f.id)
+    );
+
+    let didCleanup = false;
+    for (const id of [...pendingDeletedTicketIdsRef.current]) {
+      if (
+        confirmedDeletedTicketIdsRef.current.has(id) &&
+        !listenerIds.has(id)
+      ) {
+        pendingDeletedTicketIdsRef.current.delete(id);
+        confirmedDeletedTicketIdsRef.current.delete(id);
+        deleteRevertSnapshotsRef.current.delete(id);
+        didCleanup = true;
+      }
+    }
+
+    if (didCleanup) bumpOverlayVersion();
+  }, [feedbackStoreState?.feedback, bumpOverlayVersion]);
 
   useEffect(() => {
     if (pendingOptimisticResolvedRef.current.size === 0) return;
-    const base = feedbackStoreState?.feedback;
-    if (!base) return;
+    const base = feedbackStoreState?.feedback ?? [];
+
+    let didCleanup = false;
     for (const [id, entry] of pendingOptimisticResolvedRef.current) {
+      const latestGen = resolveSaveLatestGenRef.current.get(id);
       const listenerItem = base.find((f: Feedback) => f.id === id);
-      if (listenerItem && listenerItem.isResolved === entry.isResolved) {
+      if (!listenerItem) continue;
+
+      if (entry.generation === latestGen) {
+        // Latest generation owns the overlay — release only when listener
+        // catches up to our intent.
+        if (listenerItem.isResolved === entry.isResolved) {
+          pendingOptimisticResolvedRef.current.delete(id);
+          resolveSaveLatestGenRef.current.delete(id);
+          // PATCH response will see latestGen=undefined and bail early, so
+          // release the in-flight button lock here to avoid stuck-disabled.
+          removeResolvingRef.current(id);
+          didCleanup = true;
+        }
+      } else {
+        // Stale generation — superseded by a newer click, drop immediately.
         pendingOptimisticResolvedRef.current.delete(id);
+        didCleanup = true;
       }
     }
-  }, [feedbackStoreState?.feedback]);
+
+    if (didCleanup) bumpOverlayVersion();
+  }, [feedbackStoreState?.feedback, bumpOverlayVersion]);
 
   useEffect(() => {
     if (pendingOptimisticAssigneeRef.current.size === 0) return;
     const base = feedbackStoreState?.feedback;
     if (!base) return;
+    let didCleanup = false;
     for (const [id, entry] of pendingOptimisticAssigneeRef.current) {
       const listenerItem = base.find((f: Feedback) => f.id === id);
       if (listenerItem && listenerItem.assigneeId === entry.assigneeId) {
         pendingOptimisticAssigneeRef.current.delete(id);
+        didCleanup = true;
       }
     }
-  }, [feedbackStoreState?.feedback]);
+    if (didCleanup) bumpOverlayVersion();
+  }, [feedbackStoreState?.feedback, bumpOverlayVersion]);
 
   useEffect(() => {
     if (pendingOptimisticPriorityRef.current.size === 0) return;
     const base = feedbackStoreState?.feedback;
     if (!base) return;
+    let didCleanup = false;
     for (const [id, entry] of pendingOptimisticPriorityRef.current) {
       const listenerItem = base.find((f: Feedback) => f.id === id);
       if (listenerItem && listenerItem.priority === entry.priority) {
         pendingOptimisticPriorityRef.current.delete(id);
+        didCleanup = true;
       }
     }
-  }, [feedbackStoreState?.feedback]);
+    if (didCleanup) bumpOverlayVersion();
+  }, [feedbackStoreState?.feedback, bumpOverlayVersion]);
 
   useEffect(() => {
     if (pendingOptimisticTagsRef.current.size === 0) return;
     const base = feedbackStoreState?.feedback;
     if (!base) return;
+    let didCleanup = false;
     for (const [id, entry] of pendingOptimisticTagsRef.current) {
       const listenerItem = base.find((f: Feedback) => f.id === id);
       if (
         listenerItem &&
-        JSON.stringify(listenerItem.suggestedTags ?? null) === JSON.stringify(entry.suggestedTags)
+        JSON.stringify(listenerItem.tags ?? null) === JSON.stringify(entry.tags)
       ) {
         pendingOptimisticTagsRef.current.delete(id);
+        didCleanup = true;
       }
     }
-  }, [feedbackStoreState?.feedback]);
+    if (didCleanup) bumpOverlayVersion();
+  }, [feedbackStoreState?.feedback, bumpOverlayVersion]);
 
   useEffect(() => {
-    if (pendingOptimisticActionStepsRef.current.size === 0) return;
+    if (pendingOptimisticDescriptionRef.current.size === 0) return;
     const base = feedbackStoreState?.feedback;
     if (!base) return;
-    for (const [id, entry] of pendingOptimisticActionStepsRef.current) {
+    let didCleanup = false;
+    for (const [id, entry] of pendingOptimisticDescriptionRef.current) {
       const listenerItem = base.find((f: Feedback) => f.id === id);
       if (
         listenerItem &&
-        JSON.stringify(listenerItem.actionSteps ?? null) === JSON.stringify(entry.steps)
+        (listenerItem.description ?? null) === entry.description
       ) {
-        pendingOptimisticActionStepsRef.current.delete(id);
+        pendingOptimisticDescriptionRef.current.delete(id);
+        didCleanup = true;
       }
     }
-  }, [feedbackStoreState?.feedback]);
+    if (didCleanup) bumpOverlayVersion();
+  }, [feedbackStoreState?.feedback, bumpOverlayVersion]);
 
   const scheduleOptimisticClear = useCallback((id: string) => {
     const existing = optimisticTimersRef.current.get(id);
@@ -857,14 +924,16 @@ export default function SessionPageClient({
   const feedback: Feedback[] = useMemo(() => {
     const baseIds = new Set(baseFeedback.map((f) => f.id));
     const overlay = optimisticFeedback;
-    const actionStepsOverlay = pendingOptimisticActionStepsRef.current;
+    const descriptionOverlay = pendingOptimisticDescriptionRef.current;
+    const pendingDeleted = pendingDeletedTicketIdsRef.current;
     const merged: Feedback[] = [];
     const pushItem = (item: Feedback) => {
+      if (pendingDeleted.has(item.id)) return; // suppress until server confirms removal
       const ov = overlay.get(item.id);
       if (ov === null) return; // treat as deleted
       let next = ov ? { ...item, ...ov } : item;
-      const stepRow = actionStepsOverlay.get(item.id);
-      if (stepRow) next = { ...next, actionSteps: stepRow.steps };
+      const descRow = descriptionOverlay.get(item.id);
+      if (descRow) next = { ...next, description: descRow.description };
       const titleRow = pendingOptimisticTitleRef.current.get(item.id);
       if (titleRow) next = { ...next, title: titleRow.title };
       const resolvedRow = pendingOptimisticResolvedRef.current.get(item.id);
@@ -874,7 +943,7 @@ export default function SessionPageClient({
       const priorityRow = pendingOptimisticPriorityRef.current.get(item.id);
       if (priorityRow) next = { ...next, priority: priorityRow.priority };
       const tagsRow = pendingOptimisticTagsRef.current.get(item.id);
-      if (tagsRow) next = { ...next, suggestedTags: tagsRow.suggestedTags };
+      if (tagsRow) next = { ...next, tags: tagsRow.tags };
       merged.push(next);
     };
     for (const ins of insertedFeedback) {
@@ -896,7 +965,7 @@ export default function SessionPageClient({
       return b.id.localeCompare(a.id);
     });
     return merged;
-  }, [baseFeedback, insertedFeedback, optimisticFeedback]);
+  }, [baseFeedback, insertedFeedback, optimisticFeedback, optimisticOverlayVersion]);
 
   /**
    * Shim with the same {@link React.Dispatch} shape that the deleted hook exposed.
@@ -1085,23 +1154,7 @@ export default function SessionPageClient({
       }),
     []
   );
-  const setOptimistic = useCallback(
-    (id: string, val: boolean) =>
-      setResolveOptimisticMap(prev =>
-        new Map([...prev, [id, val]])
-      ),
-    []
-  );
-  const clearOptimistic = useCallback(
-    (id: string) =>
-      setResolveOptimisticMap(prev => {
-        const next = new Map(prev);
-        next.delete(id);
-        return next;
-      }),
-    []
-  );
-
+  removeResolvingRef.current = removeResolving;
   const feedbackScopedVisual = useMemo(() => {
     if (resolveOptimisticMap.size === 0)
       return feedbackScoped;
@@ -1254,7 +1307,7 @@ export default function SessionPageClient({
     if (!sessionId) return;
     const handler = (e: Event) => {
       const ev = e as CustomEvent<{
-        ticket: { id: string; title: string; instruction?: string; description?: string; type?: string };
+        ticket: { id: string; title: string; description?: string; type?: string };
         sessionId: string;
       }>;
       const { ticket, sessionId: evSessionId } = ev.detail ?? {};
@@ -1266,8 +1319,7 @@ export default function SessionPageClient({
         sessionId: evSessionId,
         workspaceId,
         title: ticket.title,
-        instruction: ticket.instruction ?? ticket.description,
-        description: ticket.description ?? ticket.instruction,
+        description: ticket.description ?? null,
         type: ticket.type ?? "Feedback",
         isResolved: false,
         createdAt: null,
@@ -2110,6 +2162,7 @@ export default function SessionPageClient({
       )
     );
     pendingOptimisticTitleRef.current.set(effectiveSelectedId, { title: trimmed });
+    bumpOverlayVersion();
     try {
       const res = await authFetch(`/api/tickets/${effectiveSelectedId}`, {
         method: "PATCH",
@@ -2118,6 +2171,7 @@ export default function SessionPageClient({
       });
       if (!res) {
         pendingOptimisticTitleRef.current.delete(effectiveSelectedId);
+        bumpOverlayVersion();
         setFeedback((prev) =>
           prev.map((item) =>
             item.id === effectiveSelectedId
@@ -2131,6 +2185,7 @@ export default function SessionPageClient({
       const raw = await res.json();
       if (!res.ok) {
         pendingOptimisticTitleRef.current.delete(effectiveSelectedId);
+        bumpOverlayVersion();
         setFeedback((prev) =>
           prev.map((item) =>
             item.id === effectiveSelectedId
@@ -2147,6 +2202,7 @@ export default function SessionPageClient({
         ticketPayload = requireApiSuccessData<{ ticket: TicketFromApi }>(raw).ticket;
       } catch {
         pendingOptimisticTitleRef.current.delete(effectiveSelectedId);
+        bumpOverlayVersion();
         setFeedback((prev) =>
           prev.map((item) =>
             item.id === effectiveSelectedId
@@ -2169,6 +2225,7 @@ export default function SessionPageClient({
       console.error("[ECHLY] saveTitle failed", err);
       showToast("Could not save title");
       pendingOptimisticTitleRef.current.delete(effectiveSelectedId);
+      bumpOverlayVersion();
       setFeedback((prev) =>
         prev.map((item) =>
           item.id === effectiveSelectedId
@@ -2179,35 +2236,38 @@ export default function SessionPageClient({
     }
   };
 
-  /* ================= SAVE ACTION STEPS (optimistic update, then PATCH) ================= */
+  /* ================= SAVE DESCRIPTION (optimistic update, then PATCH) ================= */
 
-  const saveActionSteps = async (actionSteps: string[]) => {
+  const saveDescription = async (description: string) => {
     if (!effectiveSelectedId) return;
     if (!isIdentityResolved) return;
     const ticketId = effectiveSelectedId;
-    const currentSteps = selectedItem?.actionSteps ?? null;
-    if (sameStringArrayContent(currentSteps, actionSteps)) return;
+    const currentDescription = selectedItem?.description ?? null;
+    const nextDescription = description.trim().length > 0 ? description : null;
+    if ((currentDescription ?? "") === (nextDescription ?? "")) return;
 
-    const previousSteps = currentSteps;
-    const priorGen = actionStepsSaveLatestGenRef.current.get(ticketId) ?? 0;
+    const previousDescription = currentDescription;
+    const priorGen = descriptionSaveLatestGenRef.current.get(ticketId) ?? 0;
     const myGen = priorGen + 1;
-    actionStepsSaveLatestGenRef.current.set(ticketId, myGen);
-    pendingOptimisticActionStepsRef.current.set(ticketId, { steps: actionSteps });
+    descriptionSaveLatestGenRef.current.set(ticketId, myGen);
+    pendingOptimisticDescriptionRef.current.set(ticketId, { description: nextDescription });
+    bumpOverlayVersion();
 
     setFeedback((prev) =>
       prev.map((item) =>
-        item.id === ticketId ? { ...item, actionSteps } : item
+        item.id === ticketId ? { ...item, description: nextDescription } : item
       )
     );
 
     void (async () => {
       const rollbackIfLatest = () => {
-        if (actionStepsSaveLatestGenRef.current.get(ticketId) !== myGen) return;
-        pendingOptimisticActionStepsRef.current.delete(ticketId);
+        if (descriptionSaveLatestGenRef.current.get(ticketId) !== myGen) return;
+        pendingOptimisticDescriptionRef.current.delete(ticketId);
+        bumpOverlayVersion();
         setFeedback((prev) =>
           prev.map((item) =>
             item.id === ticketId
-              ? { ...item, actionSteps: previousSteps }
+              ? { ...item, description: previousDescription }
               : item
           )
         );
@@ -2217,21 +2277,21 @@ export default function SessionPageClient({
         const res = await authFetch(`/api/tickets/${ticketId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ actionSteps }),
+          body: JSON.stringify({ description: nextDescription ?? "" }),
         });
         if (!res) {
           rollbackIfLatest();
-          if (actionStepsSaveLatestGenRef.current.get(ticketId) === myGen) {
-            showToast("Could not save action items");
+          if (descriptionSaveLatestGenRef.current.get(ticketId) === myGen) {
+            showToast("Could not save description");
           }
           return;
         }
         const raw = await res.json();
         if (!res.ok) {
           rollbackIfLatest();
-          if (actionStepsSaveLatestGenRef.current.get(ticketId) === myGen) {
+          if (descriptionSaveLatestGenRef.current.get(ticketId) === myGen) {
             if (responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
-            else showToast("Could not save action items");
+            else showToast("Could not save description");
           }
           return;
         }
@@ -2240,56 +2300,66 @@ export default function SessionPageClient({
           ticketPayload = requireApiSuccessData<{ ticket: TicketFromApi }>(raw).ticket;
         } catch {
           rollbackIfLatest();
-          if (actionStepsSaveLatestGenRef.current.get(ticketId) === myGen) {
-            showToast("Could not save action items");
+          if (descriptionSaveLatestGenRef.current.get(ticketId) === myGen) {
+            showToast("Could not save description");
           }
           return;
         }
-        if (actionStepsSaveLatestGenRef.current.get(ticketId) !== myGen) {
+        if (descriptionSaveLatestGenRef.current.get(ticketId) !== myGen) {
           return;
         }
-        pendingOptimisticActionStepsRef.current.delete(ticketId);
         setFeedback((prev) =>
           prev.map((item) => {
             if (item.id !== ticketId) return item;
             const { createdAt, updatedAt, ...safePayload } = ticketPayload as Record<string, unknown>;
-            return { ...item, ...safePayload };
+            // Skip re-writing description if it matches optimistic value, to
+            // avoid re-parsing the markdown / hex chips and causing a flicker.
+            const { description: serverDescription, ...nonDescriptionFields } =
+              safePayload as { description?: string | null } & Record<string, unknown>;
+            const shouldUpdateDescription = serverDescription !== item.description;
+            return {
+              ...item,
+              ...nonDescriptionFields,
+              ...(shouldUpdateDescription ? { description: serverDescription } : {}),
+            };
           })
         );
         broadcastTicketUpdated(ticketPayload);
       } catch (err) {
-        console.error("[ECHLY] saveActionSteps failed", err);
+        console.error("[ECHLY] saveDescription failed", err);
         rollbackIfLatest();
-        if (actionStepsSaveLatestGenRef.current.get(ticketId) === myGen) {
-          showToast("Could not save action items");
+        if (descriptionSaveLatestGenRef.current.get(ticketId) === myGen) {
+          showToast("Could not save description");
         }
       }
     })();
   };
 
-  const saveTags = async (suggestedTags: string[]) => {
+  const saveTags = async (tags: string[]) => {
     if (!effectiveSelectedId) return;
     if (!isIdentityResolved) return;
     const ticketId = effectiveSelectedId;
-    const nextTags = Array.isArray(suggestedTags) ? suggestedTags : null;
-    const previous = selectedItem?.suggestedTags ?? null;
+    const nextTags = Array.isArray(tags) ? tags : null;
+    const previous = selectedItem?.tags ?? null;
     setFeedback((prev) =>
       prev.map((item) =>
-        item.id === ticketId ? { ...item, suggestedTags: nextTags } : item
+        item.id === ticketId ? { ...item, tags: nextTags } : item
       )
     );
-    pendingOptimisticTagsRef.current.set(ticketId, { suggestedTags: nextTags });
+    pendingOptimisticTagsRef.current.set(ticketId, { tags: nextTags });
+    bumpOverlayVersion();
     try {
       const res = await authFetch(`/api/tickets/${ticketId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ suggestedTags }),
+        body: JSON.stringify({ tags }),
       });
       if (!res) {
         pendingOptimisticTagsRef.current.delete(ticketId);
+        bumpOverlayVersion();
         setFeedback((prev) =>
           prev.map((item) =>
-            item.id === ticketId ? { ...item, suggestedTags: previous } : item
+            item.id === ticketId ? { ...item, tags: previous } : item
           )
         );
         showToast("Could not save tags");
@@ -2298,9 +2368,10 @@ export default function SessionPageClient({
       const rawTags = await res.json();
       if (!res.ok) {
         pendingOptimisticTagsRef.current.delete(ticketId);
+        bumpOverlayVersion();
         setFeedback((prev) =>
           prev.map((item) =>
-            item.id === ticketId ? { ...item, suggestedTags: previous } : item
+            item.id === ticketId ? { ...item, tags: previous } : item
           )
         );
         if (responseIsPermissionDenied(res)) notifyPermissionDenied(showToast);
@@ -2312,9 +2383,10 @@ export default function SessionPageClient({
         ticketPayload = requireApiSuccessData<{ ticket: TicketFromApi }>(rawTags).ticket;
       } catch {
         pendingOptimisticTagsRef.current.delete(ticketId);
+        bumpOverlayVersion();
         setFeedback((prev) =>
           prev.map((item) =>
-            item.id === ticketId ? { ...item, suggestedTags: previous } : item
+            item.id === ticketId ? { ...item, tags: previous } : item
           )
         );
         showToast("Could not save tags");
@@ -2332,9 +2404,10 @@ export default function SessionPageClient({
       console.error("[ECHLY] saveTags failed", err);
       showToast("Could not save tags");
       pendingOptimisticTagsRef.current.delete(ticketId);
+      bumpOverlayVersion();
       setFeedback((prev) =>
         prev.map((item) =>
-          item.id === ticketId ? { ...item, suggestedTags: previous } : item
+          item.id === ticketId ? { ...item, tags: previous } : item
         )
       );
     }
@@ -2353,24 +2426,31 @@ export default function SessionPageClient({
       triggerRequestAccessFlow: openRequestAccessModal,
       run: () => {
         if (!isIdentityResolved) return;
+        // Read from listener-source state, not optimistic-merged feedback —
+        // rapid clicks must not capture stale optimistic values.
+        const serverFeedback = feedbackStoreState?.feedback ?? [];
         const previousResolved = Boolean(
-          feedback.find((i) => i.id === ticketId)?.isResolved
+          serverFeedback.find((i) => i.id === ticketId)?.isResolved
         );
 
+        const myGen = (resolveSaveLatestGenRef.current.get(ticketId) ?? 0) + 1;
+        resolveSaveLatestGenRef.current.set(ticketId, myGen);
+
         addResolving(ticketId);
-        setOptimistic(ticketId, isResolved);
-        pendingOptimisticResolvedRef.current.set(ticketId, { isResolved });
+        pendingOptimisticResolvedRef.current.set(ticketId, {
+          isResolved,
+          generation: myGen,
+        });
+        bumpOverlayVersion();
         if (isResolved) {
           setResolveAffirmationKey((k) => k + 1);
         }
 
-        startTransition(() => {
-          setFeedback((prevList) =>
-            prevList.map((item) =>
-              item.id === ticketId ? { ...item, isResolved } : item
-            )
-          );
-        });
+        // No setFeedback overlay write here — the per-ID ref overlay (above)
+        // is the single source of truth for optimistic resolve state and the
+        // version counter ensures the memo recomputes. Going through the shim
+        // would route through the 500ms scheduleOptimisticClear timer which
+        // can race rapid clicks.
 
         const countsTransition = previousResolved !== isResolved;
         if (countsTransition) {
@@ -2383,9 +2463,12 @@ export default function SessionPageClient({
 
         void (async () => {
           const rollbackResolved = () => {
-            clearOptimistic(ticketId);
+            if (resolveSaveLatestGenRef.current.get(ticketId) !== myGen) {
+              return;
+            }
             removeResolving(ticketId);
             pendingOptimisticResolvedRef.current.delete(ticketId);
+            bumpOverlayVersion();
             if (countsTransition) {
               setSessionCountsDelta((prev) => ({
                 open: prev.open + (isResolved ? 1 : -1),
@@ -2439,7 +2522,11 @@ export default function SessionPageClient({
                 "[ECHLY_PERF] Full breakdown: compare CLIENT total above with authFetch TOKEN/NETWORK lines and server [Resolve] logs for API vs Firestore."
               );
             }
-            clearOptimistic(ticketId);
+            // Only the latest generation owns cleanup; older PATCHes must not
+            // wipe optimistic state for a newer in-flight click.
+            if (resolveSaveLatestGenRef.current.get(ticketId) !== myGen) {
+              return;
+            }
             removeResolving(ticketId);
             setFeedback((prev) =>
               prev.map((item) => {
@@ -2453,7 +2540,6 @@ export default function SessionPageClient({
           } catch (err) {
             console.error("[ECHLY] saveResolved failed", err);
             rollbackResolved();
-            removeResolving(ticketId);
             onError?.();
           }
         })();
@@ -2526,8 +2612,9 @@ export default function SessionPageClient({
         assigneeName: assigneeName ?? null,
         assigneeAvatarUrl: assigneeAvatarUrl ?? null,
       });
+      bumpOverlayVersion();
     },
-    [effectiveSelectedId, setFeedback]
+    [effectiveSelectedId, setFeedback, bumpOverlayVersion]
   );
 
   const handlePriorityChanged = useCallback(
@@ -2540,8 +2627,9 @@ export default function SessionPageClient({
         )
       );
       pendingOptimisticPriorityRef.current.set(ticketId, { priority: priority ?? null });
+      bumpOverlayVersion();
     },
-    [effectiveSelectedId, setFeedback]
+    [effectiveSelectedId, setFeedback, bumpOverlayVersion]
   );
 
   const handleSessionTitleBlur = useCallback(async () => {
@@ -2784,16 +2872,34 @@ export default function SessionPageClient({
 
   const handleDeleteFeedback = async (id: string) => {
     if (!isIdentityResolved) return;
-    const ticket = feedback.find((i) => i.id === id);
+
+    // Request deduplication — if this ticket is already being deleted, ignore.
+    if (pendingDeletedTicketIdsRef.current.has(id)) return;
+
+    // Snapshot from listener-source state (not the optimistic-merged list) so
+    // the rollback reflects the true server position.
+    const listenerFeedback = feedbackStoreState?.feedback ?? [];
+    const ticketIndex = listenerFeedback.findIndex((i: Feedback) => i.id === id);
+    const ticket = ticketIndex !== -1 ? listenerFeedback[ticketIndex] : undefined;
     if (!ticket) return;
 
     const wasResolved = Boolean(ticket.isResolved);
     const selectionBeforeDelete = effectiveSelectedId;
-    const prevFeedback = feedback;
+
+    // Determine next selection BEFORE we mutate the list.
     const nextSelected =
       selectionBeforeDelete === id
         ? feedback.filter((item) => item.id !== id)[0]?.id ?? null
         : selectionBeforeDelete;
+
+    // Add to suppression set FIRST (before any state mutation) so listener ticks
+    // mid-flight can't re-emit this ticket.
+    pendingDeletedTicketIdsRef.current.add(id);
+
+    // Snapshot ONLY this ticket and its index — not the whole list — so concurrent
+    // deletes don't overwrite each other's rollback state.
+    deleteRevertSnapshotsRef.current.set(id, { ticket, index: ticketIndex });
+    bumpOverlayVersion();
 
     setSessionCountsDelta((prev) => ({
       open: prev.open + (wasResolved ? 0 : -1),
@@ -2805,13 +2911,25 @@ export default function SessionPageClient({
     setShowDeleteModal(false);
 
     const rollbackDelete = () => {
+      const snapshot = deleteRevertSnapshotsRef.current.get(id);
+      if (snapshot) {
+        setFeedback((prev) => {
+          if (prev.some((item) => item.id === id)) return prev;
+          const next = [...prev];
+          next.splice(Math.min(snapshot.index, next.length), 0, snapshot.ticket);
+          return next;
+        });
+      }
       setSessionCountsDelta((prev) => ({
         open: prev.open + (wasResolved ? 0 : 1),
         resolved: prev.resolved + (wasResolved ? 1 : 0),
         total: prev.total + 1,
       }));
-      setFeedback(prevFeedback);
       setSelectedId(selectionBeforeDelete);
+      pendingDeletedTicketIdsRef.current.delete(id);
+      confirmedDeletedTicketIdsRef.current.delete(id);
+      deleteRevertSnapshotsRef.current.delete(id);
+      bumpOverlayVersion();
     };
 
     try {
@@ -2819,6 +2937,13 @@ export default function SessionPageClient({
       if (!res) {
         rollbackDelete();
         showToast("Could not delete ticket");
+        return;
+      }
+      // 404 → already deleted server-side; treat as success.
+      if (res.status === 404) {
+        confirmedDeletedTicketIdsRef.current.add(id);
+        deleteRevertSnapshotsRef.current.delete(id);
+        bumpOverlayVersion();
         return;
       }
       const rawDelTicket = await res.json();
@@ -2835,8 +2960,12 @@ export default function SessionPageClient({
         showToast("Could not delete ticket");
         return;
       }
-      const currentPath = window.location.pathname;
-      router.push(currentPath);
+      // Success: mark server-confirmed and drop the rollback snapshot. The
+      // suppression-set entry stays until the listener also drops the doc —
+      // the release effect waits on the dual confirmation.
+      confirmedDeletedTicketIdsRef.current.add(id);
+      deleteRevertSnapshotsRef.current.delete(id);
+      bumpOverlayVersion();
     } catch (err) {
       console.error("[ECHLY] handleDeleteFeedback failed", err);
       rollbackDelete();
@@ -3010,7 +3139,7 @@ export default function SessionPageClient({
         onSaveTitle={isWorkspaceMember ? saveTitle : undefined}
         onResolvedChange={handleResolvedChange}
         resolveSubmitting={resolvingSet.has(effectiveSelectedId ?? "")}
-        onSaveActionSteps={isWorkspaceMember ? saveActionSteps : undefined}
+        onSaveDescription={isWorkspaceMember ? saveDescription : undefined}
         onSaveTags={isWorkspaceMember ? saveTags : undefined}
         setIsImageExpanded={setIsImageExpanded}
         onEdit={() => {

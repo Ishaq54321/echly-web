@@ -93,6 +93,11 @@ export function useShareController(
   const [linkCopied, setLinkCopied] = useState(false);
   const linkCopiedTimerRef = useRef<number | null>(null);
 
+  const generalAccessDebounceRef = useRef<number | null>(null);
+  const generalAccessLatestGenRef = useRef(0);
+  const generalAccessPendingValueRef = useRef<ShareGeneralAccess | null>(null);
+  const generalAccessPreviousValueRef = useRef<ShareGeneralAccess | null>(null);
+
   const load = useCallback(async () => {
     const sid = sessionId.trim();
     if (!sid) return;
@@ -161,42 +166,93 @@ export function useShareController(
       if (json.data?.type === "already_member") {
         setItems((prev) => prev.filter((i) => i.id !== optimisticItem.id));
         setInviteError("User already has access");
+        setInviteEmail("");
         return;
       }
 
       setInviteEmail("");
-      await load();
+      try {
+        const memRes = await authFetch(`/api/sessions/${encodeURIComponent(sid)}/members`);
+        const mj = memRes?.ok
+          ? ((await memRes.json().catch(() => null)) as ApiEnvelope<{ items?: ShareItem[] }> | null)
+          : null;
+        if (mj?.success && Array.isArray(mj.data?.items)) {
+          setItems(mj.data.items);
+        }
+      } catch (err) {
+        console.error("Failed to refresh members after invite:", err);
+      }
     } finally {
       setInviting(false);
     }
-  }, [inviteAccess, inviteEmail, load, sessionId]);
+  }, [inviteAccess, inviteEmail, sessionId]);
 
   const updateGeneralAccess = useCallback(
-    async (value: ShareGeneralAccess) => {
+    (value: ShareGeneralAccess) => {
       const sid = sessionId.trim();
       if (!sid) return;
-      const previous = generalAccess;
-      setGeneralAccess(value);
+
+      // Capture the pre-toggle value on the first click of a debounce window,
+      // so rapid back-and-forth toggles still know what to roll back to on failure.
+      if (generalAccessDebounceRef.current === null) {
+        setGeneralAccess((prev) => {
+          generalAccessPreviousValueRef.current = prev;
+          return value;
+        });
+      } else {
+        setGeneralAccess(value);
+      }
+
+      generalAccessPendingValueRef.current = value;
       setUpdatingGeneralAccess(true);
-      const res = await authFetch(`/api/sessions/${encodeURIComponent(sid)}/share-settings`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ generalAccess: value }),
-      });
-      if (!res) {
-        setGeneralAccess(previous);
+
+      if (generalAccessDebounceRef.current !== null) {
+        window.clearTimeout(generalAccessDebounceRef.current);
+      }
+
+      generalAccessDebounceRef.current = window.setTimeout(async () => {
+        generalAccessDebounceRef.current = null;
+        const myGen = generalAccessLatestGenRef.current + 1;
+        generalAccessLatestGenRef.current = myGen;
+
+        const valueToSend = generalAccessPendingValueRef.current;
+        const previous = generalAccessPreviousValueRef.current;
+        if (valueToSend === null) {
+          setUpdatingGeneralAccess(false);
+          return;
+        }
+
+        const res = await authFetch(`/api/sessions/${encodeURIComponent(sid)}/share-settings`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ generalAccess: valueToSend }),
+        });
+
+        // Newer request superseded this one — ignore the response.
+        if (myGen !== generalAccessLatestGenRef.current) return;
+
+        if (!res) {
+          if (previous !== null) setGeneralAccess(previous);
+          setUpdatingGeneralAccess(false);
+          generalAccessPendingValueRef.current = null;
+          generalAccessPreviousValueRef.current = null;
+          return;
+        }
+
+        const json = (await res.json().catch(() => ({}))) as ApiEnvelope<Record<string, never>>;
+        if (myGen !== generalAccessLatestGenRef.current) return;
+
+        if (!res.ok || !json.success) {
+          if (previous !== null) setGeneralAccess(previous);
+          setListError("Only the session owner can change general access");
+          console.error("[useShareController] updateGeneralAccess failed", { status: res.status, json });
+        }
         setUpdatingGeneralAccess(false);
-        return;
-      }
-      const json = (await res.json().catch(() => ({}))) as ApiEnvelope<Record<string, never>>;
-      if (!res.ok || !json.success) {
-        setGeneralAccess(previous);
-        setListError("Only the session owner can change general access");
-        console.error("[useShareController] updateGeneralAccess failed", { status: res.status, json });
-      }
-      setUpdatingGeneralAccess(false);
+        generalAccessPendingValueRef.current = null;
+        generalAccessPreviousValueRef.current = null;
+      }, 300);
     },
-    [sessionId, generalAccess]
+    [sessionId]
   );
 
   const copyShareLink = useCallback(async () => {
@@ -216,6 +272,7 @@ export function useShareController(
   useEffect(() => {
     return () => {
       if (linkCopiedTimerRef.current != null) window.clearTimeout(linkCopiedTimerRef.current);
+      if (generalAccessDebounceRef.current != null) window.clearTimeout(generalAccessDebounceRef.current);
     };
   }, []);
 

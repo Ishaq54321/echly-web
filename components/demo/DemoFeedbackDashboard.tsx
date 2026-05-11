@@ -4,19 +4,17 @@ import React, { useState } from "react"
 import { motion } from "framer-motion"
 import { MessageSquare, FileText, ChevronDown } from "lucide-react"
 
-const MOCK_ACTION_STEPS = [
-  "Review current hierarchy and contrast",
-  "Prioritize key sections and CTAs",
-]
+const MOCK_DESCRIPTION =
+  "The hierarchy on the landing page was reported as difficult to scan. Sections feel similar in weight and the primary action is hard to find."
 
 type TicketStatus = "Open" | "Resolved"
 
-type TicketItem = { id: string; title: string; status: TicketStatus; preview?: string; actionSteps?: string[] }
+type TicketItem = { id: string; title: string; status: TicketStatus; preview?: string; description?: string }
 
 const MOCK_TICKETS: TicketItem[] = [
-  { id: "1", title: "Improve visual hierarchy of landing page", status: "Open", preview: "Clarify section order and emphasis.", actionSteps: MOCK_ACTION_STEPS },
-  { id: "2", title: "Enhance onboarding section to feel more engaging", status: "Open", preview: "Make first-time experience clearer and more inviting.", actionSteps: MOCK_ACTION_STEPS },
-  { id: "3", title: "Refine overall UI spacing consistency", status: "Resolved", preview: "Align padding and gaps across components.", actionSteps: ["Apply spacing scale", "Update card and list components"] },
+  { id: "1", title: "Improve visual hierarchy of landing page", status: "Open", preview: "Clarify section order and emphasis.", description: MOCK_DESCRIPTION },
+  { id: "2", title: "Enhance onboarding section to feel more engaging", status: "Open", preview: "Make first-time experience clearer and more inviting.", description: "First-time users were unsure where to begin. Onboarding feels passive." },
+  { id: "3", title: "Refine overall UI spacing consistency", status: "Resolved", preview: "Align padding and gaps across components.", description: "Padding and gaps differ across cards and lists. Reported as visually inconsistent." },
 ]
 
 function UITicketPreview({ ticketId }: { ticketId: string }) {
@@ -199,18 +197,11 @@ export default function DemoFeedbackDashboard() {
                 <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)]/80 p-4">
                   <div className="flex items-center gap-2 text-[12px] font-semibold text-[var(--text-secondary)] mb-2">
                     <FileText className="h-3.5 w-3.5" />
-                    What to change
+                    Description
                   </div>
-                  <ul className="space-y-1.5">
-                    {(selected.actionSteps ?? MOCK_ACTION_STEPS).map((step, i) => (
-                      <li key={i} className="text-[12px] text-[var(--text-body)] flex items-center gap-2">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--brand)]/10 text-[12px] font-semibold text-[var(--brand)]">
-                          {i + 1}
-                        </span>
-                        {step}
-                      </li>
-                    ))}
-                  </ul>
+                  <p className="text-[12px] leading-[1.55] text-[var(--text-body)]">
+                    {selected.description ?? MOCK_DESCRIPTION}
+                  </p>
                 </div>
                 <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)]/50 p-4">
                   <div className="h-[160px] rounded-lg bg-gradient-to-br from-gray-50 to-white border border-[var(--border)] p-2 flex items-center justify-center relative overflow-hidden">

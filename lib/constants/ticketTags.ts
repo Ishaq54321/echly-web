@@ -27,19 +27,33 @@ import {
   WifiOff,
   Keyboard,
   Printer,
-  OctagonX,
-  AlertTriangle,
-  ChevronDown,
-  Brush,
   Inbox,
   Loader,
   AlertCircle,
   Shuffle,
   Flag,
+  Bug,
+  Sparkles,
+  MessageCircle,
+  ArrowRightCircle,
+  MessageSquare,
+  Mic,
+  Bookmark,
+  GitBranch,
+  Rocket,
+  TrendingUp,
+  FileText,
   type LucideIcon,
 } from "lucide-react";
 
 export const TICKET_TAG_TAXONOMY = {
+  feedbackType: [
+    { key: "bug", label: "Bug", description: "Something is broken or doesn't work as expected", icon: Bug },
+    { key: "feature-request", label: "Feature Request", description: "Explicit request for new functionality", icon: Sparkles },
+    { key: "feedback", label: "Feedback", description: "General opinion or observation", icon: MessageCircle },
+    { key: "question", label: "Question", description: "Recorder is asking, not reporting", icon: HelpCircle },
+    { key: "request", label: "Request", description: "Prescriptive change request", icon: ArrowRightCircle },
+  ],
   component: [
     { key: "layout", label: "Layout", description: "Spacing, alignment, positioning", icon: LayoutGrid },
     { key: "typography", label: "Typography", description: "Font, text styling", icon: Type },
@@ -60,6 +74,18 @@ export const TICKET_TAG_TAXONOMY = {
     { key: "tooltip-popover", label: "Tooltip & Popover", description: "Tooltips, popovers, context menus", icon: HelpCircle },
     { key: "scroll-overflow", label: "Scroll & Overflow", description: "Scroll behavior, sticky, overflow", icon: ArrowDownUp },
   ],
+  contentDesign: [
+    { key: "copy", label: "Copy", description: "Written text, body content, microcopy", icon: Type },
+    { key: "messaging", label: "Messaging", description: "Message clarity, value prop, communication", icon: MessageSquare },
+    { key: "tone", label: "Tone", description: "Voice, tone-of-voice, personality", icon: Mic },
+    { key: "branding", label: "Branding", description: "Brand consistency, logo, brand colors", icon: Bookmark },
+    { key: "visual-design", label: "Visual Design", description: "Overall visual aesthetics, design quality", icon: Palette },
+    { key: "ux-flow", label: "UX Flow", description: "User flow, task paths, decision points", icon: GitBranch },
+    { key: "onboarding", label: "Onboarding", description: "First-time UX, tutorial, welcome", icon: Rocket },
+    { key: "conversion", label: "Conversion", description: "CTAs, sign-up flows, checkout funnel", icon: TrendingUp },
+    { key: "content", label: "Content", description: "Articles, posts, media content", icon: FileText },
+    { key: "search", label: "Search", description: "Search behavior, results, search experience", icon: Search },
+  ],
   platform: [
     { key: "responsive", label: "Responsive", description: "Mobile, tablet, viewport issues", icon: Smartphone },
     { key: "cross-browser", label: "Cross-Browser", description: "Browser-specific rendering", icon: Globe },
@@ -72,12 +98,6 @@ export const TICKET_TAG_TAXONOMY = {
     { key: "keyboard-shortcut", label: "Keyboard Shortcut", description: "Hotkeys, key conflicts", icon: Keyboard },
     { key: "print", label: "Print", description: "Print layout, PDF export", icon: Printer },
   ],
-  priority: [
-    { key: "blocker", label: "Blocker", description: "Cannot proceed, deploy stopper", icon: OctagonX },
-    { key: "critical", label: "Critical", description: "Blocking, broken, crashes", icon: AlertTriangle },
-    { key: "minor", label: "Minor", description: "Small, polish, nice-to-have", icon: ChevronDown },
-    { key: "cosmetic", label: "Cosmetic", description: "Purely visual, zero functional impact", icon: Brush },
-  ],
   state: [
     { key: "empty-state", label: "Empty State", description: "Empty/zero-data state rendering", icon: Inbox },
     { key: "loading-state", label: "Loading State", description: "Spinners, skeletons, loading", icon: Loader },
@@ -88,9 +108,10 @@ export const TICKET_TAG_TAXONOMY = {
 } as const;
 
 export const ALL_TAG_KEYS = [
+  ...TICKET_TAG_TAXONOMY.feedbackType,
   ...TICKET_TAG_TAXONOMY.component,
+  ...TICKET_TAG_TAXONOMY.contentDesign,
   ...TICKET_TAG_TAXONOMY.platform,
-  ...TICKET_TAG_TAXONOMY.priority,
   ...TICKET_TAG_TAXONOMY.state,
 ].map(t => t.key);
 
@@ -110,9 +131,10 @@ export function whitelistTags(tags: unknown): string[] {
 
 export const TAG_ICON_MAP = new Map<string, LucideIcon>(
   [
+    ...TICKET_TAG_TAXONOMY.feedbackType,
     ...TICKET_TAG_TAXONOMY.component,
+    ...TICKET_TAG_TAXONOMY.contentDesign,
     ...TICKET_TAG_TAXONOMY.platform,
-    ...TICKET_TAG_TAXONOMY.priority,
     ...TICKET_TAG_TAXONOMY.state,
   ].map((t) => [t.key, t.icon as LucideIcon])
 );

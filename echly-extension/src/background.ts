@@ -124,7 +124,7 @@ chrome.action.onClicked.addListener(() => {
 });
 
 type StoredUser = { uid: string; name: string | null; email: string | null; photoURL: string | null };
-type FeedbackApiItem = { id: string; title?: string; actionSteps?: string[]; type?: string; screenshotId?: string | null; suggestedTags?: string[]; pageArea?: string | null; userAgent?: string | null; viewportWidth?: number | null; viewportHeight?: number | null; devicePixelRatio?: number | null; createdAt?: string | null };
+type FeedbackApiItem = { id: string; title?: string; description?: string; type?: string; screenshotId?: string | null; tags?: string[]; pageArea?: string | null; userAgent?: string | null; viewportWidth?: number | null; viewportHeight?: number | null; devicePixelRatio?: number | null; createdAt?: string | null };
 type FeedbackListResponse = {
   feedback?: FeedbackApiItem[];
   nextCursor?: string | null;
@@ -198,7 +198,7 @@ const BILLING_USAGE_CACHE_TTL = 5 * 60 * 1000;
 let trayOpen = false;
 
 /** Minimal ticket shape for global tray; matches StructuredFeedback. */
-type StructuredFeedback = { id: string; title: string; actionSteps: string[]; type?: string; screenshotId?: string | null; suggestedTags?: string[]; pageArea?: string | null; userAgent?: string | null; viewportWidth?: number | null; viewportHeight?: number | null; devicePixelRatio?: number | null; createdAt?: string | number | null };
+type StructuredFeedback = { id: string; title: string; description?: string; type?: string; screenshotId?: string | null; tags?: string[]; pageArea?: string | null; userAgent?: string | null; viewportWidth?: number | null; viewportHeight?: number | null; devicePixelRatio?: number | null; createdAt?: string | number | null };
 type CanonicalGlobalState = {
   visible: boolean;
   expanded: boolean;
@@ -291,10 +291,10 @@ function mapFeedbackToPointers(feedback: FeedbackApiItem[]): StructuredFeedback[
   return feedback.map((item) => ({
     id: item.id,
     title: item.title ?? "",
-    actionSteps: item.actionSteps ?? [],
+    description: item.description ?? "",
     type: item.type ?? "Feedback",
     screenshotId: item.screenshotId ?? null,
-    suggestedTags: item.suggestedTags ?? [],
+    tags: item.tags ?? [],
     pageArea: item.pageArea ?? null,
     userAgent: item.userAgent ?? null,
     viewportWidth: item.viewportWidth ?? null,
@@ -1164,10 +1164,8 @@ async function createFeedbackInternal({
   feedbackId: string;
   ticket: {
     title?: string;
-    instruction?: string;
     description?: string;
-    suggestedTags?: string[];
-    actionSteps?: string[];
+    tags?: string[];
     status?: "open" | "resolved";
     pageArea?: string | null;
     url?: string;
@@ -1412,15 +1410,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "ECHLY_FEEDBACK_CREATED") {
-    const ticket = (request as { ticket?: { id: string; title: string; actionSteps?: string[]; type?: string; screenshotId?: string | null; suggestedTags?: string[]; pageArea?: string | null; userAgent?: string | null; viewportWidth?: number | null; viewportHeight?: number | null; devicePixelRatio?: number | null; createdAt?: string | number | null } }).ticket;
+    const ticket = (request as { ticket?: { id: string; title: string; description?: string; type?: string; screenshotId?: string | null; tags?: string[]; pageArea?: string | null; userAgent?: string | null; viewportWidth?: number | null; viewportHeight?: number | null; devicePixelRatio?: number | null; createdAt?: string | number | null } }).ticket;
     if (ticket?.id && ticket?.title) {
       const pointer: StructuredFeedback = {
         id: ticket.id,
         title: ticket.title,
-        actionSteps: ticket.actionSteps ?? [],
+        description: ticket.description ?? "",
         type: ticket.type ?? "Feedback",
         screenshotId: ticket.screenshotId ?? null,
-        suggestedTags: ticket.suggestedTags ?? [],
+        tags: ticket.tags ?? [],
         pageArea: ticket.pageArea ?? null,
         userAgent: ticket.userAgent ?? null,
         viewportWidth: ticket.viewportWidth ?? null,
@@ -1505,7 +1503,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               ...p,
               id: ticket.id,
               title: ticket.title,
-              actionSteps: ticket.actionSteps ?? [],
+              description: ticket.description ?? "",
               type: ticket.type ?? p.type,
             }
           : p
@@ -2007,10 +2005,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         feedbackId: string;
         ticket: {
           title?: string;
-          instruction?: string;
           description?: string;
-          suggestedTags?: string[];
-          actionSteps?: string[];
+          tags?: string[];
           pageArea?: string | null;
         };
         screenshotId?: string;

@@ -13,8 +13,8 @@ export interface FeedbackDetailProps {
   selectedItem: (FeedbackItemShape & { index: number; total: number }) | null;
   onSaveTitle?: (newTitle: string) => Promise<void>;
   onRequestDelete?: () => void;
-  onSaveActionSteps?: (actionSteps: string[]) => Promise<void>;
-  onSaveTags?: (suggestedTags: string[]) => Promise<void>;
+  onSaveDescription?: (description: string) => Promise<void>;
+  onSaveTags?: (tags: string[]) => Promise<void>;
   onResolvedChange?: (isResolved: boolean) => void;
   setIsImageExpanded: (v: boolean) => void;
   onEdit?: () => void;
@@ -28,7 +28,7 @@ function FeedbackDetailInner({
   selectedItem,
   onSaveTitle,
   onRequestDelete,
-  onSaveActionSteps,
+  onSaveDescription,
   onSaveTags,
   onResolvedChange,
   setIsImageExpanded,
@@ -72,7 +72,7 @@ function FeedbackDetailInner({
         screenshotUrl={screenshotUrl}
         screenshotUrlLoading={screenshotUrlLoading}
         screenshotUrlError={screenshotUrlError}
-        onSaveActionSteps={onSaveActionSteps}
+        onSaveDescription={onSaveDescription}
         onSaveTags={onSaveTags}
         onExpandImage={() => setIsImageExpanded(true)}
         onEdit={onEdit}

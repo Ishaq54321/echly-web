@@ -13,7 +13,7 @@ interface TicketItemProps {
   onSelect: (id: string) => void;
   /** When true, applies a brief highlight animation (new ticket from realtime). */
   isNewTicket?: boolean;
-  suggestedTags?: string[] | null;
+  tags?: string[] | null;
 }
 
 function TicketItemInner({
@@ -24,9 +24,9 @@ function TicketItemInner({
   active,
   onSelect,
   isNewTicket = false,
-  suggestedTags,
+  tags,
 }: TicketItemProps) {
-  const IconComponent = getTicketIconFromTags(suggestedTags, title);
+  const IconComponent = getTicketIconFromTags(tags, title);
 
   const handleClick = () => {
     onSelect(id);

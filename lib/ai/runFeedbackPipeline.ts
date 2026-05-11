@@ -62,8 +62,8 @@ export async function runFeedbackPipeline(
 
   const ticketPayload = {
     title: result.ticket.title,
-    actionSteps: result.ticket.actionSteps,
-    suggestedTags: result.ticket.suggestedTags,
+    description: result.ticket.description,
+    tags: result.ticket.tags,
     pageArea: result.ticket.pageArea,
   };
 

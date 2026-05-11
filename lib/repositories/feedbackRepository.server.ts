@@ -50,16 +50,13 @@ const feedbackPayload = (
   userId,
   sessionId,
   title: data.title,
-  instruction: data.instruction ?? data.description ?? null,
-  suggestion: data.suggestion ?? "",
+  description: data.description ?? "",
   type: data.type,
   status: "open" as const,
   createdAt,
   commentCount: 0,
 
-  contextSummary: data.contextSummary ?? null,
-  actionSteps: data.actionSteps ?? null,
-  suggestedTags: data.suggestedTags ?? null,
+  tags: data.tags ?? null,
   pageArea: data.pageArea ?? null,
 
   url: data.url ?? null,
@@ -87,29 +84,16 @@ export function feedbackFromCreateInsert(args: {
   createdAt: Date;
 }): Feedback {
   const row = args.data;
-  const instructionRaw = row.instruction ?? row.description ?? null;
-  const instruction =
-    typeof instructionRaw === "string" ? instructionRaw : undefined;
-  const description =
-    typeof row.description === "string"
-      ? row.description
-      : typeof instructionRaw === "string"
-        ? instructionRaw
-        : undefined;
   return {
     id: args.id,
     userId: requireUserId(args.userId, "feedbackFromCreateInsert"),
     sessionId: args.sessionId,
     title: row.title,
-    instruction,
-    description,
-    suggestion: row.suggestion ?? "",
+    description: typeof row.description === "string" ? row.description : null,
     type: row.type,
     isResolved: false,
     createdAt: Timestamp.fromDate(args.createdAt) as Feedback["createdAt"],
-    contextSummary: row.contextSummary ?? null,
-    actionSteps: row.actionSteps ?? null,
-    suggestedTags: row.suggestedTags ?? null,
+    tags: row.tags ?? null,
     pageArea: row.pageArea ?? null,
     url: row.url ?? null,
     viewportWidth: row.viewportWidth ?? null,
@@ -317,13 +301,12 @@ export async function addFeedbackWithSessionCountersRepo(
 
 type FeedbackUpdate = Partial<{
   title: string;
-  instruction: string;
+  description: string;
   type: string;
   status: "open" | "resolved";
   screenshotId: string | null;
   screenshotStatus: "attached" | "pending" | "none" | "failed" | null;
-  actionSteps: string[] | null;
-  suggestedTags: string[] | null;
+  tags: string[] | null;
   assigneeId: string | null;
   assigneeName: string | null;
   assigneeAvatarUrl: string | null;
@@ -341,21 +324,17 @@ function assertValidFeedbackWriteStatus(value: unknown): asserts value is Feedba
 /** True when PATCH carries fields other than resolve/reopen status (title, body, tags, etc.). */
 function hasNonStatusResolvePayload(data: {
   title?: string;
-  instruction?: string;
   description?: string;
   type?: string;
   screenshotId?: string | null;
-  actionSteps?: string[] | null;
-  suggestedTags?: string[] | null;
+  tags?: string[] | null;
 }): boolean {
   return (
     typeof data.title === "string" ||
-    typeof data.instruction === "string" ||
     typeof data.description === "string" ||
     typeof data.type === "string" ||
     data.screenshotId !== undefined ||
-    data.actionSteps !== undefined ||
-    data.suggestedTags !== undefined
+    data.tags !== undefined
   );
 }
 
@@ -396,14 +375,12 @@ export async function updateFeedbackRepo(
   feedbackId: string,
   data: Partial<{
     title: string;
-    instruction: string;
     description: string;
     type: string;
     status: "open" | "resolved";
     screenshotId: string | null;
     screenshotStatus: "attached" | "pending" | "none" | "failed" | null;
-    actionSteps: string[] | null;
-    suggestedTags: string[] | null;
+    tags: string[] | null;
     assigneeId: string | null;
     assigneeName: string | null;
     assigneeAvatarUrl: string | null;
@@ -413,8 +390,7 @@ export async function updateFeedbackRepo(
 ): Promise<void> {
   const updates: FeedbackUpdate = {};
   if (typeof data.title === "string") updates.title = data.title;
-  if (typeof data.instruction === "string") updates.instruction = data.instruction;
-  else if (typeof data.description === "string") updates.instruction = data.description;
+  if (typeof data.description === "string") updates.description = data.description;
   if (typeof data.type === "string") updates.type = data.type;
   if (typeof data.status === "string") {
     assertValidFeedbackWriteStatus(data.status);
@@ -422,8 +398,7 @@ export async function updateFeedbackRepo(
   }
   if (data.screenshotId !== undefined) updates.screenshotId = data.screenshotId;
   if (data.screenshotStatus !== undefined) updates.screenshotStatus = data.screenshotStatus;
-  if (data.actionSteps !== undefined) updates.actionSteps = data.actionSteps;
-  if (data.suggestedTags !== undefined) updates.suggestedTags = data.suggestedTags;
+  if (data.tags !== undefined) updates.tags = data.tags;
   if ("assigneeId" in data) updates.assigneeId = data.assigneeId ?? null;
   if ("assigneeName" in data) updates.assigneeName = data.assigneeName ?? null;
   if ("assigneeAvatarUrl" in data) updates.assigneeAvatarUrl = data.assigneeAvatarUrl ?? null;
@@ -491,12 +466,10 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
   actorId: string,
   data: Partial<{
     title: string;
-    instruction: string;
     description: string;
     type: string;
     screenshotId: string | null;
-    actionSteps: string[] | null;
-    suggestedTags: string[] | null;
+    tags: string[] | null;
     status: FeedbackStatus;
   }>
 ): Promise<UpdateFeedbackResolveAndSessionCountersResult> {
@@ -510,12 +483,10 @@ export async function updateFeedbackResolveAndSessionCountersRepo(
 
   const updates: FeedbackUpdate = {};
   if (typeof data.title === "string") updates.title = data.title;
-  if (typeof data.instruction === "string") updates.instruction = data.instruction;
-  else if (typeof data.description === "string") updates.instruction = data.description;
+  if (typeof data.description === "string") updates.description = data.description;
   if (typeof data.type === "string") updates.type = data.type;
   if (data.screenshotId !== undefined) updates.screenshotId = data.screenshotId;
-  if (data.actionSteps !== undefined) updates.actionSteps = data.actionSteps;
-  if (data.suggestedTags !== undefined) updates.suggestedTags = data.suggestedTags;
+  if (data.tags !== undefined) updates.tags = data.tags;
   updates.status = toStatus;
 
   type TxApplied = {
@@ -815,7 +786,7 @@ export interface FeedbackPageResult {
 
 const FEEDBACK_PAGE_SIZE_DEFAULT = 20;
 
-/** Maps a Firestore doc snapshot to domain Feedback. Backward compat: actionItems → actionSteps. */
+/** Maps a Firestore doc snapshot to domain Feedback. */
 function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
   const data = docSnap.data();
   const status = data.status === "resolved" ? "resolved" : "open";
@@ -828,26 +799,12 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
     ),
     sessionId: data.sessionId,
     title: data.title,
-    instruction:
-      typeof data.instruction === "string"
-        ? data.instruction
-        : typeof data.description === "string"
-          ? data.description
-          : undefined,
-    description:
-      typeof data.description === "string"
-        ? data.description
-        : typeof data.instruction === "string"
-          ? data.instruction
-          : undefined,
-    suggestion: data.suggestion ?? "",
+    description: typeof data.description === "string" ? data.description : null,
     type: data.type,
     isResolved,
     // Domain type uses client Firestore Timestamp; server may return Admin Timestamp/Date.
     createdAt: (data.createdAt ?? null) as any,
-    contextSummary: data.contextSummary ?? null,
-    actionSteps: data.actionSteps ?? data.actionItems ?? null,
-    suggestedTags: data.suggestedTags ?? null,
+    tags: Array.isArray(data.tags) ? (data.tags as string[]) : null,
     pageArea: typeof data.pageArea === "string" ? data.pageArea : null,
     url: data.url ?? null,
     viewportWidth: data.viewportWidth ?? null,
@@ -1386,19 +1343,30 @@ export async function deleteFeedbackWithSessionCountersRepo(
       console.error("\u274c INSIGHTS SYNC FAILED", e);
     }
     if (opts?.actorId) {
-      const actor = await resolveActorForActivityEvent(opts.actorId);
-      await createActivityEvent({
-        workspaceId: insightsAfterDelete.workspaceId,
-        sessionId: insightsAfterDelete.sessionId,
-        eventType: "feedback.deleted",
-        actorId: opts.actorId,
-        actorName: actor.actorName,
-        actorPhotoURL: actor.actorPhotoURL,
-        metadata: {
-          sessionTitle: opts.sessionTitle ?? undefined,
-          feedbackTitle: insightsAfterDelete.feedbackTitle ?? "Untitled feedback",
-        },
-      });
+      // Do not let activity-event logging fail the DELETE — the transaction
+      // already committed the document removal; a downstream logging error
+      // must not bubble into a 500 response that makes the client think the
+      // delete failed.
+      try {
+        const actor = await resolveActorForActivityEvent(opts.actorId);
+        await createActivityEvent({
+          workspaceId: insightsAfterDelete.workspaceId,
+          sessionId: insightsAfterDelete.sessionId,
+          eventType: "feedback.deleted",
+          actorId: opts.actorId,
+          actorName: actor.actorName,
+          actorPhotoURL: actor.actorPhotoURL,
+          metadata: {
+            sessionTitle: opts.sessionTitle ?? undefined,
+            feedbackTitle: insightsAfterDelete.feedbackTitle ?? "Untitled feedback",
+          },
+        });
+      } catch (activityError) {
+        console.error(
+          "Failed to create activity event for feedback.deleted:",
+          activityError
+        );
+      }
     }
   }
 }

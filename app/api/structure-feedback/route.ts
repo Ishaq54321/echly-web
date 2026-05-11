@@ -53,7 +53,7 @@ function checkRateLimit(uid: string): boolean {
 /**
  * POST /api/structure-feedback
  *
- * Capture layer: accepts transcript + context (visibleText, nearbyText, domPath, elements, viewport, etc.).
+ * Capture layer: accepts transcript + context (selected element subtree, viewport, etc.).
  * All processing is delegated to the central pipeline (lib/ai/runFeedbackPipeline).
  */
 export async function POST(req: NextRequest): Promise<Response> {

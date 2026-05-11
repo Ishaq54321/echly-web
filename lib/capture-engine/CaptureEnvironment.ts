@@ -30,7 +30,7 @@ export interface CaptureEnvironment {
   openDashboard(url: string): void;
 
   /** [OPTIONAL] Notify the environment that a feedback ticket was created (e.g. sync to background). */
-  notifyFeedbackCreated?(ticket: { id: string; title: string; actionSteps?: string[]; type?: string }): void;
+  notifyFeedbackCreated?(ticket: { id: string; title: string; description?: string; type?: string }): void;
 
   /** [OPTIONAL] Set the active session (e.g. notify background). */
   setActiveSession?(sessionId: string): void | Promise<void>;

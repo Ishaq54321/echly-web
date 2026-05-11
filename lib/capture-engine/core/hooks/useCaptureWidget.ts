@@ -146,7 +146,7 @@ export function useCaptureWidget({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedTitle, setEditedTitle] = useState("");
-  const [editedSteps, setEditedSteps] = useState<string[]>([]);
+  const [editedDescription, setEditedDescription] = useState<string>("");
   const [showMenu, setShowMenu] = useState(false);
   const [position, setPosition] = useState<Position | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -1024,12 +1024,12 @@ export function useCaptureWidget({
   const startEditing = useCallback((p: StructuredFeedback) => {
     setEditingId(p.id);
     setEditedTitle(p.title);
-    setEditedSteps(p.actionSteps ?? []);
+    setEditedDescription(p.description ?? "");
   }, []);
 
   const saveEdit = useCallback(async (id: string) => {
     const title = editedTitle.trim() || editedTitle;
-    const actionSteps = editedSteps;
+    const description = editedDescription;
 
     if (!environment?.authenticatedFetch) {
       throw new Error("[ECHLY CORE] No capture environment available (authenticatedFetch required for saveEdit).");
@@ -1040,14 +1040,14 @@ export function useCaptureWidget({
       const res = await environment.authenticatedFetch(`/api/tickets/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title || editedTitle, actionSteps }),
+        body: JSON.stringify({ title: title || editedTitle, description }),
       });
       const raw = await res.json();
       if (!res.ok) {
         throw new Error("Save failed: API_ERROR_" + res.status);
       }
-      const ticketPayload = requireApiSuccessData<{
-        ticket: { id: string; title: string; actionSteps?: string[]; type?: string };
+      requireApiSuccessData<{
+        ticket: { id: string; title: string; description?: string; type?: string };
       }>(raw).ticket;
       setEditingId(null);
     } catch (err) {
@@ -1055,10 +1055,10 @@ export function useCaptureWidget({
       setEditingId(id);
       setErrorMessage("Could not save changes. Try again.");
     }
-  }, [editedTitle, editedSteps, environment, guardWorkspaceMutation]);
+  }, [editedTitle, editedDescription, environment, guardWorkspaceMutation]);
 
   const updatePointer = useCallback(
-    async (id: string, payload: { title: string; actionSteps: string[]; suggestedTags?: string[] }) => {
+    async (id: string, payload: { title: string; description?: string; tags?: string[] }) => {
       try {
         if (onUpdate) {
           await onUpdate(id, payload);
@@ -1074,14 +1074,14 @@ export function useCaptureWidget({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             title: payload.title,
-            actionSteps: payload.actionSteps,
-            suggestedTags: payload.suggestedTags,
+            description: payload.description,
+            tags: payload.tags,
           }),
         });
         const raw = await res.json();
         if (!res.ok) throw new Error("Update failed");
         requireApiSuccessData<{
-          ticket: { id: string; title: string; actionSteps?: string[]; type?: string };
+          ticket: { id: string; title: string; description?: string; type?: string };
         }>(raw);
       } catch (err) {
         logger.error("error", "ticket_update_failed", err);
@@ -1737,7 +1737,7 @@ export function useCaptureWidget({
       saveEdit,
       setExpandedId,
       setEditedTitle,
-      setEditedSteps,
+      setEditedDescription,
       startCapture,
       handleAddFeedback,
       handleRegionCaptured,
@@ -1773,7 +1773,7 @@ export function useCaptureWidget({
       saveEdit,
       setExpandedId,
       setEditedTitle,
-      setEditedSteps,
+      setEditedDescription,
       startCapture,
       handleAddFeedback,
       handleRegionCaptured,
@@ -1817,7 +1817,7 @@ export function useCaptureWidget({
       expandedId,
       editingId,
       editedTitle,
-      editedSteps,
+      editedDescription,
       showMenu,
       position,
       isSnapping,

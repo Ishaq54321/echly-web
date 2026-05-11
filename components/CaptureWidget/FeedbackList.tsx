@@ -6,14 +6,14 @@ import type { StructuredFeedback } from "@/lib/capture-engine/core/types";
 
 type FeedbackListProps = {
   items: StructuredFeedback[];
-  onUpdate: (id: string, payload: { title: string; actionSteps: string[] }) => Promise<void>;
+  onUpdate: (id: string, payload: { title: string; description?: string }) => Promise<void>;
   onDelete: (id: string) => void | Promise<void>;
   highlightTicketId?: string | null;
 };
 
 function FeedbackList({
   items,
-  onUpdate,
+  onUpdate: _onUpdate,
   onDelete,
   highlightTicketId = null,
 }: FeedbackListProps) {

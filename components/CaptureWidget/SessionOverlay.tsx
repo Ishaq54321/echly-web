@@ -20,19 +20,6 @@ function createCommentCursor() {
 
 const COMMENT_CURSOR = createCommentCursor();
 
-/** Derive a short readable selector from a full domPath (e.g. "div#hero > button.cta" → "#cta"). */
-function shortSelector(domPath: string | null | undefined): string | undefined {
-  if (!domPath) return undefined;
-  const parts = domPath.split(" > ");
-  const last = parts[parts.length - 1] || "";
-  const idMatch = last.match(/#[a-zA-Z0-9_-]+/);
-  if (idMatch) return idMatch[0];
-  const classMatch = last.match(/\.[a-zA-Z0-9_-]+/);
-  if (classMatch) return classMatch[0];
-  const tagMatch = last.match(/^[a-zA-Z0-9]+/);
-  return tagMatch ? tagMatch[0] : undefined;
-}
-
 export type SessionOverlayProps = {
   captureRoot: HTMLDivElement;
   sessionMode: boolean;
@@ -248,10 +235,8 @@ export function SessionOverlay({
 
   const saving = Boolean(__extensionSavingState);
 
-  /* Derive element selector + dimensions for the screenshot badge. */
-  const elemSelector = sessionFeedbackPending
-    ? shortSelector(sessionFeedbackPending.context?.domPath)
-    : undefined;
+  /* Derive element dimensions for the screenshot badge. */
+  const elemSelector: string | undefined = undefined;
   const elemWidth = sessionFeedbackPending?.elementRect?.width
     ? Math.round(sessionFeedbackPending.elementRect.width)
     : undefined;

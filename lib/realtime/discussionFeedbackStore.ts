@@ -114,22 +114,12 @@ function mapFeedbackFromSnap(snap: QueryDocumentSnapshot<DocumentData>): Feedbac
     workspaceId,
     userId,
     title: typeof data.title === "string" ? data.title : "",
-    instruction:
-      (typeof data.instruction === "string" ? data.instruction : "") ||
-      (typeof data.description === "string" ? data.description : "") ||
-      "",
-    description: typeof data.description === "string" ? data.description : "",
-    suggestion: typeof data.suggestion === "string" ? data.suggestion : "",
+    description: typeof data.description === "string" ? data.description : null,
     type: typeof data.type === "string" ? data.type : "Feedback",
     isResolved: normalizedStatus === "resolved",
     createdAt: asTimestamp(data.createdAt),
-    contextSummary:
-      typeof data.contextSummary === "string" ? data.contextSummary : null,
-    actionSteps: Array.isArray(data.actionSteps)
-      ? (data.actionSteps as unknown[]).filter((s): s is string => typeof s === "string")
-      : null,
-    suggestedTags: Array.isArray(data.suggestedTags)
-      ? (data.suggestedTags as unknown[]).filter((s): s is string => typeof s === "string")
+    tags: Array.isArray(data.tags)
+      ? (data.tags as unknown[]).filter((s): s is string => typeof s === "string")
       : null,
     mentionedUserIds: Array.isArray(data.mentionedUserIds)
       ? (data.mentionedUserIds as unknown[]).filter((s): s is string => typeof s === "string")

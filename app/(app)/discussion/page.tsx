@@ -200,7 +200,7 @@ export default function DiscussionPage() {
       title: f.title,
       sessionId: f.sessionId,
       screenshotId: f.screenshotId,
-      actionSteps: f.actionSteps,
+      description: f.description,
       status: (f.status === "resolved" ? "resolved" : "open") as "open" | "resolved",
       isResolved: f.isResolved,
     };

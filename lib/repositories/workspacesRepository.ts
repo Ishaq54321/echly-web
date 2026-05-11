@@ -133,7 +133,6 @@ export async function updateWorkspaceSettings(
       | "notifications"
       | "automations"
       | "permissions"
-      | "ai"
       | "integrations"
       | "billing"
       | "entitlements"

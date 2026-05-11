@@ -503,7 +503,7 @@ function ShareModalForSession({ session, onClose, authUid }: ShareModalForSessio
         void share.invite().catch(() => {});
       }}
       onUpdateGeneralAccess={(value) => {
-        void share.updateGeneralAccess(value).catch(() => {});
+        share.updateGeneralAccess(value);
       }}
       onUpdateRole={(item, access) => {
         void share.updateRole(item, access).catch(() => {});

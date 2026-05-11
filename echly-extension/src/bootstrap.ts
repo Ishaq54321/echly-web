@@ -49,7 +49,7 @@ type GlobalUIState = {
 type RuntimeMessage = {
   type?: string;
   state?: GlobalUIState;
-  ticket?: { id: string; title: string; instruction?: string; description?: string; type?: string };
+  ticket?: { id: string; title: string; description?: string; type?: string };
   sessionId?: string;
 };
 

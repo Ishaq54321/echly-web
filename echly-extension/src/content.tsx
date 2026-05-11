@@ -48,22 +48,6 @@ const THEME_STORAGE_KEY = "widget-theme";
 const APP_ORIGIN = API_BASE;
 const inFlightFeedbackIds = new Set<string>();
 
-const detectElementType = (el: HTMLElement | null): string | null => {
-  if (!el) return null;
-
-  const tag = el.tagName.toLowerCase();
-
-  if (tag === "button") return "button";
-  if (tag === "img") return "image";
-  if (tag === "svg") return "icon";
-
-  if (tag === "h1" || tag === "h2" || tag === "h3") return "heading";
-
-  if (tag === "a") return "link";
-
-  return null;
-};
-
 /** Error boundary to capture CaptureWidget render errors (OPEN_WIDGET crash trace). */
 class EchlyWidgetErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -228,7 +212,7 @@ function ensureAuthenticated(): Promise<boolean> {
 
 /** Notify background when content creates a ticket via apiFetch so globalUIState stays in sync. */
 function notifyFeedbackCreated(
-  ticket: { id: string; title: string; actionSteps?: string[]; type?: string; screenshotId?: string | null; suggestedTags?: string[]; pageArea?: string | null; userAgent?: string | null; viewportWidth?: number | null; viewportHeight?: number | null; devicePixelRatio?: number | null; createdAt?: string | number | null },
+  ticket: { id: string; title: string; description?: string; type?: string; screenshotId?: string | null; tags?: string[]; pageArea?: string | null; userAgent?: string | null; viewportWidth?: number | null; viewportHeight?: number | null; devicePixelRatio?: number | null; createdAt?: string | number | null },
   sessionId?: string | null
 ): void {
   chrome.runtime.sendMessage({
@@ -237,10 +221,10 @@ function notifyFeedbackCreated(
     ticket: {
       id: ticket.id,
       title: ticket.title,
-      actionSteps: ticket.actionSteps ?? [],
+      description: ticket.description ?? "",
       type: ticket.type ?? "Feedback",
       screenshotId: ticket.screenshotId ?? null,
-      suggestedTags: ticket.suggestedTags ?? [],
+      tags: ticket.tags ?? [],
       pageArea: ticket.pageArea ?? null,
       userAgent: ticket.userAgent ?? null,
       viewportWidth: ticket.viewportWidth ?? null,
@@ -278,7 +262,7 @@ function mergeGlobalFeedbackIntoLocal(
       return {
         ...serverItem,
         screenshotId: serverItem.screenshotId ?? localItem.screenshotId ?? null,
-        suggestedTags: serverItem.suggestedTags?.length ? serverItem.suggestedTags : (localItem.suggestedTags ?? []),
+        tags: serverItem.tags?.length ? serverItem.tags : (localItem.tags ?? []),
       };
     }
     return serverItem;
@@ -726,35 +710,18 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         throw new Error("Missing session or user");
       }
 
-      const extractedVisibleText = "";
-
       const currentUrl = typeof window !== "undefined" ? window.location.href : "";
-      let selectedElement: HTMLElement | null = null;
-      if (context?.domPath && typeof document !== "undefined") {
-        try {
-          selectedElement = document.querySelector(context.domPath) as HTMLElement | null;
-        } catch (e) {
-          console.error("[ECHLY] domPath querySelector failed", e);
-          selectedElement = null;
-        }
-      }
-      const elementType = detectElementType(selectedElement);
       const { ocrImageDataUrl: _ocrImg, ...contextForApi } = (context ?? {}) as Record<string, unknown>;
       const enrichedContext: CaptureContext = {
-        ...(contextForApi as Omit<CaptureContext, "visibleText" | "url">),
-        visibleText:
-          (extractedVisibleText?.trim() && extractedVisibleText) ||
-          (context as CaptureContext | null)?.visibleText ||
-          null,
+        ...(contextForApi as Omit<CaptureContext, "url">),
         url: (context as CaptureContext | null)?.url ?? currentUrl,
-        elementType: elementType || null,
       };
       delete (enrichedContext as Record<string, unknown>).ocrImageDataUrl;
 
       type StructureTicket = {
         title?: string;
-        suggestedTags?: string[];
-        actionSteps?: string[];
+        tags?: string[];
+        description?: string;
         pageArea?: string | null;
       };
       const [structureSettled, uploadSettled] = await Promise.allSettled([
@@ -828,7 +795,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               success?: boolean;
               data?: {
                 success?: boolean;
-                ticket?: { id: string; title: string; instruction?: string; description?: string; type?: string; actionSteps?: string[] };
+                ticket?: { id: string; title: string; description?: string; type?: string };
               };
               error?: string;
             }
@@ -843,8 +810,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
                   feedbackId,
                   ticket: {
                     title: normalized.title,
-                    suggestedTags: normalized.suggestedTags ?? [],
-                    actionSteps: normalized.actionSteps ?? [],
+                    tags: normalized.tags ?? [],
+                    description: normalized.description ?? "",
                     pageArea: normalized.pageArea ?? null,
                     url: enrichedContext.url ?? undefined,
                     viewportWidth:
@@ -902,7 +869,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             success?: boolean;
             data?: {
               success?: boolean;
-              ticket?: { id: string; title: string; instruction?: string; description?: string; type?: string; actionSteps?: string[] };
+              ticket?: { id: string; title: string; description?: string; type?: string };
             };
             error?: string;
           };
@@ -913,12 +880,10 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         type CreatedTicket = {
           id: string;
           title: string;
-          instruction?: string;
           description?: string;
           type?: string;
-          actionSteps?: string[];
           screenshotId?: string | null;
-          suggestedTags?: string[];
+          tags?: string[];
         };
         const feedbackJson = feedbackResponse?.data;
         const text =
@@ -935,16 +900,10 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         const created: StructuredFeedback = {
           id: tick.id,
           title: tick.title,
-          actionSteps:
-            tick.actionSteps ??
-            (tick.instruction
-              ? tick.instruction.split(/\n\s*\n/)
-              : tick.description
-                ? tick.description.split(/\n\s*\n/)
-                : []),
+          description: tick.description ?? "",
           type: tick.type ?? "Feedback",
           screenshotId: finalScreenshotId,
-          suggestedTags: normalized.suggestedTags ?? [],
+          tags: normalized.tags ?? [],
           pageArea: normalized.pageArea ?? null,
           userAgent:
             typeof navigator !== "undefined" && typeof navigator.userAgent === "string"
@@ -991,10 +950,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
         devicePixelRatio?: number;
         screenWidth?: number;
         screenHeight?: number;
-        domPath?: string | null;
-        nearbyText?: string | null;
         subtreeText?: string | null;
-        visibleText?: string | null;
         capturedAt?: number;
       } | null,
       options?: { sessionMode?: boolean }
@@ -1102,7 +1058,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
   );
 
   const handleUpdate = React.useCallback(
-    async (id: string, payload: { title: string; actionSteps: string[]; suggestedTags?: string[] }) => {
+    async (id: string, payload: { title: string; description?: string; tags?: string[] }) => {
       let typeForMessage = "Feedback";
       setLocalFeedbackItems((prev) => {
         const list = prev ?? [];
@@ -1118,8 +1074,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             ? {
                 ...p,
                 title: payload.title,
-                actionSteps: payload.actionSteps,
-                suggestedTags: payload.suggestedTags ?? p.suggestedTags,
+                description: payload.description ?? "",
+                tags: payload.tags ?? p.tags,
               }
             : p
         );
@@ -1130,8 +1086,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           ticket: {
             id,
             title: payload.title,
-            actionSteps: payload.actionSteps,
-            suggestedTags: payload.suggestedTags,
+            description: payload.description ?? "",
+            tags: payload.tags,
             type: typeForMessage,
           },
         })
@@ -1144,15 +1100,14 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             title: payload.title,
-            instruction: payload.actionSteps?.join("\n") ?? "",
-            actionSteps: payload.actionSteps ?? [],
-            suggestedTags: payload.suggestedTags,
+            description: payload.description ?? "",
+            tags: payload.tags,
           }),
         });
         throwIfHttpError(res, "PATCH ticket");
         const rawPatch = await res.json();
         const ticket = requireApiSuccessData<{
-          ticket: { id: string; title: string; actionSteps?: string[]; type?: string; suggestedTags?: string[] };
+          ticket: { id: string; title: string; description?: string; type?: string; tags?: string[] };
         }>(rawPatch).ticket;
         editRollbackRef.current.delete(id);
         chrome.runtime
@@ -1161,8 +1116,8 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             ticket: {
               id: ticket.id,
               title: ticket.title,
-              actionSteps: ticket.actionSteps ?? [],
-              suggestedTags: ticket.suggestedTags ?? payload.suggestedTags,
+              description: ticket.description ?? "",
+              tags: ticket.tags ?? payload.tags,
               type: ticket.type ?? "Feedback",
             },
           })
@@ -1179,7 +1134,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
               ticket: {
                 id: rolled.id,
                 title: rolled.title,
-                actionSteps: rolled.actionSteps ?? [],
+                description: rolled.description ?? "",
                 type: rolled.type ?? "Feedback",
               },
             })

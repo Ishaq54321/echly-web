@@ -19,7 +19,7 @@ export type ExtensionCaptureEnvironmentDeps = {
   notifyFeedbackCreated: (ticket: {
     id: string;
     title: string;
-    actionSteps?: string[];
+    description?: string;
     type?: string;
   }) => void;
 };
@@ -44,7 +44,7 @@ export class ExtensionCaptureEnvironment implements CaptureEnvironment {
   notifyFeedbackCreated(ticket: {
     id: string;
     title: string;
-    actionSteps?: string[];
+    description?: string;
     type?: string;
   }): void {
     this.deps.notifyFeedbackCreated(ticket);

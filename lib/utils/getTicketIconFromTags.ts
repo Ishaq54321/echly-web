@@ -2,11 +2,12 @@ import type { LucideIcon } from "lucide-react";
 import { TICKET_TAG_TAXONOMY, TAG_ICON_MAP } from "@/lib/constants/ticketTags";
 import { getTicketIcon } from "@/lib/utils/getTicketIcon";
 
-// Priority order: Component → Platform → Priority → State
+// Priority order: Component → Platform → Content/Design → Feedback Type → State
 const CATEGORY_PRIORITY: (keyof typeof TICKET_TAG_TAXONOMY)[] = [
   "component",
   "platform",
-  "priority",
+  "contentDesign",
+  "feedbackType",
   "state",
 ];
 
@@ -19,14 +20,14 @@ for (let ci = 0; ci < CATEGORY_PRIORITY.length; ci++) {
 }
 
 export function getTicketIconFromTags(
-  suggestedTags: string[] | null | undefined,
+  tags: string[] | null | undefined,
   title: string
 ): LucideIcon {
-  if (suggestedTags && suggestedTags.length > 0) {
+  if (tags && tags.length > 0) {
     let bestTag: string | null = null;
     let bestPriority = Infinity;
 
-    for (const tag of suggestedTags) {
+    for (const tag of tags) {
       const priority = CATEGORY_KEYS.get(tag);
       if (priority !== undefined && priority < bestPriority) {
         bestPriority = priority;

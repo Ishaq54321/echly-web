@@ -503,7 +503,7 @@ function TicketListInner({
                       active={item.id === selectedId}
                       onSelect={onSelect}
                       isNewTicket={item.id === newTicketId}
-                      suggestedTags={item.suggestedTags}
+                      tags={item.tags}
                     />
                   ))}
                   {openItems.length === 0 && !showSearchEmpty && !countsLoading && (
@@ -570,7 +570,7 @@ function TicketListInner({
                       active={item.id === selectedId}
                       onSelect={onSelect}
                       isNewTicket={item.id === newTicketId}
-                      suggestedTags={item.suggestedTags}
+                      tags={item.tags}
                     />
                   ))}
                   {resolvedItems.length === 0 && !showSearchEmpty && !(isSearchMode && searchLoading) && (

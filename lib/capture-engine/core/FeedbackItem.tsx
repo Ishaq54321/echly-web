@@ -48,7 +48,7 @@ function FeedbackItem({
   const [isDeleting, setIsDeleting] = useState(false);
 
   const priority = priorityFromType(ticket.type);
-  const IconComponent = getTicketIconFromTags(ticket.suggestedTags ?? null, ticket.title);
+  const IconComponent = getTicketIconFromTags(ticket.tags ?? null, ticket.title);
 
   useEffect(() => {
     if (highlightTicketId === ticket.id) {
@@ -68,8 +68,8 @@ function FeedbackItem({
     }
   }, [ticket.id, onDelete, isDeleting]);
 
-  const stepCount = ticket.actionSteps?.length ?? 0;
-  const stepLabel = stepCount === 1 ? "change" : "changes";
+  const tagCount = ticket.tags?.length ?? 0;
+  const tagLabel = tagCount === 1 ? "tag" : "tags";
 
   return (
     <div
@@ -85,7 +85,7 @@ function FeedbackItem({
         <div className="ticket-title">{ticket.title}</div>
         <div className="ticket-meta">
           <span>
-            <b>{stepCount}</b> {stepLabel}
+            <b>{tagCount}</b> {tagLabel}
           </span>
         </div>
       </div>
@@ -134,7 +134,7 @@ export default React.memo(FeedbackItem, (prev, next) => {
 export type TicketEditorOverlayProps = {
   ticket: StructuredFeedback;
   sessionId: string;
-  onUpdate: (id: string, payload: { title: string; actionSteps: string[]; suggestedTags?: string[] }) => Promise<void>;
+  onUpdate: (id: string, payload: { title: string; description?: string; tags?: string[] }) => Promise<void>;
   onClose: () => void;
   onPauseForEditor?: () => void | Promise<void>;
 };
@@ -147,18 +147,16 @@ export function TicketEditorOverlay({
   onPauseForEditor,
 }: TicketEditorOverlayProps) {
   const [editedTitle, setEditedTitle] = useState(ticket.title);
-  const [editedSteps, setEditedSteps] = useState<string[]>(ticket.actionSteps ?? []);
-  const [editedTags, setEditedTags] = useState<string[]>(ticket.suggestedTags ?? []);
+  const [editedDescription, setEditedDescription] = useState<string>(ticket.description ?? "");
+  const [editedTags, setEditedTags] = useState<string[]>(ticket.tags ?? []);
   const [addingTag, setAddingTag] = useState(false);
   const [newTagText, setNewTagText] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [screenshotExpanded, setScreenshotExpanded] = useState(false);
   const [screenshotLoaded, setScreenshotLoaded] = useState(false);
-  const stepsListRef = useRef<HTMLDivElement>(null);
-  const isFirstRenderRef = useRef(true);
-  const focusStepIndexRef = useRef<number | null>(null);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
 
-  const IconComponent = getTicketIconFromTags(ticket.suggestedTags ?? null, ticket.title);
+  const IconComponent = getTicketIconFromTags(ticket.tags ?? null, ticket.title);
   const screenshotUrl =
     ticket.screenshotId ? tryBuildScreenshotUrl(sessionId, ticket.screenshotId) : null;
 
@@ -198,32 +196,17 @@ export function TicketEditorOverlay({
     el.style.height = `${el.scrollHeight}px`;
   }, []);
 
-  // Focus + resize step textareas after append (skip focus on initial mount)
   useEffect(() => {
-    const list = stepsListRef.current;
-    if (!list) return;
-    const textareas = list.querySelectorAll<HTMLTextAreaElement>("textarea");
-    textareas.forEach((ta) => resizeTextarea(ta));
-    if (isFirstRenderRef.current) {
-      isFirstRenderRef.current = false;
-      return;
-    }
-    const targetIndex = focusStepIndexRef.current;
-    if (targetIndex !== null && textareas[targetIndex]) {
-      textareas[targetIndex].focus();
-      focusStepIndexRef.current = null;
-    } else if (textareas.length > 0) {
-      textareas[textareas.length - 1].focus();
-    }
-  }, [editedSteps.length, resizeTextarea]);
+    resizeTextarea(descriptionRef.current);
+  }, [editedDescription, resizeTextarea]);
 
   const handleSave = useCallback(async () => {
     setIsSaving(true);
     try {
       await onUpdate(ticket.id, {
         title: editedTitle.trim() || ticket.title,
-        actionSteps: editedSteps.filter((s) => s.trim()),
-        suggestedTags: editedTags,
+        description: editedDescription.trim(),
+        tags: editedTags,
       });
       onClose();
     } catch (err) {
@@ -231,7 +214,7 @@ export function TicketEditorOverlay({
     } finally {
       setIsSaving(false);
     }
-  }, [ticket.id, ticket.title, editedTitle, editedSteps, onUpdate, onClose]);
+  }, [ticket.id, ticket.title, editedTitle, editedDescription, editedTags, onUpdate, onClose]);
 
   const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && newTagText.trim()) {
@@ -388,68 +371,20 @@ export function TicketEditorOverlay({
 
           <div className="editor-divider" />
 
-          {/* Action steps */}
+          {/* Description */}
           <div className="editor-steps">
-            <div className="editor-steps-label">What to change</div>
-            <div className="editor-steps-list" ref={stepsListRef}>
-              {editedSteps.map((step, i) => (
-                <div key={i} className="step-row">
-                  <span className="step-number">{i + 1}.</span>
-                  <textarea
-                    className="step-text"
-                    value={step}
-                    rows={1}
-                    placeholder="Add a change…"
-                    ref={(el) => resizeTextarea(el)}
-                    onChange={(e) => {
-                      setEditedSteps((prev) =>
-                        prev.map((s, j) => (j === i ? e.target.value : s))
-                      );
-                      resizeTextarea(e.target);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        focusStepIndexRef.current = i + 1;
-                        setEditedSteps((prev) => {
-                          const next = [...prev];
-                          next.splice(i + 1, 0, "");
-                          return next;
-                        });
-                      } else if (e.key === "Backspace" && editedSteps[i] === "" && editedSteps.length > 1) {
-                        e.preventDefault();
-                        focusStepIndexRef.current = Math.max(0, i - 1);
-                        setEditedSteps((prev) => prev.filter((_, j) => j !== i));
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="step-delete"
-                    title="Remove step"
-                    onClick={() =>
-                      setEditedSteps((prev) => prev.filter((_, j) => j !== i))
-                    }
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
-            </div>
-            <button
-              type="button"
-              className="step-add"
-              onClick={() => setEditedSteps((prev) => [...prev, ""])}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              Add a change
-            </button>
+            <div className="editor-steps-label">Description</div>
+            <textarea
+              ref={descriptionRef}
+              className="step-text"
+              value={editedDescription}
+              rows={3}
+              placeholder="Description…"
+              onChange={(e) => {
+                setEditedDescription(e.target.value);
+                resizeTextarea(e.target);
+              }}
+            />
           </div>
         </div>
 

@@ -37,9 +37,9 @@ export function ConfirmationCard({ ticket, onConfirm, onEdit }: ConfirmationCard
         <li className="echly-confirmation-card-title" style={{ fontSize: 14, fontWeight: 600, color: "var(--text-on-dark)", lineHeight: 1.45 }}>
           {ticket.title}
         </li>
-        {ticket.actionSteps?.length ? (
+        {ticket.description?.trim() ? (
           <li className="echly-confirmation-card-desc" style={{ fontSize: 13, fontWeight: 500, color: "var(--text-tertiary)", marginTop: 6, lineHeight: 1.4 }}>
-            {ticket.actionSteps.join("\n\n")}
+            {ticket.description}
           </li>
         ) : null}
       </ul>

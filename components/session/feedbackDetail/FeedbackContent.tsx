@@ -3,8 +3,6 @@
 import { useState } from "react";
 import { ScreenshotBlock } from "./ScreenshotBlock";
 import { ScreenshotWithPins } from "./ScreenshotWithPins";
-import { SuggestionSection } from "./SuggestionSection";
-import { DescriptionSection } from "./DescriptionSection";
 import { ActionItemsSection } from "./ActionItemsSection";
 import { Tag } from "@/components/ui/Tag";
 import type { FeedbackItemShape } from "./types";
@@ -18,8 +16,8 @@ interface FeedbackContentProps {
   screenshotUrlError: string | null;
   /** Read-only body text from public share / sanitized description (not editable). */
   readOnlyDescription?: string | null;
-  onSaveActionSteps?: (actionSteps: string[]) => Promise<void>;
-  onSaveTags?: (suggestedTags: string[]) => Promise<void>;
+  onSaveDescription?: (description: string) => Promise<void>;
+  onSaveTags?: (tags: string[]) => Promise<void>;
   onExpandImage: () => void;
   onEdit?: () => void;
   canEdit?: boolean;
@@ -46,7 +44,7 @@ export function FeedbackContent({
   screenshotUrlLoading,
   screenshotUrlError,
   readOnlyDescription = null,
-  onSaveActionSteps,
+  onSaveDescription,
   onSaveTags,
   onExpandImage,
   onEdit,
@@ -61,14 +59,15 @@ export function FeedbackContent({
   onCloseInlinePopover,
   sendPinComment,
   updateComment,
-  sendTextComment,
+  sendTextComment: _sendTextComment,
   onCommentPlaced,
   updatePinPosition,
   animatingPinId,
   participants,
 }: FeedbackContentProps) {
-  const actionSteps = Array.isArray(item.actionSteps) ? item.actionSteps : [];
-  const tags = Array.isArray(item.suggestedTags) ? item.suggestedTags : [];
+  const description =
+    typeof item.description === "string" ? item.description : "";
+  const tags = Array.isArray(item.tags) ? item.tags : [];
   const fileAttachments =
     item.publicAttachments?.filter((a): a is { kind: "file"; url: string; name?: string; size?: number } => a.kind === "file") ??
     [];
@@ -81,15 +80,19 @@ export function FeedbackContent({
     onSaveTags(next);
   };
 
-  const roDesc = typeof readOnlyDescription === "string" ? readOnlyDescription.trim() : "";
   const hasAttachmentContent =
     Boolean(item.screenshotId?.trim()) || fileAttachments.length > 0;
 
+  // Public share renders read-only description body; otherwise use ticket description.
+  const effectiveDescription =
+    typeof readOnlyDescription === "string" && readOnlyDescription.trim().length > 0
+      ? readOnlyDescription
+      : description;
+  const isDescriptionReadOnly =
+    typeof readOnlyDescription === "string" && readOnlyDescription.trim().length > 0;
+
   return (
     <div className="content-wrapper flex flex-col min-w-0">
-      {roDesc ? (
-        <DescriptionSection description={roDesc} />
-      ) : null}
       {hasAttachmentContent ? (
         <section className="min-w-0">
           <div className="attachments rounded-[14px] overflow-hidden space-y-3 border border-[var(--hair)] shadow-[0_10px_30px_-16px_rgba(28,25,23,0.18)]">
@@ -163,15 +166,12 @@ export function FeedbackContent({
           </div>
         </section>
       ) : null}
-      {item.suggestion != null && item.suggestion !== "" && (
-        <SuggestionSection suggestion={item.suggestion} />
-      )}
       <ActionItemsSection
-        actionSteps={actionSteps}
-        onSave={onSaveActionSteps}
+        description={effectiveDescription}
+        onSave={isDescriptionReadOnly ? undefined : onSaveDescription}
         isResolved={item.isResolved ?? false}
       />
-      {(onSaveTags != null || (Array.isArray(item.suggestedTags) && item.suggestedTags.length > 0)) && (
+      {(onSaveTags != null || (Array.isArray(item.tags) && item.tags.length > 0)) && (
         <section className="mt-12 min-w-0">
           <h2 className="text-[17px] font-semibold text-[var(--text-heading)] mb-3">Tags</h2>
           <div className="flex flex-wrap justify-start gap-3 max-w-full min-w-0">

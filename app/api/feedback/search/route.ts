@@ -21,18 +21,10 @@ function feedbackMatchesQuery(item: Feedback, needle: string): boolean {
   const title = (item.title ?? "").toLowerCase();
   if (title.includes(q)) return true;
 
-  const textParts = [
-    item.instruction,
-    item.description,
-    item.suggestion,
-    ...(Array.isArray(item.actionSteps) ? item.actionSteps : []),
-  ]
-    .filter((x): x is string => typeof x === "string" && x.length > 0)
-    .join("\n")
-    .toLowerCase();
-  if (textParts.includes(q)) return true;
+  const description = (item.description ?? "").toLowerCase();
+  if (description && description.includes(q)) return true;
 
-  const tags = item.suggestedTags;
+  const tags = item.tags;
   if (Array.isArray(tags)) {
     for (const t of tags) {
       if (typeof t === "string" && t.toLowerCase().includes(q)) return true;

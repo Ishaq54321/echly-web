@@ -15,17 +15,9 @@ export function buildFeedbackPayload({
     sessionId,
     feedbackId,
     title: ticket.title ?? "",
-    instruction: ticket.instruction ?? ticket.description ?? "",
-    description: "",
-    type:
-      Array.isArray(ticket.suggestedTags) && ticket.suggestedTags[0]
-        ? ticket.suggestedTags[0]
-        : "Feedback",
-    contextSummary: "",
-    actionSteps: Array.isArray(ticket.actionSteps)
-      ? ticket.actionSteps
-      : [],
-    suggestedTags: ticket.suggestedTags,
+    description: typeof ticket.description === "string" ? ticket.description : "",
+    type: Array.isArray(ticket.tags) && ticket.tags[0] ? ticket.tags[0] : "feedback",
+    tags: Array.isArray(ticket.tags) ? ticket.tags : [],
     pageArea: typeof ticket.pageArea === "string" ? ticket.pageArea : undefined,
     screenshotId,
     status,

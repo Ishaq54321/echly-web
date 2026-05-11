@@ -15,8 +15,8 @@ export interface ExecutionViewProps {
   resolveAffirmationKey?: number;
   onSaveTitle?: (newTitle: string) => Promise<void>;
   onResolvedChange?: (isResolved: boolean) => void;
-  onSaveActionSteps?: (actionSteps: string[]) => Promise<void>;
-  onSaveTags?: (suggestedTags: string[]) => Promise<void>;
+  onSaveDescription?: (description: string) => Promise<void>;
+  onSaveTags?: (tags: string[]) => Promise<void>;
   setIsImageExpanded: (v: boolean) => void;
   onEdit?: () => void;
   canEdit?: boolean;
@@ -79,7 +79,7 @@ export function ExecutionView({
   resolveAffirmationKey = 0,
   onSaveTitle,
   onResolvedChange,
-  onSaveActionSteps,
+  onSaveDescription,
   onSaveTags,
   setIsImageExpanded,
   onEdit,
@@ -184,8 +184,8 @@ export function ExecutionView({
               screenshotUrlLoading={screenshotUrlLoading}
               screenshotUrlError={screenshotUrlError}
               readOnlyDescription={readOnlyDescription}
-              onSaveActionSteps={
-                isPublicReadOnly || isShareSurface ? undefined : onSaveActionSteps
+              onSaveDescription={
+                isPublicReadOnly || isShareSurface ? undefined : onSaveDescription
               }
               onSaveTags={
                 isPublicReadOnly || isShareSurface ? undefined : onSaveTags

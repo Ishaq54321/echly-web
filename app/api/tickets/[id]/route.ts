@@ -95,7 +95,7 @@ export async function GET(req: Request, ctx: HandlerContext) {
   }
 }
 
-/** PATCH /api/tickets/:id — update ticket; body: { title?, instruction?, actionSteps?, suggestedTags?, isResolved? }. */
+/** PATCH /api/tickets/:id — update ticket; body: { title?, description?, tags?, isResolved? }. */
 export const PATCH = withAuthorization(
   "resolve_feedback",
   async (
@@ -107,10 +107,8 @@ export const PATCH = withAuthorization(
     log("[API] PATCH /api/tickets/[id] start");
     let body: {
       title?: string;
-      instruction?: string;
       description?: string;
-      actionSteps?: string[];
-      suggestedTags?: string[];
+      tags?: string[];
       isResolved?: boolean;
       status?: "open" | "resolved";
       screenshotId?: string;
@@ -188,25 +186,23 @@ export const PATCH = withAuthorization(
 
     const contentUpdates: Parameters<typeof updateFeedbackRepo>[1] = {};
     if (typeof body.title === "string") contentUpdates.title = body.title;
-    if (typeof body.instruction === "string") contentUpdates.instruction = body.instruction;
-    else if (typeof body.description === "string") contentUpdates.instruction = body.description;
+    if (typeof body.description === "string") {
+      if (!context.access?.isWorkspaceMember) {
+        return apiError({
+          code: "FORBIDDEN",
+          message: "Only workspace members can edit the description",
+          status: 403,
+        });
+      }
+      contentUpdates.description = body.description;
+    }
     if (typeof body.screenshotId === "string" && body.screenshotId.trim()) {
       if (!context.access?.isWorkspaceMember) {
         return apiError({ code: "FORBIDDEN", message: "Only workspace members can update the screenshot", status: 403 });
       }
       contentUpdates.screenshotId = body.screenshotId.trim();
     }
-    if (Array.isArray(body.actionSteps)) {
-      if (!context.access?.isWorkspaceMember) {
-        return apiError({
-          code: "FORBIDDEN",
-          message: "Only workspace members can edit changes",
-          status: 403,
-        });
-      }
-      contentUpdates.actionSteps = body.actionSteps;
-    }
-    if (Array.isArray(body.suggestedTags)) contentUpdates.suggestedTags = body.suggestedTags;
+    if (Array.isArray(body.tags)) contentUpdates.tags = body.tags;
 
     // Assign support
     if ("assigneeId" in body) {

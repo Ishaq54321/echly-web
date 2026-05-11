@@ -56,10 +56,6 @@ export interface Workspace {
     allowGuestComments: boolean;
   };
 
-  ai: {
-    actionStepsEnabled: boolean;
-  };
-
   integrations: {
     slack: { connected: boolean };
     linear: { connected: boolean };
@@ -153,9 +149,6 @@ export function defaultWorkspaceDoc(params: {
     },
     permissions: {
       allowGuestComments: false,
-    },
-    ai: {
-      actionStepsEnabled: true,
     },
     integrations: {
       slack: { connected: false },

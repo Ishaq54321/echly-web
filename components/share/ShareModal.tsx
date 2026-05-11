@@ -79,6 +79,31 @@ function emailInitial(email: string): string {
   return ch ? ch.toUpperCase() : "?";
 }
 
+function MemberAvatar({
+  avatarUrl,
+  alt,
+  initial,
+}: {
+  avatarUrl?: string | null;
+  alt: string;
+  initial: string;
+}) {
+  const [imageError, setImageError] = useState(false);
+
+  if (!avatarUrl || imageError) {
+    return <span className="share-user-avatar-initial">{initial}</span>;
+  }
+
+  return (
+    <img
+      src={avatarUrl}
+      alt={alt}
+      className="w-full h-full object-cover rounded-full"
+      onError={() => setImageError(true)}
+    />
+  );
+}
+
 function memberSubtitle(item: ShareItem): string {
   const kind = item.type === "member" ? "Member" : "Invite";
   const st = item.status === "active" ? "Active" : "Pending";
@@ -411,23 +436,11 @@ export function ShareModal({
                       <li key={`${item.type}:${item.id}`} className="share-member" style={{ paddingTop: "10px", paddingBottom: "10px" }}>
                         <div className="share-member-info">
                           <div className="share-user-avatar" aria-hidden>
-                            {item.avatarUrl ? (
-                              <img
-                                src={item.avatarUrl}
-                                alt={item.email}
-                                className="w-full h-full object-cover rounded-full"
-                                onError={e => {
-                                  (e.target as HTMLImageElement).style.display = "none";
-                                  (e.target as HTMLImageElement).nextElementSibling?.removeAttribute("style");
-                                }}
-                              />
-                            ) : null}
-                            <span
-                              className="share-user-avatar-initial"
-                              style={item.avatarUrl ? { display: "none" } : {}}
-                            >
-                              {emailInitial(item.email)}
-                            </span>
+                            <MemberAvatar
+                              avatarUrl={item.avatarUrl}
+                              alt={item.email}
+                              initial={emailInitial(item.email)}
+                            />
                           </div>
                           <div className="min-w-0 flex-1">
                             <span className="share-user-email">{item.email}</span>
@@ -551,17 +564,11 @@ export function ShareModal({
                         <li key={member.uid} className="share-access-request-row flex items-center gap-3 py-3 px-0">
                           <div className="share-member-info">
                             <div className="share-user-avatar" aria-hidden>
-                              {member.avatarUrl ? (
-                                <img
-                                  src={member.avatarUrl}
-                                  alt={member.displayName ?? member.email}
-                                  className="w-full h-full object-cover rounded-full"
-                                />
-                              ) : (
-                                <span className="share-user-avatar-initial">
-                                  {initials}
-                                </span>
-                              )}
+                              <MemberAvatar
+                                avatarUrl={member.avatarUrl}
+                                alt={member.displayName ?? member.email}
+                                initial={initials}
+                              />
                             </div>
                             <div className="min-w-0 flex-1">
                               <span className="share-user-email">

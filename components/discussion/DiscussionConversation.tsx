@@ -96,7 +96,7 @@ export interface DiscussionConversationProps {
     title?: string;
     sessionId?: string;
     screenshotId?: string | null;
-    actionSteps?: string[] | null;
+    description?: string | null;
     status?: "open" | "resolved";
     isResolved?: boolean;
   } | null;
@@ -107,7 +107,7 @@ interface TicketData {
   title?: string;
   sessionId?: string;
   screenshotId?: string | null;
-  actionSteps?: string[];
+  description?: string;
   createdAt?: string;
   status?: "open" | "resolved";
   isResolved?: boolean;
@@ -239,7 +239,7 @@ export function DiscussionConversation({
         title: initialTicket.title,
         sessionId: initialTicket.sessionId,
         screenshotId: initialTicket.screenshotId ?? null,
-        actionSteps: initialTicket.actionSteps ?? undefined,
+        description: initialTicket.description ?? undefined,
         status: initialTicket.status,
         isResolved: initialTicket.isResolved,
       });
@@ -795,8 +795,8 @@ export function DiscussionConversation({
 
   const isResolved = ticket.status === "resolved" || ticket.isResolved === true;
   const hasScreenshot = Boolean(ticket.screenshotId?.trim());
-  const steps = ticket.actionSteps;
-  const hasSteps = steps && Array.isArray(steps) && steps.length > 0;
+  const description = typeof ticket.description === "string" ? ticket.description : "";
+  const hasDescription = description.trim().length > 0;
   return (
     <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden bg-[var(--surface-card)] shadow-[var(--shadow-panel)]">
       {/* Header */}
@@ -877,10 +877,10 @@ export function DiscussionConversation({
           </div>
         )}
 
-        {/* Action steps (numbered, via shared session-page component) */}
-        {hasSteps && (
+        {/* Description (via shared session-page component) */}
+        {hasDescription && (
           <div className="mx-6 mt-4 px-5 py-4 [&>div]:!mt-0 [&>div]:!mb-0">
-            <ActionItemsSection actionSteps={steps!} isResolved={isResolved} />
+            <ActionItemsSection description={description} isResolved={isResolved} />
           </div>
         )}
 

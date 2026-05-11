@@ -22,8 +22,8 @@ export interface CommandPanelItem {
   id: string;
   title: string;
   isResolved?: boolean;
-  suggestedTags?: string[] | null;
-  contextSummary?: string | null;
+  tags?: string[] | null;
+  description?: string | null;
   createdAt?: { seconds: number } | null;
   clientTimestamp?: number | null;
   updatedAt?: string | null;
@@ -379,13 +379,13 @@ export function FeedbackCommandPanel({
                         {item.title}
                       </div>
                     ) : null}
-                    {item.contextSummary && (
+                    {item.description && (
                       <div className="text-[12px] text-[var(--text-tertiary)] truncate mt-0.5 leading-tight">
-                        {item.contextSummary}
+                        {item.description}
                       </div>
                     )}
                                        <div className="flex items-center gap-2 mt-1 flex-wrap min-w-0">
-                      {(item.suggestedTags ?? []).slice(0, 2).map((tag) => (
+                      {(item.tags ?? []).slice(0, 2).map((tag) => (
                         <span
                           key={tag}
                           className="inline-flex items-center max-w-full truncate rounded-full border px-2 py-0.5 text-[12px] font-medium bg-[var(--surface-subtle)] text-[var(--text-body)] border-[var(--border)]"

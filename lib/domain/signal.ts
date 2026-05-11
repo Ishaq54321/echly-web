@@ -36,8 +36,6 @@ export interface Signal {
   clientTimestamp: number | null;
   updatedAt: string | null;
   isResolved: boolean;
-  suggestedTags: string[] | null;
-  contextSummary: string | null;
 }
 
 /** AI Executive Summary block (Command Center). */
@@ -92,8 +90,7 @@ export interface FeedbackLike {
   sessionId: string;
   title: string;
   isResolved?: boolean;
-  suggestedTags?: string[] | null;
-  contextSummary?: string | null;
+  tags?: string[] | null;
   createdAt?: { seconds: number } | null;
   clientTimestamp?: number | null;
   updatedAt?: string | null;
@@ -112,7 +109,7 @@ export function feedbackToSignal(f: FeedbackLike): Signal {
     impactScore: DEFAULT_IMPACT_SCORE,
     urgency,
     confidencePercent: DEFAULT_CONFIDENCE_PERCENT,
-    clusterLabel: Array.isArray(f.suggestedTags) && f.suggestedTags[0] ? f.suggestedTags[0] : null,
+    clusterLabel: Array.isArray(f.tags) && f.tags[0] ? f.tags[0] : null,
     status,
     ownerId: null,
     ownerName: null,
@@ -122,7 +119,5 @@ export function feedbackToSignal(f: FeedbackLike): Signal {
     clientTimestamp: f.clientTimestamp ?? null,
     updatedAt: f.updatedAt ?? null,
     isResolved: !!f.isResolved,
-    suggestedTags: f.suggestedTags ?? null,
-    contextSummary: f.contextSummary ?? null,
   };
 }
