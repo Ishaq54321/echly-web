@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans } from "next/font/google";
 import "./globals.css";
+import { Toaster } from "sonner";
 import { ToastProvider } from "@/components/dashboard/context/ToastContext";
 import { RootProviders } from "@/components/providers/RootProviders";
 
@@ -33,6 +34,18 @@ export default function RootLayout({
             <div className="env-canvas h-full flex flex-col">{children}</div>
           </RootProviders>
         </ToastProvider>
+        <Toaster
+          position="bottom-right"
+          expand={false}
+          closeButton
+          toastOptions={{
+            style: {
+              background: "var(--surface-card)",
+              color: "var(--text-heading)",
+              border: "1px solid var(--border)",
+            },
+          }}
+        />
       </body>
     </html>
   );

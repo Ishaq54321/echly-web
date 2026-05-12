@@ -64,6 +64,8 @@ import { useToast } from "@/components/dashboard/context/ToastContext";
 import { ImageViewer } from "@/components/ImageViewer";
 import { ResolveToast, type ResolveToastState } from "@/components/ui/ResolveToast";
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "sonner";
+import type { ActionItemsSectionHandle } from "@/components/session/feedbackDetail/ActionItemsSection";
 
 function formatRelativeTime(timestamp: unknown): string {
   try {
@@ -361,6 +363,8 @@ export default function SessionPageClient({
     Feedback[] | null
   >(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  /** Imperative handle into the active description section, used to guard ticket switches. */
+  const actionItemsRef = useRef<ActionItemsSectionHandle | null>(null);
   /** Tracks the newest ticket id for the highlight animation; cleared after animation ends. */
   const [newTicketId, setNewTicketId] = useState<string | null>(null);
   /** Tracks which pin comment should pulse its ring animation; cleared after animation ends. */
@@ -1227,6 +1231,51 @@ export default function SessionPageClient({
 
   const selectedTicketTitle = ticketTitleMap.get(effectiveSelectedId ?? "") ?? "Untitled";
 
+  /**
+   * Guarded ticket switch. If the description editor on the current ticket is
+   * dirty or has an AI improve stream in flight, blocks the switch and shows a
+   * toast (with a Discard action for dirty edits). Otherwise calls `commit`.
+   */
+  const trySwitchToTicket = useCallback(
+    (newId: string | null, commit: () => void) => {
+      if (newId === effectiveSelectedId) {
+        commit();
+        return;
+      }
+      const handle = actionItemsRef.current;
+      if (!handle) {
+        commit();
+        return;
+      }
+      const result = handle.canLeave();
+      if (result.ok) {
+        commit();
+        return;
+      }
+      if (result.reason === "streaming") {
+        toast.warning("AI is still writing", {
+          description: "Wait for it to finish, then try switching again.",
+          duration: 4000,
+        });
+        return;
+      }
+      // reason === "dirty"
+      toast.warning("Unsaved changes", {
+        description: "Save your changes or discard them before switching tickets.",
+        duration: 8000,
+        action: {
+          label: "Discard",
+          onClick: () => {
+            handle.discardAndClose();
+            commit();
+          },
+        },
+        cancel: { label: "Cancel", onClick: () => { /* stay on current ticket */ } },
+      });
+    },
+    [effectiveSelectedId],
+  );
+
   if (stableScopedFeedback.length > 0 && selectedId === null) {
     const url = ticketIdFromUrl;
     if (url && stableScopedFeedback.some((f) => f.id === url)) {
@@ -1328,12 +1377,14 @@ export default function SessionPageClient({
         screenshotStatus: null,
       };
       setFeedback((prev) => [newItem, ...prev.filter((x) => x.id !== newItem.id)]);
-      setSelectedId(ticket.id);
-      setNewTicketId(ticket.id);
+      trySwitchToTicket(ticket.id, () => {
+        setSelectedId(ticket.id);
+        setNewTicketId(ticket.id);
+      });
     };
     window.addEventListener("ECHLY_FEEDBACK_CREATED", handler);
     return () => window.removeEventListener("ECHLY_FEEDBACK_CREATED", handler);
-  }, [sessionId, session?.workspaceId ?? "", setFeedback]);
+  }, [sessionId, session?.workspaceId ?? "", setFeedback, trySwitchToTicket]);
 
   /* ================= LOAD SESSION (optional auth; getAccessContext on server) ================= */
   useEffect(() => {
@@ -2259,7 +2310,7 @@ export default function SessionPageClient({
       )
     );
 
-    void (async () => {
+    await (async () => {
       const rollbackIfLatest = () => {
         if (descriptionSaveLatestGenRef.current.get(ticketId) !== myGen) return;
         pendingOptimisticDescriptionRef.current.delete(ticketId);
@@ -3135,6 +3186,7 @@ export default function SessionPageClient({
     return (
       <ExecutionView
         item={selectedItem}
+        actionItemsRef={actionItemsRef}
         resolveAffirmationKey={resolveAffirmationKey}
         onSaveTitle={isWorkspaceMember ? saveTitle : undefined}
         onResolvedChange={handleResolvedChange}
@@ -3300,12 +3352,14 @@ export default function SessionPageClient({
             items={stableScopedFeedback}
             selectedId={effectiveSelectedId}
             onSelect={(id: string) => {
-              setSelectedId(id);
-              const url = new URL(window.location.href);
-              if (url.searchParams.has("ticket")) {
-                url.searchParams.delete("ticket");
-                window.history.replaceState({}, "", url.pathname + url.search);
-              }
+              trySwitchToTicket(id, () => {
+                setSelectedId(id);
+                const url = new URL(window.location.href);
+                if (url.searchParams.has("ticket")) {
+                  url.searchParams.delete("ticket");
+                  window.history.replaceState({}, "", url.pathname + url.search);
+                }
+              });
             }}
             newTicketId={newTicketId}
             loadingMore={isSearchMode ? false : feedbackLoadingMore}
@@ -3392,7 +3446,9 @@ export default function SessionPageClient({
                   showToast={showToast}
                   ticketTitleMap={ticketTitleMap}
                   selectedTicketTitle={selectedTicketTitle}
-                  onNavigateToTicket={(fid: string) => setSelectedId(fid)}
+                  onNavigateToTicket={(fid: string) =>
+                    trySwitchToTicket(fid, () => setSelectedId(fid))
+                  }
                   onAnimatePin={triggerPinAnimation}
                   animatingCommentId={animatingCommentId}
                 />
@@ -3423,13 +3479,15 @@ export default function SessionPageClient({
               items={stableScopedFeedback}
               selectedId={effectiveSelectedId}
               onSelect={(id: string) => {
-                setSelectedId(id);
-                setIsTicketNavigatorOpen(false);
-                const url = new URL(window.location.href);
-                if (url.searchParams.has("ticket")) {
-                  url.searchParams.delete("ticket");
-                  window.history.replaceState({}, "", url.pathname + url.search);
-                }
+                trySwitchToTicket(id, () => {
+                  setSelectedId(id);
+                  setIsTicketNavigatorOpen(false);
+                  const url = new URL(window.location.href);
+                  if (url.searchParams.has("ticket")) {
+                    url.searchParams.delete("ticket");
+                    window.history.replaceState({}, "", url.pathname + url.search);
+                  }
+                });
               }}
               newTicketId={newTicketId}
               loadingMore={isSearchMode ? false : feedbackLoadingMore}

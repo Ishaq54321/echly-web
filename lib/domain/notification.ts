@@ -3,6 +3,7 @@ import type { Timestamp } from "firebase/firestore";
 export type NotificationType =
   | "comment.added"
   | "comment.mention"
+  | "description.mention"
   | "feedback.created"
   | "feedback.resolved"
   | "feedback.reopened"

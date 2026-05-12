@@ -6,6 +6,9 @@ import {
 } from "@/lib/repositories/feedbackRepository.server";
 import { updateSessionUpdatedAtRepo } from "@/lib/repositories/sessionsRepository.server";
 import { fireAndForget } from "@/lib/server/fireAndForget";
+import { dispatchNotifications } from "@/lib/server/notificationFanOut.server";
+import { resolveActorForActivityEvent } from "@/lib/repositories/activityEventsRepository.server";
+import { diffMentionSets } from "@/lib/server/descriptionMentions";
 import { log } from "@/lib/utils/logger";
 import {
   withAuthorization,
@@ -184,6 +187,11 @@ export const PATCH = withAuthorization(
       patchStatus = body.isResolved ? "resolved" : "open";
     }
 
+    const previousDescription =
+      typeof existingForOwnership.description === "string"
+        ? existingForOwnership.description
+        : null;
+
     const contentUpdates: Parameters<typeof updateFeedbackRepo>[1] = {};
     if (typeof body.title === "string") contentUpdates.title = body.title;
     if (typeof body.description === "string") {
@@ -320,6 +328,54 @@ export const PATCH = withAuthorization(
           updateSessionUpdatedAtRepo(existingForOwnership.sessionId)
         );
       }
+
+      // Description @mention notifications. Only fires for newly-added mentions
+      // (diffed against the previous description) so editing an unchanged
+      // mention does not re-notify the user. Matches the comment.mention flow.
+      if (
+        typeof contentUpdates.description === "string" &&
+        contentUpdates.description !== previousDescription
+      ) {
+        const newlyMentionedIds = diffMentionSets(
+          previousDescription,
+          contentUpdates.description
+        );
+        const actorId = (context.userId ?? user.uid).trim();
+        const recipientIds = newlyMentionedIds.filter(
+          (uid) => uid && uid !== actorId
+        );
+        if (recipientIds.length > 0) {
+          const workspaceId = (context.sessionWorkspaceId ?? "").trim();
+          const sessionId = existingForOwnership.sessionId;
+          const feedbackTitle =
+            (typeof existingForOwnership.title === "string"
+              ? existingForOwnership.title.trim()
+              : "") || "a ticket";
+          const sessionTitle = context.session?.title ?? null;
+          if (workspaceId && sessionId) {
+            fireAndForget("notification:description-mention", async () => {
+              const actor = await resolveActorForActivityEvent(actorId);
+              await dispatchNotifications({
+                recipientIds,
+                workspaceId,
+                sessionId,
+                sessionTitle,
+                feedbackId: id,
+                type: "description.mention",
+                actor: {
+                  id: actorId,
+                  name: actor.actorName,
+                  photoURL: actor.actorPhotoURL ?? null,
+                },
+                title: `${actor.actorName} mentioned you in the description of "${feedbackTitle}"`,
+                entityTitle: feedbackTitle,
+                body: null,
+              });
+            });
+          }
+        }
+      }
+
       const updated: Feedback = {
         ...existingForOwnership,
         ...contentUpdates,

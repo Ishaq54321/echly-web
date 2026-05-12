@@ -1,7 +1,9 @@
 "use client";
 
+import type { Ref } from "react";
 import type { FeedbackItemShape } from "@/components/session/feedbackDetail/types";
 import { FeedbackContent } from "@/components/session/feedbackDetail/FeedbackContent";
+import type { ActionItemsSectionHandle } from "@/components/session/feedbackDetail/ActionItemsSection";
 import { SessionFeedbackHeader } from "@/components/session/FeedbackHeader";
 import { CanvasEmptyState } from "@/components/empty/CanvasEmptyState";
 import { NoTicketSelectedIllu } from "@/components/empty/canvasIllustrations";
@@ -72,6 +74,8 @@ export interface ExecutionViewProps {
   canAssignTicket?: boolean;
   isWorkspaceMember?: boolean;
   animatingPinId?: string | null;
+  /** Imperative handle for guarding navigation against unsaved description edits. */
+  actionItemsRef?: Ref<ActionItemsSectionHandle>;
 }
 
 export function ExecutionView({
@@ -119,6 +123,7 @@ export function ExecutionView({
   isWorkspaceMember = false,
   animatingPinId,
   participants,
+  actionItemsRef,
 }: ExecutionViewProps) {
   const displayItem = item;
 
@@ -179,7 +184,9 @@ export function ExecutionView({
             </div>
           ) : (
             <FeedbackContent
+              key={displayItem.id}
               item={displayItem}
+              actionItemsRef={actionItemsRef}
               screenshotUrl={screenshotUrl}
               screenshotUrlLoading={screenshotUrlLoading}
               screenshotUrlError={screenshotUrlError}

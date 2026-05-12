@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type Ref } from "react";
 import { ScreenshotBlock } from "./ScreenshotBlock";
 import { ScreenshotWithPins } from "./ScreenshotWithPins";
-import { ActionItemsSection } from "./ActionItemsSection";
+import { ActionItemsSection, type ActionItemsSectionHandle } from "./ActionItemsSection";
 import { Tag } from "@/components/ui/Tag";
 import type { FeedbackItemShape } from "./types";
 import type { Comment } from "@/lib/domain/comment";
@@ -36,6 +36,8 @@ interface FeedbackContentProps {
   updatePinPosition?: (commentId: string, position: { xPercent: number; yPercent: number }) => Promise<void>;
   animatingPinId?: string | null;
   participants?: { uid: string; displayName: string; email: string; avatarUrl?: string | null }[];
+  /** Imperative handle so the parent can guard navigation against unsaved edits. */
+  actionItemsRef?: Ref<ActionItemsSectionHandle>;
 }
 
 export function FeedbackContent({
@@ -64,6 +66,7 @@ export function FeedbackContent({
   updatePinPosition,
   animatingPinId,
   participants,
+  actionItemsRef,
 }: FeedbackContentProps) {
   const description =
     typeof item.description === "string" ? item.description : "";
@@ -167,9 +170,11 @@ export function FeedbackContent({
         </section>
       ) : null}
       <ActionItemsSection
+        ref={actionItemsRef}
         description={effectiveDescription}
         onSave={isDescriptionReadOnly ? undefined : onSaveDescription}
         isResolved={item.isResolved ?? false}
+        participants={participants}
       />
       {(onSaveTags != null || (Array.isArray(item.tags) && item.tags.length > 0)) && (
         <section className="mt-12 min-w-0">

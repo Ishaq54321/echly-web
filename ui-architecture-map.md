@@ -308,11 +308,14 @@ Color density is a **best-effort estimate** based on file type and obvious styli
 - `components/session/feedbackDetail/FeedbackContent.tsx`
   - **description**: Core feedback content compositor.
   - **color density**: High
-- `components/session/feedbackDetail/DescriptionSection.tsx`
-  - **description**: Description section block.
+- `components/session/feedbackDetail/DescriptionEditor/`
+  - **description**: Inline description editor package (Phase 1).
   - **color density**: Medium
 - `components/session/feedbackDetail/ActionItemsSection.tsx`
-  - **description**: Action items section block.
+  - **description**: Inline description section wrapper (renders DescriptionMarkdown / DescriptionEditor).
+  - **color density**: Medium
+- `components/session/feedbackDetail/DescriptionMarkdown.tsx`
+  - **description**: Markdown display renderer for descriptions.
   - **color density**: Medium
 - `components/session/feedbackDetail/SuggestionSection.tsx`
   - **description**: Suggestions section block.
@@ -323,12 +326,6 @@ Color density is a **best-effort estimate** based on file type and obvious styli
 - `components/session/feedbackDetail/ScreenshotWithPins.tsx`
   - **description**: Screenshot with pin overlays (interactive).
   - **color density**: High
-- `components/session/feedbackDetail/SelectableText.tsx`
-  - **description**: Selectable text block (interaction-heavy).
-  - **color density**: Medium
-- `components/session/feedbackDetail/Section.tsx`
-  - **description**: Section wrapper variant for feedback detail.
-  - **color density**: Low
 - `components/session/feedbackDetail/ActivityPanel.tsx`
   - **description**: Activity panel container.
   - **color density**: High

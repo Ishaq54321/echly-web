@@ -31,6 +31,7 @@ function getBadgeClass(type: NotificationType | string): string {
     case "comment.added":
       return "badge-comment";
     case "comment.mention":
+    case "description.mention":
       return "badge-mention";
     case "feedback.created":
       return "badge-feedback";
@@ -60,6 +61,7 @@ function getTypeIcon(type: NotificationType | string) {
     case "comment.added":
       return <MessageSquare {...props} />;
     case "comment.mention":
+    case "description.mention":
       return <AtSign {...props} />;
     case "feedback.created":
       return <PenLine {...props} />;
@@ -178,6 +180,14 @@ function renderNotificationText(n: NotificationRow): React.ReactNode {
           {inSession}
         </>
       );
+    case "description.mention":
+      return (
+        <>
+          <strong>{actorName}</strong> mentioned you in the description of
+          {entityPart}
+          {inSession}
+        </>
+      );
     case "feedback.created":
       return (
         <>
@@ -277,6 +287,7 @@ function ticketGroupKey(n: NotificationRow): string | null {
   if (
     n.type !== "comment.added" &&
     n.type !== "comment.mention" &&
+    n.type !== "description.mention" &&
     n.type !== "feedback.created" &&
     n.type !== "feedback.resolved" &&
     n.type !== "feedback.reopened"

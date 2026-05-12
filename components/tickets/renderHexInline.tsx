@@ -70,10 +70,6 @@ function findStyleValueMatches(text: string): StyleMatch[] {
   return filtered;
 }
 
-function stripBackticks(text: string): string {
-  return text.replace(/`/g, "");
-}
-
 function StyleChip({ children }: { children: ReactNode }) {
   return (
     <span
@@ -96,9 +92,9 @@ function StyleChip({ children }: { children: ReactNode }) {
  * - Pixel/rem/em values, dimensions, border combos → generic chip
  *
  * Plain English (color names, keywords, percentages, bare numbers) is left
- * untouched. Legacy backticks from older stored descriptions are stripped.
+ * untouched.
  *
- * `matchIndex` (position of the hex in the cleaned text) is forwarded to
+ * `matchIndex` (position of the hex in the input text) is forwarded to
  * onHexEdit so the same hex can appear multiple times and still be replaced
  * unambiguously.
  */
@@ -109,10 +105,9 @@ export function renderHexInline(
 ): ReactNode {
   if (!text) return text;
 
-  const cleanText = stripBackticks(text);
-  const matches = findStyleValueMatches(cleanText);
+  const matches = findStyleValueMatches(text);
 
-  if (matches.length === 0) return cleanText;
+  if (matches.length === 0) return text;
 
   const onHexEdit = options?.onHexEdit;
   const nodes: ReactNode[] = [];
@@ -122,7 +117,7 @@ export function renderHexInline(
     if (m.start > cursor) {
       nodes.push(
         <Fragment key={`${keyPrefix}t-${i}`}>
-          {cleanText.slice(cursor, m.start)}
+          {text.slice(cursor, m.start)}
         </Fragment>,
       );
     }
@@ -150,9 +145,9 @@ export function renderHexInline(
     cursor = m.end;
   });
 
-  if (cursor < cleanText.length) {
+  if (cursor < text.length) {
     nodes.push(
-      <Fragment key={`${keyPrefix}t-end`}>{cleanText.slice(cursor)}</Fragment>,
+      <Fragment key={`${keyPrefix}t-end`}>{text.slice(cursor)}</Fragment>,
     );
   }
 

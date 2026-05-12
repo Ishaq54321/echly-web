@@ -1,15 +1,26 @@
 "use client";
 
-import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { Pencil, Check } from "lucide-react";
-import { renderHexInline } from "@/components/tickets/renderHexInline";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { Pencil } from "lucide-react";
 import { ColorPickerPopover } from "@/components/ui/ColorPickerPopover";
+import { DescriptionEditor } from "./DescriptionEditor/DescriptionEditor";
+import { DescriptionMarkdown } from "./DescriptionMarkdown";
+import type { MentionParticipant } from "@/lib/tiptap/mentionSuggestion";
 
 interface DescriptionSectionInlineProps {
   description: string;
   onSave?: (description: string) => Promise<void>;
   /** When true, show description with muted styling (resolved tickets). */
   isResolved?: boolean;
+  /** Workspace + session participants for @mention suggestions while editing. */
+  participants?: MentionParticipant[];
+}
+
+export interface ActionItemsSectionHandle {
+  /** Returns whether it's safe to navigate away. */
+  canLeave(): { ok: true } | { ok: false; reason: "dirty" | "streaming" };
+  /** Force-discard unsaved changes and close edit mode. */
+  discardAndClose(): void;
 }
 
 const cardClass = "mt-12 mb-2";
@@ -25,86 +36,110 @@ interface HexEditState {
 }
 
 /**
- * Renders a feedback ticket's description (markdown bullets / line breaks).
+ * Inline description editing section for a ticket. Renders the description
+ * display (markdown) and toggles into edit mode via DescriptionEditor.
  * Click-to-edit when onSave is provided; otherwise read-only.
- *
- * Note: file remains named ActionItemsSection.tsx for import stability,
- * but the component is now `DescriptionSectionInline` and renders a description string.
  */
-export function ActionItemsSection({
-  description,
-  onSave,
-  isResolved = false,
-}: DescriptionSectionInlineProps) {
+export const ActionItemsSection = forwardRef<
+  ActionItemsSectionHandle,
+  DescriptionSectionInlineProps
+>(function ActionItemsSection(
+  { description, onSave, isResolved = false, participants },
+  ref,
+) {
   const isReadOnly = typeof onSave !== "function";
   const [isEditing, setIsEditing] = useState(false);
-  const [draft, setDraft] = useState(description);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
   const [hexEdit, setHexEdit] = useState<HexEditState | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Baseline = markdown TipTap emits on mount (after its own normalization).
+  // Compare current against baseline rather than the raw `description` prop so
+  // whitespace/format normalization isn't mistaken for user edits.
+  const baselineMarkdownRef = useRef<string | null>(null);
+  const currentMarkdownRef = useRef<string>(description ?? "");
+  const isAiStreamingRef = useRef<boolean>(false);
+
+  // Reset baseline whenever we leave edit mode or the saved description changes
+  // out from under us.
   useEffect(() => {
-    if (!isEditing) setDraft(description);
+    if (!isEditing) {
+      baselineMarkdownRef.current = null;
+      currentMarkdownRef.current = description ?? "";
+    }
   }, [description, isEditing]);
 
-  useEffect(() => {
-    const el = textareaRef.current;
-    if (!el || !isEditing) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.max(100, el.scrollHeight)}px`;
-  }, [isEditing, draft]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      canLeave() {
+        if (!isEditing) return { ok: true };
+        if (isAiStreamingRef.current) {
+          return { ok: false, reason: "streaming" };
+        }
+        const baseline = (baselineMarkdownRef.current ?? description ?? "").trim();
+        const current = (currentMarkdownRef.current ?? "").trim();
+        if (current !== baseline) {
+          return { ok: false, reason: "dirty" };
+        }
+        return { ok: true };
+      },
+      discardAndClose() {
+        setIsEditing(false);
+      },
+    }),
+    [isEditing, description],
+  );
 
-  // Close hex picker if textarea editing starts or description changes underneath it.
+  // Close hex picker if editing starts.
   useEffect(() => {
     if (isEditing) setHexEdit(null);
   }, [isEditing]);
 
   const startEdit = () => {
     if (isReadOnly) return;
-    setDraft(description);
+    // PHASE_13_6_DIAG
+    console.log("[AI-DIAG]", "SET-IS-EDITING", { newValue: true, source: "startEdit" });
     setIsEditing(true);
   };
 
   const cancelEdit = () => {
+    // PHASE_13_6_DIAG
+    console.log("[AI-DIAG]", "SET-IS-EDITING", { newValue: false, source: "cancelEdit" });
     setIsEditing(false);
-    setDraft(description);
   };
 
-  const triggerSave = async () => {
+  const handleEditorSave = async (next: string) => {
     if (!onSave) return;
-    const trimmed = draft.trim();
+    const trimmed = next.trim();
+    // PHASE_13_6_DIAG
+    console.log("[AI-DIAG]", "HANDLE-EDITOR-SAVE-CALLED", {
+      descriptionLength: trimmed.length,
+      isStreamingAtCall: isAiStreamingRef.current,
+    });
     if (trimmed === (description ?? "").trim()) {
+      // PHASE_13_6_DIAG
+      console.log("[AI-DIAG]", "SET-IS-EDITING", { newValue: false, source: "handleEditorSave-noop" });
       setIsEditing(false);
       return;
     }
 
     // Flip out of edit mode IMMEDIATELY — trust the optimistic update.
     // Parent sets description optimistically; server response syncs later.
+    // PHASE_13_6_DIAG
+    console.log("[AI-DIAG]", "SET-IS-EDITING", { newValue: false, source: "handleEditorSave-success" });
     setIsEditing(false);
     setIsSaving(true);
 
     try {
       await onSave(trimmed);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 1500);
     } catch (err) {
       // Re-enter edit mode on failure so user can retry
+      // PHASE_13_6_DIAG
+      console.log("[AI-DIAG]", "SET-IS-EDITING", { newValue: true, source: "handleEditorSave-error" });
       setIsEditing(true);
       console.error("Failed to save description:", err);
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      cancelEdit();
-    }
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-      e.preventDefault();
-      void triggerSave();
     }
   };
 
@@ -136,8 +171,6 @@ export function ActionItemsSection({
     setIsSaving(true);
     try {
       await onSave(updated);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 1500);
     } finally {
       setIsSaving(false);
     }
@@ -158,33 +191,23 @@ export function ActionItemsSection({
     return (
       <div className={cardClass}>
         <h2 className={titleClass}>Description</h2>
-        <textarea
-          ref={textareaRef}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={() => void triggerSave()}
-          onKeyDown={handleKeyDown}
-          className="w-full min-h-[100px] rounded-xl border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] p-4 text-[15px] leading-[1.7] text-[var(--text-primary-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] resize-none overflow-hidden"
+        <DescriptionEditor
+          value={description}
+          onSave={handleEditorSave}
+          onCancel={cancelEdit}
           autoFocus
-          aria-label="Edit description"
+          participants={participants}
+          isEditing={isEditing}
+          onContentChange={(md) => {
+            if (baselineMarkdownRef.current === null) {
+              baselineMarkdownRef.current = md;
+            }
+            currentMarkdownRef.current = md;
+          }}
+          onStreamingChange={(streaming) => {
+            isAiStreamingRef.current = streaming;
+          }}
         />
-        <div className="flex items-center gap-2 mt-2">
-          <button
-            type="button"
-            onClick={cancelEdit}
-            className="inline-flex h-[34px] items-center gap-2 px-3 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[14px] font-medium hover:bg-[var(--surface-hover)] cursor-pointer"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={() => void triggerSave()}
-            disabled={isSaving}
-            className="inline-flex h-[34px] items-center gap-2 px-3 rounded-[var(--radius-btn)] bg-[var(--text-heading)] text-white text-[14px] font-medium hover:opacity-85 cursor-pointer disabled:opacity-50"
-          >
-            {isSaving ? "Saving..." : "Save"}
-          </button>
-        </div>
       </div>
     );
   }
@@ -214,20 +237,13 @@ export function ActionItemsSection({
           isReadOnly={isReadOnly}
           onHexEdit={isReadOnly ? undefined : handleHexEdit}
         />
-        {!isReadOnly && (
+        {!isReadOnly && !isSaving && (
           <span className="absolute top-0 right-0 flex items-center gap-1.5">
-            {saveSuccess ? (
-              <span className="text-xs text-semantic-success flex items-center gap-1.5">
-                <Check size={14} className="shrink-0" aria-hidden />
-                Saved
-              </span>
-            ) : (
-              <Pencil
-                size={14}
-                className="opacity-0 group-hover:opacity-60 transition-[opacity] duration-[120ms] ease text-[var(--text-secondary)] shrink-0"
-                aria-hidden
-              />
-            )}
+            <Pencil
+              size={14}
+              className="opacity-0 group-hover:opacity-60 transition-[opacity] duration-[120ms] ease text-[var(--text-secondary)] shrink-0"
+              aria-hidden
+            />
           </span>
         )}
       </div>
@@ -241,168 +257,16 @@ export function ActionItemsSection({
       )}
     </div>
   );
-}
+});
 
-/**
- * Replaces a hex at a specific match index with a new hex.
- * `matchIndex` is the position of the "#" in the (backtick-stripped) source text.
- * Source is stripped of any legacy backticks before matching so positions align
- * with what the renderer sees. Returns the original string unchanged if the
- * position no longer matches.
- */
 function replaceHexAtMatchIndex(
   text: string,
   matchIndex: number,
   newHex: string,
 ): string {
-  const cleaned = text.replace(/`/g, "");
-  const segment = cleaned.slice(matchIndex, matchIndex + HEX_LENGTH);
+  const segment = text.slice(matchIndex, matchIndex + HEX_LENGTH);
   if (!/^#[0-9A-Fa-f]{6}$/.test(segment)) {
     return text;
   }
-  const before = cleaned.slice(0, matchIndex);
-  const after = cleaned.slice(matchIndex + HEX_LENGTH);
-  return `${before}${newHex}${after}`;
+  return `${text.slice(0, matchIndex)}${newHex}${text.slice(matchIndex + HEX_LENGTH)}`;
 }
-
-/**
- * Minimal markdown renderer for descriptions:
- * - Lines starting with "- " become bullets
- * - Blank lines separate paragraphs
- * - All other content rendered as prose
- *
- * `onHexEdit` (when provided) makes inline hex swatches clickable. The match
- * index passed to the callback is relative to the *line/segment* that the swatch
- * appears in, since markdown lines are rendered independently. We compute an
- * absolute offset here so callers receive an index into the original `text`.
- */
-type DescriptionBlock =
-  | { kind: "para"; entries: { text: string; offset: number }[] }
-  | { kind: "list"; items: { text: string; offset: number }[] };
-
-const DescriptionMarkdown = memo(function DescriptionMarkdown({
-  text,
-  isResolved,
-  isReadOnly,
-  onHexEdit,
-}: {
-  text: string;
-  isResolved: boolean;
-  isReadOnly: boolean;
-  onHexEdit?: (params: {
-    hex: string;
-    matchIndex: number;
-    anchorEl: HTMLElement | null;
-  }) => void;
-}) {
-  const blocks = useMemo<DescriptionBlock[]>(() => {
-    // Normalize CRLF and strip any legacy backticks so absolute offsets we
-    // compute line up with the cleaned text the renderer operates on.
-    const normalized = text.replace(/\r\n/g, "\n").replace(/`/g, "");
-    const lines = normalized.split("\n");
-
-    const lineOffsets: number[] = [];
-    {
-      let acc = 0;
-      for (const line of lines) {
-        lineOffsets.push(acc);
-        acc += line.length + 1; // +1 for the consumed "\n"
-      }
-    }
-
-    const out: DescriptionBlock[] = [];
-    let currentPara: { text: string; offset: number }[] = [];
-
-    const flushPara = () => {
-      if (currentPara.length > 0) {
-        out.push({ kind: "para", entries: currentPara });
-        currentPara = [];
-      }
-    };
-
-    for (let li = 0; li < lines.length; li++) {
-      const raw = lines[li];
-      const lineStart = lineOffsets[li];
-      const trimmedRight = raw.trimEnd();
-      const bulletMatch = trimmedRight.match(/^(\s*[-*]\s+)(.+)$/);
-      if (bulletMatch) {
-        flushPara();
-        const prefixIdx = raw.indexOf(bulletMatch[1]);
-        const itemOffset =
-          lineStart + (prefixIdx >= 0 ? prefixIdx + bulletMatch[1].length : 0);
-        const last = out[out.length - 1];
-        if (last && last.kind === "list") {
-          last.items.push({ text: bulletMatch[2], offset: itemOffset });
-        } else {
-          out.push({
-            kind: "list",
-            items: [{ text: bulletMatch[2], offset: itemOffset }],
-          });
-        }
-      } else if (trimmedRight.trim() === "") {
-        flushPara();
-      } else {
-        currentPara.push({ text: trimmedRight, offset: lineStart });
-      }
-    }
-    flushPara();
-    return out;
-  }, [text]);
-
-  if (blocks.length === 0) return null;
-
-  const proseClass = `text-[15px] leading-[1.7] flex-1 ${isReadOnly ? "pr-0" : "pr-6"} ${
-    isResolved
-      ? "line-through text-[var(--text-tertiary)]"
-      : "text-[var(--text-primary-strong)]"
-  }`;
-
-  // Wraps the line-relative onHexEdit so callers receive absolute offsets.
-  const buildLineHexEdit = (lineOffset: number) =>
-    onHexEdit
-      ? (params: {
-          hex: string;
-          matchIndex: number;
-          anchorEl: HTMLElement | null;
-        }) =>
-          onHexEdit({
-            ...params,
-            matchIndex: params.matchIndex + lineOffset,
-          })
-      : undefined;
-
-  return (
-    <div className={proseClass}>
-      {blocks.map((block, bi) => {
-        if (block.kind === "list") {
-          return (
-            <ul
-              key={bi}
-              className="list-disc pl-5 my-2 space-y-1 marker:text-[var(--text-tertiary)]"
-            >
-              {block.items.map((item, ii) => (
-                <li key={ii}>
-                  {renderHexInline(item.text, `b${bi}-i${ii}-`, {
-                    onHexEdit: buildLineHexEdit(item.offset),
-                  })}
-                </li>
-              ))}
-            </ul>
-          );
-        }
-        return (
-          <p key={bi} className={bi > 0 ? "mt-3" : ""}>
-            {block.entries.map((entry, li) => (
-              <span key={li}>
-                {renderHexInline(entry.text, `b${bi}-l${li}-`, {
-                  onHexEdit: buildLineHexEdit(entry.offset),
-                })}
-                {li < block.entries.length - 1 ? <br /> : null}
-              </span>
-            ))}
-          </p>
-        );
-      })}
-    </div>
-  );
-});

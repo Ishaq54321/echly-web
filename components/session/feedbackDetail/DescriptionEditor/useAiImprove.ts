@@ -99,14 +99,32 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
     const previouslyInsertedSize = currentCursor - insertedStart;
 
     try {
-      ed.chain()
+      // PHASE_13_6_DIAG
+      console.log("[AI-DIAG]", "flush-chain-START", {
+        insertedStart,
+        currentCursor,
+        htmlLen: html.length,
+      });
+      const chainResult = ed.chain()
         .deleteRange({ from: insertedStart, to: currentCursor })
         .insertContentAt(insertedStart, html, {
           parseOptions: { preserveWhitespace: "full" },
           updateSelection: false,
         })
+        .command(({ tr }) => {
+          // PHASE_13_6_DIAG
+          console.log("[AI-DIAG]", "flush-chain-tr", {
+            docChanged: tr.docChanged,
+            addToHistory: tr.getMeta("addToHistory"),
+            hasAiMeta: !!tr.getMeta(aiStreamingPluginKey),
+            stepsCount: tr.steps.length,
+          });
+          return true;
+        })
         .setMeta("addToHistory", false)
         .run();
+      // PHASE_13_6_DIAG
+      console.log("[AI-DIAG]", "flush-chain-DONE", { success: chainResult });
     } catch (chainErr) {
       console.warn("Mid-stream chain failed:", chainErr);
       return;
@@ -128,6 +146,14 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
         const deleteTr = ed.state.tr;
         deleteTr.delete(newCursorPos, newCursorPos + consumeAmount);
         deleteTr.setMeta("addToHistory", false);
+        // PHASE_13_6_DIAG
+        console.log("[AI-DIAG]", "flush-dim-consume", {
+          docChanged: deleteTr.docChanged,
+          addToHistory: deleteTr.getMeta("addToHistory"),
+          hasAiMeta: !!deleteTr.getMeta(aiStreamingPluginKey),
+          stepsCount: deleteTr.steps.length,
+          selection: deleteTr.selection.from,
+        });
         ed.view.dispatch(deleteTr);
       } catch (deleteErr) {
         console.warn("Dim consume failed (non-fatal):", deleteErr);
@@ -143,6 +169,14 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
       dimmedFrom: newDimFrom,
     });
     updateTr.setMeta("addToHistory", false);
+    // PHASE_13_6_DIAG
+    console.log("[AI-DIAG]", "flush-cursor-update", {
+      docChanged: updateTr.docChanged,
+      addToHistory: updateTr.getMeta("addToHistory"),
+      hasAiMeta: !!updateTr.getMeta(aiStreamingPluginKey),
+      stepsCount: updateTr.steps.length,
+      selection: updateTr.selection.from,
+    });
     ed.view.dispatch(updateTr);
   }, []);
 
@@ -171,6 +205,14 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
       const tr = ed.state.tr;
       tr.setMeta(aiStreamingPluginKey, { action: "stop" });
       tr.setMeta("addToHistory", false);
+      // PHASE_13_6_DIAG
+      console.log("[AI-DIAG]", "cleanup-stop", {
+        docChanged: tr.docChanged,
+        addToHistory: tr.getMeta("addToHistory"),
+        hasAiMeta: !!tr.getMeta(aiStreamingPluginKey),
+        stepsCount: tr.steps.length,
+        selection: tr.selection.from,
+      });
       ed.view.dispatch(tr);
       ed.setEditable(true);
     }
@@ -224,6 +266,14 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
           tr.delete(safeStart, safeEnd);
         }
         tr.setMeta(aiStreamingPluginKey, { action: "stop" });
+        // PHASE_13_6_DIAG
+        console.log("[AI-DIAG]", "finalize-empty-path", {
+          docChanged: tr.docChanged,
+          addToHistory: tr.getMeta("addToHistory"),
+          hasAiMeta: !!tr.getMeta(aiStreamingPluginKey),
+          stepsCount: tr.steps.length,
+          selection: tr.selection.from,
+        });
         ed2.view.dispatch(tr);
         ed2.setEditable(true);
         setIsStreaming(false);
@@ -258,17 +308,41 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
         deleteTr.delete(safeStart, safeEnd);
       }
       deleteTr.setMeta(aiStreamingPluginKey, { action: "stop" });
+      // PHASE_13_6_DIAG
+      console.log("[AI-DIAG]", "finalize-delete-stop", {
+        docChanged: deleteTr.docChanged,
+        addToHistory: deleteTr.getMeta("addToHistory"),
+        hasAiMeta: !!deleteTr.getMeta(aiStreamingPluginKey),
+        stepsCount: deleteTr.steps.length,
+        selection: deleteTr.selection.from,
+        safeStart,
+        safeEnd,
+      });
       ed2.view.dispatch(deleteTr);
 
       try {
-        ed2
+        // PHASE_13_6_DIAG
+        console.log("[AI-DIAG]", "finalize-insert-chain-START", { safeStart, safeEnd });
+        const chainResult = ed2
           .chain()
           .focus()
           .setTextSelection(safeStart)
           .insertContent(html, {
             parseOptions: { preserveWhitespace: "full" },
           })
+          .command(({ tr }) => {
+            // PHASE_13_6_DIAG
+            console.log("[AI-DIAG]", "finalize-chain-tr", {
+              docChanged: tr.docChanged,
+              addToHistory: tr.getMeta("addToHistory"),
+              hasAiMeta: !!tr.getMeta(aiStreamingPluginKey),
+              stepsCount: tr.steps.length,
+            });
+            return true;
+          })
           .run();
+        // PHASE_13_6_DIAG
+        console.log("[AI-DIAG]", "finalize-insert-chain-DONE", { success: chainResult });
       } catch (insertErr) {
         console.error(
           "Final insert failed, falling back to plain markdown:",
@@ -293,6 +367,14 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
         const cleanupTr = ed2.state.tr;
         cleanupTr.removeMark(safeStart, insertEndPos, markType);
         cleanupTr.setMeta("addToHistory", false);
+        // PHASE_13_6_DIAG
+        console.log("[AI-DIAG]", "finalize-mark-cleanup", {
+          docChanged: cleanupTr.docChanged,
+          addToHistory: cleanupTr.getMeta("addToHistory"),
+          hasAiMeta: !!cleanupTr.getMeta(aiStreamingPluginKey),
+          stepsCount: cleanupTr.steps.length,
+          selection: cleanupTr.selection.from,
+        });
         ed2.view.dispatch(cleanupTr);
       }
 
@@ -301,6 +383,59 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
       sessionRef.current = null;
 
       ed2.commands.focus(ed2.state.selection.from);
+
+      // PHASE_13_6_DIAG: snapshot history state right after finalize
+      setTimeout(() => {
+        const ed3 = editorRef.current;
+        if (!ed3) return;
+
+        const plugins = ed3.state.plugins;
+        const historyPlugin = plugins.find((p: unknown) => {
+          const spec = (p as { spec?: { key?: unknown } }).spec;
+          const key = spec?.key as { key?: string } | string | undefined;
+          const keyName =
+            typeof key === "string"
+              ? key
+              : (key as { key?: string } | undefined)?.key ?? "";
+          return typeof keyName === "string" && keyName.startsWith("history$");
+        });
+
+        const historyState = (historyPlugin as { getState?: (s: unknown) => unknown } | undefined)?.getState?.(ed3.state) as
+          | { done?: { eventCount?: number }; undone?: { eventCount?: number } }
+          | undefined;
+
+        console.log("[AI-DIAG]", "POST-FINALIZE-SNAPSHOT", {
+          isEditable: ed3.isEditable,
+          isFocused: ed3.isFocused,
+          doneEventCount: historyState?.done?.eventCount ?? "no-history-plugin",
+          undoneEventCount: historyState?.undone?.eventCount ?? "no-history-plugin",
+          canUndo: ed3.can?.()?.undo?.() ?? "unknown",
+          pluginsCount: plugins.length,
+          pluginKeys: plugins.map((p: unknown) => {
+            const k = (p as { spec?: { key?: unknown } }).spec?.key as
+              | { key?: string }
+              | string
+              | undefined;
+            return typeof k === "string"
+              ? k
+              : (k as { key?: string } | undefined)?.key ?? "anonymous";
+          }),
+          aiStreamingActive: (() => {
+            const aiState = aiStreamingPluginKey.getState(ed3.state);
+            return aiState?.active ?? "no-state";
+          })(),
+          docSize: ed3.state.doc.content.size,
+          currentMarkdownPreview: (() => {
+            const storage = ed3.storage as unknown as {
+              markdown?: { getMarkdown?: () => string };
+            };
+            const getter = storage?.markdown?.getMarkdown;
+            return typeof getter === "function"
+              ? getter().slice(0, 100)
+              : "no-markdown-storage";
+          })(),
+        });
+      }, 100);
 
       toast.success("Improved");
     });
@@ -337,6 +472,14 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
         finalizing: false,
       };
 
+      // PHASE_13_6_DIAG
+      console.log("[AI-DIAG]", "perform-improve-selection-collapse", {
+        targetFrom,
+        targetTo,
+        empty,
+      });
+      ed.commands.setTextSelection(targetFrom);
+
       ed.setEditable(false);
       setIsStreaming(true);
 
@@ -350,6 +493,14 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
         targetEnd: targetTo,
       });
       startTr.setMeta("addToHistory", false);
+      // PHASE_13_6_DIAG
+      console.log("[AI-DIAG]", "start-meta", {
+        docChanged: startTr.docChanged,
+        addToHistory: startTr.getMeta("addToHistory"),
+        hasAiMeta: !!startTr.getMeta(aiStreamingPluginKey),
+        stepsCount: startTr.steps.length,
+        selection: startTr.selection.from,
+      });
       ed.view.dispatch(startTr);
 
       try {

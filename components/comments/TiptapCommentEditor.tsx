@@ -5,6 +5,7 @@ import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Mention from "@tiptap/extension-mention";
 import Placeholder from "@tiptap/extension-placeholder";
+import { createMentionSuggestion } from "@/lib/tiptap/mentionSuggestion";
 
 export type TiptapEditorParticipant = {
   uid: string;
@@ -91,139 +92,10 @@ export function TiptapCommentEditor({
       Placeholder.configure({ placeholder }),
       Mention.configure({
         HTMLAttributes: { class: "mention-chip" },
-        suggestion: {
-          items: ({ query }: { query: string }) =>
-            participantsRef.current
-              .filter(
-                (p) =>
-                  p.displayName.toLowerCase().includes(query.toLowerCase()) ||
-                  p.email.toLowerCase().includes(query.toLowerCase())
-              )
-              .slice(0, 5),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          render: (): any => {
-            let dropdownEl: HTMLDivElement | null = null;
-            let currentItems: TiptapEditorParticipant[] = [];
-            let selectedIndex = 0;
-            let savedCommand: ((attrs: { id: string; label: string }) => void) | null = null;
-
-            function renderDropdownItems(
-              items: TiptapEditorParticipant[],
-              selected: number,
-              command: (attrs: { id: string; label: string }) => void
-            ) {
-              if (!dropdownEl) return;
-              dropdownEl.innerHTML = "";
-              if (items.length === 0) {
-                dropdownEl.style.display = "none";
-                return;
-              }
-              dropdownEl.style.display = "block";
-
-              items.forEach((item, i) => {
-                const btn = document.createElement("button");
-                btn.type = "button";
-                btn.className = `mention-dropdown-item${i === selected ? " active" : ""}`;
-
-                const avatarDiv = document.createElement("div");
-                avatarDiv.className = "mention-dropdown-avatar";
-                if (item.avatarUrl) {
-                  const img = document.createElement("img");
-                  img.src = item.avatarUrl;
-                  img.alt = "";
-                  avatarDiv.appendChild(img);
-                } else {
-                  avatarDiv.textContent = item.displayName.charAt(0).toUpperCase();
-                }
-                btn.appendChild(avatarDiv);
-
-                const infoDiv = document.createElement("div");
-                infoDiv.className = "mention-dropdown-info";
-
-                const nameDiv = document.createElement("div");
-                nameDiv.className = "mention-dropdown-name";
-                nameDiv.textContent = item.displayName;
-                infoDiv.appendChild(nameDiv);
-
-                const emailDiv = document.createElement("div");
-                emailDiv.className = "mention-dropdown-email";
-                emailDiv.textContent = item.email;
-                infoDiv.appendChild(emailDiv);
-
-                btn.appendChild(infoDiv);
-
-                btn.onmousedown = (e) => {
-                  e.preventDefault();
-                  command({ id: item.uid, label: item.displayName });
-                };
-
-                dropdownEl!.appendChild(btn);
-              });
-            }
-
-            return {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              onStart(props: any) {
-                mentionOpenRef.current = true;
-                dropdownEl = document.createElement("div");
-                dropdownEl.className = "mention-dropdown";
-                document.body.appendChild(dropdownEl);
-                currentItems = (props.items as TiptapEditorParticipant[]) ?? [];
-                selectedIndex = 0;
-                const rect = props.clientRect?.() as DOMRect | null;
-                if (rect && dropdownEl) {
-                  dropdownEl.style.position = "fixed";
-                  dropdownEl.style.left = `${rect.left}px`;
-                  dropdownEl.style.bottom = `${window.innerHeight - rect.top + 4}px`;
-                  dropdownEl.style.top = "auto";
-                  dropdownEl.style.zIndex = "2147480001";
-                }
-                savedCommand = props.command;
-                renderDropdownItems(currentItems, selectedIndex, props.command);
-              },
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              onUpdate(props: any) {
-                currentItems = (props.items as TiptapEditorParticipant[]) ?? [];
-                selectedIndex = 0;
-                const rect = props.clientRect?.() as DOMRect | null;
-                if (rect && dropdownEl) {
-                  dropdownEl.style.left = `${rect.left}px`;
-                  dropdownEl.style.bottom = `${window.innerHeight - rect.top + 4}px`;
-                  dropdownEl.style.top = "auto";
-                }
-                savedCommand = props.command;
-                renderDropdownItems(currentItems, selectedIndex, props.command);
-              },
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              onKeyDown(props: any) {
-                if ((props.event as KeyboardEvent).key === "ArrowUp") {
-                  selectedIndex = Math.max(selectedIndex - 1, 0);
-                  renderDropdownItems(currentItems, selectedIndex, props.command ?? (() => {}));
-                  return true;
-                }
-                if ((props.event as KeyboardEvent).key === "ArrowDown") {
-                  selectedIndex = Math.min(selectedIndex + 1, currentItems.length - 1);
-                  renderDropdownItems(currentItems, selectedIndex, props.command ?? (() => {}));
-                  return true;
-                }
-                if ((props.event as KeyboardEvent).key === "Enter") {
-                  const item = currentItems[selectedIndex];
-                  if (item && savedCommand) {
-                    savedCommand({ id: item.uid, label: item.displayName });
-                  }
-                  return true;
-                }
-                return false;
-              },
-              onExit() {
-                mentionOpenRef.current = false;
-                dropdownEl?.remove();
-                dropdownEl = null;
-                savedCommand = null;
-              },
-            };
-          },
-        },
+        // Refs are captured by closure and only read inside event-driven callbacks
+        // (items/onStart/onUpdate/onKeyDown/onExit), never during render.
+        // eslint-disable-next-line react-hooks/refs
+        suggestion: createMentionSuggestion({ participantsRef, mentionOpenRef }),
       }),
     ],
     autofocus: autoFocus ?? false,
