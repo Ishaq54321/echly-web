@@ -74,6 +74,8 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
 
     const insertedStart = pluginState.insertedStart;
     const currentCursor = pluginState.cursorPos;
+    const dimFrom = pluginState.dimmedFrom;
+    const dimTo = pluginState.dimmedTo;
 
     let html: string;
     try {
@@ -94,7 +96,7 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
     if (!html) return;
 
     const sizeBefore = ed.state.doc.content.size;
-    const deletedRangeSize = currentCursor - insertedStart;
+    const previouslyInsertedSize = currentCursor - insertedStart;
 
     try {
       ed.chain()
@@ -110,15 +112,35 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
       return;
     }
 
-    const sizeAfter = ed.state.doc.content.size;
-    const insertedContentSize = sizeAfter - sizeBefore + deletedRangeSize;
+    const sizeAfterInsert = ed.state.doc.content.size;
+    const insertedContentSize =
+      sizeAfterInsert - sizeBefore + previouslyInsertedSize;
     const newCursorPos = insertedStart + insertedContentSize;
+
+    const growthThisFlush = insertedContentSize - previouslyInsertedSize;
+
+    const dimSize = dimTo - dimFrom;
+
+    const consumeAmount = Math.max(0, Math.min(growthThisFlush, dimSize));
+
+    if (consumeAmount > 0) {
+      try {
+        const deleteTr = ed.state.tr;
+        deleteTr.delete(newCursorPos, newCursorPos + consumeAmount);
+        deleteTr.setMeta("addToHistory", false);
+        ed.view.dispatch(deleteTr);
+      } catch (deleteErr) {
+        console.warn("Dim consume failed (non-fatal):", deleteErr);
+      }
+    }
+
+    const newDimFrom = newCursorPos;
 
     const updateTr = ed.state.tr;
     updateTr.setMeta(aiStreamingPluginKey, {
       action: "updateCursor",
       cursorPos: newCursorPos,
-      dimmedFrom: newCursorPos,
+      dimmedFrom: newDimFrom,
     });
     updateTr.setMeta("addToHistory", false);
     ed.view.dispatch(updateTr);
@@ -161,120 +183,128 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
     }
   }, []);
 
-  const finalize = useCallback(
-    (fullText: string) => {
-      const ed = editorRef.current;
-      const session = sessionRef.current;
-      if (!ed || !session) return;
+  const finalize = useCallback((fullText: string) => {
+    const ed = editorRef.current;
+    const session = sessionRef.current;
+    if (!ed || !session) return;
+    session.finalizing = true;
 
-      session.finalizing = true;
-      session.rafScheduled = false;
+    if (session.pendingText) {
+      flushPending();
+    }
 
-      if (session.pendingText) {
-        session.accumulatedMarkdown += session.pendingText;
-        session.pendingText = "";
-      }
+    requestAnimationFrame(() => {
+      const ed2 = editorRef.current;
+      const session2 = sessionRef.current;
+      if (!ed2 || !session2) return;
 
-      requestAnimationFrame(() => {
-        const ed2 = editorRef.current;
-        if (!ed2) return;
-
-        const pluginState = aiStreamingPluginKey.getState(ed2.state);
-        if (!pluginState?.active) {
-          ed2.setEditable(true);
-          setIsStreaming(false);
-          sessionRef.current = null;
-          return;
-        }
-
-        const insertedStart = pluginState.insertedStart;
-        const insertedEnd = pluginState.cursorPos;
-        const dimStart = pluginState.dimmedFrom;
-        const dimEnd = pluginState.dimmedTo;
-
-        const tr = ed2.state.tr;
-        // Delete leftover dimmed original (anything from dimStart to dimEnd).
-        if (dimEnd > dimStart) {
-          tr.delete(dimStart, dimEnd);
-        }
-        // Delete our streamed plain text; we'll replace with parsed HTML.
-        if (insertedEnd > insertedStart) {
-          tr.delete(insertedStart, insertedEnd);
-        }
-        tr.setMeta(aiStreamingPluginKey, { action: "stop" });
-        ed2.view.dispatch(tr);
-
-        const authoritative =
-          fullText && fullText.trim().length > 0
-            ? fullText.trim()
-            : (session.accumulatedMarkdown || "").trim();
-        const md = authoritative.replace(/\n{3,}/g, "\n\n");
-        if (!md) {
-          ed2.setEditable(true);
-          setIsStreaming(false);
-          sessionRef.current = null;
-          toast.error("AI returned empty response");
-          return;
-        }
-
-        let html: string;
-        try {
-          html = marked.parse(md, {
-            async: false,
-            breaks: true,
-            gfm: true,
-          }) as string;
-          html = html
-            .replace(/^(?:\s*<p>\s*<\/p>\s*)+/i, "")
-            .replace(/(?:\s*<p>\s*<\/p>\s*)+$/i, "")
-            .trim();
-        } catch {
-          const escaped = md
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;");
-          html = `<p>${escaped}</p>`;
-        }
-
-        try {
-          ed2
-            .chain()
-            .focus()
-            .setTextSelection(insertedStart)
-            .insertContent(html, {
-              parseOptions: { preserveWhitespace: "full" },
-            })
-            .run();
-        } catch (insertErr) {
-          console.error("Final insert failed:", insertErr);
-          ed2
-            .chain()
-            .focus()
-            .setTextSelection(insertedStart)
-            .insertContent(md)
-            .run();
-        }
-
-        const markType = ed2.schema.marks.aiTouched;
-        if (markType) {
-          const insertEnd = ed2.state.selection.from;
-          if (insertEnd > insertedStart) {
-            const cleanupTr = ed2.state.tr;
-            cleanupTr.removeMark(insertedStart, insertEnd, markType);
-            cleanupTr.setMeta("addToHistory", false);
-            ed2.view.dispatch(cleanupTr);
-          }
-        }
-
+      const pluginState = aiStreamingPluginKey.getState(ed2.state);
+      if (!pluginState?.active) {
         ed2.setEditable(true);
         setIsStreaming(false);
         sessionRef.current = null;
-        ed2.commands.focus(ed2.state.selection.from);
-        toast.success("Improved");
-      });
-    },
-    [],
-  );
+        return;
+      }
+
+      const targetStart = pluginState.insertedStart;
+      const targetEnd = pluginState.targetEnd;
+
+      const docSize = ed2.state.doc.content.size;
+      const safeStart = Math.max(0, Math.min(targetStart, docSize));
+      const safeEnd = Math.max(safeStart, Math.min(targetEnd, docSize));
+
+      const authoritativeMarkdown =
+        fullText && fullText.trim().length > 0
+          ? fullText.trim()
+          : (session2.accumulatedMarkdown || "").trim();
+
+      if (!authoritativeMarkdown) {
+        const tr = ed2.state.tr;
+        if (safeEnd > safeStart) {
+          tr.delete(safeStart, safeEnd);
+        }
+        tr.setMeta(aiStreamingPluginKey, { action: "stop" });
+        ed2.view.dispatch(tr);
+        ed2.setEditable(true);
+        setIsStreaming(false);
+        sessionRef.current = null;
+        toast.error("AI improve returned empty response");
+        return;
+      }
+
+      const normalizedMd = authoritativeMarkdown.replace(/\n{3,}/g, "\n\n");
+      let html: string;
+      try {
+        html = marked.parse(normalizedMd, {
+          async: false,
+          breaks: true,
+          gfm: true,
+        }) as string;
+        html = html
+          .replace(/^(\s*<p>\s*<\/p>\s*)+/, "")
+          .replace(/(\s*<p>\s*<\/p>\s*)+$/, "")
+          .trim();
+      } catch (parseErr) {
+        console.error("Markdown parse failed in finalize:", parseErr);
+        const escaped = normalizedMd
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+        html = `<p>${escaped}</p>`;
+      }
+
+      const deleteTr = ed2.state.tr;
+      if (safeEnd > safeStart) {
+        deleteTr.delete(safeStart, safeEnd);
+      }
+      deleteTr.setMeta(aiStreamingPluginKey, { action: "stop" });
+      ed2.view.dispatch(deleteTr);
+
+      try {
+        ed2
+          .chain()
+          .focus()
+          .setTextSelection(safeStart)
+          .insertContent(html, {
+            parseOptions: { preserveWhitespace: "full" },
+          })
+          .run();
+      } catch (insertErr) {
+        console.error(
+          "Final insert failed, falling back to plain markdown:",
+          insertErr,
+        );
+        try {
+          ed2
+            .chain()
+            .focus()
+            .setTextSelection(safeStart)
+            .insertContent(authoritativeMarkdown)
+            .run();
+        } catch (fallbackErr) {
+          console.error("Fallback insert also failed:", fallbackErr);
+          toast.error("AI improve failed to apply output");
+        }
+      }
+
+      const markType = ed2.schema.marks.aiTouched;
+      if (markType) {
+        const insertEndPos = ed2.state.selection.from;
+        const cleanupTr = ed2.state.tr;
+        cleanupTr.removeMark(safeStart, insertEndPos, markType);
+        cleanupTr.setMeta("addToHistory", false);
+        ed2.view.dispatch(cleanupTr);
+      }
+
+      ed2.setEditable(true);
+      setIsStreaming(false);
+      sessionRef.current = null;
+
+      ed2.commands.focus(ed2.state.selection.from);
+
+      toast.success("Improved");
+    });
+  }, [flushPending]);
 
   const performImprove = useCallback(
     async (action: ImproveAction) => {
@@ -317,6 +347,7 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
         insertedStart: targetFrom,
         dimmedFrom: targetFrom,
         dimmedTo: targetTo,
+        targetEnd: targetTo,
       });
       startTr.setMeta("addToHistory", false);
       ed.view.dispatch(startTr);
