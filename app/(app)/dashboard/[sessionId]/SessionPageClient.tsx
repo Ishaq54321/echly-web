@@ -56,8 +56,8 @@ import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 import {
   TicketList,
   ExecutionView,
-  CommentPanel,
 } from "@/components/layout/operating-system";
+import { TicketActivityPanel } from "@/components/session/feedbackDetail/TicketActivityPanel";
 import { TopControlBar } from "@/components/ui/TopControlBar";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useToast } from "@/components/dashboard/context/ToastContext";
@@ -415,6 +415,17 @@ export default function SessionPageClient({
     enabled: isIdentityReady && !!authUid,
     user: presenceUser,
   });
+
+  // Single source of truth for which workspace's data we're viewing.
+  // Always prefer the session's workspace (this is where writes land,
+  // matching the existing listener pattern at the activity feed and
+  // other realtime stores). ctxWorkspaceId is the viewer's active
+  // workspace — useful as a fallback while session loads, but should
+  // never override session.workspaceId once available.
+  const effectiveWorkspaceId = useMemo<string | null>(
+    () => session?.workspaceId ?? ctxWorkspaceId ?? null,
+    [session?.workspaceId, ctxWorkspaceId]
+  );
 
   /**
    * Clear the optimistic overlay only after the listener has had time to catch up
@@ -1284,7 +1295,12 @@ export default function SessionPageClient({
   const [navPanelOpen, setNavPanelOpen] = useState(false);
   const [isTicketNavigatorOpen, setIsTicketNavigatorOpen] = useState(false);
   const [isCommentMode, setIsCommentMode] = useState(false);
-  const [isCommentPanelOpen, setIsCommentPanelOpen] = useState(false);
+  // Right-rail panel. Phase 26.1: now the per-ticket Activity timeline
+  // (was the CommentPanel). Comments live in the middle panel
+  // (ExecutionView). The open-triggers below are kept as-is so existing
+  // entry points (comment deep-link, image comment mode) still surface
+  // the rail.
+  const [isActivityPanelOpen, setIsActivityPanelOpen] = useState(false);
   const [isImageExpanded, setIsImageExpanded] = useState(false);
   const [openImageInEditMode, setOpenImageInEditMode] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -1299,7 +1315,7 @@ export default function SessionPageClient({
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setIsCommentMode(false);
-        setIsCommentPanelOpen(false);
+        setIsActivityPanelOpen(false);
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -1342,7 +1358,7 @@ export default function SessionPageClient({
   }, [sessionId, session != null]);
 
   const sessionWorkspaceIdRef = useRef<string | undefined>(undefined);
-  sessionWorkspaceIdRef.current = session?.workspaceId;
+  sessionWorkspaceIdRef.current = effectiveWorkspaceId ?? undefined;
 
   /* Local-first: insert ticket immediately when extension creates feedback (no refetch). */
   useEffect(() => {
@@ -1377,7 +1393,7 @@ export default function SessionPageClient({
     };
     window.addEventListener("ECHLY_FEEDBACK_CREATED", handler);
     return () => window.removeEventListener("ECHLY_FEEDBACK_CREATED", handler);
-  }, [sessionId, session?.workspaceId ?? "", setFeedback, trySwitchToTicket]);
+  }, [sessionId, effectiveWorkspaceId ?? "", setFeedback, trySwitchToTicket]);
 
   /* ================= LOAD SESSION (optional auth; getAccessContext on server) ================= */
   useEffect(() => {
@@ -1763,8 +1779,8 @@ export default function SessionPageClient({
   // firing the listener's error path twice on permission-denied.
   const workspaceIdForListenersRef = useRef<string>("");
   useEffect(() => {
-    workspaceIdForListenersRef.current = (session?.workspaceId ?? ctxWorkspaceId ?? "").trim();
-  }, [ctxWorkspaceId, session?.workspaceId]);
+    workspaceIdForListenersRef.current = (effectiveWorkspaceId ?? "").trim();
+  }, [effectiveWorkspaceId]);
 
   // Realtime session doc subscription. Gated on identity AND session-level access;
   // auto-detaches on sign-out via the module-init auth observer in sessionStore.
@@ -1776,7 +1792,7 @@ export default function SessionPageClient({
     if (!sid || !wid) return;
     const release = retainSessionListener(sid, wid);
     return () => release();
-  }, [isIdentityReady, canSubscribeToFirestore, sessionId, session?.workspaceId]);
+  }, [isIdentityReady, canSubscribeToFirestore, sessionId, effectiveWorkspaceId]);
 
   // Realtime feedback subscription. Same gating as the session listener;
   // anonymous and unauthorized authed viewers fall through to the REST/bundle path.
@@ -1788,7 +1804,7 @@ export default function SessionPageClient({
     if (!sid || !wid) return;
     const release = retainFeedbackListener(sid, wid);
     return () => release();
-  }, [isIdentityReady, canSubscribeToFirestore, sessionId, session?.workspaceId]);
+  }, [isIdentityReady, canSubscribeToFirestore, sessionId, effectiveWorkspaceId]);
 
   // Realtime presence subscription. Same gating as the other listeners.
   // The store filters stale heartbeats client-side and runs a 15s GC interval
@@ -2179,7 +2195,7 @@ export default function SessionPageClient({
     if (!effectiveSelectedId) return;
     if (ticketIdFromUrl && effectiveSelectedId !== ticketIdFromUrl) return;
     hasAppliedCommentParam.current = true;
-    setIsCommentPanelOpen(true);
+    setIsActivityPanelOpen(true);
     setActiveThreadId(commentIdFromUrl);
     const url = new URL(window.location.href);
     if (url.searchParams.has("comment")) {
@@ -3195,12 +3211,12 @@ export default function SessionPageClient({
         isCommentMode={isCommentMode}
         onOpenComment={() => {
           setIsCommentMode(true);
-          setIsCommentPanelOpen(true);
+          setIsActivityPanelOpen(true);
           showToast("Tap anywhere on the image to leave a comment");
         }}
         onCloseCommentMode={() => {
           setIsCommentMode(false);
-          setIsCommentPanelOpen(false);
+          setIsActivityPanelOpen(false);
           setActiveThreadId(null);
         }}
         impactScore={(selectedItem as { impactScore?: number } | null)?.impactScore}
@@ -3335,7 +3351,7 @@ export default function SessionPageClient({
         <div
           className="grid flex-1 min-h-0 overflow-hidden bg-[var(--surface-subtle)]"
           style={{
-            gridTemplateColumns: (isCommentPanelOpen || activeThreadId != null) ? '346px 1fr 360px' : '346px 1fr',
+            gridTemplateColumns: (isActivityPanelOpen || activeThreadId != null) ? '346px 1fr 360px' : '346px 1fr',
             gap: '14px',
             padding: '0px 14px 14px',
             transition: 'grid-template-columns 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -3414,47 +3430,29 @@ export default function SessionPageClient({
           </main>
           </section>
 
-          {/* Right card: Comment panel */}
-          {(isCommentPanelOpen || activeThreadId != null) && (
-            <aside
-              className="flex flex-col min-h-0 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300"
-              style={{ animationTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)' }}
-            >
-              <div className="flex flex-col flex-1 min-h-0 bg-[var(--surface)] rounded-[14px] overflow-hidden" style={{ boxShadow: 'var(--shadow-panel)' }}>
-                <CommentPanel
-                  variant="sidebar"
-                  isOpen
-                  onClose={() => {
-                    setActiveThreadId(null);
-                    setIsCommentPanelOpen(false);
-                    setIsCommentMode(false);
-                  }}
-                  selectedTicketId={effectiveSelectedId}
-                  comments={comments}
-                  loading={loadingComments}
-                  threadCounts={displayCommentThreadCounts}
-                  sendReply={sendReply}
-                  sendComment={sendComment}
-                  activeThreadId={activeThreadId}
-                  onSelectThread={setActiveThreadId}
-                  currentUserId={authUid}
-                  currentUserInitial={firstName ? firstName.charAt(0).toUpperCase() : "?"}
-                  currentUserName={displayName || undefined}
-                  currentUserAvatarUrl={avatarUrl || authPhotoUrl || undefined}
-                  updateComment={updateComment}
-                  deleteComment={deleteComment}
-                  onReactionsChanged={handleReactionsChanged}
-                  participants={participants}
-                  showToast={showToast}
-                  onNavigateToTicket={(fid: string) =>
-                    trySwitchToTicket(fid, () => setSelectedId(fid))
-                  }
-                  onAnimatePin={triggerPinAnimation}
-                  animatingCommentId={animatingCommentId}
-                />
-              </div>
-            </aside>
-          )}
+          {/* Right card: per-ticket Activity timeline (Phase 26.1).
+              Replaces the old CommentPanel — comments now live in the
+              middle panel (ExecutionView). */}
+          {(isActivityPanelOpen || activeThreadId != null) &&
+            effectiveSelectedId &&
+            effectiveWorkspaceId && (
+              <aside
+                className="flex flex-col min-h-0 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300"
+                style={{ animationTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)' }}
+              >
+                <div className="flex flex-col flex-1 min-h-0 bg-[var(--surface)] rounded-[14px] overflow-hidden" style={{ boxShadow: 'var(--shadow-panel)' }}>
+                  <TicketActivityPanel
+                    workspaceId={effectiveWorkspaceId as string}
+                    feedbackId={effectiveSelectedId}
+                    onClose={() => {
+                      setActiveThreadId(null);
+                      setIsActivityPanelOpen(false);
+                      setIsCommentMode(false);
+                    }}
+                  />
+                </div>
+              </aside>
+            )}
         </div>
       </div>
 
