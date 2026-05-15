@@ -9,7 +9,7 @@ import type { FeedbackItemShape } from "@/components/session/feedbackDetail/type
 import type { ShareSurfacePermissions } from "@/lib/access/resolveAccess";
 import type { Priority } from "@/lib/domain/feedback";
 import {
-  SquareKanban,
+  CalendarCheck2,
   Check,
   Clock,
   Lock,
@@ -352,7 +352,7 @@ export function SessionFeedbackHeader({
                   onClick={gateComment}
                   aria-label="Open activity"
                 >
-                  <SquareKanban size={14} strokeWidth={1.5} />
+                  <CalendarCheck2 size={14} strokeWidth={1.5} />
                   Activity
                 </button>
               </>
@@ -401,7 +401,7 @@ export function SessionFeedbackHeader({
                     className={`${actionBtn} opacity-60 cursor-not-allowed`}
                     aria-label="Open activity"
                   >
-                    <SquareKanban size={14} strokeWidth={1.5} />
+                    <CalendarCheck2 size={14} strokeWidth={1.5} />
                     Activity
                   </button>
                 ) : isAnonymousViewer ? (
@@ -415,7 +415,7 @@ export function SessionFeedbackHeader({
                     className={actionBtn}
                     aria-label="Open activity"
                   >
-                    <SquareKanban size={14} strokeWidth={1.5} />
+                    <CalendarCheck2 size={14} strokeWidth={1.5} />
                     Activity
                   </button>
                 ) : null}
@@ -561,7 +561,7 @@ export function SessionFeedbackHeader({
                   aria-pressed={isActivityPanelOpen}
                   aria-label={isActivityPanelOpen ? "Close activity panel" : "Open activity panel"}
                 >
-                  <SquareKanban size={14} strokeWidth={1.5} />
+                  <CalendarCheck2 size={14} strokeWidth={1.5} />
                   Activity
                 </button>
               ) : null}

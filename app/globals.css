@@ -593,6 +593,406 @@ button[aria-disabled="true"],
   animation: activity-expand-dot 1s ease-in-out infinite;
 }
 
+/* ── Phase 28.3: Timeline-anchored single-line activity feed ──
+   Two-element left anchor per row: 26px vibrant event-icon SQUARE +
+   26px actor avatar CIRCLE, threaded by a 1px vertical connector that
+   runs behind both (white rings make it look threaded). Each row is
+   ONE line; an optional detail row (mention preview / replies) spans
+   the body+time columns. Colors map to styles/tokens.css. */
+.activity-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 32px 32px 1fr auto;
+  grid-template-areas:
+    "icon avatar body time"
+    ".    .      detail detail";
+  gap: 5px 14px;
+  padding: 14px 10px 14px 0;
+  border-radius: 9px;
+  align-items: center;
+  transition: background 100ms ease;
+}
+
+.activity-row > .badge-wrap { grid-area: icon; }
+.activity-row > .activity-row-avatar { grid-area: avatar; }
+.activity-row > .activity-row-body { grid-area: body; min-width: 0; }
+.activity-row > .activity-row-time { grid-area: time; }
+.activity-row > .activity-row-detail {
+  grid-area: detail;
+  margin-top: 5px;
+  min-width: 0;
+}
+
+.activity-row:hover {
+  background: rgba(0, 0, 0, 0.018);
+}
+
+/* Vertical connector — threads through the x-center of the 32px badge
+   column. col1 starts at row's content edge (0 left padding); the
+   badge halo is the full 32px so its center is 16px. The badge's own
+   SVG halo (full 32px circle) masks the line where it passes behind,
+   so the line can start under the badge. top = row padding (14) +
+   32px badge + ~3px gap. :not(:last-child) so the last row has no
+   trailing spine. */
+.activity-row:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 16px;
+  top: 49px;
+  bottom: -2px;
+  width: 1.5px;
+  background: rgba(0, 0, 0, 0.06);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* The badge wrapper: its SVG halo (full 32px) is its own white ring —
+   no CSS border needed. The avatar is a solid circle, so it still
+   needs a surface-colored ring so the connector threads behind it. */
+.activity-row > .badge-wrap {
+  position: relative;
+  z-index: 1;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition: transform 200ms ease;
+}
+
+.activity-row > .activity-row-avatar {
+  position: relative;
+  z-index: 1;
+  border: 2px solid var(--surface-card);
+  box-sizing: border-box;
+  transition: transform 200ms ease;
+}
+
+/* Hover: badge + avatar scale together — subtle life, no layout shift. */
+.activity-row:hover > .badge-wrap,
+.activity-row:hover > .activity-row-avatar {
+  transform: scale(1.06);
+}
+
+/* Copy container — self-sufficient flex so it also lays out correctly
+   inside expanded "Show all" sub-rows (which live in .activity-row-detail,
+   not .activity-row-body). */
+.activity-copy {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-body);
+}
+
+/* Main row only: single line with truncation. Sub-rows are allowed to
+   wrap (set above) for readability in the expanded list. */
+.activity-row-body .activity-copy {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.activity-copy .activity-actor {
+  color: var(--text-heading);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.activity-copy .ev-verb {
+  color: var(--text-body);
+  flex-shrink: 0;
+}
+
+.activity-copy .ev-sep {
+  color: var(--text-placeholder);
+  font-size: 13px;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+.activity-copy .ev-plain {
+  color: var(--text-body);
+  flex-shrink: 0;
+}
+
+/* ── Pills ── */
+.activity-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px 3px 7px;
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text-heading);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 100ms ease;
+  max-width: 340px;
+  overflow: hidden;
+  white-space: nowrap;
+  flex-shrink: 1;
+  min-width: 0;
+  text-decoration: none;
+}
+.activity-pill:hover {
+  background: rgba(0, 0, 0, 0.07);
+}
+.activity-pill .activity-pill-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.activity-pill .activity-pill-lead {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+/* Ticket pill: neutral gray body; the mini event-colour square (inline
+   styled in TicketPill) carries the colour. Tighter left padding hugs
+   the 18px square. (Phase 28.5) */
+.activity-pill-ticket {
+  gap: 6px;
+  padding: 3px 9px 3px 3px;
+}
+
+/* Session pill: whole pill inherits the event colour. background + color
+   are set inline from the event colour (dynamic); hover is driven in JS
+   in SessionPill since an inline background can't be overridden by a CSS
+   :hover rule. (Phase 28.5) */
+.activity-pill-session {
+  gap: 6px;
+  padding: 3px 10px;
+  font-size: 13.5px;
+  max-width: 240px;
+}
+
+.activity-pill-mention {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px 2px 4px;
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+  color: var(--brand);
+  border-radius: 5px;
+  font-size: 13.5px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+/* ── Detail row: mention preview + replies ── */
+.activity-mention-preview {
+  padding: 10px 14px 10px 16px;
+  background: color-mix(in srgb, var(--brand) 5%, transparent);
+  border-radius: 8px;
+  border-left: 3px solid var(--brand);
+  font-size: 14px;
+  color: var(--text-body);
+  line-height: 1.5;
+  max-width: 620px;
+}
+.activity-mention-preview .activity-mention-tag {
+  color: var(--brand);
+  font-weight: 500;
+}
+
+.activity-grouped-toggle {
+  margin-top: 5px;
+  background: transparent;
+  border: 0;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  font-weight: 500;
+  padding: 4px 10px 4px 7px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.activity-grouped-toggle:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text-heading);
+}
+
+/* ── Time + hover actions ── */
+.activity-row-time {
+  font-size: 13px;
+  color: var(--text-placeholder);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding-right: 6px;
+  transition: opacity 100ms ease;
+}
+
+/* On row hover the action buttons take over the right side — hide the
+   top-level time entirely so it doesn't bleed through behind them.
+   visibility:hidden fully removes it from paint while preserving its
+   grid column (no layout shift). Scoped to the direct grid child so
+   expanded sub-row times stay visible. */
+.activity-row:hover > .activity-row-time {
+  visibility: hidden;
+}
+
+.activity-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 100ms ease;
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--surface-card) 18%,
+    var(--surface-card) 100%
+  );
+  padding-left: 24px;
+  z-index: 2;
+}
+.activity-row:hover .activity-row-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+.activity-row-actions button {
+  padding: 6px 11px;
+  background: rgba(0, 0, 0, 0.04);
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-body);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 100ms ease;
+}
+.activity-row-actions button:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--text-heading);
+}
+.activity-row-actions a {
+  text-decoration: none;
+}
+
+/* ── Day section divider — separates "Yesterday" / "This week" / etc.
+   The top-most section gets no divider. ── */
+.activity-day-section {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 8px;
+}
+.activity-day-section--first {
+  border-top: none;
+  padding-top: 0;
+}
+
+/* ── Day label — centered pill ── */
+.activity-day-pillrow {
+  text-align: center;
+  padding: 22px 0 14px;
+}
+.activity-day-pillrow:first-child {
+  padding-top: 6px;
+}
+.activity-day-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-body);
+  background: rgba(0, 0, 0, 0.04);
+  padding: 5px 13px 5px 15px;
+  border-radius: 999px;
+  margin: 0;
+}
+.activity-day-label .activity-day-icon {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+/* ── Filter bar — underline tabs ── */
+.activity-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  border-bottom: 0.5px solid rgba(0, 0, 0, 0.08);
+  /* No wrap: tabs on the left, scope dropdowns pinned to the right edge
+     on the SAME line. If truly cramped, scroll horizontally rather than
+     stack the dropdowns onto their own line.
+
+     overflow MUST stay visible here: the scope dropdowns open downward
+     (absolute, top-full) and would be clipped by any overflow:auto/hidden
+     on this bar — overflow-x:auto forces overflow-y to auto too, trapping
+     them behind the feed below regardless of z-index. Horizontal scroll
+     for the cramped-tab edge case is delegated to the inner tab strip. */
+  flex-wrap: nowrap;
+  overflow: visible;
+}
+/* Scope dropdowns (All sessions · Members) ride the right edge of the
+   same tab bar. margin-left:auto pushes them past the tabs; the bar's
+   own align-items:center keeps the 34px pills centered against the
+   ~42px-tall underline tabs. nowrap keeps both pills on one line. */
+.activity-scope-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+
+.activity-filter-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 7px;
+  padding: 12px 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: color 100ms ease;
+}
+.activity-filter-tab:hover:not(.is-active) {
+  color: var(--text-heading);
+}
+.activity-filter-tab.is-active {
+  color: var(--text-heading);
+  font-weight: 600;
+}
+/* Active underline — matches Settings nav: 3px brand bar, rounded ends */
+.activity-filter-tab.is-active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.5px;
+  height: 3px;
+  background: var(--brand);
+  border-radius: 9999px;
+}
+.activity-filter-tab .activity-filter-count {
+  color: var(--text-placeholder);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+}
+
 /* ======================================
    HOMEPAGE DASHBOARD — BRAND LOADER (CSS)
 ====================================== */

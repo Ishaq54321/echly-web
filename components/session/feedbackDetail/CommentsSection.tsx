@@ -818,6 +818,7 @@ export function CommentsSection({
             <div
               role="button"
               tabIndex={0}
+              data-comment-composer
               className="flex items-center gap-3 border border-[var(--hair-strong)] rounded-[var(--radius-md)] px-4 bg-white transition-colors duration-150 cursor-text hover:border-[var(--border-strong)]"
               style={{ minHeight: 56 }}
               onClick={() => setComposeExpanded(true)}
@@ -866,7 +867,10 @@ export function CommentsSection({
               </span>
             </div>
           ) : (
-            <div className="rounded-[var(--radius-md)] bg-white border border-[var(--hair-strong)] overflow-hidden focus-within:border-[var(--border-strong)] transition-colors duration-150">
+            <div
+              data-comment-composer
+              className="rounded-[var(--radius-md)] bg-white border border-[var(--hair-strong)] overflow-hidden focus-within:border-[var(--border-strong)] transition-colors duration-150"
+            >
               <div className="flex items-start gap-3 px-4 pt-4">
                 <div className="w-[26px] h-[26px] rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold text-[10.5px] flex items-center justify-center shrink-0 overflow-hidden mt-0.5">
                   {currentUserAvatarUrl && !avatarError ? (

@@ -1,40 +1,46 @@
 "use client";
 
 import { memo, useCallback } from "react";
-import type { ReactNode } from "react";
+import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, ChevronDown, ExternalLink, RotateCcw } from "lucide-react";
+import {
+  ArrowUpRight,
+  ChevronDown,
+  Layers,
+  MessageCircle,
+} from "lucide-react";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import {
   groupPreviewEvents,
   type ActivityEvent,
   type GroupedActivity,
 } from "@/lib/activity/groupEvents";
-import { getTier, eventIconMap } from "@/components/activity/eventIcons";
+import { isPersonalMention } from "@/components/activity/eventIcons";
+import { EventBadge, getEventColor } from "./EventBadge";
 
 // ─── Metadata helpers ────────────────────────────────────────────────────────
 
-function feedbackTitleFromMeta(meta?: Record<string, unknown>): string | null {
+function metaStr(meta: Record<string, unknown> | undefined, keys: string[]): string | null {
   if (!meta) return null;
-  for (const k of ["feedbackTitle", "title"] as const) {
+  for (const k of keys) {
     const v = meta[k];
     if (typeof v === "string" && v.trim()) return v.trim();
   }
   return null;
+}
+
+function feedbackTitleFromMeta(meta?: Record<string, unknown>): string | null {
+  const v = metaStr(meta, ["feedbackTitle", "title"]);
+  return v ? v.replace(/^#\s*/, "") : null;
 }
 
 function sessionTitleFromMeta(meta?: Record<string, unknown>): string | null {
-  if (!meta) return null;
-  for (const k of ["sessionTitle", "sessionName"] as const) {
-    const v = meta[k];
-    if (typeof v === "string" && v.trim()) return v.trim();
-  }
-  return null;
+  return metaStr(meta, ["sessionTitle", "sessionName"]);
 }
 
-function commentPreviewFromMetadata(meta?: Record<string, unknown>): string | null {
-  if (!meta) return null;
-  for (const k of [
+function commentPreviewFromMeta(meta?: Record<string, unknown>): string | null {
+  return metaStr(meta, [
     "commentText",
     "commentBody",
     "commentPreview",
@@ -43,459 +49,420 @@ function commentPreviewFromMetadata(meta?: Record<string, unknown>): string | nu
     "text",
     "preview",
     "snippet",
-  ] as const) {
-    const v = meta[k];
-    if (typeof v === "string" && v.trim()) return v.trim();
-  }
-  return null;
+  ]);
 }
 
-/** Compact time formatter for expanded sub-items inside a group. */
-function fmtTime(ms: number | null): string {
-  if (ms == null || !Number.isFinite(ms)) return "";
-  const diff = Math.max(0, (Date.now() - ms) / 1000);
-  if (diff < 45) return "Just now";
-  if (diff < 3600) return `${Math.max(1, Math.floor(diff / 60))} min ago`;
-  if (diff < 86400) return `${Math.max(1, Math.floor(diff / 3600))}h ago`;
-  const d = new Date(ms);
-  const n = new Date();
-  const dd = Math.round(
-    (new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime() -
-      new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()) /
-      86400000
-  );
-  if (dd === 1) return "Yesterday";
-  return d.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: d.getFullYear() !== n.getFullYear() ? "numeric" : undefined,
-  });
+function targetUserName(meta?: Record<string, unknown>): string | null {
+  return metaStr(meta, ["targetName", "targetUserName", "targetEmail", "requesterName", "requesterEmail"]);
 }
 
-/** Subtle left accent for comment preview only (not titles). */
-function ActivityContextBlock({ children }: { children: ReactNode }) {
+function targetUserId(meta?: Record<string, unknown>): string | null {
+  return metaStr(meta, ["targetUserId", "targetUid", "requesterUid", "requesterId"]);
+}
+
+// ─── Navigation hrefs (codebase convention: /session/{sid}?ticket={fid}) ──────
+
+function feedbackHref(sessionId: string | null, feedbackId: string | null): string | null {
+  const sid = sessionId?.trim();
+  if (!sid) return null;
+  const fid = feedbackId?.trim();
+  return fid
+    ? `/session/${encodeURIComponent(sid)}?ticket=${encodeURIComponent(fid)}`
+    : `/session/${encodeURIComponent(sid)}`;
+}
+
+function replyHref(ev: ActivityEvent): string | null {
+  const sid = ev.sessionId?.trim();
+  const fid = ev.feedbackId?.trim();
+  const cid = ev.commentId?.trim();
+  if (!sid || !fid || !cid) return feedbackHref(ev.sessionId, ev.feedbackId ?? null);
   return (
-    <div className="relative mt-2 pl-4">
-      <div
-        className="absolute bottom-0 left-0 top-0 w-[2px] rounded-full bg-[var(--brand)]/60"
-        aria-hidden
-      />
-      <div className="py-1">{children}</div>
-    </div>
+    `/session/${encodeURIComponent(sid)}` +
+    `?ticket=${encodeURIComponent(fid)}` +
+    `&comment=${encodeURIComponent(cid)}` +
+    `&action=reply`
   );
 }
 
-/** Same semantic color as the row body; weight carries hierarchy. */
-const FEEDBACK_TITLE_EMPHASIS = "font-medium text-[var(--text-heading)]";
+// ─── Pills ───────────────────────────────────────────────────────────────────
 
-/** Display string for inline feedback title; primary titles include a # prefix when missing. */
-function feedbackTitleDisplay(primaryFromMeta: string | null, fallback: string): string {
-  const p = primaryFromMeta?.trim();
-  if (p) return p.startsWith("#") ? p : `# ${p}`;
-  return fallback.trim();
-}
-
-// ─── Row model ───────────────────────────────────────────────────────────────
-
-type RowModel = {
-  actionPhrase: string;
-  entityLabel: string | null;
-  entityFallback: string;
-  sessionContext: string | null;
-  feedbackId: string | null;
-  sessionId: string | null;
-  previewText: string | null;
-  showPreview: boolean;
-};
-
-function deriveRowModel(ev: ActivityEvent): RowModel {
-  const sid = ev.sessionId?.trim() ?? "";
-  const fid = ev.feedbackId?.trim() ?? "";
-  const meta = ev.metadata;
-  const ft = feedbackTitleFromMeta(meta);
-  const st = sessionTitleFromMeta(meta);
-  const preview =
-    ev.eventType === "comment.added" || ev.eventType === "feedback.created"
-      ? commentPreviewFromMetadata(meta)
-      : null;
-  const showPreview =
-    (ev.eventType === "comment.added" || ev.eventType === "feedback.created") &&
-    Boolean(preview?.trim());
-
-  switch (ev.eventType) {
-    case "comment.added":
-      return {
-        actionPhrase: "commented on",
-        entityLabel: ft,
-        entityFallback: "a feedback",
-        sessionContext: st && st !== ft ? st : null,
-        feedbackId: fid || null,
-        sessionId: sid || null,
-        previewText: preview,
-        showPreview,
-      };
-    case "feedback.created":
-      return {
-        actionPhrase: "created feedback",
-        entityLabel: ft,
-        entityFallback: "a new thread",
-        sessionContext: st && st !== ft ? st : null,
-        feedbackId: fid || null,
-        sessionId: sid || null,
-        previewText: preview,
-        showPreview,
-      };
-    case "feedback.resolved":
-      return {
-        actionPhrase: "resolved",
-        entityLabel: ft,
-        entityFallback: "an issue",
-        sessionContext: st ?? null,
-        feedbackId: fid || null,
-        sessionId: sid || null,
-        previewText: null,
-        showPreview: false,
-      };
-    case "feedback.reopened":
-      return {
-        actionPhrase: "reopened",
-        entityLabel: ft,
-        entityFallback: "an issue",
-        sessionContext: st ?? null,
-        feedbackId: fid || null,
-        sessionId: sid || null,
-        previewText: null,
-        showPreview: false,
-      };
-    case "session.created":
-      return {
-        actionPhrase: "created a new session",
-        entityLabel: null,
-        entityFallback: "",
-        sessionContext: null,
-        feedbackId: null,
-        sessionId: sid || null,
-        previewText: null,
-        showPreview: false,
-      };
-    case "session.archived":
-      return {
-        actionPhrase: "archived",
-        entityLabel: st,
-        entityFallback: "a session",
-        sessionContext: null,
-        feedbackId: null,
-        sessionId: sid || null,
-        previewText: null,
-        showPreview: false,
-      };
-    case "invite.sent": {
-      const email = (ev.metadata?.email as string | undefined) ?? "";
-      const sessionTitle = (ev.metadata?.sessionTitle as string | undefined) ?? "";
-      return {
-        actionPhrase: `invited ${email} to`,
-        entityLabel: null,
-        entityFallback: "",
-        sessionContext: sessionTitle || null,
-        feedbackId: null,
-        sessionId: sid || null,
-        previewText: null,
-        showPreview: false,
-      };
-    }
-    case "invite.accepted": {
-      const sessionTitle = (ev.metadata?.sessionTitle as string | undefined) ?? "";
-      return {
-        actionPhrase: "joined",
-        entityLabel: null,
-        entityFallback: "",
-        sessionContext: sessionTitle || null,
-        feedbackId: null,
-        sessionId: sid || null,
-        previewText: null,
-        showPreview: false,
-      };
-    }
-    case "session.member.added": {
-      const source = (ev.metadata?.source as string | undefined) ?? "";
-      const targetName =
-        (ev.metadata?.targetName as string | undefined) ||
-        (ev.metadata?.targetEmail as string | undefined) ||
-        "a user";
-      const accessLevel = (ev.metadata?.accessLevel as string | undefined) ?? "";
-      const sessionTitle = (ev.metadata?.sessionTitle as string | undefined) ?? "";
-      const accessLabel = accessLevel === "resolve" ? "resolve" : "view";
-
-      if (source === "invite_redemption") {
-        return {
-          actionPhrase: "joined",
-          entityLabel: null,
-          entityFallback: "",
-          sessionContext: sessionTitle || null,
-          feedbackId: null,
-          sessionId: sid || null,
-          previewText: null,
-          showPreview: false,
-        };
-      }
-
-      return {
-        actionPhrase: `granted ${targetName} ${accessLabel} access to`,
-        entityLabel: null,
-        entityFallback: "",
-        sessionContext: sessionTitle || null,
-        feedbackId: null,
-        sessionId: sid || null,
-        previewText: null,
-        showPreview: false,
-      };
-    }
-    case "session.member.removed": {
-      const targetName =
-        (ev.metadata?.targetName as string | undefined) ||
-        (ev.metadata?.targetEmail as string | undefined) ||
-        "a user";
-      const sessionTitle = (ev.metadata?.sessionTitle as string | undefined) ?? "";
-      return {
-        actionPhrase: `removed ${targetName} from`,
-        entityLabel: null,
-        entityFallback: "",
-        sessionContext: sessionTitle || null,
-        feedbackId: null,
-        sessionId: sid || null,
-        previewText: null,
-        showPreview: false,
-      };
-    }
-    case "session.member.role_changed": {
-      const targetName =
-        (ev.metadata?.targetName as string | undefined) ||
-        (ev.metadata?.targetEmail as string | undefined) ||
-        "a user";
-      const prev = (ev.metadata?.previousAccess as string | undefined) ?? "";
-      const next = (ev.metadata?.newAccess as string | undefined) ?? "";
-      const sessionTitle = (ev.metadata?.sessionTitle as string | undefined) ?? "";
-      const prevLabel = prev === "resolve" ? "resolve" : "view";
-      const nextLabel = next === "resolve" ? "resolve" : "view";
-      return {
-        actionPhrase: `changed ${targetName}'s access from ${prevLabel} to ${nextLabel} in`,
-        entityLabel: null,
-        entityFallback: "",
-        sessionContext: sessionTitle || null,
-        feedbackId: null,
-        sessionId: sid || null,
-        previewText: null,
-        showPreview: false,
-      };
-    }
-    case "access_request.approved": {
-      const requesterName =
-        (ev.metadata?.requesterName as string | undefined) ||
-        (ev.metadata?.requesterEmail as string | undefined) ||
-        "someone";
-      const sessionTitle = (ev.metadata?.sessionTitle as string | undefined) ?? "";
-      return {
-        actionPhrase: `approved ${requesterName}'s access request for`,
-        entityLabel: null,
-        entityFallback: "",
-        sessionContext: sessionTitle || null,
-        feedbackId: null,
-        sessionId: sid || null,
-        previewText: null,
-        showPreview: false,
-      };
-    }
-    case "access_request.rejected": {
-      const requesterName =
-        (ev.metadata?.requesterName as string | undefined) ||
-        (ev.metadata?.requesterEmail as string | undefined) ||
-        "someone";
-      const sessionTitle = (ev.metadata?.sessionTitle as string | undefined) ?? "";
-      return {
-        actionPhrase: `rejected ${requesterName}'s access request for`,
-        entityLabel: null,
-        entityFallback: "",
-        sessionContext: sessionTitle || null,
-        feedbackId: null,
-        sessionId: sid || null,
-        previewText: null,
-        showPreview: false,
-      };
-    }
-    case "session.settings_changed":
-      return {
-        actionPhrase: "updated session settings",
-        entityLabel: null,
-        entityFallback: "",
-        sessionContext: st ?? null,
-        feedbackId: null,
-        sessionId: sid || null,
-        previewText: null,
-        showPreview: false,
-      };
-    case "session.deleted": {
-      const sessionTitle = ev.metadata?.sessionTitle as string ?? "a session";
-      return {
-        actionPhrase: "deleted a session",
-        entityLabel: sessionTitle,
-        entityFallback: "a session",
-        sessionContext: null,
-        feedbackId: null,
-        sessionId: sid || null,
-        previewText: null,
-        showPreview: false,
-      };
-    }
-    case "feedback.deleted": {
-      const feedbackTitle = ev.metadata?.feedbackTitle as string ?? "a feedback item";
-      const sessionTitle = ev.metadata?.sessionTitle as string ?? "";
-      return {
-        actionPhrase: "deleted feedback",
-        entityLabel: feedbackTitle,
-        entityFallback: "a feedback item",
-        sessionContext: sessionTitle || null,
-        feedbackId: null,
-        sessionId: sid || null,
-        previewText: null,
-        showPreview: false,
-      };
-    }
-    default:
-      return {
-        actionPhrase: "recorded activity",
-        entityLabel: null,
-        entityFallback: "",
-        sessionContext: st ?? null,
-        feedbackId: null,
-        sessionId: sid || null,
-        previewText: null,
-        showPreview: false,
-      };
-  }
-}
-
-function deriveGroupRowModel(g: Extract<GroupedActivity, { type: "group" }>): RowModel {
-  const preview = groupPreviewEvents(g);
-  const first = preview[0]!;
-  const firstWithFeedback = preview.find((e) => e.feedbackId?.trim());
-  const sid = (first?.sessionId ?? g.sessionId)?.trim() ?? "";
-  const fid = firstWithFeedback?.feedbackId?.trim() ?? "";
-  const meta = firstWithFeedback?.metadata ?? first?.metadata;
-  const ft = feedbackTitleFromMeta(meta);
-  const st = sessionTitleFromMeta(meta);
-
-  let previewText: string | null = null;
-  if (g.eventType === "comment.added") {
-    for (const e of preview) {
-      const p = commentPreviewFromMetadata(e.metadata);
-      if (p) {
-        previewText = p;
-        break;
-      }
-    }
-  } else if (g.eventType === "feedback.created") {
-    for (const e of preview) {
-      const p = feedbackTitleFromMeta(e.metadata);
-      if (p) {
-        previewText = p;
-        break;
-      }
-    }
-  }
-
-  if (g.eventType === "comment.added") {
-    return {
-      actionPhrase: `added ${g.count} comments on`,
-      entityLabel: ft,
-      entityFallback: "a feedback",
-      sessionContext: st && st !== ft ? st : null,
-      feedbackId: fid || null,
-      sessionId: sid || null,
-      previewText,
-      showPreview: Boolean(previewText?.trim()),
-    };
-  }
-  if (g.eventType === "feedback.created") {
-    return {
-      actionPhrase: `created ${g.count} feedback items in`,
-      entityLabel: st,
-      entityFallback: "a session",
-      sessionContext: null,
-      feedbackId: null,
-      sessionId: sid || null,
-      previewText,
-      showPreview: Boolean(previewText?.trim()),
-    };
-  }
-  return {
-    actionPhrase: `recorded ${g.count} events`,
-    entityLabel: null,
-    entityFallback: "",
-    sessionContext: st ?? null,
-    feedbackId: null,
-    sessionId: sid || null,
-    previewText: null,
-    showPreview: false,
-  };
-}
-
-// ─── State pills ─────────────────────────────────────────────────────────────
-
-const PILL_STYLES: Record<string, { label: string; className: string; icon?: "check" | "reopen" }> = {
-  "feedback.resolved": {
-    label: "Resolved",
-    className: "bg-[var(--color-success-bg)] text-[var(--color-success)] border-[var(--color-success-border)]",
-    icon: "check",
-  },
-  "feedback.reopened": {
-    label: "Reopened",
-    className: "bg-[var(--color-warning-bg)] text-[var(--color-warning-text)] border-[var(--color-warning-border)]",
-    icon: "reopen",
-  },
-  "feedback.created": {
-    label: "New",
-    className: "bg-[var(--color-insight-bg)] text-[var(--color-insight)] border-[var(--color-insight-border)]",
-  },
-  "session.created": {
-    label: "Session",
-    className: "bg-[var(--color-info-bg)] text-[var(--color-info)] border-[var(--color-info-border)]",
-  },
-  "session.archived": {
-    label: "Archived",
-    className: "bg-[var(--surface-hover)] text-[var(--text-secondary)] border-[var(--border)]",
-  },
-  "access_request.approved": {
-    label: "Approved",
-    className: "bg-[var(--color-success-bg)] text-[var(--color-success)] border-[var(--color-success-border)]",
-    icon: "check",
-  },
-  "access_request.rejected": {
-    label: "Rejected",
-    className: "bg-[var(--color-danger-bg)] text-[var(--color-danger)] border-[var(--color-danger-border)]",
-  },
-};
-
-function StatePill({ eventType }: { eventType: string }) {
-  const pill = PILL_STYLES[eventType];
-  if (!pill) return null;
+/** Tiny "this is a ticket" glyph for the mini-square inside TicketPill.
+ *  The square's COLOR carries the event meaning; this glyph just signals
+ *  "a ticket" — one consistent symbol keeps the row calm. */
+function TicketIcon({ size = 11 }: { size?: number }) {
   return (
-    <span
-      className={`inline-flex items-center gap-1 text-[12px] font-medium rounded-full px-2.5 py-0.5 border ${pill.className}`}
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 12 12"
+      fill="none"
+      aria-hidden="true"
     >
-      {pill.icon === "check" && <Check className="h-3 w-3" aria-hidden />}
-      {pill.icon === "reopen" && <RotateCcw className="h-3 w-3" aria-hidden />}
-      {pill.label}
+      {/* Filled dot in the event colour with a white hole — reads as "a thing" */}
+      <circle cx="6" cy="6" r="4.5" fill="currentColor" />
+      <circle cx="6" cy="6" r="1.6" fill="#FFFFFF" />
+    </svg>
+  );
+}
+
+function TicketPill({
+  event,
+  eventColor,
+  fallbackText,
+}: {
+  event: ActivityEvent;
+  eventColor: string;
+  fallbackText?: string | null;
+}) {
+  const title =
+    feedbackTitleFromMeta(event.metadata) ||
+    fallbackText?.trim() ||
+    "untitled ticket";
+  const href = feedbackHref(event.sessionId, event.feedbackId ?? null);
+  // Soft halo for the mini-icon, derived from the event colour (echoes
+  // the big badge's 12–14% halo at small scale).
+  const iconBg = `color-mix(in srgb, ${eventColor} 14%, transparent)`;
+  const inner = (
+    <>
+      {/* Mini event-colour square — echoes the big badge anatomy */}
+      <span
+        aria-hidden="true"
+        style={{
+          width: 18,
+          height: 18,
+          borderRadius: 5,
+          background: iconBg,
+          color: eventColor,
+          display: "grid",
+          placeItems: "center",
+          flexShrink: 0,
+        }}
+      >
+        <TicketIcon size={11} />
+      </span>
+      <span className="activity-pill-label">{title}</span>
+    </>
+  );
+  if (!href) {
+    return (
+      <span className="activity-pill activity-pill-ticket" title={title}>
+        {inner}
+      </span>
+    );
+  }
+  return (
+    <Link
+      href={href}
+      className="activity-pill activity-pill-ticket"
+      title={title}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {inner}
+    </Link>
+  );
+}
+
+function SessionPill({
+  event,
+  eventColor,
+}: {
+  event: ActivityEvent;
+  eventColor: string;
+}) {
+  const name = sessionTitleFromMeta(event.metadata) || "a session";
+  const sid = event.sessionId?.trim();
+  // Whole pill inherits the event colour: soft tinted fill + matching text.
+  // Hover is driven in JS because the resting background is an inline style
+  // (dynamic colour) and an inline style can't be overridden by a CSS :hover.
+  const bg = `color-mix(in srgb, ${eventColor} 8%, transparent)`;
+  const bgHover = `color-mix(in srgb, ${eventColor} 14%, transparent)`;
+  const style = { background: bg, color: eventColor } as CSSProperties;
+  const onEnter = (e: ReactMouseEvent<HTMLElement>) => {
+    e.currentTarget.style.background = bgHover;
+  };
+  const onLeave = (e: ReactMouseEvent<HTMLElement>) => {
+    e.currentTarget.style.background = bg;
+  };
+  const inner = <span className="activity-pill-label">{name}</span>;
+  if (!sid) {
+    return (
+      <span
+        className="activity-pill activity-pill-session"
+        title={name}
+        style={style}
+        onMouseEnter={onEnter}
+        onMouseLeave={onLeave}
+      >
+        {inner}
+      </span>
+    );
+  }
+  return (
+    <Link
+      href={`/session/${encodeURIComponent(sid)}`}
+      className="activity-pill activity-pill-session"
+      title={name}
+      style={style}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {inner}
+    </Link>
+  );
+}
+
+function MentionPill({ uid, name }: { uid?: string | null; name?: string | null }) {
+  if (!uid && !name) return <span className="ev-plain">someone</span>;
+  return (
+    <span className="activity-pill-mention">
+      <UserAvatar size={17} colorSeed={uid || name || ""} name={name ?? null} />
+      <span>{name ?? "someone"}</span>
     </span>
   );
 }
 
-// ─── @mention highlight ──────────────────────────────────────────────────────
+function SessionSep() {
+  return <span className="ev-sep ev-sep-in">in</span>;
+}
 
-function renderMentions(text: string): ReactNode {
+// ─── Event copy (one line) ───────────────────────────────────────────────────
+
+function renderActionAndTargets(
+  event: ActivityEvent,
+  isGroup: boolean,
+  groupCount: number,
+  eventColor: string
+): ReactNode {
+  const meta = event.metadata;
+  const hasSession = Boolean(event.sessionId?.trim());
+  const sessionPart = hasSession ? (
+    <>
+      <SessionSep />
+      <SessionPill event={event} eventColor={eventColor} />
+    </>
+  ) : null;
+
+  switch (event.eventType) {
+    case "feedback.created":
+      if (isGroup && groupCount > 1) {
+        return (
+          <>
+            <span className="ev-verb">created</span>
+            <span className="activity-pill" title={`${groupCount} feedback items`}>
+              <Layers size={14} strokeWidth={1.75} className="activity-pill-lead" aria-hidden />
+              <span className="activity-pill-label">{groupCount} feedback items</span>
+            </span>
+            {sessionPart}
+          </>
+        );
+      }
+      return (
+        <>
+          <span className="ev-verb">created</span>
+          <TicketPill event={event} eventColor={eventColor} />
+          {sessionPart}
+        </>
+      );
+
+    case "feedback.resolved":
+      return (
+        <>
+          <span className="ev-verb">resolved</span>
+          <TicketPill event={event} eventColor={eventColor} />
+          {sessionPart}
+        </>
+      );
+
+    case "feedback.reopened":
+      return (
+        <>
+          <span className="ev-verb">reopened</span>
+          <TicketPill event={event} eventColor={eventColor} />
+          {sessionPart}
+        </>
+      );
+
+    case "feedback.deleted":
+      return (
+        <>
+          <span className="ev-verb">deleted</span>
+          <TicketPill
+            event={event}
+            eventColor={eventColor}
+            fallbackText={metaStr(meta, ["feedbackTitle", "title"]) ?? "a feedback item"}
+          />
+          {sessionPart}
+        </>
+      );
+
+    case "comment.added":
+      if (isGroup && groupCount > 1) {
+        return (
+          <>
+            <span className="ev-verb">added {groupCount} comments on</span>
+            <TicketPill event={event} eventColor={eventColor} />
+            {sessionPart}
+          </>
+        );
+      }
+      return (
+        <>
+          <span className="ev-verb">commented on</span>
+          <TicketPill event={event} eventColor={eventColor} />
+          {sessionPart}
+        </>
+      );
+
+    case "session.created":
+      return (
+        <>
+          <span className="ev-verb">created session</span>
+          <SessionPill event={event} eventColor={eventColor} />
+        </>
+      );
+
+    case "session.archived":
+      return (
+        <>
+          <span className="ev-verb">archived</span>
+          <SessionPill event={event} eventColor={eventColor} />
+        </>
+      );
+
+    case "session.deleted":
+      return (
+        <>
+          <span className="ev-verb">deleted session</span>
+          <span className="ev-plain">{sessionTitleFromMeta(meta) ?? "a session"}</span>
+        </>
+      );
+
+    case "session.settings_changed":
+      return (
+        <>
+          <span className="ev-verb">updated settings for</span>
+          <SessionPill event={event} eventColor={eventColor} />
+        </>
+      );
+
+    case "session.member.added":
+    case "invite.accepted": {
+      const source = metaStr(meta, ["source"]);
+      if (source === "invite_redemption" || event.eventType === "invite.accepted") {
+        return (
+          <>
+            <span className="ev-verb">joined</span>
+            {hasSession ? <SessionPill event={event} eventColor={eventColor} /> : <span className="ev-plain">the workspace</span>}
+          </>
+        );
+      }
+      return (
+        <>
+          <span className="ev-verb">added</span>
+          <MentionPill uid={targetUserId(meta)} name={targetUserName(meta)} />
+          {hasSession ? (
+            <>
+              <span className="ev-plain">to</span>
+              <SessionPill event={event} eventColor={eventColor} />
+            </>
+          ) : null}
+        </>
+      );
+    }
+
+    case "session.member.removed":
+      return (
+        <>
+          <span className="ev-verb">removed</span>
+          <MentionPill uid={targetUserId(meta)} name={targetUserName(meta)} />
+          {hasSession ? (
+            <>
+              <span className="ev-plain">from</span>
+              <SessionPill event={event} eventColor={eventColor} />
+            </>
+          ) : null}
+        </>
+      );
+
+    case "session.member.role_changed":
+      return (
+        <>
+          <span className="ev-verb">changed access for</span>
+          <MentionPill uid={targetUserId(meta)} name={targetUserName(meta)} />
+          {sessionPart}
+        </>
+      );
+
+    case "invite.sent":
+      return (
+        <>
+          <span className="ev-verb">invited</span>
+          <span className="ev-plain" style={{ fontWeight: 500, color: "var(--text-heading)" }}>
+            {metaStr(meta, ["email", "targetEmail"]) ?? "someone"}
+          </span>
+          {hasSession ? (
+            <>
+              <span className="ev-plain">to</span>
+              <SessionPill event={event} eventColor={eventColor} />
+            </>
+          ) : null}
+        </>
+      );
+
+    case "access_request.approved":
+      return (
+        <>
+          <span className="ev-verb">approved access for</span>
+          <MentionPill uid={targetUserId(meta)} name={targetUserName(meta)} />
+          {sessionPart}
+        </>
+      );
+
+    case "access_request.rejected":
+      return (
+        <>
+          <span className="ev-verb">denied access for</span>
+          <MentionPill uid={targetUserId(meta)} name={targetUserName(meta)} />
+          {sessionPart}
+        </>
+      );
+
+    default:
+      return <span className="ev-verb">updated this workspace</span>;
+  }
+}
+
+function EventCopy({
+  actorName,
+  event,
+  isGroup,
+  groupCount,
+  isMention,
+}: {
+  actorName: string;
+  event: ActivityEvent;
+  isGroup: boolean;
+  groupCount: number;
+  isMention: boolean;
+}) {
+  // Single source of truth (EventBadge.tsx) — same colour the big badge uses.
+  const eventColor = getEventColor(event.eventType, isMention);
+  return (
+    <p className="activity-copy">
+      <span className="activity-actor">{actorName}</span>
+      {renderActionAndTargets(event, isGroup, groupCount, eventColor)}
+    </p>
+  );
+}
+
+// ─── @mention highlight in preview bubble ────────────────────────────────────
+
+function renderPreviewWithMentions(text: string): ReactNode {
   const parts = text.split(/(@[\w.-]+)/g);
   return parts.map((part, i) =>
     part.startsWith("@") ? (
-      <span key={i} className="font-medium text-[12px] text-[var(--text-heading)]">
+      <span key={i} className="activity-mention-tag">
         {part}
       </span>
     ) : (
@@ -504,9 +471,27 @@ function renderMentions(text: string): ReactNode {
   );
 }
 
+// ─── Event badge ─────────────────────────────────────────────────────────────
+
+/** Bespoke 32px SVG badge (halo + circle + solid glyph). The SVG's own
+ *  outer halo masks the connector line, so no CSS white-ring is needed. */
+function EventBadgeIcon({
+  eventType,
+  isMention,
+}: {
+  eventType: string;
+  isMention: boolean;
+}) {
+  return (
+    <span className="badge-wrap" aria-hidden>
+      <EventBadge eventType={eventType} isPersonalMention={isMention} size={32} />
+    </span>
+  );
+}
+
 // ─── Props ───────────────────────────────────────────────────────────────────
 
-export type ActivityItemProps =
+export type ActivityItemProps = (
   | {
       kind: "single";
       event: ActivityEvent;
@@ -522,29 +507,53 @@ export type ActivityItemProps =
       onToggleExpand: (g: Extract<GroupedActivity, { type: "group" }>) => void;
       /** Full member list when expanded (preview-only rows use `previewEvents` until lazy load completes). */
       expandListEvents?: ActivityEvent[];
-    };
+    }
+) & {
+  /** Extra classes merged onto the row root (e.g. enter-animation). */
+  className?: string;
+  /** Current viewer uid — drives the personal-mention treatment. */
+  currentUserId?: string | null;
+};
 
 // ─── Component ───────────────────────────────────────────────────────────────
+
+function representativeEvent(props: ActivityItemProps): ActivityEvent {
+  if (props.kind === "single") return props.event;
+  const preview = groupPreviewEvents(props.group);
+  const withFeedback = preview.find((e) => e.feedbackId?.trim());
+  return withFeedback ?? preview[0]!;
+}
 
 function ActivityItemBase(props: ActivityItemProps) {
   const router = useRouter();
 
-  const eventType = props.kind === "single" ? props.event.eventType : props.group.eventType;
-  const tier = getTier(eventType);
+  const eventType =
+    props.kind === "single" ? props.event.eventType : props.group.eventType;
+
+  const event = representativeEvent(props);
 
   const actor =
     props.kind === "single"
       ? props.event.actor
-      : { id: props.group.actorId, name: props.group.actorName, photoURL: undefined as string | undefined };
-
+      : {
+          id: props.group.actorId,
+          name: props.group.actorName,
+          photoURL: props.group.previewEvents?.[0]?.actor?.photoURL,
+        };
   const actorName = actor.name?.trim() || "A teammate";
-  const photoURL =
-    props.kind === "single"
-      ? (props.event.actor.photoURL ?? undefined)
-      : (props.group.previewEvents?.[0]?.actor?.photoURL ?? undefined);
 
-  const row =
-    props.kind === "single" ? deriveRowModel(props.event) : deriveGroupRowModel(props.group);
+  const groupCount = props.kind === "group" ? props.group.count : 1;
+  const isGroup = props.kind === "group";
+
+  const isMention = isPersonalMention(
+    eventType,
+    event.metadata,
+    props.currentUserId ?? null
+  );
+
+  const isComment = eventType === "comment.added";
+  const previewText = isMention ? commentPreviewFromMeta(event.metadata) : null;
+  const showDetail = isMention && Boolean(previewText);
 
   const previewForGroup =
     props.kind === "group" ? groupPreviewEvents(props.group) : null;
@@ -557,16 +566,11 @@ function ActivityItemBase(props: ActivityItemProps) {
 
   const goToFeedback = useCallback(
     (sessionId: string, feedbackId: string) => {
-      const sid = sessionId.trim();
-      const fid = feedbackId.trim();
-      if (sid && fid)
-        router.push(
-          `/session/${encodeURIComponent(sid)}?ticket=${encodeURIComponent(fid)}`
-        );
+      const href = feedbackHref(sessionId, feedbackId);
+      if (href) router.push(href);
     },
     [router]
   );
-
   const goToSession = useCallback(
     (sessionId: string) => {
       const sid = sessionId.trim();
@@ -575,264 +579,193 @@ function ActivityItemBase(props: ActivityItemProps) {
     [router]
   );
 
-  const handleEntityClick =
-    row.feedbackId && row.sessionId
-      ? () => goToFeedback(row.sessionId!, row.feedbackId!)
-      : row.sessionId
-        ? () => goToSession(row.sessionId!)
-        : undefined;
-
-  const entityLabel = (row.entityLabel?.trim() || row.entityFallback).trim();
-  const hasPrimaryEntityTitle = Boolean(row.entityLabel?.trim());
-  const hasEntityChip = tier !== 3 && Boolean(entityLabel);
-  const hasCommentPreview = Boolean(row.showPreview && row.previewText);
-  const inlineTitleText = hasPrimaryEntityTitle
-    ? feedbackTitleDisplay(row.entityLabel, "")
-    : entityLabel;
-  const hasStatePill = tier !== 3 && eventType in PILL_STYLES;
-
-  /** Rows with preview or group chrome stack below the headline; keep cross-axis alignment sensible. */
-  const isTallRow = hasCommentPreview || props.kind === "group";
+  const openHref = feedbackHref(event.sessionId, event.feedbackId ?? null);
+  const rootClass = ["activity-row", "group", props.className]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <div
-      className={`flex w-full gap-3 py-4 ${isTallRow ? "items-start" : "items-center"}`}
-    >
-      {/* Fixed-width avatar column — w-[52px] keeps the timeline spine centred */}
-      <div className="relative z-10 flex w-[52px] shrink-0 justify-center">
-        <div className="relative">
-          <UserAvatar
-            photoURL={photoURL}
-            name={actorName}
-            colorSeed={actor.id || actorName}
-            className="h-9 w-9"
-          />
-        </div>
+    <div className={rootClass} data-event-id={event.id}>
+      {/* Col 1 — bespoke event badge */}
+      <EventBadgeIcon eventType={eventType} isMention={isMention} />
+
+      {/* Col 2 — actor avatar circle */}
+      <UserAvatar
+        avatarUrl={actor.photoURL ?? null}
+        name={actorName}
+        colorSeed={actor.id || actorName}
+        size={32}
+        className="activity-row-avatar"
+      />
+
+      {/* Col 3 — one-line copy */}
+      <div className="activity-row-body">
+        <EventCopy
+          actorName={actorName}
+          event={event}
+          isGroup={isGroup}
+          groupCount={groupCount}
+          isMention={isMention}
+        />
       </div>
 
-      {/* Content */}
-      <div className="min-w-0 flex-1">
-        {/* Action line — timestamp column fixed right */}
-        <div className="flex w-full min-w-0 items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 leading-snug text-[15px]">
-            <span className="text-[var(--text-heading)]">{actorName}</span>
-            <span className="text-[var(--text-heading)]">{row.actionPhrase}</span>
+      {/* Col 4 — time + hover actions */}
+      {props.relativeTime ? (
+        <time
+          className="activity-row-time"
+          dateTime={props.isoTime}
+        >
+          {props.relativeTime}
+        </time>
+      ) : (
+        <span className="activity-row-time" aria-hidden />
+      )}
 
-            {hasEntityChip && entityLabel ? (
-              handleEntityClick ? (
-                <button
-                  type="button"
-                  onClick={handleEntityClick}
-                  className={`inline-flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 text-left underline-offset-2 transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                    hasPrimaryEntityTitle
-                      ? FEEDBACK_TITLE_EMPHASIS
-                      : "font-medium text-[var(--text-secondary)]"
-                  }`}
-                >
-                  <span className="min-w-0 break-words">{inlineTitleText}</span>
-                  <ExternalLink
-                    className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)]"
-                    aria-hidden
-                  />
-                </button>
-              ) : (
-                <span
-                  className={
-                    hasPrimaryEntityTitle
-                      ? FEEDBACK_TITLE_EMPHASIS
-                      : "font-medium text-[var(--text-secondary)]"
-                  }
-                >
-                  {inlineTitleText}
-                </span>
-              )
-            ) : null}
+      <div className="activity-row-actions">
+        {isComment ? (
+          <Link
+            href={replyHref(event) ?? "#"}
+            onClick={(e) => e.stopPropagation()}
+            aria-label="Reply"
+          >
+            <button type="button">
+              <MessageCircle size={13} strokeWidth={1.75} aria-hidden />
+              Reply
+            </button>
+          </Link>
+        ) : null}
+        {openHref ? (
+          <Link
+            href={openHref}
+            onClick={(e) => e.stopPropagation()}
+            aria-label="Open"
+          >
+            <button type="button">
+              <ArrowUpRight size={13} strokeWidth={1.75} aria-hidden />
+              Open
+            </button>
+          </Link>
+        ) : null}
+      </div>
 
-            {hasStatePill && <StatePill eventType={eventType} />}
+      {/* Detail row — personal mention preview + group expand */}
+      {(showDetail || showGroupExpandToggle || (props.kind === "group" && props.isExpanded)) ? (
+        <div className="activity-row-detail">
+          {showDetail && previewText ? (
+            <div className="activity-mention-preview">
+              {renderPreviewWithMentions(previewText)}
+            </div>
+          ) : null}
 
-            {row.sessionContext ? (
-              <span className="text-[15px] text-[var(--text-secondary)]">
-                in {row.sessionContext}
-              </span>
-            ) : null}
-          </div>
-
-          {props.relativeTime ? (
-            <time
-              dateTime={props.isoTime}
-              className="shrink-0 text-right text-sm tabular-nums text-[var(--text-secondary)] whitespace-nowrap"
+          {showGroupExpandToggle && props.kind === "group" ? (
+            <button
+              type="button"
+              aria-expanded={props.isExpanded}
+              onClick={(e) => {
+                e.stopPropagation();
+                props.onToggleExpand(props.group);
+              }}
+              className="activity-grouped-toggle"
             >
-              {props.relativeTime}
-            </time>
+              <ChevronDown
+                size={13}
+                strokeWidth={1.75}
+                style={{
+                  transform: props.isExpanded ? "rotate(180deg)" : "none",
+                  transition: "transform 120ms",
+                }}
+                aria-hidden
+              />
+              {props.isExpanded ? "Show less" : `Show all ${props.group.count}`}
+            </button>
+          ) : null}
+
+          {/* Expanded group sub-items */}
+          {props.kind === "group" && props.isExpanded ? (
+            <div className="mt-2 w-full min-w-0" role="list">
+              {(() => {
+                const g = props.group;
+                const needsRemoteMembers = g.count > g.previewEvents.length;
+                const membersReady =
+                  !needsRemoteMembers || props.expandListEvents !== undefined;
+                const showMembersLoading =
+                  Boolean(g.groupId) && needsRemoteMembers && !membersReady;
+                const list = showMembersLoading
+                  ? []
+                  : (props.expandListEvents ?? g.previewEvents);
+                return (
+                  <>
+                    {showMembersLoading ? (
+                      <div
+                        className="flex items-center gap-1.5 py-2 text-[var(--text-secondary)]"
+                        aria-live="polite"
+                        aria-busy="true"
+                      >
+                        <span className="sr-only">Loading group activity</span>
+                        <span className="inline-flex items-center gap-1 px-0.5" aria-hidden>
+                          <span className="activity-expand-dot" style={{ animationDelay: "0ms" }} />
+                          <span className="activity-expand-dot" style={{ animationDelay: "140ms" }} />
+                          <span className="activity-expand-dot" style={{ animationDelay: "280ms" }} />
+                        </span>
+                      </div>
+                    ) : null}
+                    {list.map((ev) => {
+                      const subIsMention = isPersonalMention(
+                        ev.eventType,
+                        ev.metadata,
+                        props.currentUserId ?? null
+                      );
+                      const subActorName = ev.actor?.name?.trim() || "A teammate";
+                      const subEntityClick =
+                        ev.feedbackId && ev.sessionId
+                          ? () => goToFeedback(ev.sessionId, ev.feedbackId!)
+                          : ev.sessionId
+                            ? () => goToSession(ev.sessionId)
+                            : undefined;
+                      return (
+                        <div
+                          key={ev.id}
+                          role="listitem"
+                          className="grid w-full min-w-0 items-center gap-3 py-2.5"
+                          style={{ gridTemplateColumns: "22px 1fr" }}
+                        >
+                          <span
+                            className="flex h-[22px] w-[22px] items-center justify-center"
+                            aria-hidden
+                          >
+                            <EventBadge
+                              eventType={ev.eventType}
+                              isPersonalMention={subIsMention}
+                              size={22}
+                            />
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              subEntityClick?.();
+                            }}
+                            disabled={!subEntityClick}
+                            className="min-w-0 text-left disabled:cursor-default"
+                          >
+                            <EventCopy
+                              actorName={subActorName}
+                              event={ev}
+                              isGroup={false}
+                              groupCount={1}
+                              isMention={subIsMention}
+                            />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </>
+                );
+              })()}
+            </div>
           ) : null}
         </div>
-
-        {/* Comment preview — blue accent only */}
-        {hasCommentPreview && row.previewText ? (
-          <ActivityContextBlock>
-            <div className="text-sm leading-relaxed text-[var(--text-secondary)] line-clamp-2">
-              {renderMentions(row.previewText)}
-            </div>
-          </ActivityContextBlock>
-        ) : null}
-
-        {/* Group expand toggle — only when more members exist than the preview slice */}
-        {showGroupExpandToggle ? (
-          <button
-            type="button"
-            aria-expanded={props.isExpanded}
-            onClick={(e) => {
-              e.stopPropagation();
-              props.onToggleExpand(props.group);
-            }}
-            className="mt-2 flex w-fit cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-xs text-[var(--text-body)] transition-colors hover:text-[var(--text-heading)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <ChevronDown
-              className={`h-4 w-4 shrink-0 text-[var(--text-heading)] transition-transform duration-150 ${props.isExpanded ? "rotate-180" : ""}`}
-              aria-hidden
-            />
-            {props.isExpanded ? "Show less" : "Show all"}
-          </button>
-        ) : null}
-
-        {/* Expanded group sub-items */}
-        {props.kind === "group" && props.isExpanded ? (
-          <div className="mt-3 w-full min-w-0" role="list">
-            {(() => {
-              const g = props.group;
-              const needsRemoteMembers = g.count > g.previewEvents.length;
-              const membersReady =
-                !needsRemoteMembers || props.expandListEvents !== undefined;
-              const showMembersLoading =
-                Boolean(g.groupId) && needsRemoteMembers && !membersReady;
-              const list = showMembersLoading ? [] : (props.expandListEvents ?? []);
-              return (
-                <>
-                  {showMembersLoading ? (
-                    <div
-                      className="flex items-center gap-1.5 py-2 text-[var(--text-secondary)]"
-                      aria-live="polite"
-                      aria-busy="true"
-                    >
-                      <span className="sr-only">Loading group activity</span>
-                      <span className="inline-flex items-center gap-1 px-0.5" aria-hidden>
-                        <span className="activity-expand-dot" style={{ animationDelay: "0ms" }} />
-                        <span className="activity-expand-dot" style={{ animationDelay: "140ms" }} />
-                        <span className="activity-expand-dot" style={{ animationDelay: "280ms" }} />
-                      </span>
-                    </div>
-                  ) : null}
-                  {list.map((ev) => {
-              const evRow = deriveRowModel(ev);
-              const evTier = getTier(ev.eventType);
-              const timeLabel =
-                ev.createdAt != null ? fmtTime(ev.createdAt) : null;
-              const SubIcon = eventIconMap[ev.eventType]?.icon;
-              const subEntityLabel = (
-                evRow.entityLabel?.trim() || evRow.entityFallback
-              ).trim();
-              const subHasPrimaryTitle = Boolean(evRow.entityLabel?.trim());
-              const subHasEntityChip = evTier !== 3 && Boolean(subEntityLabel);
-              const subHasPreview = Boolean(
-                evRow.showPreview && evRow.previewText
-              );
-              const subInlineTitleText = subHasPrimaryTitle
-                ? feedbackTitleDisplay(evRow.entityLabel, "")
-                : subEntityLabel;
-              const subEntityClick =
-                evRow.feedbackId && evRow.sessionId
-                  ? () => goToFeedback(evRow.sessionId!, evRow.feedbackId!)
-                  : evRow.sessionId
-                    ? () => goToSession(evRow.sessionId!)
-                    : undefined;
-              const subTallRow = subHasPreview;
-              return (
-                <div
-                  key={ev.id}
-                  role="listitem"
-                  className={`flex w-full min-w-0 justify-between gap-3 py-4 ${subTallRow ? "items-start" : "items-center"}`}
-                >
-                  <div
-                    className={`flex min-w-0 flex-1 gap-3 ${subTallRow ? "items-start" : "items-center"}`}
-                  >
-                    {SubIcon ? (
-                      <SubIcon
-                        className="h-4 w-4 shrink-0 text-[var(--text-secondary)]"
-                        aria-hidden
-                      />
-                    ) : (
-                      <span className="h-4 w-4 shrink-0" aria-hidden />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="flex min-w-0 flex-wrap items-center gap-2 text-[15px] leading-relaxed">
-                        <span className="text-[var(--text-heading)]">
-                          {ev.actor?.name?.trim() || "A teammate"}
-                        </span>
-                        <span className="text-[var(--text-heading)]">
-                          {evRow.actionPhrase}
-                        </span>
-                        {subHasEntityChip && subEntityLabel ? (
-                          subEntityClick ? (
-                            <button
-                              type="button"
-                              onClick={subEntityClick}
-                              className={`inline-flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 text-left underline-offset-2 transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                                subHasPrimaryTitle
-                                  ? FEEDBACK_TITLE_EMPHASIS
-                                  : "font-medium text-[var(--text-secondary)]"
-                              }`}
-                            >
-                              <span className="min-w-0 break-words">
-                                {subInlineTitleText}
-                              </span>
-                              <ExternalLink
-                                className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)]"
-                                aria-hidden
-                              />
-                            </button>
-                          ) : (
-                            <span
-                              className={
-                                subHasPrimaryTitle
-                                  ? FEEDBACK_TITLE_EMPHASIS
-                                  : "font-medium text-[var(--text-secondary)]"
-                              }
-                            >
-                              {subInlineTitleText}
-                            </span>
-                          )
-                        ) : null}
-                      </p>
-                      {subHasPreview && evRow.previewText ? (
-                        <ActivityContextBlock>
-                          <div className="text-sm leading-relaxed text-[var(--text-secondary)] line-clamp-2">
-                            {renderMentions(evRow.previewText)}
-                          </div>
-                        </ActivityContextBlock>
-                      ) : null}
-                    </div>
-                  </div>
-                  {timeLabel ? (
-                    <time
-                      dateTime={
-                        ev.createdAt != null
-                          ? new Date(ev.createdAt).toISOString()
-                          : undefined
-                      }
-                      className={`shrink-0 text-right text-sm tabular-nums text-[var(--text-secondary)] whitespace-nowrap ${subTallRow ? "self-start" : ""}`}
-                    >
-                      {timeLabel}
-                    </time>
-                  ) : null}
-                </div>
-              );
-                  })}
-                </>
-              );
-            })()}
-          </div>
-        ) : null}
-      </div>
+      ) : null}
     </div>
   );
 }

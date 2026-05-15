@@ -10,7 +10,15 @@ import {
 } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Check, ChevronDown, Clock, Settings } from "lucide-react";
+import {
+  Calendar,
+  Check,
+  ChevronDown,
+  Clock,
+  MessageCircle,
+  Plus,
+  Settings,
+} from "lucide-react";
 import {
   ActivityErrorIllustration,
   ActivityFilterNoResultsIllustration,
@@ -160,29 +168,38 @@ function normalizeOneGroupedActivity(raw: unknown): GroupedActivity | null {
   };
 }
 
+/** Compact relative time — "1h ago", "3d ago", "yesterday", "May 12". */
 function formatRelativeActivityTime(ms: number | null): string {
   if (ms == null || !Number.isFinite(ms)) return "";
   const date = new Date(ms);
   const now = new Date();
   const diffSec = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 1000));
-  if (diffSec < 45) return "Just now";
-  if (diffSec < 3600) {
-    const m = Math.max(1, Math.floor(diffSec / 60));
-    return `${m} min ago`;
-  }
-  if (diffSec < 86400) {
-    const h = Math.max(1, Math.floor(diffSec / 3600));
-    return `${h} hour${h === 1 ? "" : "s"} ago`;
-  }
+  if (diffSec < 60) return "just now";
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
   const startOf = (d: Date) =>
     new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const dayDiff = Math.round((startOf(now) - startOf(date)) / 86400000);
-  if (dayDiff === 1) return "Yesterday";
-  return date.toLocaleDateString(undefined, {
+  if (dayDiff === 1) return "yesterday";
+  if (dayDiff < 7) return `${dayDiff}d ago`;
+  return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
   });
+}
+
+/** "Today · Wednesday, May 15" — date suffix only for the single-day buckets. */
+function dayBucketLabel(label: "Today" | "Yesterday" | "This week" | "Earlier"): string {
+  if (label !== "Today" && label !== "Yesterday") return label;
+  const d = new Date();
+  if (label === "Yesterday") d.setDate(d.getDate() - 1);
+  const suffix = d.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+  return `${label} · ${suffix}`;
 }
 
 // ─── System-event collapsing ─────────────────────────────────────────────────
@@ -305,12 +322,16 @@ function writeActivityCache(
   }
 }
 
-/** Semantic active state per category — inline styles to guarantee colors render (sourced from eventIconMap badgeClass). */
-const ACTIVITY_TYPE_PILL_ACTIVE_STYLES: Record<ActivityFilterCategoryId, React.CSSProperties> = {
-  comments: { background: 'var(--avatar-gold)', borderColor: 'var(--avatar-gold)', color: '#FFFFFF' },
-  created:  { background: 'var(--color-insight)', borderColor: 'var(--color-insight)', color: '#FFFFFF' },
-  resolved: { background: 'var(--color-success)', borderColor: 'var(--color-success)', color: '#FFFFFF' },
+/** Leading icon per type filter (Phase 28.2). */
+const ACTIVITY_TYPE_PILL_ICONS: Record<
+  ActivityFilterCategoryId,
+  typeof MessageCircle
+> = {
+  comments: MessageCircle,
+  created: Plus,
+  resolved: Check,
 };
+
 
 /** Shared pill geometry + motion; hover applied via FILTER_PILL_DEFAULT when not active. */
 const FILTER_PILL_BASE =
@@ -332,6 +353,38 @@ function isActivityViewportFilled(rowCount: number): boolean {
   const shortPage = scrollH <= window.innerHeight + 2;
   const enoughRows = rowCount >= ACTIVITY_FEED_MIN_VISIBLE_ROWS;
   return enoughRows && !shortPage;
+}
+
+// ─── Filter tab (Phase 28.3 underline style) ─────────────────────────────────
+
+function FilterTab({
+  active,
+  onClick,
+  icon,
+  count,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon?: React.ReactNode;
+  count?: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`activity-filter-tab${active ? " is-active" : ""}`}
+    >
+      {icon}
+      {children}
+      {count != null ? (
+        <span className="activity-filter-count">{count}</span>
+      ) : null}
+    </button>
+  );
 }
 
 // ─── Page ────────────────────────────────────────────────────────────────────
@@ -803,18 +856,46 @@ function ActivityFeed() {
 
         {/* Page header */}
         <div className="mb-7">
-          <h1 className="text-xl font-bold text-[var(--text-heading)] tracking-[-0.4px] mt-1 mb-0">
+          <h1
+            className="text-xl font-bold text-[var(--text-heading)] m-0"
+            style={{ letterSpacing: "-0.02em", lineHeight: 1.2 }}
+          >
             Activity
           </h1>
-          <p className="text-sm font-normal text-[var(--text-secondary)] mt-2">
+          <p
+            className="m-0 font-normal text-[var(--text-secondary)]"
+            style={{ fontSize: "15px", marginTop: "7px", marginBottom: "24px" }}
+          >
             Everything that&apos;s happened across your sessions and workspace
           </p>
-          <div className="flex items-center gap-2 mt-5">
-            <div
-              className="flex flex-wrap items-center gap-1"
-              role="toolbar"
-              aria-label="Activity filters"
-            >
+          <div className="mt-5">
+            {/* Type filter tabs + scope dropdowns — one line, dropdowns right-aligned */}
+            <div className="activity-filter-bar" role="group" aria-label="Activity filters">
+              <FilterTab
+                active={selectedCategory == null || selectedCategory === "member"}
+                onClick={() => setSelectedCategory(null)}
+              >
+                All
+              </FilterTab>
+              {ACTIVITY_FILTER_CATEGORY_IDS.map((id) => {
+                const TabIcon = ACTIVITY_TYPE_PILL_ICONS[id];
+                return (
+                  <FilterTab
+                    key={id}
+                    active={selectedCategory === id}
+                    onClick={() => selectCategory(id)}
+                    icon={<TabIcon size={16} strokeWidth={1.75} aria-hidden />}
+                  >
+                    {ACTIVITY_FILTER_CATEGORY_LABELS[id]}
+                  </FilterTab>
+                );
+              })}
+
+              <div
+                className="activity-scope-filters"
+                role="toolbar"
+                aria-label="Scope filters"
+              >
               <div
                 className={`relative shrink-0 ${sessionMenuOpen ? "z-[200]" : "z-0"}`}
                 ref={sessionMenuRef}
@@ -839,7 +920,7 @@ function ActivityFeed() {
 
                 {sessionMenuOpen ? (
                   <div
-                    className="absolute left-1/2 top-full z-[200] mt-1 w-max min-w-[220px] max-w-[min(100vw-2rem,320px)] -translate-x-1/2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-card)] p-1.5 text-[var(--text-heading)] shadow-none"
+                    className="absolute right-0 top-full z-[200] mt-1 w-max min-w-[220px] max-w-[min(100vw-2rem,320px)] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-card)] p-1.5 text-[var(--text-heading)] shadow-none"
                     role="listbox"
                     aria-label="Sessions"
                   >
@@ -893,7 +974,14 @@ function ActivityFeed() {
                 ) : null}
               </div>
 
-              <div className="relative" ref={memberDropdownRef}>
+              <div
+                className={`relative shrink-0 ${
+                  (selectedCategory === "member" && selectedMemberId === null) || memberDropdownOpen
+                    ? "z-[200]"
+                    : "z-0"
+                }`}
+                ref={memberDropdownRef}
+              >
                 <button
                   type="button"
                   onClick={() => {
@@ -927,7 +1015,7 @@ function ActivityFeed() {
 
                 {(selectedCategory === "member" && selectedMemberId === null) ||
                 memberDropdownOpen ? (
-                  <div className="absolute top-full left-0 mt-1 w-56 bg-[var(--surface-card)] border border-[var(--border)] rounded-[var(--radius-md)] shadow-none z-50 py-1">
+                  <div className="absolute top-full right-0 mt-1 w-56 bg-[var(--surface-card)] border border-[var(--border)] rounded-[var(--radius-md)] shadow-none z-[200] py-1">
                     <button
                       type="button"
                       onClick={() => {
@@ -984,27 +1072,6 @@ function ActivityFeed() {
                 ) : null}
               </div>
 
-              <div
-                className="flex flex-wrap items-center gap-1"
-                role="radiogroup"
-                aria-label="Activity type"
-              >
-                {ACTIVITY_FILTER_CATEGORY_IDS.map((id) => {
-                  const selected = selectedCategory === id;
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      onClick={() => selectCategory(id)}
-                      className={`${FILTER_PILL_BASE} ${selected ? "" : FILTER_PILL_DEFAULT}`}
-                      style={selected ? ACTIVITY_TYPE_PILL_ACTIVE_STYLES[id] : undefined}
-                    >
-                      {ACTIVITY_FILTER_CATEGORY_LABELS[id]}
-                    </button>
-                  );
-                })}
               </div>
             </div>
           </div>
@@ -1072,15 +1139,24 @@ function ActivityFeed() {
             {collapsedDayBuckets.map((section, sectionIndex) => {
               const renderRows = section.renderRows;
               return (
-                <div key={section.label} className="space-y-2">
+                <div
+                  key={section.label}
+                  className={`activity-day-section space-y-2${
+                    sectionIndex === 0 ? " activity-day-section--first" : ""
+                  }`}
+                >
 
-                  {/* Day section rule */}
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1 h-px bg-border" aria-hidden />
-                    <span className="text-sm font-semibold text-[var(--text-heading)]/60 whitespace-nowrap tracking-wide">
-                      {section.label}
-                    </span>
-                    <div className="flex-1 h-px bg-border" aria-hidden />
+                  {/* Day label — centered pill (Phase 28.3) */}
+                  <div className="activity-day-pillrow">
+                    <p className="activity-day-label">
+                      <Calendar
+                        size={14}
+                        strokeWidth={1.75}
+                        className="activity-day-icon"
+                        aria-hidden
+                      />
+                      {dayBucketLabel(section.label)}
+                    </p>
                   </div>
 
                   {/* Event rows */}
@@ -1100,30 +1176,34 @@ function ActivityFeed() {
                             <button
                               type="button"
                               onClick={() => toggleSystemGroup(row.key)}
-                              className="flex w-full cursor-pointer items-center gap-3 border-0 bg-transparent py-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              className="grid w-full cursor-pointer items-center gap-3.5 rounded-lg border-0 bg-transparent px-2 py-3 text-left transition-colors duration-100 hover:bg-[rgba(0,0,0,0.025)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              style={{ gridTemplateColumns: "32px 1fr auto" }}
                             >
-                              <div className="relative z-10 flex w-[52px] shrink-0 justify-center">
-                                <div
-                                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--surface-hover)]/50 text-[var(--text-secondary)]"
-                                  aria-hidden
-                                >
-                                  <Settings className="h-5 w-5" />
-                                </div>
-                              </div>
-                              <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                                <span className="min-w-0 text-[15px] font-normal leading-snug text-[var(--text-secondary)]">
-                                  {row.items.length} system{" "}
-                                  {row.items.length === 1 ? "event" : "events"}
-                                </span>
-                                <ChevronDown
-                                  className={`h-4 w-4 shrink-0 text-[var(--text-secondary)] transition-transform duration-150 ${isExpanded ? "rotate-180" : ""}`}
-                                  aria-hidden
-                                />
-                              </div>
+                              <span
+                                className="grid h-8 w-8 place-items-center rounded-full ring-2 ring-[var(--surface-card)]"
+                                style={{
+                                  background: "rgba(0,0,0,0.04)",
+                                  color: "var(--text-secondary)",
+                                }}
+                                aria-hidden
+                              >
+                                <Settings size={16} strokeWidth={1.75} />
+                              </span>
+                              <span
+                                className="min-w-0 font-normal text-[var(--text-secondary)]"
+                                style={{ fontSize: "15px", lineHeight: 1.55 }}
+                              >
+                                {row.items.length} system{" "}
+                                {row.items.length === 1 ? "event" : "events"}
+                              </span>
+                              <ChevronDown
+                                className={`h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)] transition-transform duration-150 ${isExpanded ? "rotate-180" : ""}`}
+                                aria-hidden
+                              />
                             </button>
 
                             {isExpanded && (
-                              <div className="mt-2 w-full min-w-0 pl-[52px]">
+                              <div className="mt-1 w-full min-w-0 pl-[42px]">
                                 {row.items.map((item, itemIndex) => {
                                   const ev =
                                     item.type === "single"
@@ -1137,6 +1217,7 @@ function ActivityFeed() {
                                       key={`${sectionIndex}-${rowIndex}-${itemIndex}-${rowKey}`}
                                       kind="single"
                                       event={ev}
+                                      currentUserId={user?.uid ?? null}
                                       relativeTime={time || null}
                                       isoTime={
                                         ev.createdAt != null
@@ -1161,21 +1242,19 @@ function ActivityFeed() {
                         const rowKey = ev.id || `${ev.eventType}-${ev.createdAt}`;
                         const enter = enterRowKeys.has(groupedActivityStableKey(item));
                         return (
-                          <div
+                          <ActivityItem
                             key={`${sectionIndex}-${rowIndex}-${rowKey}`}
+                            kind="single"
+                            event={ev}
+                            currentUserId={user?.uid ?? null}
+                            relativeTime={time || null}
+                            isoTime={
+                              ev.createdAt != null
+                                ? new Date(ev.createdAt).toISOString()
+                                : undefined
+                            }
                             className={enter ? "activity-feed-row-enter" : undefined}
-                          >
-                            <ActivityItem
-                              kind="single"
-                              event={ev}
-                              relativeTime={time || null}
-                              isoTime={
-                                ev.createdAt != null
-                                  ? new Date(ev.createdAt).toISOString()
-                                  : undefined
-                              }
-                            />
-                          </div>
+                          />
                         );
                       }
 
@@ -1192,13 +1271,12 @@ function ActivityFeed() {
                             : undefined;
                       const gEnter = enterRowKeys.has(groupedActivityStableKey(item));
                       return (
-                        <div
-                          key={`${sectionIndex}-${rowIndex}-group-${groupKey}`}
-                          className={gEnter ? "activity-feed-row-enter" : undefined}
-                        >
                           <ActivityItem
+                            key={`${sectionIndex}-${rowIndex}-group-${groupKey}`}
+                            className={gEnter ? "activity-feed-row-enter" : undefined}
                             kind="group"
                             group={g}
+                            currentUserId={user?.uid ?? null}
                             relativeTime={time || null}
                             isoTime={
                               g.createdAt != null
@@ -1209,7 +1287,6 @@ function ActivityFeed() {
                             onToggleExpand={() => toggleGroup(g)}
                             expandListEvents={expandListEvents}
                           />
-                        </div>
                       );
                     })}
                   </div>

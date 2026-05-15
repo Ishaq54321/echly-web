@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { UserPlus, UserMinus, Check, ChevronDown, Search } from "lucide-react";
+import { UserPlus, UserPen, UserMinus, Check, ChevronDown, Search } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
 import { NAME_FALLBACK } from "@/lib/utils/nameSplit";
 import { useToast } from "@/components/dashboard/context/ToastContext";
@@ -276,7 +276,7 @@ export function AssignDropdown({
             </>
           ) : (
             <>
-              <UserPlus size={14} strokeWidth={1.7} style={{ flexShrink: 0 }} aria-hidden />
+              <UserPen size={14} strokeWidth={1.7} style={{ flexShrink: 0 }} aria-hidden />
               Assign
             </>
           )}

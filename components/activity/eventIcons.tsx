@@ -1,42 +1,12 @@
-import type { LucideIcon } from "lucide-react";
-import {
-  Archive,
-  Check,
-  Layers,
-  MessageCircle,
-  Plus,
-  RotateCcw,
-  Settings,
-  Shield,
-  Trash2,
-  UserCheck,
-  UserMinus,
-  UserPlus,
-} from "lucide-react";
-
-export type EventIconEntry = {
-  icon: LucideIcon;
-  badgeClass: string;
-};
-
-export const eventIconMap: Record<string, EventIconEntry> = {
-  "comment.added":            { icon: MessageCircle, badgeClass: "bg-[var(--brand)]" },
-  "feedback.created":         { icon: Plus,          badgeClass: "bg-[var(--color-insight)]" },
-  "feedback.resolved":        { icon: Check,         badgeClass: "bg-[var(--color-success)]" },
-  "feedback.reopened":        { icon: RotateCcw,     badgeClass: "bg-[var(--color-warning-dot)]" },
-  "session.created":          { icon: Layers,        badgeClass: "bg-[var(--color-insight)]" },
-  "session.archived":         { icon: Archive,       badgeClass: "bg-[var(--text-body)]" },
-  "session.member.added":     { icon: UserPlus,      badgeClass: "bg-[var(--text-body)]" },
-  "session.member.removed":   { icon: UserMinus,     badgeClass: "bg-[var(--text-body)]" },
-  "session.member.role_changed": { icon: UserPlus,   badgeClass: "bg-[var(--text-body)]" },
-  "session.settings_changed": { icon: Settings,      badgeClass: "bg-[var(--text-body)]" },
-  "access_request.approved":  { icon: Shield,        badgeClass: "bg-[var(--color-success-dot)]" },
-  "access_request.rejected":  { icon: Shield,        badgeClass: "bg-[var(--color-danger)]" },
-  "invite.sent":              { icon: UserPlus,      badgeClass: "bg-blue-400" },
-  "invite.accepted":          { icon: UserCheck,     badgeClass: "bg-[var(--color-success-dot)]" },
-  "session.deleted":          { icon: Trash2,        badgeClass: "bg-[var(--color-danger)]" },
-  "feedback.deleted":         { icon: Trash2,        badgeClass: "bg-[var(--color-danger)]" },
-};
+// ─── Event classification + mention detection ────────────────────────────────
+//
+// The visual badges themselves now live in ./EventBadge.tsx (bespoke SVG
+// components, Phase 28.4). Per-event pill colour now also comes from there
+// (getEventColor, Phase 28.5) — the old hash-based getSessionColor helper
+// was removed since pills inherit the event colour, not a session-stable one.
+// This module keeps only the non-visual helpers that survived:
+//   - getTier / TIER_MAP    → activity feed density classification
+//   - isPersonalMention     → @-mention detection for the pink badge variant
 
 export const TIER_MAP: Record<string, 1 | 2 | 3> = {
   "comment.added": 1,
@@ -59,4 +29,18 @@ export const TIER_MAP: Record<string, 1 | 2 | 3> = {
 
 export function getTier(eventType: string): 1 | 2 | 3 {
   return TIER_MAP[eventType] ?? 2;
+}
+
+// ─── Personal-mention detection ──────────────────────────────────────────────
+
+/** True when a comment.added event lists `currentUserId` in metadata.mentionedUserIds. */
+export function isPersonalMention(
+  eventType: string,
+  metadata: Record<string, unknown> | undefined,
+  currentUserId: string | null | undefined
+): boolean {
+  if (eventType !== "comment.added") return false;
+  if (!currentUserId) return false;
+  const m = metadata?.mentionedUserIds;
+  return Array.isArray(m) && m.includes(currentUserId);
 }

@@ -278,6 +278,9 @@ export default function SessionPageClient({
   const ticketIdFromUrl = searchParams.get("ticket");
   const editFromUrl = searchParams.get("edit") === "true";
   const commentIdFromUrl = searchParams.get("comment");
+  // Phase 28.3: Activity feed "Reply" deep-link — `?action=reply` focuses
+  // the comment composer once the panel + thread are open.
+  const actionFromUrl = searchParams.get("action");
 
   /**
    * Local optimistic overlay for session-level mutations (rename, archive, title edit).
@@ -2239,12 +2242,46 @@ export default function SessionPageClient({
     // Phase 26.7: a shared ?comment= link also scrolls + highlights the
     // comment in the middle panel, matching pin-click navigation.
     setHighlightedCommentId(commentIdFromUrl);
+
+    // Phase 28.3: Activity feed "Reply" deep-link — focus the comment
+    // composer. The collapsed composer carries [data-comment-composer];
+    // clicking it expands to the Tiptap editor (which autoFocuses). If
+    // already expanded, the wrapper also carries the attribute, so we
+    // focus the contenteditable inside it directly.
+    if (actionFromUrl === "reply") {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const composer = document.querySelector<HTMLElement>(
+            "[data-comment-composer]"
+          );
+          if (!composer) return;
+          const editable = composer.querySelector<HTMLElement>(
+            '[contenteditable="true"]'
+          );
+          if (editable) {
+            editable.focus();
+          } else {
+            composer.click();
+          }
+          composer.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+      });
+    }
+
     const url = new URL(window.location.href);
+    let urlChanged = false;
     if (url.searchParams.has("comment")) {
       url.searchParams.delete("comment");
+      urlChanged = true;
+    }
+    if (url.searchParams.has("action")) {
+      url.searchParams.delete("action");
+      urlChanged = true;
+    }
+    if (urlChanged) {
       window.history.replaceState({}, "", url.pathname + url.search);
     }
-  }, [commentIdFromUrl, effectiveSelectedId, ticketIdFromUrl]);
+  }, [commentIdFromUrl, effectiveSelectedId, ticketIdFromUrl, actionFromUrl]);
 
   const triggerPinAnimation = useCallback((commentId: string) => {
     setAnimatingPinId(commentId);
