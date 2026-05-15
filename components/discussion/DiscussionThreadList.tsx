@@ -3,6 +3,8 @@
 import { memo, useMemo, type ComponentType } from "react";
 import { Search, Reply } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils/time";
+import { NAME_FALLBACK } from "@/lib/utils/nameSplit";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import {
   EmptyAssignedIllustration,
   EmptyInboxIllustration,
@@ -16,8 +18,11 @@ export interface ThreadListItem {
   title: string;
   sessionId: string;
   sessionName?: string;
-  authorName?: string;
-  authorAvatarUrl?: string | null;
+  /** Inbox row shows the LAST ACTOR (most recent commenter), not the creator. */
+  lastActorName?: string;
+  lastActorAvatarUrl?: string | null;
+  /** uid of the last actor — seeds the consistent fallback color. */
+  lastActorUid?: string | null;
   commentCount?: number;
   lastCommentPreview?: string;
   status: "open" | "resolved";
@@ -90,24 +95,6 @@ function getEmptyState(ctx: ThreadListEmptyContext | undefined): EmptyState {
   }
 }
 
-const AVATAR_BG_PALETTE = [
-  "#5B7BD3",
-  "#4A8B6F",
-  "#B47BC7",
-  "#E8835D",
-  "#D1A845",
-  "#6E8FB5",
-];
-
-function getAvatarBg(seed: string) {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = ((hash << 5) - hash) + seed.charCodeAt(i);
-    hash |= 0;
-  }
-  return AVATAR_BG_PALETTE[Math.abs(hash) % AVATAR_BG_PALETTE.length];
-}
-
 function parseUpdatedAt(item: ThreadListItem): number {
   const la = item.lastCommentAt;
   if (la && typeof la === "object" && typeof (la as { seconds?: number }).seconds === "number") {
@@ -123,14 +110,6 @@ function parseUpdatedAt(item: ThreadListItem): number {
   return 0;
 }
 
-function getInitials(name: string | undefined) {
-  if (!name) return "?";
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
 interface ThreadCardProps {
   item: ThreadListItem;
   isSelected: boolean;
@@ -141,8 +120,7 @@ const ThreadCard = memo(function ThreadCard({ item, isSelected, onSelect }: Thre
   const isUnread = item.isUnread === true;
   const ts = parseUpdatedAt(item);
   const timeLabel = ts > 0 ? formatRelativeTime(new Date(ts)) : "Just now";
-  const author = item.authorName || "Anonymous";
-  const avatarBg = getAvatarBg(item.id || author);
+  const author = item.lastActorName || NAME_FALLBACK.ANONYMOUS;
   const replyCount = item.commentCount ?? 0;
 
   return (
@@ -170,23 +148,12 @@ const ThreadCard = memo(function ThreadCard({ item, isSelected, onSelect }: Thre
       )}
 
       <div className="flex items-center gap-2 mb-3">
-        {item.authorAvatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={item.authorAvatarUrl}
-            alt=""
-            className="w-[22px] h-[22px] rounded-full object-cover shrink-0"
-            aria-hidden
-          />
-        ) : (
-          <div
-            className="w-[22px] h-[22px] rounded-full text-white text-[9px] font-semibold flex items-center justify-center shrink-0"
-            style={{ background: avatarBg }}
-            aria-hidden
-          >
-            {getInitials(author)}
-          </div>
-        )}
+        <UserAvatar
+          avatarUrl={item.lastActorAvatarUrl}
+          name={author}
+          size={22}
+          colorSeed={item.lastActorUid || item.id}
+        />
         <span
           className={`flex-1 min-w-0 text-[14px] truncate ${
             isUnread ? "font-semibold text-[var(--text-heading)]" : "font-medium text-[var(--text-heading)]"
@@ -250,7 +217,7 @@ export function DiscussionThreadList({
         i.title.toLowerCase().includes(q) ||
         (i.sessionName ?? "").toLowerCase().includes(q) ||
         (i.lastCommentPreview ?? "").toLowerCase().includes(q) ||
-        (i.authorName ?? "").toLowerCase().includes(q)
+        (i.lastActorName ?? "").toLowerCase().includes(q)
     );
   }, [items, search]);
 

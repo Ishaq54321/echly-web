@@ -5,6 +5,7 @@ import { adminDb, adminBucket } from "@/lib/server/firebaseAdmin";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue } from "firebase-admin/firestore";
 import { getSignedStorageUrl, extractStoragePathFromUrl } from "@/lib/server/storage/getSignedUrl";
+import { mirrorUserProfileFromUserDoc } from "@/lib/repositories/userProfilesRepository.server";
 // @ts-ignore
 import heicConvert from "heic-convert";
 
@@ -68,6 +69,7 @@ export async function GET(req: NextRequest) {
       { avatarUrl: signedUrl, photoURL: signedUrl, updatedAt: FieldValue.serverTimestamp() },
       { merge: true }
     );
+    await mirrorUserProfileFromUserDoc(user.uid);
 
     return apiSuccess({ avatarUrl: signedUrl });
   } catch (err) {
@@ -140,6 +142,7 @@ export async function POST(req: NextRequest) {
     );
 
     await getAuth().updateUser(user.uid, { photoURL: signedUrl });
+    await mirrorUserProfileFromUserDoc(user.uid);
 
     return apiSuccess({ avatarUrl: signedUrl });
   } catch (err) {
@@ -174,6 +177,7 @@ export async function DELETE(req: NextRequest) {
     );
 
     await getAuth().updateUser(user.uid, { photoURL: null });
+    await mirrorUserProfileFromUserDoc(user.uid);
 
     return apiSuccess({ removed: true });
   } catch (err) {

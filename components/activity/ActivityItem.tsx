@@ -5,33 +5,12 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ChevronDown, ExternalLink, RotateCcw } from "lucide-react";
 import { UserAvatar } from "@/components/ui/UserAvatar";
-import { getInitials } from "@/lib/utils/getInitials";
 import {
   groupPreviewEvents,
   type ActivityEvent,
   type GroupedActivity,
 } from "@/lib/activity/groupEvents";
 import { getTier, eventIconMap } from "@/components/activity/eventIcons";
-
-// ─── Activity-page-only fallback avatar palette ──────────────────────────────
-
-const ACTIVITY_AVATAR_COLORS = [
-  "var(--avatar-warm-orange)",
-  "var(--avatar-blue)",
-  "var(--avatar-purple)",
-  "var(--avatar-green)",
-  "var(--avatar-pink)",
-  "var(--avatar-gold)",
-  "var(--avatar-teal)",
-];
-
-function getActivityAvatarColor(userId: string): string {
-  let hash = 0;
-  for (let i = 0; i < userId.length; i++) {
-    hash = ((hash << 5) - hash + userId.charCodeAt(i)) | 0;
-  }
-  return ACTIVITY_AVATAR_COLORS[Math.abs(hash) % ACTIVITY_AVATAR_COLORS.length]!;
-}
 
 // ─── Metadata helpers ────────────────────────────────────────────────────────
 
@@ -558,10 +537,7 @@ function ActivityItemBase(props: ActivityItemProps) {
       ? props.event.actor
       : { id: props.group.actorId, name: props.group.actorName, photoURL: undefined as string | undefined };
 
-  const actorName =
-    actor.name?.trim() ||
-    actor.id?.split("@")[0]?.trim() ||
-    "A teammate";
+  const actorName = actor.name?.trim() || "A teammate";
   const photoURL =
     props.kind === "single"
       ? (props.event.actor.photoURL ?? undefined)
@@ -625,21 +601,12 @@ function ActivityItemBase(props: ActivityItemProps) {
       {/* Fixed-width avatar column — w-[52px] keeps the timeline spine centred */}
       <div className="relative z-10 flex w-[52px] shrink-0 justify-center">
         <div className="relative">
-          {photoURL ? (
-            <UserAvatar
-              photoURL={photoURL}
-              name={actorName}
-              className="h-9 w-9"
-            />
-          ) : (
-            <span
-              className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-white font-semibold text-[14px]"
-              style={{ backgroundColor: getActivityAvatarColor(actor.id || actorName) }}
-              aria-hidden
-            >
-              {getInitials(actorName)}
-            </span>
-          )}
+          <UserAvatar
+            photoURL={photoURL}
+            name={actorName}
+            colorSeed={actor.id || actorName}
+            className="h-9 w-9"
+          />
         </div>
       </div>
 

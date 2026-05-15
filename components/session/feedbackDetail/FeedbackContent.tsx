@@ -23,6 +23,10 @@ interface FeedbackContentProps {
   onEdit?: () => void;
   canEdit?: boolean;
   isCommentMode?: boolean;
+  /** Toggles screenshot pin-placement mode (Phase 26.7 comment action). */
+  onTogglePinMode?: () => void;
+  /** Force-exits comment mode (cancel / Escape / click-outside). */
+  onExitCommentMode?: () => void;
   comments?: Comment[];
   pinComments?: (Comment & { position: { xPercent: number; yPercent: number } })[];
   activePinId?: string;
@@ -64,6 +68,8 @@ interface FeedbackContentProps {
   currentUserName?: string;
   currentUserInitial?: string;
   currentUserAvatarUrl?: string;
+  /** Comment to scroll to + briefly highlight (Phase 26.7 pin-click nav). */
+  highlightedCommentId?: string | null;
 }
 
 export function FeedbackContent({
@@ -78,6 +84,8 @@ export function FeedbackContent({
   onEdit,
   canEdit,
   isCommentMode,
+  onTogglePinMode,
+  onExitCommentMode,
   comments = [],
   pinComments,
   activePinId,
@@ -102,6 +110,7 @@ export function FeedbackContent({
   currentUserName,
   currentUserInitial,
   currentUserAvatarUrl,
+  highlightedCommentId,
 }: FeedbackContentProps) {
   const description =
     typeof item.description === "string" ? item.description : "";
@@ -143,6 +152,8 @@ export function FeedbackContent({
                   screenshotUrlError={screenshotUrlError}
                   onExpand={onExpandImage}
                   isCommentMode={isCommentMode}
+                  onTogglePinMode={onTogglePinMode}
+                  onExitCommentMode={onExitCommentMode}
                   pins={pinComments ?? []}
                   comments={comments}
                   activePinId={activePinId}
@@ -283,6 +294,7 @@ export function FeedbackContent({
           currentUserInitial={currentUserInitial}
           currentUserAvatarUrl={currentUserAvatarUrl}
           participants={participants}
+          highlightedCommentId={highlightedCommentId}
         />
       ) : null}
     </div>

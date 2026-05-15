@@ -25,6 +25,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Phase 25.4: public profile mirror of users/{uid}. Carries ONLY
+    // displayName + avatarUrl (both already shown publicly in the UI) — never
+    // email/workspaceId/role/memberships. Any authed user may read it so the
+    // realtime client (lib/realtime/userAvatarStore.ts) can resolve other
+    // users' avatars live without touching the private users/{uid} doc.
+    // Writes are Admin-SDK only (lib/repositories/userProfilesRepository.server.ts).
+    match /userProfiles/{uid} {
+      allow read: if isAuthed();
+      allow write: if false;
+    }
+
     match /workspaces/{wid} {
       allow read: if isWorkspaceMember(wid);
       allow write: if false;
@@ -89,6 +100,20 @@ service cloud.firestore {
     match /comments/{id} {
       allow read: if isWorkspaceMember(resource.data.workspaceId)
                   || hasSessionAccess(request.auth.uid, resource.data.sessionId);
+      allow write: if false;
+    }
+
+    // Per-ticket activity timeline (Phase 26.1). Same audience as the
+    // feedback/comments rules above: workspace members, or session-invited
+    // guests for the session this event belongs to. The client onSnapshot
+    // in lib/realtime/ticketActivityStore.ts depends on this rule — without
+    // it the subcollection falls through to the catch-all deny.
+    match /workspaces/{wid}/activityEvents/{eventId} {
+      allow read: if isAuthed()
+                  && (
+                       isWorkspaceMember(wid)
+                       || hasSessionAccess(request.auth.uid, resource.data.sessionId)
+                     );
       allow write: if false;
     }
 

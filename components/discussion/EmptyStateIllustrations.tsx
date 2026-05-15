@@ -195,7 +195,7 @@ export function EmptyNoThreadSelectedIllustration(props: IllustrationProps) {
     <IllustrationFrame {...props}>
       <g transform="translate(50 50)">
         <path
-          d="M0 0 H80 Q88 0 88 8 V32 Q88 40 80 40 H28 L18 50 L20 40 H8 Q0 40 0 32 Z"
+          d="M0 8 Q0 0 8 0 H80 Q88 0 88 8 V32 Q88 40 80 40 H28 L18 50 L20 40 H8 Q0 40 0 32 Z"
           fill="#F3F4F6"
           stroke="#D1D5DB"
           strokeWidth="1.5"

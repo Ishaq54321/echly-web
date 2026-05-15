@@ -151,6 +151,12 @@ export async function addCommentRepo(
     commentCount: FieldValue.increment(1),
     lastCommentPreview: preview || null,
     lastCommentAt: FieldValue.serverTimestamp(),
+    // Phase 25.1: denormalize the LAST ACTOR so the realtime discussion
+    // inbox can show who most recently commented (not the creator). The
+    // avatar is resolved live by uid at render time, so only the uid +
+    // name are stored here.
+    lastCommentByUid: resolvedUserId,
+    lastCommentByName: data.userName,
     ...(filteredMentionedUserIds.length > 0
       ? { mentionedUserIds: FieldValue.arrayUnion(...filteredMentionedUserIds) }
       : {}),

@@ -24,6 +24,8 @@ export function Toast({
 
   useEffect(() => {
     if (!visible || !message) return;
+    // duration 0 → persistent: caller dismisses it explicitly.
+    if (duration === 0) return;
     const t = setTimeout(onDismiss, duration);
     return () => clearTimeout(t);
   }, [visible, message, duration, onDismiss]);

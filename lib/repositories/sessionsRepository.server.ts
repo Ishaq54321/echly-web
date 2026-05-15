@@ -236,10 +236,18 @@ export async function recordSessionViewIfNewRepo(
     if (viewerId === sessionData.createdByUserId) return;
 
     const isAnonymous = viewerId.startsWith("anon_");
+    // NOTE (Phase 25.3): We continue to denormalize avatarUrl into
+    // recentViewers[] at write time even though it goes stale (there is no
+    // fan-out when a user changes their photo — see app/api/users/avatar).
+    // Display logic must NOT trust this field: the dashboard's recent-viewers
+    // row resolves it live via the useUserAvatars hook keyed on viewer.id
+    // (see components/dashboard/SessionsWorkspace.tsx). The denormalized copy
+    // is kept for non-display purposes — recording that this user viewed the
+    // session and preserving the viewer history as a permanent record.
     const newViewer: RecentViewer = {
       id: viewerId,
       displayName: viewerProfile?.displayName ?? null,
-      avatarUrl: viewerProfile?.avatarUrl ?? null,
+      avatarUrl: viewerProfile?.avatarUrl ?? null, // display-irrelevant; see note above
       isAnonymous,
       viewedAt: Date.now(),
     };

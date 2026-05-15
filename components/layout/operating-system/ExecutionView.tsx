@@ -22,9 +22,18 @@ export interface ExecutionViewProps {
   setIsImageExpanded: (v: boolean) => void;
   onEdit?: () => void;
   canEdit?: boolean;
-  onOpenComment?: () => void;
-  onCloseCommentMode?: () => void;
+  /** Toggles the activity rail (history timeline). Phase 26.8. */
+  onToggleActivity?: () => void;
+  /** Reflects panel open state so the Activity button can show pressed. */
+  isActivityPanelOpen?: boolean;
+  /** Pin-placement mode for the screenshot (driven by the MapPin action). */
   isCommentMode?: boolean;
+  /** Toggles screenshot pin-placement mode (Phase 26.7 comment action). */
+  onTogglePinMode?: () => void;
+  /** Force-exits comment mode (cancel / Escape / click-outside). */
+  onExitCommentMode?: () => void;
+  /** Comment to scroll to + briefly highlight on pin click (Phase 26.7). */
+  highlightedCommentId?: string | null;
   /** True while PATCH resolve is in flight (dashboard Resolve control). */
   resolveSubmitting?: boolean;
   impactScore?: number | null;
@@ -111,9 +120,12 @@ export function ExecutionView({
   setIsImageExpanded,
   onEdit,
   canEdit,
-  onOpenComment,
-  onCloseCommentMode,
+  onToggleActivity,
+  isActivityPanelOpen = false,
   isCommentMode = false,
+  onTogglePinMode,
+  onExitCommentMode,
+  highlightedCommentId,
   resolveSubmitting = false,
   impactScore,
   comments = [],
@@ -175,11 +187,10 @@ export function ExecutionView({
         resolveSubmitting={
           isPublicReadOnly || isShareSurface ? false : resolveSubmitting
         }
-        onOpenComment={
-          isPublicReadOnly || isShareSurface ? undefined : onOpenComment
+        onToggleActivity={
+          isPublicReadOnly || isShareSurface ? undefined : onToggleActivity
         }
-        onCloseCommentMode={onCloseCommentMode}
-        isCommentMode={isCommentMode}
+        isActivityPanelOpen={isActivityPanelOpen}
         onDelete={isShareSurface ? undefined : onDelete}
         readOnly={isPublicReadOnly}
         readOnlyPermissions={isPublicReadOnly ? readOnlyPermissions : undefined}
@@ -234,6 +245,13 @@ export function ExecutionView({
               isCommentMode={
                 !isPublicReadOnly && !isShareSurface && isCommentMode
               }
+              onTogglePinMode={
+                !isPublicReadOnly && !isShareSurface ? onTogglePinMode : undefined
+              }
+              onExitCommentMode={
+                !isPublicReadOnly && !isShareSurface ? onExitCommentMode : undefined
+              }
+              highlightedCommentId={highlightedCommentId}
               comments={comments}
               pinComments={comments.filter((c): c is Comment & { position: NonNullable<Comment["position"]> } => c.type === "pin" && c.position != null && c.feedbackId === displayItem?.id)}
               animatingPinId={animatingPinId}

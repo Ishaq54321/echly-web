@@ -18,6 +18,8 @@ import {
   ActivityUnauthenticatedIllustration,
 } from "@/components/discussion/EmptyStateIllustrations";
 import { authFetch } from "@/lib/authFetch";
+import { UserAvatar } from "@/components/ui/UserAvatar";
+import { NAME_FALLBACK } from "@/lib/utils/nameSplit";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { ActivityItem } from "@/components/activity/ActivityItem";
 import { ActivitySkeletonStack } from "@/components/activity/ActivitySkeletonRow";
@@ -305,7 +307,7 @@ function writeActivityCache(
 
 /** Semantic active state per category — inline styles to guarantee colors render (sourced from eventIconMap badgeClass). */
 const ACTIVITY_TYPE_PILL_ACTIVE_STYLES: Record<ActivityFilterCategoryId, React.CSSProperties> = {
-  comments: { background: 'var(--brand)', borderColor: 'var(--brand)', color: '#FFFFFF' },
+  comments: { background: 'var(--avatar-gold)', borderColor: 'var(--avatar-gold)', color: '#FFFFFF' },
   created:  { background: 'var(--color-insight)', borderColor: 'var(--color-insight)', color: '#FFFFFF' },
   resolved: { background: 'var(--color-success)', borderColor: 'var(--color-success)', color: '#FFFFFF' },
 };
@@ -917,7 +919,7 @@ function ActivityFeed() {
                         const selected = workspaceMembers.find(
                           (m) => m.uid === selectedMemberId
                         );
-                        return selected?.displayName ?? selected?.email.split("@")[0] ?? "Members";
+                        return selected?.displayName ?? "Members";
                       })()
                     : "Members"}
                   <ChevronDown className="h-3.5 w-3.5 ml-1" />
@@ -963,19 +965,14 @@ function ActivityFeed() {
                           }}
                           className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-[var(--surface-hover)] text-left${selectedMemberId === member.uid ? " font-medium text-[var(--text-heading)]" : ""}`}
                         >
-                          <div className="w-5 h-5 rounded-full bg-[var(--surface-hover)] flex-shrink-0 overflow-hidden flex items-center justify-center text-[12px] font-medium text-[var(--text-secondary)]">
-                            {member.avatarUrl ? (
-                              <img
-                                src={member.avatarUrl}
-                                className="w-full h-full object-cover"
-                                alt=""
-                              />
-                            ) : (
-                              (member.displayName ?? member.email)[0]?.toUpperCase()
-                            )}
-                          </div>
+                          <UserAvatar
+                            avatarUrl={member.avatarUrl}
+                            name={member.displayName}
+                            size={20}
+                            colorSeed={member.uid}
+                          />
                           <span className="truncate">
-                            {member.displayName ?? member.email.split("@")[0]}
+                            {member.displayName ?? NAME_FALLBACK.UNKNOWN}
                           </span>
                           {selectedMemberId === member.uid && (
                             <Check className="h-3.5 w-3.5 text-[var(--brand)] ml-auto flex-shrink-0" />

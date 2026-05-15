@@ -123,7 +123,7 @@ chrome.action.onClicked.addListener(() => {
   });
 });
 
-type StoredUser = { uid: string; name: string | null; email: string | null; photoURL: string | null };
+type StoredUser = { uid: string; name: string | null; email: string | null; photoURL: string | null; workspaceName: string | null };
 type FeedbackApiItem = { id: string; title?: string; description?: string; type?: string; screenshotId?: string | null; tags?: string[]; pageArea?: string | null; userAgent?: string | null; viewportWidth?: number | null; viewportHeight?: number | null; devicePixelRatio?: number | null; createdAt?: string | null };
 type FeedbackListResponse = {
   feedback?: FeedbackApiItem[];
@@ -778,7 +778,7 @@ async function getOrRefreshToken(): Promise<string> {
   const envelope = (await res.json()) as {
     data?: {
       extensionToken?: string;
-      user?: { uid: string; email?: string | null };
+      user?: { uid: string; email?: string | null; workspaceName?: string | null };
     };
   };
   const payload = envelope?.data;
@@ -798,6 +798,7 @@ async function getOrRefreshToken(): Promise<string> {
       name: null,
       email: payload.user.email ?? null,
       photoURL: null,
+      workspaceName: payload.user.workspaceName ?? null,
     };
     cachedSessionUser = sw.currentUser;
   }
@@ -1266,6 +1267,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           name: null,
           email: user.email ?? null,
           photoURL: null,
+          workspaceName: null,
         };
         cachedSessionUser = sw.currentUser;
       }
@@ -1836,6 +1838,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           name: null,
           email: u.email ?? null,
           photoURL: null,
+          workspaceName: null,
         };
         sw.currentUser = cachedSessionUser;
       }

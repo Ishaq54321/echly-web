@@ -93,7 +93,7 @@ function applyThemeToRoot(root: HTMLElement, theme: "dark" | "light"): void {
   }
 }
 
-type AuthUser = { uid: string; name: string | null; email: string | null; photoURL: string | null };
+type AuthUser = { uid: string; name: string | null; email: string | null; photoURL: string | null; workspaceName: string | null };
 
 type GlobalUIState = {
   visible: boolean;
@@ -690,6 +690,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
             name: response.user.name ?? null,
             email: response.user.email ?? null,
             photoURL: response.user.photoURL ?? null,
+            workspaceName: response.user.workspaceName ?? null,
           });
           setAuthState("authenticated");
         } else {
@@ -1471,6 +1472,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           key={widgetResetKey}
           sessionId={effectiveSessionId ?? ""}
           userId={user.uid}
+          workspaceName={user.workspaceName}
           extensionMode={true}
           fetchClient={extensionFetchClient}
           __extensionSavingState={isSaving}

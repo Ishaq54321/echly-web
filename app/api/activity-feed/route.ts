@@ -9,9 +9,28 @@ import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { parseActivityFeedEventTypesParam } from "@/lib/activity/activityEventTypeFilters";
 import { groupEventsServer } from "@/lib/server/activity/groupEventsServer";
 import { normalizeForGrouping } from "@/lib/server/activity/normalizeForGrouping";
+import { resolveUserAvatars } from "@/lib/utils/resolveUserAvatar";
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
+
+// Events that live exclusively in the per-ticket activity panel
+// (Phase 26.7 decoupling). Excluded from the workspace Activity
+// feed because they're field-level changes most useful in the
+// context of a specific ticket. Lifecycle events (created,
+// resolved, reopened) remain on the workspace feed.
+//
+// The per-ticket panel (TicketActivityPanel) does NOT use this
+// route — it reads workspaces/{wid}/activityEvents directly via
+// useTicketActivity's onSnapshot listener — so excluding these
+// here has no effect on the per-ticket timeline.
+//
+// Going forward: new event types specific to per-ticket context
+// should be added to this set.
+const PER_TICKET_PANEL_EVENT_TYPES = new Set([
+  "ticket.priority.changed",
+  "ticket.assignment.changed",
+]);
 
 type ActivityFeedNextCursor = {
   createdAt: number;
@@ -199,46 +218,45 @@ export async function GET(req: NextRequest) {
 
   try {
     const snapshot = await q.get();
-    const events = snapshot.docs.map((d) => activityEventFromDoc(d as QueryDocumentSnapshot));
+    const rawEvents = snapshot.docs.map((d) => activityEventFromDoc(d as QueryDocumentSnapshot));
 
-    const actorIdsNeedingPhoto = [
+    // Phase 26.7: always exclude per-ticket-panel field-change events
+    // from the workspace Activity feed, regardless of the eventTypes
+    // allowlist filter. This guarantees they never surface here, even
+    // via a malformed query string. (No effect on the per-ticket
+    // panel — see PER_TICKET_PANEL_EVENT_TYPES note above.)
+    const events = rawEvents.filter(
+      (event) =>
+        event.eventType == null ||
+        !PER_TICKET_PANEL_EVENT_TYPES.has(event.eventType)
+    );
+
+    // Phase 25.1: resolve actor avatars LIVE from users/{uid} and OVERRIDE
+    // the photoURL frozen onto the activity event at write time (it goes
+    // stale when the actor changes their photo). The event snapshot is
+    // only a fallback when the user doc has no avatar.
+    const actorIds = [
       ...new Set(
         events
-          .filter(e => e.actor && !e.actor.photoURL)
-          .map(e => e.actor.id)
-          .filter(Boolean)
-      )
+          .map((e) => e.actor?.id)
+          .filter((id): id is string => typeof id === "string" && id.length > 0)
+      ),
     ];
 
-    let photoByActorId: Record<string, string | null> = {};
+    const photoByActorId = await resolveUserAvatars(actorIds);
 
-    if (actorIdsNeedingPhoto.length > 0) {
-      const userRefs = actorIdsNeedingPhoto.map(uid => adminDb.doc(`users/${uid}`));
-      const userSnaps = await adminDb.getAll(...userRefs);
-
-      userSnaps.forEach((snap, i) => {
-        const uid = actorIdsNeedingPhoto[i]!;
-        const data = snap.exists ? snap.data() : null;
-        photoByActorId[uid] =
-          typeof data?.avatarUrl === "string" && data.avatarUrl.trim()
-            ? data.avatarUrl.trim()
-            : typeof data?.photoURL === "string" && data.photoURL.trim()
-            ? data.photoURL.trim()
-            : null;
-      });
-    }
-
-    const enrichedEvents = events.map(event => {
-      if (event.actor && !event.actor.photoURL && photoByActorId[event.actor.id]) {
-        return {
-          ...event,
-          actor: {
-            ...event.actor,
-            photoURL: photoByActorId[event.actor.id],
-          },
-        };
-      }
-      return event;
+    const enrichedEvents = events.map((event) => {
+      if (!event.actor) return event;
+      const live = photoByActorId.get(event.actor.id);
+      const resolved = live ?? event.actor.photoURL ?? null;
+      if (resolved === (event.actor.photoURL ?? null)) return event;
+      return {
+        ...event,
+        actor: {
+          ...event.actor,
+          photoURL: resolved,
+        },
+      };
     });
 
     const normalizedEvents = enrichedEvents.map(normalizeForGrouping);
@@ -256,7 +274,10 @@ export async function GET(req: NextRequest) {
     }
 
     let nextCursor: ActivityFeedNextCursor = null;
-    if (events.length === limit) {
+    // Pagination is driven by the raw Firestore page size, NOT the
+    // post-filter count — otherwise filtering out per-ticket events
+    // could falsely signal "no more pages" while more docs remain.
+    if (snapshot.docs.length === limit) {
       const lastDoc = snapshot.docs[snapshot.docs.length - 1] as QueryDocumentSnapshot;
       const createdAtMs = lastDoc.get("createdAt")?.toMillis?.();
       if (createdAtMs != null) {

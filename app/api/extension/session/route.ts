@@ -3,6 +3,8 @@ import { SignJWT } from "jose";
 import { getSessionUser } from "@/lib/server/session";
 import { corsHeaders } from "@/lib/server/cors";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
+import { resolveWorkspaceForUserLight } from "@/lib/server/resolveWorkspaceForUser";
+import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 
 export const dynamic = "force-dynamic";
 
@@ -54,12 +56,25 @@ export async function POST(request: NextRequest) {
       .setExpirationTime("15m")
       .sign(secret);
 
+    // Best-effort: surface the active workspace name so the extension can
+    // show it in place of the generic "AI ready" label. Never fail the
+    // token exchange over this — degrade to null.
+    let workspaceName: string | null = null;
+    try {
+      const { workspaceId } = await resolveWorkspaceForUserLight(uid, request);
+      const workspace = await getWorkspace(workspaceId);
+      workspaceName = workspace?.name?.trim() || null;
+    } catch {
+      workspaceName = null;
+    }
+
     return apiSuccess(
       {
         extensionToken,
         user: {
           uid,
           email,
+          workspaceName,
         },
       },
       null,

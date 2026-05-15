@@ -18,6 +18,7 @@ import { tryBuildRequestContext } from "@/lib/server/requestContext";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { composeFullName } from "@/lib/utils/nameSplit";
+import { resolveUserAvatars } from "@/lib/utils/resolveUserAvatar";
 
 async function loadViewerProfileForBundle(
   uid: string
@@ -33,7 +34,11 @@ async function loadViewerProfileForBundle(
         typeof d.firstName === "string" ? d.firstName : null,
         typeof d.lastName === "string" ? d.lastName : null
       );
-      displayName = composed || null;
+      displayName =
+        composed ||
+        (typeof d.authDisplayName === "string" && d.authDisplayName.trim()
+          ? d.authDisplayName.trim()
+          : null);
       avatarUrl =
         typeof d.photoURL === "string" && d.photoURL.trim()
           ? d.photoURL.trim()
@@ -191,7 +196,27 @@ export async function GET(req: NextRequest) {
     let nextCursor: string | null | undefined;
     let hasMore: boolean | undefined;
     if (feedbackPageResult) {
-      feedbackPayload = feedbackPageResult.feedback.map((f) => serializeFeedback(f, access));
+      // Phase 25.1: override the stale creator/assignee avatar snapshots
+      // with the live users/{uid} avatar.
+      const liveAvatarByUid = await resolveUserAvatars([
+        ...feedbackPageResult.feedback.map((f) => f.userId),
+        ...feedbackPageResult.feedback.map((f) => f.assigneeId),
+      ]);
+      feedbackPayload = feedbackPageResult.feedback.map((f) => {
+        const uid = typeof f.userId === "string" ? f.userId : "";
+        const assigneeId =
+          typeof f.assigneeId === "string" ? f.assigneeId : "";
+        const base = serializeFeedback(f, access);
+        return {
+          ...base,
+          creatorAvatarUrl:
+            (uid && liveAvatarByUid.get(uid)) ?? base.creatorAvatarUrl ?? null,
+          assigneeAvatarUrl:
+            (assigneeId && liveAvatarByUid.get(assigneeId)) ??
+            base.assigneeAvatarUrl ??
+            null,
+        };
+      });
       nextCursor = feedbackPageResult.nextCursor;
       hasMore = feedbackPageResult.hasMore;
     }

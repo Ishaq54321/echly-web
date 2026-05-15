@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { apiSuccess, apiError } from "@/lib/server/apiResponse";
 import { tryGetAuthUser } from "@/lib/server/auth/authorize";
-import { composeFullName } from "@/lib/utils/nameSplit";
+import { resolveUserName } from "@/lib/utils/nameSplit";
 
 export const dynamic = "force-dynamic";
 
@@ -51,13 +51,21 @@ export async function GET(
         const data = doc.data();
         participants.push({
           uid: doc.id,
-          displayName:
-            composeFullName(
+          displayName: resolveUserName({
+            firstName:
               typeof data?.firstName === "string" ? data.firstName : null,
-              typeof data?.lastName === "string" ? data.lastName : null
-            ) || (typeof data?.email === "string" ? data.email.split("@")[0] : "") || "User",
+            lastName:
+              typeof data?.lastName === "string" ? data.lastName : null,
+            authDisplayName:
+              typeof data?.authDisplayName === "string"
+                ? data.authDisplayName
+                : null,
+            email: typeof data?.email === "string" ? data.email : null,
+          }),
           email: data?.email || "",
-          avatarUrl: data?.photoURL || data?.avatarUrl || null,
+          // Phase 25.1: avatarUrl (uploaded) takes precedence over the
+          // legacy/OAuth photoURL — match resolveUserAvatar ordering.
+          avatarUrl: data?.avatarUrl || data?.photoURL || null,
         });
       }
     });

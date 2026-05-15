@@ -8,6 +8,7 @@ import {
   getWorkspaceMembersRepo,
   getWorkspacePendingInvitationsRepo,
 } from "@/lib/repositories/workspaceMembersRepository.server";
+import { resolveUserAvatars } from "@/lib/utils/resolveUserAvatar";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,11 @@ export async function GET(req: NextRequest) {
       getWorkspacePendingInvitationsRepo(workspaceId),
     ]);
 
+    // Phase 25.1: resolve avatars LIVE from users/{uid} — the member-doc
+    // snapshot is captured at invite time and never re-synced on photo
+    // change, so it overrides the stale snapshot here.
+    const avatarMap = await resolveUserAvatars(members.map((m) => m.uid));
+
     const activeRows: UnifiedMemberRow[] = [
       ...members.filter((m) => m.role === "OWNER"),
       ...members
@@ -56,7 +62,7 @@ export async function GET(req: NextRequest) {
       joinedAt: m.joinedAt
         ? { seconds: m.joinedAt.seconds, nanoseconds: m.joinedAt.nanoseconds }
         : null,
-      avatarUrl: m.avatarUrl ?? null,
+      avatarUrl: avatarMap.get(m.uid) ?? m.avatarUrl ?? null,
       invitationToken: null,
     }));
 

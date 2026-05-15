@@ -9,9 +9,9 @@ import type { FeedbackItemShape } from "@/components/session/feedbackDetail/type
 import type { ShareSurfacePermissions } from "@/lib/access/resolveAccess";
 import type { Priority } from "@/lib/domain/feedback";
 import {
+  SquareKanban,
   Check,
   Clock,
-  MessageSquare,
   Lock,
   Trash2,
   RotateCcw,
@@ -65,9 +65,15 @@ export interface SessionFeedbackHeaderProps {
   impactScore?: number | null;
   onResolvedChange?: (isResolved: boolean) => void;
   resolveSubmitting?: boolean;
-  onOpenComment?: () => void;
-  onCloseCommentMode?: () => void;
-  isCommentMode?: boolean;
+  /**
+   * Toggles the activity rail (history timeline). Phase 26.8: a
+   * single click opens it, a second click closes it. Phase 26.7
+   * removed pin-placement from this button — that moved to the
+   * MapPin action on the screenshot. See ScreenshotWithPins.
+   */
+  onToggleActivity?: () => void;
+  /** Reflects panel open state so the button can show a pressed style. */
+  isActivityPanelOpen?: boolean;
   onDelete?: () => void;
   readOnly?: boolean;
   readOnlyPermissions?: { canResolve: boolean; canComment: boolean };
@@ -105,9 +111,8 @@ export function SessionFeedbackHeader({
   impactScore,
   onResolvedChange,
   resolveSubmitting = false,
-  onOpenComment,
-  onCloseCommentMode,
-  isCommentMode = false,
+  onToggleActivity,
+  isActivityPanelOpen = false,
   onDelete,
   readOnly = false,
   readOnlyPermissions,
@@ -340,10 +345,15 @@ export function SessionFeedbackHeader({
                     />
                   </div>
                 ) : null}
-                {/* Comment */}
-                <button type="button" className={actionBtn} onClick={gateComment}>
-                  <MessageSquare size={14} strokeWidth={1.5} />
-                  Comment
+                {/* Activity */}
+                <button
+                  type="button"
+                  className={actionBtn}
+                  onClick={gateComment}
+                  aria-label="Open activity"
+                >
+                  <SquareKanban size={14} strokeWidth={1.5} />
+                  Activity
                 </button>
               </>
             ) : null
@@ -383,15 +393,16 @@ export function SessionFeedbackHeader({
                     </button>
                   )
                 ) : null}
-                {/* Comment (read-only) */}
+                {/* Activity (read-only) */}
                 {readOnlyPermissions?.canComment ? (
                   <button
                     type="button"
                     disabled
                     className={`${actionBtn} opacity-60 cursor-not-allowed`}
+                    aria-label="Open activity"
                   >
-                    <MessageSquare size={14} strokeWidth={1.5} />
-                    Comment
+                    <SquareKanban size={14} strokeWidth={1.5} />
+                    Activity
                   </button>
                 ) : isAnonymousViewer ? (
                   <button
@@ -402,9 +413,10 @@ export function SessionFeedbackHeader({
                       )}`;
                     }}
                     className={actionBtn}
+                    aria-label="Open activity"
                   >
-                    <MessageSquare size={14} strokeWidth={1.5} />
-                    Comment
+                    <SquareKanban size={14} strokeWidth={1.5} />
+                    Activity
                   </button>
                 ) : null}
                 {/* Assign (read-only dropdown) */}
@@ -540,30 +552,37 @@ export function SessionFeedbackHeader({
                   />
                 </div>
               ) : null}
-              {/* Comment */}
-              {onOpenComment ? (
+              {/* Activity — toggle (Phase 26.8): click opens, click again closes */}
+              {onToggleActivity ? (
                 <button
                   type="button"
-                  onClick={() => isCommentMode ? onCloseCommentMode?.() : onOpenComment()}
-                  className={isCommentMode ? actionBtnActive : actionBtn}
+                  onClick={onToggleActivity}
+                  className={isActivityPanelOpen ? actionBtnActive : actionBtn}
+                  aria-pressed={isActivityPanelOpen}
+                  aria-label={isActivityPanelOpen ? "Close activity panel" : "Open activity panel"}
                 >
-                  <MessageSquare size={14} strokeWidth={1.5} />
-                  Comment
+                  <SquareKanban size={14} strokeWidth={1.5} />
+                  Activity
                 </button>
               ) : null}
               {/* Spacer */}
               <div className="flex-1" />
-              {/* Delete */}
+              {/* Delete — wrapped in a flex box so the Tooltip's
+                  inline-flex anchor becomes a block-level flex item
+                  that items-center aligns on the row baseline (Phase
+                  26.8: fixes the trash icon sitting ~2px high). */}
               {onDelete ? (
-                <Tooltip content="Delete">
-                  <button
-                    type="button"
-                    onClick={onDelete}
-                    className={actionBtnDelete}
-                  >
-                    <Trash2 size={14} strokeWidth={1.5} />
-                  </button>
-                </Tooltip>
+                <div className="flex items-center">
+                  <Tooltip content="Delete">
+                    <button
+                      type="button"
+                      onClick={onDelete}
+                      className={actionBtnDelete}
+                    >
+                      <Trash2 size={14} strokeWidth={1.5} />
+                    </button>
+                  </Tooltip>
+                </div>
               ) : null}
             </>
           ) : null}

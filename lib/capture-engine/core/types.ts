@@ -33,6 +33,8 @@ export type SessionFeedbackPending = {
   screenshot?: string | null;
   context: CaptureContext | null;
   elementRect?: ElementRect | null;
+  /** Live reference to the clicked element so the persistent selection overlay can re-measure on scroll/resize. */
+  targetElement?: HTMLElement | null;
 };
 
 /** Context captured with the region (URL, scroll, viewport, selected-element subtree). */
@@ -84,7 +86,7 @@ export interface Recording {
   createdAt: number;
 }
 
-/** Voice capture failure shown in VoiceCapturePanel (session / overlay). */
+/** Voice capture failure shown in the CapturePill (session / overlay). */
 export type VoiceCaptureError =
   | null
   | "no_audio"
@@ -105,6 +107,8 @@ export type CaptureState =
 export type CaptureWidgetProps = {
   sessionId: string;
   userId: string;
+  /** Active workspace name (extension). Shown in the home-screen footer in place of the generic "AI ready" label. Null while loading — UI falls back to "Annote". */
+  workspaceName?: string | null;
   /** When true, disables auto-collapse on blur/outside click and locks tray during recording. */
   extensionMode?: boolean;
   initialPointers?: StructuredFeedback[];

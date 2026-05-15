@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import type { Editor } from "@tiptap/react";
 import { useVoiceRecording } from "./useVoiceRecording";
 import { usePortalHost } from "./PortalHost";
+import { Waveform } from "@/lib/capture-engine/pill/Waveform";
 
 export type VoiceStatus = "recording" | "transcribing" | "done" | null;
 
@@ -29,151 +30,10 @@ const POPOVER_WIDTH = 280;
 const POPOVER_MAX_HEIGHT = 160;
 const GAP = 8;
 
-const WAVE_HEIGHT = 48;
-const BAR_WIDTH = 3;
-const BAR_GAP = 2;
-const STEP = BAR_WIDTH + BAR_GAP;
-const MIN_BAR_PX = 2;
-
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
-function Waveform({ analyser }: { analyser: AnalyserNode | null }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const cssSizeRef = useRef<{ w: number; h: number }>({ w: 0, h: WAVE_HEIGHT });
-  const barCountRef = useRef(40);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    const canvas = canvasRef.current;
-    if (!container || !canvas) return;
-
-    const dpr = window.devicePixelRatio || 1;
-
-    const apply = (width: number) => {
-      const cssW = Math.max(1, Math.floor(width));
-      const cssH = WAVE_HEIGHT;
-      canvas.width = Math.max(1, Math.floor(cssW * dpr));
-      canvas.height = Math.max(1, Math.floor(cssH * dpr));
-      canvas.style.width = cssW + "px";
-      canvas.style.height = cssH + "px";
-      const ctx = canvas.getContext("2d");
-      if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      cssSizeRef.current = { w: cssW, h: cssH };
-      barCountRef.current = Math.max(8, Math.floor(cssW / STEP));
-    };
-
-    apply(container.getBoundingClientRect().width);
-
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      apply(entry.contentRect.width);
-    });
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    let rafId = 0;
-    let bufferLength = 0;
-    let frequencyData: Uint8Array<ArrayBuffer> | null = null;
-
-    if (analyser) {
-      bufferLength = analyser.frequencyBinCount;
-      frequencyData = new Uint8Array(new ArrayBuffer(bufferLength));
-    }
-
-    /* Read brand colors from CSS variables so the waveform matches the
-       active theme in both the dashboard and the extension shadow DOM. */
-    const styles = getComputedStyle(canvas);
-    const brandStart = styles.getPropertyValue("--brand").trim() || "#5A49BF";
-    const brandEnd = styles.getPropertyValue("--brand-secondary").trim() || "#7B6ACC";
-
-    const tick = () => {
-      rafId = requestAnimationFrame(tick);
-      const { w: cssW, h: cssH } = cssSizeRef.current;
-      const barCount = barCountRef.current;
-      if (cssW <= 0 || barCount <= 0) return;
-
-      ctx.clearRect(0, 0, cssW, cssH);
-
-      const gradient = ctx.createLinearGradient(0, 0, cssW, 0);
-      gradient.addColorStop(0, brandStart);
-      gradient.addColorStop(1, brandEnd);
-      ctx.fillStyle = gradient;
-
-      const centerY = cssH / 2;
-      const maxHeight = cssH - 4;
-
-      // Total drawn width to center bars horizontally
-      const drawWidth = barCount * STEP - BAR_GAP;
-      const offsetX = Math.max(0, (cssW - drawWidth) / 2);
-
-      if (analyser && frequencyData) {
-        analyser.getByteFrequencyData(frequencyData);
-      }
-
-      for (let i = 0; i < barCount; i++) {
-        let value = 0;
-        if (analyser && frequencyData && bufferLength > 0) {
-          // Sample logarithmically-ish across the lower frequency bins.
-          const binIndex = Math.min(
-            bufferLength - 1,
-            Math.floor((i / barCount) * (bufferLength * 0.7)),
-          );
-          value = frequencyData[binIndex] / 255;
-        }
-
-        const rawHeight = value * maxHeight;
-        const barHeight = Math.max(MIN_BAR_PX, rawHeight);
-        const x = offsetX + i * STEP;
-        const y = centerY - barHeight / 2;
-
-        // Rounded vertical bar
-        const r = BAR_WIDTH / 2;
-        ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.lineTo(x + BAR_WIDTH - r, y);
-        ctx.quadraticCurveTo(x + BAR_WIDTH, y, x + BAR_WIDTH, y + r);
-        ctx.lineTo(x + BAR_WIDTH, y + barHeight - r);
-        ctx.quadraticCurveTo(
-          x + BAR_WIDTH,
-          y + barHeight,
-          x + BAR_WIDTH - r,
-          y + barHeight,
-        );
-        ctx.lineTo(x + r, y + barHeight);
-        ctx.quadraticCurveTo(x, y + barHeight, x, y + barHeight - r);
-        ctx.lineTo(x, y + r);
-        ctx.quadraticCurveTo(x, y, x + r, y);
-        ctx.closePath();
-        ctx.fill();
-      }
-    };
-
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
-  }, [analyser]);
-
-  return (
-    <div
-      ref={containerRef}
-      style={{ width: "100%", height: WAVE_HEIGHT }}
-      className="relative"
-    >
-      <canvas ref={canvasRef} />
-    </div>
-  );
 }
 
 export function VoiceRecordingPopover({
@@ -408,7 +268,15 @@ export function VoiceRecordingPopover({
               </span>
             </div>
 
-            <Waveform analyser={analyserNode} />
+            <div className="flex justify-center" style={{ height: 48 }}>
+              <Waveform
+                source={analyserNode}
+                barCount={48}
+                height={48}
+                width={232}
+                color="var(--overlay-dark-text)"
+              />
+            </div>
 
             <div className="flex items-center gap-2 mt-3">
               <button

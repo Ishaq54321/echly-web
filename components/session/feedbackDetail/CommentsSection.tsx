@@ -339,6 +339,12 @@ export interface CommentsSectionProps {
   currentUserAvatarUrl?: string;
   participants?: Participant[];
   showToast?: (msg: string) => void;
+  /**
+   * Phase 26.7: clicking a screenshot pin scrolls the matching comment
+   * into view here and briefly highlights it. The parent owns this
+   * state and auto-clears it after ~2s.
+   */
+  highlightedCommentId?: string | null;
 }
 
 function getCommentTimeMs(c: Comment): number {
@@ -363,9 +369,13 @@ function ThreadBlock({
   sendReply,
   participants,
   showToast,
+  rowRef,
+  isHighlighted,
 }: {
   root: Comment;
   replies: Comment[];
+  rowRef?: (el: HTMLDivElement | null) => void;
+  isHighlighted?: boolean;
   currentUserId: string | null;
   currentUserName?: string;
   currentUserInitial?: string;
@@ -458,7 +468,12 @@ function ThreadBlock({
   );
 
   return (
-    <div className="rounded-xl px-3 py-2 min-w-0">
+    <div
+      ref={rowRef}
+      className={`comment-row rounded-xl px-3 py-2 min-w-0 ${
+        isHighlighted ? "comment-row--highlighted" : ""
+      }`}
+    >
       <CommentItem
         comment={root}
         currentUserId={currentUserId}
@@ -676,7 +691,11 @@ export function CommentsSection({
   currentUserAvatarUrl,
   participants,
   showToast,
+  highlightedCommentId,
 }: CommentsSectionProps) {
+  // Phase 26.7: maps a root comment id → its rendered row, so a pin
+  // click in the parent can scroll the matching comment into view.
+  const commentRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [composeExpanded, setComposeExpanded] = useState(false);
   const [composeHasContent, setComposeHasContent] = useState(false);
   const [composePendingAttachments, setComposePendingAttachments] = useState<CommentAttachment[]>([]);
@@ -721,6 +740,16 @@ export function CommentsSection({
       document.removeEventListener("scroll", handleScroll, true);
     };
   }, [composeEmojiOpen]);
+
+  // Phase 26.7: when a pin is clicked in the parent, scroll the matching
+  // comment row into view. The brief highlight visual is driven by
+  // `highlightedCommentId` directly in the row's className below.
+  useEffect(() => {
+    if (!highlightedCommentId) return;
+    const el = commentRefs.current.get(highlightedCommentId);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightedCommentId]);
 
   const scoped = useMemo(
     () => comments.filter((c) => c.feedbackId === selectedTicketId),
@@ -814,34 +843,26 @@ export function CommentsSection({
               <span className="flex-1 min-w-0 truncate text-[13.5px] text-[var(--text-tertiary)]">
                 Leave a comment...
               </span>
-              <span className="flex items-center gap-0.5 shrink-0">
-                <Tooltip content="Mention someone">
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setComposeExpanded(true); }}
-                    className="w-[26px] h-[26px] rounded-md grid place-items-center text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] transition-colors duration-120 border-0 bg-transparent cursor-pointer"
-                  >
-                    <AtSign className="h-3.5 w-3.5" strokeWidth={1.5} />
-                  </button>
-                </Tooltip>
-                <Tooltip content="Add emoji">
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setComposeExpanded(true); }}
-                    className="w-[26px] h-[26px] rounded-md grid place-items-center text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] transition-colors duration-120 border-0 bg-transparent cursor-pointer"
-                  >
-                    <Smile className="h-3.5 w-3.5" strokeWidth={1.5} />
-                  </button>
-                </Tooltip>
-                <Tooltip content="Attach file">
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setComposeExpanded(true); }}
-                    className="w-[26px] h-[26px] rounded-md grid place-items-center text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] transition-colors duration-120 border-0 bg-transparent cursor-pointer"
-                  >
-                    <Paperclip className="h-3.5 w-3.5" strokeWidth={1.5} />
-                  </button>
-                </Tooltip>
+              {/* Default (unfocused) state: icons are purely indicative —
+                  no hover effect, no tooltip, no pointer cursor. They become
+                  interactive only once the composer is clicked (expanded).
+                  pointer-events:none keeps clicks/hover from reaching the
+                  icons; the click falls through to the parent row which
+                  expands the composer. */}
+              <span
+                className="flex items-center gap-0.5 shrink-0"
+                style={{ pointerEvents: "none" }}
+                aria-hidden="true"
+              >
+                <span className="w-[26px] h-[26px] rounded-md grid place-items-center text-[var(--text-tertiary)]">
+                  <AtSign className="h-3.5 w-3.5" strokeWidth={1.5} />
+                </span>
+                <span className="w-[26px] h-[26px] rounded-md grid place-items-center text-[var(--text-tertiary)]">
+                  <Smile className="h-3.5 w-3.5" strokeWidth={1.5} />
+                </span>
+                <span className="w-[26px] h-[26px] rounded-md grid place-items-center text-[var(--text-tertiary)]">
+                  <Paperclip className="h-3.5 w-3.5" strokeWidth={1.5} />
+                </span>
               </span>
             </div>
           ) : (
@@ -1008,6 +1029,11 @@ export function CommentsSection({
               key={root.id}
               root={root}
               replies={repliesByThread.get(root.id) ?? []}
+              rowRef={(el) => {
+                if (el) commentRefs.current.set(root.id, el);
+                else commentRefs.current.delete(root.id);
+              }}
+              isHighlighted={highlightedCommentId === root.id}
               currentUserId={currentUserId}
               currentUserName={currentUserName}
               currentUserInitial={currentUserInitial}

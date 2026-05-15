@@ -12,7 +12,8 @@ import { tryGetAuthUser } from "@/lib/server/auth/authorize";
 import { tryBuildRequestContext } from "@/lib/server/requestContext";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { adminDb } from "@/lib/server/firebaseAdmin";
-import { composeFullName } from "@/lib/utils/nameSplit";
+import { resolveUserName } from "@/lib/utils/nameSplit";
+import { resolveUserAvatars } from "@/lib/utils/resolveUserAvatar";
 import type { Feedback } from "@/lib/domain/feedback";
 
 async function buildUserNameMap(userIds: string[]): Promise<Map<string, string>> {
@@ -25,15 +26,13 @@ async function buildUserNameMap(userIds: string[]): Promise<Map<string, string>>
   for (const snap of snaps) {
     if (!snap.exists) continue;
     const data = snap.data() ?? {};
-    const composed = composeFullName(
-      typeof data.firstName === "string" ? data.firstName : null,
-      typeof data.lastName === "string" ? data.lastName : null
-    );
-    const fallback =
-      typeof data.email === "string" && data.email.includes("@")
-        ? data.email.split("@")[0]
-        : "";
-    const name = composed || fallback || "Anonymous";
+    const name = resolveUserName({
+      firstName: typeof data.firstName === "string" ? data.firstName : null,
+      lastName: typeof data.lastName === "string" ? data.lastName : null,
+      authDisplayName:
+        typeof data.authDisplayName === "string" ? data.authDisplayName : null,
+      email: typeof data.email === "string" ? data.email : null,
+    });
     map.set(snap.id, name);
   }
   return map;
@@ -142,12 +141,31 @@ export async function GET(req: NextRequest) {
         accessibleFeedback.map((f) => f.userId).filter((id): id is string => typeof id === "string")
       );
 
+      // Phase 25.1: resolve creator + assignee avatars LIVE from
+      // users/{uid}. The creatorAvatarUrl / assigneeAvatarUrl frozen on
+      // the feedback doc go stale on photo change (no fan-out).
+      const liveAvatarByUid = await resolveUserAvatars([
+        ...accessibleFeedback.map((f) => f.userId),
+        ...accessibleFeedback.map((f) => f.assigneeId),
+      ]);
+
       const payload = accessibleFeedback.map((f) => {
         const sid = f.sessionId;
         const name = titleBySessionId.get(sid);
         const uid = typeof f.userId === "string" ? f.userId : "";
+        const assigneeId =
+          typeof f.assigneeId === "string" ? f.assigneeId : "";
+        const base = serializeFeedback(f, accessBySessionId.get(sid)!);
         return {
-          ...serializeFeedback(f, accessBySessionId.get(sid)!),
+          ...base,
+          creatorAvatarUrl:
+            (uid && liveAvatarByUid.get(uid)) ??
+            base.creatorAvatarUrl ??
+            null,
+          assigneeAvatarUrl:
+            (assigneeId && liveAvatarByUid.get(assigneeId)) ??
+            base.assigneeAvatarUrl ??
+            null,
           sessionName: name === undefined ? "" : name,
           userName: (uid && userNameMap.get(uid)) || "Anonymous",
         };
@@ -201,9 +219,32 @@ export async function GET(req: NextRequest) {
     });
     const { feedback, nextCursor, hasMore } = pageResult;
 
+    // Phase 25.1: override stale creator/assignee avatar snapshots with
+    // the live users/{uid} avatar.
+    const liveAvatarByUid = await resolveUserAvatars([
+      ...feedback.map((f) => f.userId),
+      ...feedback.map((f) => f.assigneeId),
+    ]);
+
     return apiSuccess(
       {
-        feedback: feedback.map((f) => serializeFeedback(f, access)),
+        feedback: feedback.map((f) => {
+          const uid = typeof f.userId === "string" ? f.userId : "";
+          const assigneeId =
+            typeof f.assigneeId === "string" ? f.assigneeId : "";
+          const base = serializeFeedback(f, access);
+          return {
+            ...base,
+            creatorAvatarUrl:
+              (uid && liveAvatarByUid.get(uid)) ??
+              base.creatorAvatarUrl ??
+              null,
+            assigneeAvatarUrl:
+              (assigneeId && liveAvatarByUid.get(assigneeId)) ??
+              base.assigneeAvatarUrl ??
+              null,
+          };
+        }),
         nextCursor,
         hasMore,
       },

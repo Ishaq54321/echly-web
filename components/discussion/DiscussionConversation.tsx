@@ -15,6 +15,7 @@ import {
 import { EmptyNoThreadSelectedIllustration } from "@/components/discussion/EmptyStateIllustrations";
 import { Modal } from "@/components/ui/Modal";
 import { authFetch } from "@/lib/authFetch";
+import { NAME_FALLBACK } from "@/lib/utils/nameSplit";
 import { handlePermissionError } from "@/lib/client/permissionError";
 import {
   addComment,
@@ -454,7 +455,7 @@ export function DiscussionConversation({
         feedbackId,
         data: {
           userId: authUid,
-          userName: displayName || "User",
+          userName: displayName || NAME_FALLBACK.UNKNOWN,
           userAvatar: authPhotoUrl || "",
           message: "",
           type: "general",
@@ -469,7 +470,7 @@ export function DiscussionConversation({
         try {
           await addComment(sid, feedbackId, optimisticComment.id, {
             userId: authUid,
-            userName: displayName || "User",
+            userName: displayName || NAME_FALLBACK.UNKNOWN,
             userAvatar: authPhotoUrl || "",
             message: "",
             type: "general",
@@ -512,7 +513,7 @@ export function DiscussionConversation({
         feedbackId,
         data: {
           userId: authUid,
-          userName: displayName || "User",
+          userName: displayName || NAME_FALLBACK.UNKNOWN,
           userAvatar: authPhotoUrl || "",
           message: trimmed,
           type: "general",
@@ -529,7 +530,7 @@ export function DiscussionConversation({
         try {
           await addComment(sid, feedbackId, optimisticComment.id, {
             userId: authUid,
-            userName: displayName || "User",
+            userName: displayName || NAME_FALLBACK.UNKNOWN,
             userAvatar: authPhotoUrl || "",
             message: trimmed,
             type: "general",
@@ -679,7 +680,7 @@ export function DiscussionConversation({
         feedbackId,
         data: {
           userId: authUid,
-          userName: displayName || "User",
+          userName: displayName || NAME_FALLBACK.UNKNOWN,
           userAvatar: authPhotoUrl || "",
           message: trimmed,
           type: "general",
@@ -695,7 +696,7 @@ export function DiscussionConversation({
         try {
           await addComment(sid, feedbackId, optimisticComment.id, {
             userId: authUid,
-            userName: displayName || "User",
+            userName: displayName || NAME_FALLBACK.UNKNOWN,
             userAvatar: authPhotoUrl || "",
             message: trimmed,
             type: "general",
@@ -1186,9 +1187,18 @@ export function DiscussionConversation({
                 ))}
               </div>
             ) : rootComments.length === 0 ? (
-              <p className="text-[13px] text-[var(--text-secondary)] py-2">
-                No replies yet. Be the first to comment.
-              </p>
+              <div className="px-5 py-4" aria-busy="true">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex gap-3 mb-4">
+                    <div className="w-8 h-8 rounded-full skel-block shrink-0" />
+                    <div className="flex-1">
+                      <div className="h-3 skel-block rounded-md mb-1.5" style={{ width: "20%" }} />
+                      <div className="h-3 skel-block rounded-md mb-1" style={{ width: `${85 - i * 10}%` }} />
+                      <div className="h-3 skel-block rounded-md" style={{ width: `${55 - i * 5}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
               <div className="space-y-0">
                 {rootComments.map((root) => {

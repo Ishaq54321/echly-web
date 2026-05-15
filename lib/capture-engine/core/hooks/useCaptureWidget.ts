@@ -547,6 +547,12 @@ export function useCaptureWidget({
       if (endWaitTimeoutRef.current != null) {
         window.clearTimeout(endWaitTimeoutRef.current);
       }
+      // Belt-and-braces: if the hook unmounts while a stream is still live
+      // (rare — both cancel and mode-switch handlers already call
+      // stopListeningAudio), release the tracks so the browser tab's
+      // recording indicator clears.
+      mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+      mediaStreamRef.current = null;
     };
   }, []);
 
@@ -1532,9 +1538,10 @@ export function useCaptureWidget({
         width: clickedRect.width,
         height: clickedRect.height,
       };
-      lastSessionClickedElementRef.current = element instanceof HTMLElement ? element : null;
+      const targetElement = element instanceof HTMLElement ? element : null;
+      lastSessionClickedElementRef.current = targetElement;
       sessionFeedbackPendingRef.current = true;
-      setPending({ screenshot: screenshot || undefined, context, elementRect });
+      setPending({ screenshot: screenshot || undefined, context, elementRect, targetElement });
       onSessionActivity?.();
     },
     [getFullTabImage, sessionFeedbackPending, onSessionActivity, feedbackLimitReached, triggerUpgradeShake]
@@ -1648,6 +1655,37 @@ export function useCaptureWidget({
     setSessionFeedbackSaving(false);
     setState("idle");
   }, [setPending, stopListeningAudio]);
+
+  /**
+   * Stop voice capture in-place without dismissing the pending feedback.
+   * Used when the user switches voice → text mid-recording: we tear down
+   * the MediaRecorder + audio nodes, but the pill keeps rendering so the
+   * text pill can take over.
+   */
+  const stopVoiceForModeSwitch = useCallback(() => {
+    setVoiceError(null);
+    setIsFinishing(false);
+    const recorder = mediaRecorderRef.current;
+    try {
+      if (recorder && recorder.state !== "inactive") {
+        recorder.ondataavailable = null;
+        recorder.onstop = null;
+        recorder.stop();
+      }
+    } catch (error) {
+      logger.error("error", "voice_stop_failed", error);
+    }
+    stopListeningAudio();
+    audioChunksRef.current = [];
+    mediaRecorderRef.current = null;
+    recordingActiveRef.current = false;
+    const activeId = activeRecordingIdRef.current;
+    if (activeId) {
+      setRecordings((prev) => prev.filter((r) => r.id !== activeId));
+      setActiveRecordingId(null);
+    }
+    setState("idle");
+  }, [stopListeningAudio]);
 
   const handleSessionStartVoice = useCallback(() => {
     if (feedbackLimitReached) {
@@ -1770,6 +1808,7 @@ export function useCaptureWidget({
       handleSessionElementClicked,
       handleSessionFeedbackSubmit,
       handleSessionFeedbackCancel,
+      stopVoiceForModeSwitch,
       handleSessionStartVoice,
       retryVoiceCapture,
       resetVoiceRecording,
@@ -1806,6 +1845,7 @@ export function useCaptureWidget({
       handleSessionElementClicked,
       handleSessionFeedbackSubmit,
       handleSessionFeedbackCancel,
+      stopVoiceForModeSwitch,
       handleSessionStartVoice,
       retryVoiceCapture,
       resetVoiceRecording,

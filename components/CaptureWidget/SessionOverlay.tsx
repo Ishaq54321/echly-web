@@ -5,9 +5,8 @@ import { createPortal } from "react-dom";
 import { attachElementHighlighter, detachElementHighlighter } from "./session/elementHighlighter";
 import { attachClickCapture, detachClickCapture } from "./session/clickCapture";
 import { SessionControlPanel } from "./SessionControlPanel";
-import { VoiceCapturePanel } from "./VoiceCapturePanel";
-import { TextFeedbackPanel } from "./TextFeedbackPanel";
-import type { CaptureContext, SessionFeedbackPending, VoiceCaptureError } from "@/lib/capture-engine/core/types";
+import { CapturePill } from "@/lib/capture-engine/pill";
+import type { SessionFeedbackPending, VoiceCaptureError } from "@/lib/capture-engine/core/types";
 
 function createCommentCursor() {
   const svg = [
@@ -37,6 +36,8 @@ export type SessionOverlayProps = {
   onDoneVoice: () => void;
   onSaveText: (transcript: string) => void;
   onCancel?: () => void;
+  /** Stop voice capture without dismissing pending feedback (mode-switch teardown). */
+  onStopVoiceForModeSwitch?: () => void;
   captureMode?: "voice" | "text";
   listeningAudioLevel?: number;
   audioAnalyser?: AnalyserNode | null;
@@ -74,15 +75,14 @@ export function SessionOverlay({
   onDoneVoice,
   onSaveText,
   onCancel,
+  onStopVoiceForModeSwitch,
   captureMode = "voice",
-  listeningAudioLevel = 0,
   audioAnalyser = null,
   voiceError = null,
   onRetryVoice,
   onResetVoice,
   onSelectMicrophone,
   voiceMicDeviceId = "",
-  theme = "dark",
   __extensionSavingState,
   onModeChange,
   captureSuspended = false,
@@ -167,11 +167,103 @@ export function SessionOverlay({
     }
   }, [onRecordVoice, onModeChange]);
 
-  /** Switch from voice panel to text panel while keeping the same pending feedback. */
+  /**
+   * Switch from voice panel to text panel while keeping the same pending feedback.
+   * Stops any in-flight MediaRecorder via the dedicated mode-switch handler
+   * (NOT onCancel — onCancel would dismiss the whole pill, killing the text
+   * mount we're about to do). Falls back to onCancel only if no stop handler
+   * is wired up — better to over-dismiss than to leak the recorder.
+   */
   const handleSwitchToText = useCallback(() => {
+    if (state === "voice_listening") {
+      if (onStopVoiceForModeSwitch) {
+        onStopVoiceForModeSwitch();
+      } else if (onCancel) {
+        onCancel();
+      }
+    }
+    voiceStartedForPendingRef.current = false;
     setOverrideCaptureMode("text");
     onModeChange?.("text");
-  }, [onModeChange]);
+  }, [state, onCancel, onStopVoiceForModeSwitch, onModeChange]);
+
+  /** Unified mode-change for the pill's hover-revealed toggle. */
+  const handlePillModeChange = useCallback(
+    (mode: "voice" | "text") => {
+      if (mode === "text") handleSwitchToText();
+      else handleSwitchToVoice();
+    },
+    [handleSwitchToText, handleSwitchToVoice],
+  );
+
+  /**
+   * Track whether the mic permission has been permanently blocked.
+   * Uses the Permissions API plus a timing heuristic: a getUserMedia rejection
+   * that returns in <150ms generally means the browser skipped the prompt
+   * (already-denied state). The hook recovered this logic from pre-pill commits.
+   */
+  const [micPermissionBlocked, setMicPermissionBlocked] = useState(false);
+  const lastErrorAtRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (voiceError === "mic_permission") {
+      lastErrorAtRef.current = Date.now();
+    }
+  }, [voiceError]);
+
+  useEffect(() => {
+    if (voiceError !== "mic_permission") {
+      setMicPermissionBlocked(false);
+      return;
+    }
+    let cancelled = false;
+    const elapsedSinceRetry =
+      lastErrorAtRef.current != null ? Date.now() - lastErrorAtRef.current : null;
+    /** Fast rejection (<150ms) → no prompt → permanent block. */
+    if (elapsedSinceRetry != null && elapsedSinceRetry < 150) {
+      setMicPermissionBlocked(true);
+    }
+    if (
+      typeof navigator !== "undefined" &&
+      navigator.permissions &&
+      typeof navigator.permissions.query === "function"
+    ) {
+      navigator.permissions
+        .query({ name: "microphone" as PermissionName })
+        .then((status) => {
+          if (cancelled) return;
+          if (status.state === "denied") setMicPermissionBlocked(true);
+        })
+        .catch(() => {
+          /* Permissions API not supported — rely on timing heuristic only */
+        });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [voiceError]);
+
+  /** Open browser's site-settings page so the user can flip mic from "blocked". */
+  const handleOpenSiteSettings = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const origin = window.location.origin;
+    const url = `chrome://settings/content/siteDetails?site=${encodeURIComponent(origin)}`;
+    let opened: Window | null = null;
+    try {
+      opened = window.open(url, "_blank");
+    } catch {
+      opened = null;
+    }
+    if (opened) return;
+    try {
+      void navigator.clipboard.writeText(url);
+      alert(
+        "Couldn't open settings directly. The URL is copied to your clipboard — paste it into your browser's address bar."
+      );
+    } catch {
+      alert(`Please open this URL in a new tab to manage microphone access:\n\n${url}`);
+    }
+  }, []);
 
   useEffect(() => {
     if (!sessionMode || !captureRoot) return;
@@ -247,23 +339,8 @@ export function SessionOverlay({
 
   const saving = Boolean(__extensionSavingState);
 
-  /* Derive element dimensions for the screenshot badge. */
-  const elemSelector: string | undefined = undefined;
-  const elemWidth = sessionFeedbackPending?.elementRect?.width
-    ? Math.round(sessionFeedbackPending.elementRect.width)
-    : undefined;
-  const elemHeight = sessionFeedbackPending?.elementRect?.height
-    ? Math.round(sessionFeedbackPending.elementRect.height)
-    : undefined;
-
   const content = (
     <>
-      {sessionFeedbackPending && (
-        <div
-          className="echly-dim-layer echly-dim-layer--visible"
-          aria-hidden
-        />
-      )}
       <div
         aria-hidden
         className="echly-session-overlay-cursor"
@@ -320,37 +397,25 @@ export function SessionOverlay({
         onResume={onResume}
         onEnd={onEnd}
       />
-      {sessionFeedbackPending && effectiveCaptureMode === "voice" && (
-        <VoiceCapturePanel
-          captureRoot={captureRoot}
-          screenshot={sessionFeedbackPending.screenshot ?? undefined}
-          audioLevel={listeningAudioLevel}
+      {sessionFeedbackPending && (
+        <CapturePill
+          targetElement={sessionFeedbackPending.targetElement ?? null}
+          analyser={!isFinishing && !voiceError ? (audioAnalyser ?? null) : null}
           isListening={state === "voice_listening" && !isFinishing && !voiceError}
           isFinishing={isFinishing}
-          onFinish={onDoneVoice}
-          onCancel={onCancel}
-          analyser={!isFinishing && !voiceError ? (audioAnalyser ?? null) : null}
+          mode={effectiveCaptureMode}
           voiceError={voiceError}
-          onRetryVoice={onRetryVoice}
-          onResetVoice={onResetVoice}
-          onSelectMicrophone={onSelectMicrophone}
-          voiceMicDeviceId={voiceMicDeviceId}
-          elementSelector={elemSelector}
-          elementWidth={elemWidth}
-          elementHeight={elemHeight}
-          onSwitchToText={handleSwitchToText}
-        />
-      )}
-      {sessionFeedbackPending && effectiveCaptureMode === "text" && (
-        <TextFeedbackPanel
-          screenshot={sessionFeedbackPending.screenshot ?? undefined}
-          onSubmit={onSaveText}
-          onCancel={onCancel}
-          theme={theme}
-          onSwitchToVoice={handleSwitchToVoice}
-          elementSelector={elemSelector}
-          elementWidth={elemWidth}
-          elementHeight={elemHeight}
+          micPermissionBlocked={micPermissionBlocked}
+          onSendVoice={onDoneVoice}
+          onCancel={onCancel ?? (() => {})}
+          onResetVoice={onResetVoice ?? (() => {})}
+          onSendText={onSaveText}
+          onRetryVoice={onRetryVoice ?? (() => {})}
+          onModeChange={handlePillModeChange}
+          onSelectMic={onSelectMicrophone}
+          selectedMicId={voiceMicDeviceId}
+          onOpenSiteSettings={handleOpenSiteSettings}
+          portalTarget={captureRoot}
         />
       )}
     </>

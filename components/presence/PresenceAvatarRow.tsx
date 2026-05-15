@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { usePresenceStore } from "@/lib/realtime/presenceStore";
+import { useUserAvatars } from "@/lib/hooks/useUserAvatars";
 
 const AVATAR_SIZE = 28;
 const MAX_VISIBLE = 4;
@@ -21,6 +22,12 @@ export function PresenceAvatarRow({ sessionId, currentUserId }: Props) {
     [presentUsers, currentUserId]
   );
 
+  // Phase 25.3: presence docs carry a stale denormalized photoURL snapshot.
+  // Resolve viewers' avatars LIVE so the cursor row reflects a photo change
+  // without a refresh. Falls back to the presence snapshot while loading.
+  const viewerUids = useMemo(() => others.map((u) => u.userId), [others]);
+  const liveAvatars = useUserAvatars(viewerUids);
+
   if (others.length === 0) return null;
 
   const visible = others.slice(0, MAX_VISIBLE);
@@ -35,9 +42,11 @@ export function PresenceAvatarRow({ sessionId, currentUserId }: Props) {
             style={{ boxShadow: "0 0 0 2px var(--color-warning)" }}
           >
             <UserAvatar
+              avatarUrl={liveAvatars.get(u.userId) ?? null}
               photoURL={u.photoURL}
               name={u.displayName}
               size={AVATAR_SIZE}
+              colorSeed={u.userId}
               alt={u.displayName ? `${u.displayName} viewing` : "Viewer"}
             />
           </span>

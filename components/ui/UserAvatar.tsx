@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { getInitials } from "@/lib/utils/getInitials";
+import { getAvatarColor } from "@/lib/utils/getAvatarColor";
 
 export interface UserAvatarProps {
   /** Highest priority: uploaded avatar URL stored in Firestore. */
@@ -14,11 +15,22 @@ export interface UserAvatarProps {
   name?: string | null;
   /** Pixel size. When provided, sets width/height/font inline. Omit to size via className. */
   size?: number;
+  /**
+   * Seed for the per-user fallback color (typically the user's uid).
+   * When set, the no-image branch paints `getAvatarColor(colorSeed)`
+   * INSIDE this component — callers must never wrap a background-colored
+   * div around <UserAvatar/> (that caused the SessionsWorkspace color
+   * bleed: the wrapper bg showed through the rounded image edges and
+   * flashed before the image loaded).
+   */
+  colorSeed?: string | null;
   className?: string;
+  /** Extra inline styles merged onto the wrapper (e.g. zIndex for stacks). Never set `background` here — use colorSeed. */
+  style?: CSSProperties;
   alt?: string;
-  /** Renders a neutral grey "A" circle for anonymous viewers. */
+  /** Renders a neutral grey "A" circle for anonymous viewers (never a hash color). */
   isAnonymous?: boolean;
-  /** Optional override for the initials chip styling. */
+  /** Optional override for the initials chip styling. Overrides colorSeed bg. */
   initialsClassName?: string;
 }
 
@@ -34,8 +46,13 @@ function resolveImageSrc(
 }
 
 /**
- * Canonical avatar: photo if available, else 2-char initials on brand blue,
- * else "?" on brand blue. Anonymous viewers get a neutral grey "A".
+ * Canonical avatar — the ONLY avatar renderer in the app.
+ *
+ * - Photo if available (painted on a transparent wrapper → no color leak).
+ * - Else initials on a per-user color derived from `colorSeed` (the uid),
+ *   so the same person is the same color on every screen.
+ * - Else initials on `--brand` when no seed is given.
+ * - Anonymous viewers get a neutral grey "A", never a hash color.
  */
 export function UserAvatar({
   avatarUrl,
@@ -43,7 +60,9 @@ export function UserAvatar({
   photoURL,
   name,
   size,
+  colorSeed,
   className = "",
+  style,
   alt = "User avatar",
   isAnonymous = false,
   initialsClassName,
@@ -77,8 +96,11 @@ export function UserAvatar({
     .join(" ");
 
   if (showImage) {
+    // Image branch: wrapper has NO background. The photo paints onto a
+    // transparent circle, so no fallback color can ever bleed at the edges
+    // or flash before the image decodes.
     return (
-      <span className={wrapperClass} style={sizeStyle}>
+      <span className={wrapperClass} style={{ ...sizeStyle, ...style }}>
         <img
           src={src}
           alt={alt}
@@ -94,9 +116,13 @@ export function UserAvatar({
       <span
         className={[
           wrapperClass,
-          "bg-[var(--surface-hover)] text-[var(--text-secondary)] font-semibold",
+          "text-[var(--text-secondary)] font-semibold",
         ].join(" ")}
-        style={sizeStyle}
+        style={{
+          ...sizeStyle,
+          ...style,
+          background: "var(--avatar-neutral-grey)",
+        }}
         aria-hidden
       >
         A
@@ -105,14 +131,28 @@ export function UserAvatar({
   }
 
   const initials = label ? getInitials(label) : "U";
-  const initialsCls =
-    initialsClassName ??
-    "bg-[var(--brand)] text-white font-semibold";
+
+  // No-image branch: the colored fallback bg lives HERE, keyed on the
+  // user's seed. initialsClassName (if provided) takes precedence and is
+  // expected to carry its own bg.
+  if (initialsClassName) {
+    return (
+      <span
+        className={[wrapperClass, initialsClassName].join(" ")}
+        style={{ ...sizeStyle, ...style }}
+        aria-hidden
+      >
+        {initials}
+      </span>
+    );
+  }
+
+  const fallbackBg = colorSeed ? getAvatarColor(colorSeed) : "var(--brand)";
 
   return (
     <span
-      className={[wrapperClass, initialsCls].join(" ")}
-      style={sizeStyle}
+      className={[wrapperClass, "text-white font-semibold"].join(" ")}
+      style={{ ...sizeStyle, ...style, background: fallbackBg }}
       aria-hidden
     >
       {initials}

@@ -7,7 +7,7 @@ import { assertWorkspaceActive } from "@/lib/server/assertWorkspaceActive";
 import { getWorkspaceMembersRepo } from "@/lib/repositories/workspaceMembersRepository.server";
 import type { WorkspaceMember } from "@/lib/domain/workspaceMember";
 import { adminDb } from "@/lib/server/firebaseAdmin";
-import { composeFullName } from "@/lib/utils/nameSplit";
+import { resolveUserName } from "@/lib/utils/nameSplit";
 
 export const dynamic = "force-dynamic";
 
@@ -35,39 +35,54 @@ export async function GET(req: NextRequest) {
         ),
     ];
 
-    const membersNeedingEnrichment = sorted.filter((m) => !m.avatarUrl || !m.displayName);
-    let membersWithAvatars: WorkspaceMember[] = sorted;
+    // Always read the LATEST user doc for every member. This sidesteps
+    // member-doc staleness on read paths: resolveUserName composes from the
+    // fresh users/{uid} data, falling back to the member-doc snapshot only
+    // when the user doc is missing (defensive — shouldn't happen).
+    const userRefs = sorted.map((m) => adminDb.doc(`users/${m.uid}`));
+    const userSnaps =
+      userRefs.length > 0 ? await adminDb.getAll(...userRefs) : [];
 
-    if (membersNeedingEnrichment.length > 0) {
-      const userRefs = membersNeedingEnrichment.map((m) => adminDb.doc(`users/${m.uid}`));
-      const userSnaps = await adminDb.getAll(...userRefs);
+    const userByUid: Record<string, Record<string, unknown> | null> = {};
+    userSnaps.forEach((snap, i) => {
+      userByUid[sorted[i]!.uid] = snap.exists
+        ? (snap.data() as Record<string, unknown>)
+        : null;
+    });
 
-      const avatarByUid: Record<string, string | null> = {};
-      const displayNameByUid: Record<string, string | null> = {};
+    const enriched: WorkspaceMember[] = sorted.map((m) => {
+      const data = userByUid[m.uid] ?? null;
+      const avatarFromUser =
+        typeof data?.avatarUrl === "string"
+          ? data.avatarUrl
+          : typeof data?.photoURL === "string"
+            ? data.photoURL
+            : null;
 
-      userSnaps.forEach((snap, i) => {
-        const uid = membersNeedingEnrichment[i]!.uid;
-        const data = snap.exists ? (snap.data() as Record<string, unknown>) : null;
-
-        avatarByUid[uid] =
-          typeof data?.avatarUrl === "string" ? data.avatarUrl :
-          typeof data?.photoURL === "string" ? data.photoURL : null;
-
-        displayNameByUid[uid] =
-          composeFullName(
-            typeof data?.firstName === "string" ? data.firstName : null,
-            typeof data?.lastName === "string" ? data.lastName : null
-          ) || null;
-      });
-
-      membersWithAvatars = sorted.map((m) => ({
+      return {
         ...m,
-        avatarUrl: m.avatarUrl ?? avatarByUid[m.uid] ?? null,
-        displayName: m.displayName ?? (displayNameByUid[m.uid] ?? null),
-      }));
-    }
+        // Phase 25.1: live users/{uid} avatar OVERRIDES the member-doc
+        // snapshot (which is captured at invite time and goes stale on
+        // photo change — there is no fan-out). Snapshot is only a
+        // defensive fallback if the user doc is missing entirely.
+        avatarUrl: avatarFromUser ?? m.avatarUrl ?? null,
+        displayName: resolveUserName({
+          firstName:
+            typeof data?.firstName === "string" ? data.firstName : null,
+          lastName: typeof data?.lastName === "string" ? data.lastName : null,
+          authDisplayName:
+            typeof data?.authDisplayName === "string"
+              ? data.authDisplayName
+              : null,
+          // Defensive: fall back to the member-doc snapshot if the user doc
+          // is missing entirely.
+          displayName: m.displayName,
+          email: m.email ?? (typeof data?.email === "string" ? data.email : null),
+        }),
+      };
+    });
 
-    const serialized = membersWithAvatars.map((m) => ({
+    const serialized = enriched.map((m) => ({
       ...m,
       joinedAt: m.joinedAt
         ? { seconds: m.joinedAt.seconds, nanoseconds: m.joinedAt.nanoseconds }

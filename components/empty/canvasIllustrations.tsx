@@ -80,6 +80,14 @@ const BadgeText = ({ x, y, size = 34 }: { x: number; y: number; size?: number })
   </g>
 );
 
+const BadgeClock = ({ x, y, size = 34 }: { x: number; y: number; size?: number }) => (
+  <g transform={`translate(${x + size / 2} ${y + size / 2}) scale(${size / 32})`}>
+    <circle r="14" fill="#6B7280" />
+    <circle r="8.5" fill="none" stroke="#fff" strokeWidth="2" />
+    <path d="M0 -4.5 V0 L3.5 2.5" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </g>
+);
+
 const BadgeChecklist = ({ x, y, size = 34 }: { x: number; y: number; size?: number }) => (
   <g transform={`translate(${x + size / 2} ${y + size / 2}) scale(${size / 32})`}>
     <circle r="14" fill="#6B7280" />
@@ -373,6 +381,28 @@ export function NoActionStepsIllu({ className }: IlluProps) {
         <rect x="30" y="56" width="40" height="4" rx="2" fill="#E5E7EB" />
       </g>
       <BadgeChecklist x={148} y={112} size={34} />
+    </Frame>
+  );
+}
+
+/** #13 No activity — timeline card (connector + event nodes) + clock badge */
+export function NoActivityIllu({ className }: IlluProps) {
+  return (
+    <Frame className={className}>
+      <g transform="translate(100 80) rotate(-3) translate(-50 -40)">
+        <rect width="100" height="80" rx="12" fill="#FFFFFF" stroke="#D1D5DB" strokeWidth="1.5" />
+        {/* vertical connector — mirrors the panel's own row connector */}
+        <line x1="22" y1="22" x2="22" y2="58" stroke="#E5E7EB" strokeWidth="1.5" />
+        <circle cx="22" cy="22" r="4.5" fill="#F3F4F6" stroke="#D1D5DB" strokeWidth="1.5" />
+        <rect x="34" y="18" width="50" height="4" rx="2" fill="#E5E7EB" />
+        <rect x="34" y="26" width="30" height="3" rx="1.5" fill="#F3F4F6" />
+        <circle cx="22" cy="42" r="4.5" fill="#F3F4F6" stroke="#D1D5DB" strokeWidth="1.5" />
+        <rect x="34" y="38" width="42" height="4" rx="2" fill="#E5E7EB" />
+        <rect x="34" y="46" width="24" height="3" rx="1.5" fill="#F3F4F6" />
+        <circle cx="22" cy="58" r="4.5" fill="#F3F4F6" stroke="#D1D5DB" strokeWidth="1.5" />
+        <rect x="34" y="56" width="36" height="4" rx="2" fill="#E5E7EB" />
+      </g>
+      <BadgeClock x={148} y={112} size={34} />
     </Frame>
   );
 }

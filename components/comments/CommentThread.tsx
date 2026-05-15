@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import Image from "next/image";
 import { getInitials } from "@/lib/utils/getInitials";
+import { NAME_FALLBACK } from "@/lib/utils/nameSplit";
 
 export interface CommentDisplay {
   id: string;
@@ -18,8 +19,8 @@ interface Props {
 
 function buildThreadSummary(comments: CommentDisplay[]): string {
   const count = comments.length;
-  const first = comments[0]?.name?.trim() || "Anonymous";
-  const last = comments[count - 1]?.name?.trim() || "Anonymous";
+  const first = comments[0]?.name?.trim() || NAME_FALLBACK.ANONYMOUS;
+  const last = comments[count - 1]?.name?.trim() || NAME_FALLBACK.ANONYMOUS;
   const samePerson = first === last;
   const participantLabel = samePerson ? first : `${first} and ${last}`;
   const timeNote =

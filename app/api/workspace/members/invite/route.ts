@@ -19,14 +19,17 @@ import type { WorkspaceMemberRole } from "@/lib/domain/workspaceMember";
 import { checkPlanLimit } from "@/lib/billing/checkPlanLimit";
 import type { PlanLimitError } from "@/lib/billing/checkPlanLimit";
 import { planLimitReachedApiError } from "@/lib/billing/planLimitResponse";
-import { composeFullName } from "@/lib/utils/nameSplit";
+import { resolveUserName } from "@/lib/utils/nameSplit";
 
 function composeUserName(data: Record<string, unknown> | null | undefined): string {
   if (!data) return "";
-  return composeFullName(
-    typeof data.firstName === "string" ? data.firstName : null,
-    typeof data.lastName === "string" ? data.lastName : null
-  );
+  return resolveUserName({
+    firstName: typeof data.firstName === "string" ? data.firstName : null,
+    lastName: typeof data.lastName === "string" ? data.lastName : null,
+    authDisplayName:
+      typeof data.authDisplayName === "string" ? data.authDisplayName : null,
+    email: typeof data.email === "string" ? data.email : null,
+  });
 }
 
 export const dynamic = "force-dynamic";

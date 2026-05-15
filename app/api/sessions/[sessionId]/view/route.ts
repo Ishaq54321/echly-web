@@ -19,7 +19,11 @@ async function loadViewerProfile(
         typeof d.firstName === "string" ? d.firstName : null,
         typeof d.lastName === "string" ? d.lastName : null
       );
-      displayName = composed || null;
+      displayName =
+        composed ||
+        (typeof d.authDisplayName === "string" && d.authDisplayName.trim()
+          ? d.authDisplayName.trim()
+          : null);
       avatarUrl =
         typeof d.photoURL === "string" && d.photoURL.trim()
           ? d.photoURL.trim()

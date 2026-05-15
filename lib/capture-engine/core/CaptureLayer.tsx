@@ -46,6 +46,8 @@ export type CaptureLayerProps = {
   onSessionDoneVoice?: () => void;
   onSessionSaveText?: (transcript: string) => void;
   onSessionFeedbackCancel?: () => void;
+  /** Stop the voice pipeline without dismissing the pending feedback (used when switching voice → text mid-recording). */
+  onStopVoiceForModeSwitch?: () => void;
   /** When "voice", element click opens voice UI; when "text", opens text UI. No per-click choice. */
   captureMode?: "voice" | "text";
   /** 0–1 normalized level for voice waveform (from useCaptureWidget state). */
@@ -97,6 +99,7 @@ export function CaptureLayer({
   onSessionDoneVoice,
   onSessionSaveText,
   onSessionFeedbackCancel = () => {},
+  onStopVoiceForModeSwitch,
   captureMode = "voice",
   listeningAudioLevel = 0,
   audioAnalyser = null,
@@ -151,6 +154,7 @@ export function CaptureLayer({
           onDoneVoice={onSessionDoneVoice}
           onSaveText={onSessionSaveText}
           onCancel={onSessionFeedbackCancel}
+          onStopVoiceForModeSwitch={onStopVoiceForModeSwitch}
           theme={theme}
           __extensionSavingState={__extensionSavingState}
           onModeChange={onModeChange}

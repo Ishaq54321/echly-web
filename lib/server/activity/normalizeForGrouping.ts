@@ -28,6 +28,14 @@ export function normalizeForGrouping(raw: unknown): ActivityEvent {
   if (typeof actorO.name === "string") {
     actor.name = actorO.name;
   }
+  // Preserve the live-resolved photoURL through the grouping pipeline.
+  // Without this, the photoURL set by /api/activity-feed's resolveUserAvatars
+  // override (route.ts:217-231) gets stripped here and the client only sees
+  // actor.id + actor.name, forcing an initials fallback render even when the
+  // user has a photo set.
+  if (typeof actorO.photoURL === "string") {
+    actor.photoURL = actorO.photoURL;
+  }
 
   const event: ActivityEvent = {
     id,

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { UserAvatar } from "@/components/ui/UserAvatar";
+import { resolveUserName } from "@/lib/utils/nameSplit";
 import { ProfileCommandPanel } from "@/components/layout/ProfileCommandPanel";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -163,11 +164,10 @@ export function SystemNavigationRail({ onOpenCommandPalette }: SystemNavigationR
             avatarUrl={avatarUrl}
             image={(user as { image?: string | null } | null)?.image}
             photoURL={user?.photoURL}
-            name={
-              user?.displayName?.trim() ||
-              user?.email?.split("@")[0] ||
-              undefined
-            }
+            name={resolveUserName({
+              displayName: user?.displayName,
+              email: user?.email,
+            })}
             className="h-full w-full"
           />
         </button>

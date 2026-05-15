@@ -6,6 +6,7 @@ import { useWorkspace } from "@/lib/client/workspaceContext";
 import { useToast } from "@/components/dashboard/context/ToastContext";
 import { ObIcon } from "./icons";
 import { StepShell, StepFooter } from "./StepShell";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 
 const ROLES = [
   { id: "QA",        meta: "Testing & feedback", Ico: ObIcon.QA },
@@ -28,7 +29,7 @@ export function ProfileStep({
   initialAvatarUrl,
   onContinue,
 }: Props) {
-  const { updateAvatarUrl } = useWorkspace();
+  const { updateAvatarUrl, authUid } = useWorkspace();
   const { showToast } = useToast();
 
   const [firstName, setFirstName] = useState(initialFirstName);
@@ -40,8 +41,6 @@ export function ProfileStep({
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const initials =
-    ((firstName?.[0] ?? "") + (lastName?.[0] ?? "")).toUpperCase() || "?";
   const fullName = [firstName, lastName].filter(Boolean).join(" ");
 
   const canContinue = !!firstName.trim() && !!lastName.trim() && !submitting;
@@ -113,16 +112,12 @@ export function ProfileStep({
         <div style={{ position: "relative" }}>
           <div className="ob-float-card ob-preview-card">
             <div className="pc-row">
-              <div
-                className="ob-pc-av"
-                style={
-                  avatarUrl
-                    ? {}
-                    : { background: "linear-gradient(135deg, #EAF2FD, #C8DDF6)", color: "var(--ob-brand)" }
-                }
-              >
-                {avatarUrl ? <img src={avatarUrl} alt="" /> : initials}
-              </div>
+              <UserAvatar
+                avatarUrl={avatarUrl}
+                name={fullName}
+                size={52}
+                colorSeed={authUid}
+              />
               <div>
                 <div className="ob-pc-name">{fullName || "Your name"}</div>
                 <div className="ob-pc-handle">

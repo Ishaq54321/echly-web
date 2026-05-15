@@ -3,8 +3,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { UserPlus, UserMinus, Check, ChevronDown, Search } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
+import { NAME_FALLBACK } from "@/lib/utils/nameSplit";
 import { useToast } from "@/components/dashboard/context/ToastContext";
 import { InviteMemberModal } from "@/components/workspace/InviteMemberModal";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 
 interface WorkspaceMemberRow {
   uid: string;
@@ -31,78 +33,32 @@ interface AssignDropdownProps {
   iconOnly?: boolean;
 }
 
-const AVATAR_COLORS: { bg: string; text: string }[] = [
-  { bg: 'var(--brand-subtle)', text: 'var(--brand-text)' },
-  { bg: 'var(--color-insight-bg)', text: 'var(--color-insight)' },
-  { bg: 'var(--color-insight-bg)', text: 'var(--color-insight)' },
-  { bg: 'var(--color-danger-bg)', text: 'var(--color-danger)' },
-  { bg: 'var(--color-warning-bg)', text: 'var(--color-warning-text)' },
-  { bg: 'var(--color-success-bg)', text: 'var(--color-success)' },
-  { bg: 'var(--color-success-bg)', text: 'var(--color-success)' },
-  { bg: 'var(--color-warning-bg)', text: 'var(--color-warning-text)' },
-  { bg: 'var(--color-danger-bg)', text: 'var(--color-danger)' },
-  { bg: 'var(--color-success-bg)', text: 'var(--color-success)' },
-];
-
-function hashColor(str: string): { bg: string; text: string } {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]!;
-}
-
+/** Thin adapter over the canonical UserAvatar so colors stay consistent
+ *  with the rest of the app (keyed on uid via colorSeed). */
 function Avatar({
   name,
   avatarUrl,
   size,
+  colorSeed,
 }: {
   name: string | null;
   avatarUrl: string | null;
   size: number;
+  colorSeed?: string | null;
 }) {
-  const initial = name ? name.charAt(0).toUpperCase() : "?";
-  const colors = hashColor(name ?? "?");
-  if (avatarUrl) {
-    return (
-      <img
-        src={avatarUrl}
-        alt={name ?? ""}
-        width={size}
-        height={size}
-        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
-      />
-    );
-  }
   return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        background: colors.bg,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: size * 0.45,
-        fontWeight: '600',
-        color: colors.text,
-        flexShrink: 0,
-      }}
-    >
-      {initial}
-    </div>
+    <UserAvatar
+      avatarUrl={avatarUrl}
+      name={name}
+      size={size}
+      colorSeed={colorSeed}
+    />
   );
 }
 
 function getMemberDisplayName(member: WorkspaceMemberRow): string {
-  if (member.displayName?.trim()) {
-    return member.displayName.trim();
-  }
-  if (member.email) {
-    return member.email.split('@')[0];
-  }
-  return 'Unknown';
+  // Server resolves displayName via resolveUserName; this is just a safety net.
+  return member.displayName?.trim() || NAME_FALLBACK.UNKNOWN;
 }
 
 export function AssignDropdown({
@@ -271,15 +227,16 @@ export function AssignDropdown({
               name={currentAssigneeName}
               avatarUrl={currentAssigneeAvatarUrl}
               size={20}
+              colorSeed={currentAssigneeId}
             />
           </div>
         );
       }
       return (
         <div className="inline-flex h-[34px] items-center gap-2 px-3.5 rounded-[7px] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[13px] font-medium" style={{ cursor: 'default', flexShrink: 0 }}>
-          <Avatar name={currentAssigneeName} avatarUrl={currentAssigneeAvatarUrl} size={20} />
+          <Avatar name={currentAssigneeName} avatarUrl={currentAssigneeAvatarUrl} size={20} colorSeed={currentAssigneeId} />
           <span style={{ maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {currentAssigneeName ? currentAssigneeName.split(" ")[0] : "Assigned"}
+            {currentAssigneeName || "Assigned"}
           </span>
         </div>
       );
@@ -311,7 +268,7 @@ export function AssignDropdown({
         >
           {hasAssignee ? (
             <>
-              <Avatar name={displayName} avatarUrl={currentAssigneeAvatarUrl} size={20} />
+              <Avatar name={displayName} avatarUrl={currentAssigneeAvatarUrl} size={20} colorSeed={currentAssigneeId} />
               <span style={{ maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {firstName}
               </span>
@@ -420,7 +377,7 @@ export function AssignDropdown({
                       if (!isSelected) (e.currentTarget as HTMLButtonElement).style.background = "transparent";
                     }}
                   >
-                    <Avatar name={getMemberDisplayName(member)} avatarUrl={member.avatarUrl ?? null} size={28} />
+                    <Avatar name={getMemberDisplayName(member)} avatarUrl={member.avatarUrl ?? null} size={28} colorSeed={member.uid} />
                     <span style={{
                       flex: 1,
                       fontSize: "14px",

@@ -444,7 +444,7 @@ export default function SessionPageClient({
   useEffect(() => {
     authUidRef.current = authUid;
   }, [authUid]);
-  const { showToast } = useToast();
+  const { showToast, dismissToast } = useToast();
 
   const handleRequestResolveAccess = useCallback(async () => {
     const sid = sessionId?.trim();
@@ -1229,8 +1229,14 @@ export default function SessionPageClient({
       const selHit = stableScopedFeedback.find((f) => f.id === selectedId);
       if (selHit) return selectedId;
     }
+    // Default: prefer the first *open* ticket (skip resolved/processing),
+    // falling back to the first ticket overall. Derived during render so no
+    // setState is needed to seed the selection.
     if (stableScopedFeedback.length > 0) {
-      return stableScopedFeedback[0]!.id;
+      const firstOpen = stableScopedFeedback.find(
+        (f) => f.status !== "resolved" && f.status !== "processing"
+      );
+      return (firstOpen ?? stableScopedFeedback[0]!).id;
     }
     return null;
   }, [ticketIdFromUrl, stableScopedFeedback, selectedId, sessionId]);
@@ -1280,18 +1286,6 @@ export default function SessionPageClient({
     [effectiveSelectedId],
   );
 
-  if (stableScopedFeedback.length > 0 && selectedId === null) {
-    const url = ticketIdFromUrl;
-    if (url && stableScopedFeedback.some((f) => f.id === url)) {
-      setSelectedId(url);
-    } else {
-      const firstOpen = stableScopedFeedback.find(
-        (f) => f.status !== "resolved" && f.status !== "processing"
-      );
-      setSelectedId((firstOpen ?? stableScopedFeedback[0]!).id);
-    }
-  }
-
   const [navPanelOpen, setNavPanelOpen] = useState(false);
   const [isTicketNavigatorOpen, setIsTicketNavigatorOpen] = useState(false);
   const [isCommentMode, setIsCommentMode] = useState(false);
@@ -1321,6 +1315,41 @@ export default function SessionPageClient({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  /* Tear down the persistent "tap anywhere…" toast on every comment-mode
+     exit (comment placed, cancel, Escape, outside-click) — it's only
+     shown on enter via handleTogglePinMode, but exits happen through
+     several setIsCommentMode(false) call sites, so centralise the
+     dismiss here rather than at each one. */
+  useEffect(() => {
+    if (!isCommentMode) dismissToast();
+  }, [isCommentMode, dismissToast]);
+
+  /* Comment mode auto-dismisses on any click that isn't the screenshot
+     itself or the comment compose UI. Clicking another ticket, a header
+     button, or empty chrome all drop the user out of comment mode — the
+     screenshot canvas ([data-screenshot-canvas]) and the portaled draft
+     popover / emoji picker ([data-comment-popover]) plus the Tiptap
+     mention dropdown (.mention-dropdown) are the only safe targets. */
+  useEffect(() => {
+    if (!isCommentMode) return;
+    const onPointerDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (
+        target.closest?.("[data-screenshot-canvas]") ||
+        target.closest?.("[data-comment-popover]") ||
+        target.closest?.(".mention-dropdown")
+      ) {
+        return;
+      }
+      setIsCommentMode(false);
+    };
+    // Capture phase so we win the race against React onClick handlers
+    // (e.g. ticket-row select) and exit before they run.
+    document.addEventListener("mousedown", onPointerDown, true);
+    return () => document.removeEventListener("mousedown", onPointerDown, true);
+  }, [isCommentMode]);
 
   /* Sync active session to extension when user opens this session page. */
   useEffect(() => {
@@ -2187,6 +2216,16 @@ export default function SessionPageClient({
   /** Pin whose inline thread popover is open (does not open right panel). */
   const [activePinIdForPopover, setActivePinIdForPopover] = useState<string | null>(null);
 
+  // Phase 26.7: clicking a screenshot pin scrolls the matching comment
+  // into view in the middle panel and briefly highlights it (instead of
+  // opening the right rail). Auto-clears after 2s to match the CSS pulse.
+  const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!highlightedCommentId) return;
+    const timer = setTimeout(() => setHighlightedCommentId(null), 2000);
+    return () => clearTimeout(timer);
+  }, [highlightedCommentId]);
+
   // Deep link: when ?comment= is present, open the comment panel and focus that thread once the
   // target ticket is selected. Same pattern as the ?ticket= deep link above.
   useEffect(() => {
@@ -2197,6 +2236,9 @@ export default function SessionPageClient({
     hasAppliedCommentParam.current = true;
     setIsActivityPanelOpen(true);
     setActiveThreadId(commentIdFromUrl);
+    // Phase 26.7: a shared ?comment= link also scrolls + highlights the
+    // comment in the middle panel, matching pin-click navigation.
+    setHighlightedCommentId(commentIdFromUrl);
     const url = new URL(window.location.href);
     if (url.searchParams.has("comment")) {
       url.searchParams.delete("comment");
@@ -2208,6 +2250,39 @@ export default function SessionPageClient({
     setAnimatingPinId(commentId);
     setTimeout(() => setAnimatingPinId(null), 900);
   }, []);
+
+  // Phase 26.8: the Activity button is a toggle — first click opens
+  // the rail, second click closes it. Closing also clears any
+  // selected thread so the panel doesn't stay open via activeThreadId.
+  const handleToggleActivity = useCallback(() => {
+    setIsActivityPanelOpen((prev) => {
+      const next = !prev;
+      if (!next) setActiveThreadId(null);
+      return next;
+    });
+  }, []);
+
+  // Phase 26.7: the MapPin screenshot action toggles click-to-place
+  // pin mode. Purely about pin mode — it does NOT open the activity
+  // rail (that's the Activity button's job now).
+  const handleTogglePinMode = useCallback(() => {
+    // Side-effects (showToast/dismissToast each setState on ToastProvider)
+    // must run in the event handler, NOT inside the setIsCommentMode
+    // updater — React runs updaters during render, so a toast call there
+    // is a setState-in-render. It's a plain boolean toggle, so derive
+    // `next` from current state directly and fire the toast first.
+    const next = !isCommentMode;
+    // Same bottom toast as before — but persistent now: it stays up for
+    // the whole comment-mode session instead of auto-dismissing after
+    // 3s, and is cleared the moment comment mode exits (comment placed,
+    // cancelled, Escape, or outside-click — see the dismiss effect).
+    if (next) {
+      showToast("Tap anywhere on the image to leave a comment", { persist: true });
+    } else {
+      dismissToast();
+    }
+    setIsCommentMode(next);
+  }, [isCommentMode, showToast, dismissToast]);
 
   /* ================= SAVE TITLE (optimistic update, then PATCH) ================= */
 
@@ -3209,16 +3284,11 @@ export default function SessionPageClient({
         }}
         canEdit={isWorkspaceMember && Boolean(selectedItem?.screenshotId)}
         isCommentMode={isCommentMode}
-        onOpenComment={() => {
-          setIsCommentMode(true);
-          setIsActivityPanelOpen(true);
-          showToast("Tap anywhere on the image to leave a comment");
-        }}
-        onCloseCommentMode={() => {
-          setIsCommentMode(false);
-          setIsActivityPanelOpen(false);
-          setActiveThreadId(null);
-        }}
+        onTogglePinMode={handleTogglePinMode}
+        onExitCommentMode={() => setIsCommentMode(false)}
+        onToggleActivity={handleToggleActivity}
+        isActivityPanelOpen={isActivityPanelOpen}
+        highlightedCommentId={highlightedCommentId}
         impactScore={(selectedItem as { impactScore?: number } | null)?.impactScore}
         comments={comments}
         loadingComments={loadingComments}
@@ -3235,8 +3305,11 @@ export default function SessionPageClient({
         activePinIdForPopover={activePinIdForPopover}
         activeThreadId={activeThreadId}
         onPinClick={(commentId: string) => {
+          // Phase 26.7: pin clicks now navigate to the middle-panel
+          // comment (scroll + brief highlight) instead of opening the
+          // right rail. The pin pulse animation is preserved.
           setActivePinIdForPopover(null);
-          setActiveThreadId(commentId);
+          setHighlightedCommentId(commentId);
           setAnimatingCommentId(commentId);
           setTimeout(() => setAnimatingCommentId(null), 1100);
         }}
@@ -3248,8 +3321,12 @@ export default function SessionPageClient({
         updateComment={updateComment}
         sendTextComment={sendTextComment}
         onCommentPlaced={(newCommentId?: string) => {
+          // Exit comment mode once the comment lands. Do NOT set
+          // activeThreadId here — that opens the right Activity rail
+          // (see grid/aside gated on `activeThreadId != null`), which
+          // the user doesn't want on placement. The pin still pulses.
+          setIsCommentMode(false);
           if (newCommentId) {
-            setActiveThreadId(newCommentId);
             setAnimatingCommentId(newCommentId);
             setTimeout(() => setAnimatingCommentId(null), 1100);
           }

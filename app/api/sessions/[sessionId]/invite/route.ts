@@ -16,7 +16,7 @@ import {
   sessionTitleFromSessionRow,
 } from "@/lib/repositories/activityEventsRepository.server";
 import { sendSessionInviteEmail } from "@/lib/email/workspaceEmails";
-import { composeFullName } from "@/lib/utils/nameSplit";
+import { resolveUserName } from "@/lib/utils/nameSplit";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
 
@@ -167,13 +167,24 @@ export async function POST(
 
     const inviterSnap = await adminDb.doc(`users/${inviterId}`).get();
     const inviterData = (inviterSnap.data() ?? {}) as Record<string, unknown>;
-    const inviterComposed = composeFullName(
-      typeof inviterData.firstName === "string" ? inviterData.firstName : null,
-      typeof inviterData.lastName === "string" ? inviterData.lastName : null
-    );
-    const inviterName =
-      inviterComposed ||
-      (typeof inviterData.email === "string" ? inviterData.email : "Someone");
+    const inviterName = inviterSnap.exists
+      ? resolveUserName({
+          firstName:
+            typeof inviterData.firstName === "string"
+              ? inviterData.firstName
+              : null,
+          lastName:
+            typeof inviterData.lastName === "string"
+              ? inviterData.lastName
+              : null,
+          authDisplayName:
+            typeof inviterData.authDisplayName === "string"
+              ? inviterData.authDisplayName
+              : null,
+          email:
+            typeof inviterData.email === "string" ? inviterData.email : null,
+        })
+      : "Someone";
     void sendSessionInviteEmail({
       to: email,
       invitedByName: inviterName,
@@ -245,13 +256,26 @@ export async function POST(
       try {
         const inviterSnap2 = await adminDb.doc(`users/${invitedByUserId}`).get();
         const inviterData2 = (inviterSnap2.data() ?? {}) as Record<string, unknown>;
-        const inviterComposed2 = composeFullName(
-          typeof inviterData2.firstName === "string" ? inviterData2.firstName : null,
-          typeof inviterData2.lastName === "string" ? inviterData2.lastName : null
-        );
-        const inviterName2 =
-          inviterComposed2 ||
-          (typeof inviterData2.email === "string" ? inviterData2.email : "Someone");
+        const inviterName2 = inviterSnap2.exists
+          ? resolveUserName({
+              firstName:
+                typeof inviterData2.firstName === "string"
+                  ? inviterData2.firstName
+                  : null,
+              lastName:
+                typeof inviterData2.lastName === "string"
+                  ? inviterData2.lastName
+                  : null,
+              authDisplayName:
+                typeof inviterData2.authDisplayName === "string"
+                  ? inviterData2.authDisplayName
+                  : null,
+              email:
+                typeof inviterData2.email === "string"
+                  ? inviterData2.email
+                  : null,
+            })
+          : "Someone";
         await sendSessionInviteEmail({
           to: email,
           invitedByName: inviterName2,

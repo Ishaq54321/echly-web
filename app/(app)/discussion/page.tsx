@@ -21,6 +21,7 @@ import {
   retainDiscussionFeedbackListener,
   useDiscussionFeedback,
 } from "@/lib/realtime/discussionFeedbackStore";
+import { useUserAvatars } from "@/lib/hooks/useUserAvatars";
 
 const FOLDER_LABEL: Record<FolderKey, string> = {
   inbox: "Inbox",
@@ -77,16 +78,55 @@ export default function DiscussionPage() {
     return set;
   }, [realtimeItems, authUid]);
 
+  // Phase 25.3: the realtime feedback listener only carries the stale
+  // denormalized creatorAvatarUrl snapshot. Resolve the last actor's avatar
+  // LIVE so the inbox row updates the instant that user changes their photo,
+  // without a page refresh. Both the last-commenter uid and the creator uid
+  // are subscribed because either can be the row's "last actor".
+  const actorUids = useMemo(() => {
+    const ids: string[] = [];
+    for (const f of realtimeItems) {
+      if (f.lastCommentByUid) ids.push(f.lastCommentByUid);
+      if (f.userId) ids.push(f.userId);
+    }
+    return ids;
+  }, [realtimeItems]);
+
+  const liveAvatars = useUserAvatars(actorUids);
+
   const items: ThreadListItem[] = useMemo(() => {
     return realtimeItems.map((f: Feedback): ThreadListItem => {
       const isResolved = f.status === "resolved" || f.isResolved === true;
+
+      // Phase 25.1: the inbox row shows the LAST ACTOR (most recent
+      // commenter) instead of the creator. Fall back to the creator when
+      // a ticket has no comments yet. The avatar color is keyed on the
+      // actor's uid so it stays consistent with everywhere else; the
+      // creator's snapshot URL is only reused when the last actor IS the
+      // creator (server endpoints resolve it live elsewhere).
+      const hasLastCommenter =
+        typeof f.lastCommentByUid === "string" && f.lastCommentByUid.length > 0;
+      const lastActorUid = hasLastCommenter
+        ? f.lastCommentByUid!
+        : f.userId ?? null;
+      const lastActorName = hasLastCommenter
+        ? f.lastCommentByName || undefined
+        : f.creatorName || undefined;
+      // Live avatar keyed on the actor's uid — overrides the stale
+      // f.creatorAvatarUrl snapshot entirely. Null when the user has no
+      // photo set (UserAvatar renders the seeded-color initials fallback).
+      const lastActorAvatarUrl = lastActorUid
+        ? liveAvatars.get(lastActorUid) ?? undefined
+        : undefined;
+
       return {
         id: f.id,
         title: typeof f.title === "string" ? f.title.trim() : "",
         sessionId: f.sessionId ?? "",
         sessionName: sessionTitleMap.get(f.sessionId ?? "") || undefined,
-        authorName: f.creatorName || undefined,
-        authorAvatarUrl: f.creatorAvatarUrl || undefined,
+        lastActorName,
+        lastActorAvatarUrl,
+        lastActorUid,
         commentCount: f.commentCount ?? 0,
         lastCommentPreview: f.lastCommentPreview,
         status: getTicketStatus({ isResolved }),
@@ -97,7 +137,7 @@ export default function DiscussionPage() {
         isMentionedYou: mentionedFeedbackIds.has(f.id),
       };
     });
-  }, [realtimeItems, sessionTitleMap, mentionedFeedbackIds]);
+  }, [realtimeItems, sessionTitleMap, mentionedFeedbackIds, liveAvatars]);
 
   const assigneeByFeedbackId = useMemo(() => {
     const m = new Map<string, string | null | undefined>();

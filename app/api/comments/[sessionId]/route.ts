@@ -7,8 +7,12 @@ import {
   listCommentsForSessionChronologicalRepo,
 } from "@/lib/repositories/commentsRepository.server";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
+import { resolveUserAvatars } from "@/lib/utils/resolveUserAvatar";
 
-function serializeCommentRow(row: Record<string, unknown> & { id: string }): Record<string, unknown> {
+function serializeCommentRow(
+  row: Record<string, unknown> & { id: string },
+  liveAvatarByUid: Map<string, string | null>
+): Record<string, unknown> {
   const createdAtRaw = row.createdAt;
   let createdAtOut: unknown = null;
   if (createdAtRaw && typeof createdAtRaw === "object") {
@@ -49,7 +53,15 @@ function serializeCommentRow(row: Record<string, unknown> & { id: string }): Rec
     feedbackId: row.feedbackId,
     userId: row.userId,
     userName: row.userName,
-    userAvatar: row.userAvatar,
+    // Phase 25.1: live users/{uid} avatar overrides the comment-doc
+    // snapshot (frozen at comment time). Fall back to the stored snapshot
+    // only if the user doc is missing / has no avatar.
+    userAvatar:
+      (typeof row.userId === "string"
+        ? liveAvatarByUid.get(row.userId)
+        : null) ??
+      row.userAvatar ??
+      null,
     message: row.message,
     createdAt: createdAtOut,
     type: row.type,
@@ -122,7 +134,10 @@ export async function GET(req: Request, ctx: HandlerContext) {
         ...(cursorParam ? { cursorCommentId: cursorParam } : {}),
       }
     );
-    const comments = rows.map((r) => serializeCommentRow(r));
+    const liveAvatarByUid = await resolveUserAvatars(
+      rows.map((r) => (typeof r.userId === "string" ? r.userId : ""))
+    );
+    const comments = rows.map((r) => serializeCommentRow(r, liveAvatarByUid));
     const hasMore = rows.length >= limit;
     return apiSuccess({ comments, hasMore }, context.access);
   } catch (e) {

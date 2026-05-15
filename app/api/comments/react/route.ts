@@ -3,7 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { tryGetAuthUser } from "@/lib/server/auth/authorize";
 import { apiSuccess, apiError } from "@/lib/server/apiResponse";
-import { composeFullName } from "@/lib/utils/nameSplit";
+import { resolveUserName, NAME_FALLBACK } from "@/lib/utils/nameSplit";
 
 export async function POST(req: NextRequest) {
   const user = await tryGetAuthUser(req);
@@ -11,17 +11,21 @@ export async function POST(req: NextRequest) {
 
   const uid = user.uid;
 
-  let userName = "User";
+  let userName: string = NAME_FALLBACK.UNKNOWN;
   const userDoc = await adminDb.collection("users").doc(uid).get();
   if (userDoc.exists) {
     const userData = userDoc.data();
-    const composed = composeFullName(
-      typeof userData?.firstName === "string" ? userData.firstName : null,
-      typeof userData?.lastName === "string" ? userData.lastName : null
-    );
-    const emailLocal =
-      typeof userData?.email === "string" ? userData.email.split("@")[0] : "";
-    userName = composed || emailLocal || "User";
+    userName = resolveUserName({
+      firstName:
+        typeof userData?.firstName === "string" ? userData.firstName : null,
+      lastName:
+        typeof userData?.lastName === "string" ? userData.lastName : null,
+      authDisplayName:
+        typeof userData?.authDisplayName === "string"
+          ? userData.authDisplayName
+          : null,
+      email: typeof userData?.email === "string" ? userData.email : null,
+    });
   }
 
   let body: { commentId?: string; emoji?: string };

@@ -7,7 +7,10 @@ import {
 import { updateSessionUpdatedAtRepo } from "@/lib/repositories/sessionsRepository.server";
 import { fireAndForget } from "@/lib/server/fireAndForget";
 import { dispatchNotifications } from "@/lib/server/notificationFanOut.server";
-import { resolveActorForActivityEvent } from "@/lib/repositories/activityEventsRepository.server";
+import {
+  maybeWriteConsolidatedEvent,
+  resolveActorForActivityEvent,
+} from "@/lib/repositories/activityEventsRepository.server";
 import { diffMentionSets } from "@/lib/server/descriptionMentions";
 import { log } from "@/lib/utils/logger";
 import {
@@ -327,6 +330,80 @@ export const PATCH = withAuthorization(
         fireAndForget("PATCH-tickets-sessionUpdatedAt", () =>
           updateSessionUpdatedAtRepo(existingForOwnership.sessionId)
         );
+      }
+
+      // Phase 26.1 — per-ticket activity timeline. Diff the tracked
+      // fields against the before-state we already hold
+      // (existingForOwnership), so this needs no extra Firestore read.
+      // Status (resolve/reopen) is intentionally NOT written here — it
+      // is already written by updateFeedbackResolveAndSessionCountersRepo
+      // (feedbackRepository.server.ts:625). Writing it here too would
+      // double-log every resolve.
+      {
+        const activityActorId = (context.userId ?? user.uid).trim();
+        const activityWorkspaceId = (context.sessionWorkspaceId ?? "").trim();
+        const activitySessionId = existingForOwnership.sessionId;
+
+        const priorityChanged =
+          "priority" in contentUpdates &&
+          (contentUpdates.priority ?? null) !==
+            (existingForOwnership.priority ?? null);
+        const assignmentChanged =
+          "assigneeId" in contentUpdates &&
+          (contentUpdates.assigneeId ?? null) !==
+            (existingForOwnership.assigneeId ?? null);
+
+        if (
+          activityActorId &&
+          activityWorkspaceId &&
+          activitySessionId &&
+          (priorityChanged || assignmentChanged)
+        ) {
+          const beforePriority = existingForOwnership.priority ?? null;
+          const afterPriority = contentUpdates.priority ?? null;
+          const beforeAssigneeId = existingForOwnership.assigneeId ?? null;
+          const beforeAssigneeName =
+            existingForOwnership.assigneeName ?? null;
+          const afterAssigneeId = contentUpdates.assigneeId ?? null;
+          const afterAssigneeName = contentUpdates.assigneeName ?? null;
+
+          fireAndForget("activity:ticket.field.changed", async () => {
+            const actor = await resolveActorForActivityEvent(
+              activityActorId
+            );
+            if (priorityChanged) {
+              await maybeWriteConsolidatedEvent({
+                workspaceId: activityWorkspaceId,
+                sessionId: activitySessionId,
+                feedbackId: id,
+                eventType: "ticket.priority.changed",
+                actorId: activityActorId,
+                actorName: actor.actorName,
+                actorPhotoURL: actor.actorPhotoURL,
+                metadata: { from: beforePriority, to: afterPriority },
+              });
+            }
+            if (assignmentChanged) {
+              await maybeWriteConsolidatedEvent({
+                workspaceId: activityWorkspaceId,
+                sessionId: activitySessionId,
+                feedbackId: id,
+                eventType: "ticket.assignment.changed",
+                actorId: activityActorId,
+                actorName: actor.actorName,
+                actorPhotoURL: actor.actorPhotoURL,
+                metadata: {
+                  from: beforeAssigneeId
+                    ? { uid: beforeAssigneeId, name: beforeAssigneeName }
+                    : null,
+                  to: afterAssigneeId
+                    ? { uid: afterAssigneeId, name: afterAssigneeName }
+                    : null,
+                },
+              });
+            }
+          });
+        }
       }
 
       // Description @mention notifications. Only fires for newly-added mentions

@@ -7,6 +7,7 @@ import {
   getWorkspace,
 } from "@/lib/repositories/workspacesRepository.server";
 import { composeFullName, splitFullName } from "@/lib/utils/nameSplit";
+import { mirrorUserProfileFromUserDoc } from "@/lib/repositories/userProfilesRepository.server";
 export {
   addWorkspaceMembershipRepo,
   removeWorkspaceMembershipRepo,
@@ -136,6 +137,7 @@ export async function setUserWorkspaceIdRepo(
   } else {
     await userRef.update(payload);
   }
+  await mirrorUserProfileFromUserDoc(user.uid);
 }
 
 export async function updateUserFieldsRepo(
@@ -227,6 +229,9 @@ export async function ensureUserRepo(user: UserLike): Promise<{ workspaceId: str
       email,
       firstName: seedFirstName,
       lastName: seedLastName,
+      // Store the raw auth display name so resolveUserName can fall back to it
+      // (esp. OAuth users whose firstName/lastName split may end up empty).
+      authDisplayName: user.authDisplayName ?? null,
       workspaceId: null,
       onboardingCompleted: false,
       createdAt: FieldValue.serverTimestamp(),
@@ -237,6 +242,7 @@ export async function ensureUserRepo(user: UserLike): Promise<{ workspaceId: str
       newUserDoc.avatarUrl = user.photoURL;
     }
     await userRef.set(newUserDoc, { merge: true });
+    await mirrorUserProfileFromUserDoc(user.uid);
     return { workspaceId: null, avatarUrl: resolvedAvatarUrl };
   }
 
@@ -270,6 +276,7 @@ export async function ensureUserRepo(user: UserLike): Promise<{ workspaceId: str
   }
 
   await userRef.set(profile, { merge: true });
+  await mirrorUserProfileFromUserDoc(user.uid);
   return { workspaceId: resolvedWorkspaceId, avatarUrl: resolvedAvatarUrl };
 }
 

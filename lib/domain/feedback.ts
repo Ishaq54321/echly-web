@@ -63,6 +63,10 @@ export interface Feedback {
   lastCommentPreview?: string;
   /** Timestamp of last comment. */
   lastCommentAt?: Timestamp | null;
+  /** Phase 25.1: uid of the last commenter — the inbox "last actor". */
+  lastCommentByUid?: string | null;
+  /** Phase 25.1: display name of the last commenter (historical, per Phase 23). */
+  lastCommentByName?: string | null;
 
   description?: string | null;
   tags?: string[] | null;

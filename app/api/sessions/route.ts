@@ -5,6 +5,7 @@ import {
   toAuthorizationResponse,
 } from "@/lib/server/auth/authorize";
 import { createSessionRepo } from "@/lib/repositories/sessionsRepository.server";
+import { resolveUserName } from "@/lib/utils/nameSplit";
 import {
   createActivityEvent,
   resolveActorForActivityEvent,
@@ -112,11 +113,13 @@ export async function GET(req: NextRequest) {
     for (const snap of creatorSnaps) {
       if (snap.exists) {
         const d = snap.data()!;
-        const first = typeof d.firstName === "string" ? d.firstName : "";
-        const last = typeof d.lastName === "string" ? d.lastName : "";
-        const composed = `${first} ${last}`.trim();
-        const email = typeof d.email === "string" ? d.email : "";
-        const name = composed || email.split("@")[0] || "Unknown";
+        const name = resolveUserName({
+          firstName: typeof d.firstName === "string" ? d.firstName : null,
+          lastName: typeof d.lastName === "string" ? d.lastName : null,
+          authDisplayName:
+            typeof d.authDisplayName === "string" ? d.authDisplayName : null,
+          email: typeof d.email === "string" ? d.email : null,
+        });
         creatorNameMap.set(snap.id, name);
       }
     }

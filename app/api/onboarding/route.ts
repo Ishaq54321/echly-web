@@ -14,7 +14,7 @@ import {
 } from "@/lib/server/onboardingCookie";
 import { isValidSlug } from "@/lib/utils/slugify";
 import { setWorkspaceClaims } from "@/lib/server/setWorkspaceClaim";
-import { composeFullName } from "@/lib/utils/nameSplit";
+import { resolveUserName } from "@/lib/utils/nameSplit";
 import { defaultWorkspaceDoc } from "@/lib/domain/workspace";
 
 export const dynamic = "force-dynamic";
@@ -132,11 +132,19 @@ export async function POST(req: NextRequest) {
         typeof userData.firstName === "string" ? userData.firstName : null;
       const lastName =
         typeof userData.lastName === "string" ? userData.lastName : null;
-      const ownerName = composeFullName(firstName, lastName) || null;
       const ownerEmail =
         typeof userData.email === "string"
           ? userData.email
           : (user.email ?? "");
+      const ownerName = resolveUserName({
+        firstName,
+        lastName,
+        authDisplayName:
+          typeof userData.authDisplayName === "string"
+            ? userData.authDisplayName
+            : null,
+        email: ownerEmail || null,
+      });
       const ownerPhotoUrl =
         typeof userData.photoURL === "string" ? userData.photoURL : null;
       const ownerAvatarUrl =

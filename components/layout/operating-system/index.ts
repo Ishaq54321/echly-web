@@ -16,11 +16,6 @@ export { ExecutionView } from "./ExecutionView";
 export { ExecutionView as FeedbackDetailView } from "./ExecutionView";
 export { ActivitySlideOver } from "./ActivitySlideOver";
 export type { ActivitySlideOverProps } from "./ActivitySlideOver";
-export { CommentPanel } from "./CommentPanel";
-export type {
-  CommentPanelProps,
-  CommentPanelThreadCounts,
-} from "./CommentPanel";
 export { CommentModeIndicator } from "./CommentModeIndicator";
 export { ContextIntelligenceColumn } from "./ContextIntelligenceColumn";
 export { TicketMetadata } from "./TicketMetadata";

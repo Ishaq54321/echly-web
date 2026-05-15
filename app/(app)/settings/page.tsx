@@ -32,6 +32,7 @@ import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { usePlanCatalog } from "@/lib/hooks/usePlanCatalog";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import type { Workspace } from "@/lib/domain/workspace";
 import {
   assertIdentityResolved,
@@ -1833,24 +1834,6 @@ function daysUntil(ts: SerializedTs): number {
   return Math.ceil((ts.seconds * 1000 - Date.now()) / (1000 * 60 * 60 * 24));
 }
 
-const MEMBER_AVATAR_COLORS = [
-  { bg: "var(--brand-subtle)", text: "var(--brand-hover)" },
-  { bg: "var(--color-success-bg)", text: "var(--color-success)" },
-  { bg: "var(--color-danger-bg)", text: "var(--color-danger)" },
-  { bg: "var(--color-insight-bg)", text: "var(--color-insight)" },
-  { bg: "var(--color-warning-bg)", text: "var(--color-warning-text)" },
-  { bg: "var(--color-danger-bg)", text: "var(--color-danger)" },
-  { bg: "var(--brand-subtle)", text: "var(--brand-text)" },
-  { bg: "var(--color-success-bg)", text: "var(--color-success)" },
-];
-
-function getAvatarColor(email: string): { bg: string; text: string } {
-  let hash = 0;
-  for (let i = 0; i < email.length; i++) {
-    hash = email.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return MEMBER_AVATAR_COLORS[Math.abs(hash) % MEMBER_AVATAR_COLORS.length]!;
-}
 
 function formatDateAdded(ts: unknown): string {
   try {
@@ -1943,32 +1926,17 @@ function MembersTableRow({
   setConfirmingRemoveId: (id: string | null) => void;
 }) {
   const [hovered, setHovered] = useState(false);
-  const avatarColor = getAvatarColor(row.email);
-  const initial = (row.name ?? row.email).charAt(0).toUpperCase();
   const isOwner = row.role === "OWNER";
   const confirming = confirmingRemoveId === row.id;
 
   const avatarNode =
     row.status === "active" ? (
-      row.avatarUrl ? (
-        <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full">
-          {
-            // eslint-disable-next-line @next/next/no-img-element -- remote member avatar
-            <img
-              src={row.avatarUrl}
-              alt={row.name ?? row.email}
-              className="h-full w-full object-cover"
-            />
-          }
-        </div>
-      ) : (
-        <span
-          className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-sm font-semibold select-none"
-          style={{ background: avatarColor.bg, color: avatarColor.text }}
-        >
-          {initial}
-        </span>
-      )
+      <UserAvatar
+        avatarUrl={row.avatarUrl}
+        name={row.name ?? row.email}
+        size={32}
+        colorSeed={row.id}
+      />
     ) : (
       <span
         className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center"

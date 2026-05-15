@@ -97,6 +97,8 @@
   --avatar-pink:        #B47BC7;
   --avatar-gold:        #D4A843;
   --avatar-teal:        #5EA3C8;
+  /* Neutral grey for anonymous viewers — never a hash color */
+  --avatar-neutral-grey: #E5E5E5;
 
   /* ─── RADIUS ─────────────────────────────── */
   --radius-xs:    6px;
@@ -478,6 +480,8 @@
   --avatar-pink:        #B47BC7;
   --avatar-gold:        #D4A843;
   --avatar-teal:        #5EA3C8;
+  /* Neutral grey for anonymous viewers — never a hash color */
+  --avatar-neutral-grey: #E5E5E5;
 
   /* ─── RADIUS ─────────────────────────────── */
   --radius-xs:    6px;

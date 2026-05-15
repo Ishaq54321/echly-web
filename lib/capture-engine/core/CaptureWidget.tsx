@@ -22,6 +22,7 @@ const CAPTURE_FLOW_STATES: CaptureState[] = ["focus_mode", "region_selecting", "
 export default function CaptureWidget({
   sessionId,
   userId,
+  workspaceName,
   extensionMode = false,
   initialPointers,
   onComplete,
@@ -673,6 +674,7 @@ export default function CaptureWidget({
           onSessionDoneVoice={handlers.finishListening}
           onSessionSaveText={handlers.handleSessionFeedbackSubmit}
           onSessionFeedbackCancel={handlers.handleSessionFeedbackCancel}
+          onStopVoiceForModeSwitch={handlers.stopVoiceForModeSwitch}
           theme={theme}
           onModeChange={(mode) => setMode(mode)}
           captureSuspended={trayHovered || editingTicketId != null}
@@ -1092,7 +1094,12 @@ export default function CaptureWidget({
                       <div className="pill-foot">
                         <span className="pill-foot-left">
                           <span className="ai-dot" aria-hidden />
-                          AI ready
+                          <span
+                            className="workspace-name-display"
+                            title={workspaceName ?? undefined}
+                          >
+                            {workspaceName ?? "Annote"}
+                          </span>
                         </span>
                       </div>
                     </div>

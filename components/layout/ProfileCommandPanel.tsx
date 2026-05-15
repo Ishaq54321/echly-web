@@ -24,6 +24,7 @@ import { useWorkspace } from "@/lib/client/workspaceContext";
 import { useBillingStore } from "@/lib/store/billingStore";
 import { clearNotificationStore } from "@/lib/store/notificationStore";
 import { UserAvatar } from "@/components/ui/UserAvatar";
+import { resolveUserName } from "@/lib/utils/nameSplit";
 
 const PANEL_WIDTH = 280;
 
@@ -258,8 +259,10 @@ export function ProfileCommandPanel({
     onClose();
   };
 
-  const displayName =
-    user?.displayName?.trim() || user?.email?.split("@")[0] || "User";
+  const displayName = resolveUserName({
+    displayName: user?.displayName,
+    email: user?.email,
+  });
   const wsName = workspaceName?.trim() || "Workspace";
   const metaText = `Admin · ${wsName}`;
 

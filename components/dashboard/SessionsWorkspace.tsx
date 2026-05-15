@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { UserAvatar } from "@/components/ui/UserAvatar";
-import { getAvatarColor } from "@/lib/utils/getAvatarColor";
+import { useUserAvatars } from "@/lib/hooks/useUserAvatars";
 import {
   Archive,
   Building2,
@@ -135,6 +135,21 @@ export const SessionWorkspaceRow = memo(function SessionWorkspaceRow({
   const { session, counts } = item;
   const sessionId = session.id;
   const isOptimistic = Boolean(session.isOptimistic);
+
+  // Phase 25.3: recentViewers[].avatarUrl is a stale write-time snapshot
+  // (no fan-out when a viewer changes their photo — see
+  // recordSessionViewIfNewRepo). Resolve named viewers' avatars LIVE so the
+  // row updates without a refresh. Anonymous viewers (anon_* ids) have no
+  // users/{uid} doc, so they keep their existing anonymous rendering.
+  const recentViewers = useMemo(
+    () => session.recentViewers ?? [],
+    [session.recentViewers]
+  );
+  const viewerUids = useMemo(
+    () => recentViewers.filter((v) => !v.isAnonymous).map((v) => v.id),
+    [recentViewers]
+  );
+  const liveViewerAvatars = useUserAvatars(viewerUids);
 
   const handleRowActivate = () => {
     if (isSelectionMode) {
@@ -311,13 +326,12 @@ export const SessionWorkspaceRow = memo(function SessionWorkspaceRow({
 
         <div className="flex min-h-[36px] items-center shrink-0 gap-10 transition-[margin] duration-150 group-hover:mr-[86px]">
           {(() => {
-            const viewers = session.recentViewers ?? [];
             const viewCount = session.viewCount ?? 0;
             const maxVisible = 4;
-            const visibleViewers = viewers.slice(0, maxVisible);
+            const visibleViewers = recentViewers.slice(0, maxVisible);
             const remaining = viewCount - visibleViewers.length;
 
-            if (viewCount === 0 || viewers.length === 0) return null;
+            if (viewCount === 0 || recentViewers.length === 0) return null;
 
             return (
               <div
@@ -325,26 +339,21 @@ export const SessionWorkspaceRow = memo(function SessionWorkspaceRow({
                 aria-label="Recent viewers"
               >
                 {visibleViewers.map((viewer, i) => (
-                  <div
+                  <UserAvatar
                     key={viewer.id}
-                    className="rounded-full ring-2 ring-white overflow-hidden"
-                    style={{
-                      zIndex: maxVisible - i + 1,
-                      width: 28,
-                      height: 28,
-                      backgroundColor: viewer.isAnonymous
-                        ? undefined
-                        : getAvatarColor(viewer.id),
-                    }}
-                  >
-                    <UserAvatar
-                      avatarUrl={viewer.avatarUrl}
-                      name={viewer.displayName}
-                      size={28}
-                      isAnonymous={viewer.isAnonymous}
-                      initialsClassName="bg-transparent text-white font-semibold"
-                    />
-                  </div>
+                    // Live avatar overrides the stale recentViewers snapshot.
+                    avatarUrl={
+                      viewer.isAnonymous
+                        ? null
+                        : liveViewerAvatars.get(viewer.id) ?? null
+                    }
+                    name={viewer.displayName}
+                    size={28}
+                    colorSeed={viewer.id}
+                    isAnonymous={viewer.isAnonymous}
+                    className="ring-2 ring-white"
+                    style={{ zIndex: maxVisible - i + 1 }}
+                  />
                 ))}
                 {remaining > 0 && (
                   <div

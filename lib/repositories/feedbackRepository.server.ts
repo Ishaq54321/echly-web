@@ -829,6 +829,10 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
     priority: (data.priority as Feedback["priority"]) ?? null,
     creatorName: typeof data.creatorName === "string" ? data.creatorName : null,
     creatorAvatarUrl: typeof data.creatorAvatarUrl === "string" ? data.creatorAvatarUrl : null,
+    lastCommentByUid:
+      typeof data.lastCommentByUid === "string" ? data.lastCommentByUid : null,
+    lastCommentByName:
+      typeof data.lastCommentByName === "string" ? data.lastCommentByName : null,
   };
 }
 

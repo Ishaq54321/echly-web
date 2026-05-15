@@ -21,7 +21,7 @@ import type { WorkspaceMemberRole } from "@/lib/domain/workspaceMember";
 import { checkPlanLimit } from "@/lib/billing/checkPlanLimit";
 import type { PlanLimitError } from "@/lib/billing/checkPlanLimit";
 import { planLimitReachedApiError } from "@/lib/billing/planLimitResponse";
-import { composeFullName } from "@/lib/utils/nameSplit";
+import { resolveUserName } from "@/lib/utils/nameSplit";
 import { checkRateLimit } from "@/lib/server/rateLimit";
 
 export const dynamic = "force-dynamic";
@@ -39,12 +39,21 @@ type InviteStatus =
 
 type Result = { email: string; status: InviteStatus; message?: string };
 
-function composeUserName(data: Record<string, unknown> | null | undefined): string {
-  if (!data) return "";
-  return composeFullName(
-    typeof data?.firstName === "string" ? data.firstName : null,
-    typeof data?.lastName === "string" ? data.lastName : null
-  );
+function resolveInviterName(
+  data: Record<string, unknown> | null | undefined,
+  fallbackEmail: string | null | undefined
+): string {
+  // "Someone" stays as the very last resort for notification copy
+  // ("Someone invited you …"); resolveUserName handles the name ladder.
+  if (!data && !fallbackEmail) return "Someone";
+  return resolveUserName({
+    firstName: typeof data?.firstName === "string" ? data.firstName : null,
+    lastName: typeof data?.lastName === "string" ? data.lastName : null,
+    authDisplayName:
+      typeof data?.authDisplayName === "string" ? data.authDisplayName : null,
+    email:
+      (typeof data?.email === "string" ? data.email : null) ?? fallbackEmail,
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -121,10 +130,10 @@ export async function POST(req: NextRequest) {
 
     const role: WorkspaceMemberRole = "MEMBER";
     const callerProfile = await getUserByIdRepo(user.uid);
-    const inviterName =
-      composeUserName(callerProfile as Record<string, unknown> | null) ||
-      user.email ||
-      "Someone";
+    const inviterName = resolveInviterName(
+      callerProfile as Record<string, unknown> | null,
+      user.email
+    );
     const callerAvatarUrl =
       typeof (callerProfile as Record<string, unknown> | null)?.avatarUrl === "string"
         ? ((callerProfile as Record<string, unknown>).avatarUrl as string)

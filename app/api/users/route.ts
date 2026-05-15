@@ -7,6 +7,7 @@ import {
   ensureUserRepo,
   updateUserFieldsRepo,
 } from "@/lib/repositories/usersRepository.server";
+import { mirrorUserProfileFromUserDoc } from "@/lib/repositories/userProfilesRepository.server";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue } from "firebase-admin/firestore";
@@ -14,7 +15,7 @@ import { corsHeaders } from "@/lib/server/cors";
 import { setWorkspaceClaims } from "@/lib/server/setWorkspaceClaim";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { NextResponse } from "next/server";
-import { composeFullName } from "@/lib/utils/nameSplit";
+import { composeFullName, resolveUserName } from "@/lib/utils/nameSplit";
 import {
   signOnboardedToken,
   buildOnboardedCookieString,
@@ -97,7 +98,17 @@ export async function GET(req: NextRequest) {
         firstName,
         lastName,
         displayName: composed,
-        avatarUrl: (data.avatarUrl as string | undefined) ?? null,
+        // Match resolveUserAvatar's fallback ladder (avatarUrl → photoURL) so
+        // the self-profile endpoint is consistent with every other avatar
+        // resolution in the app. Without this, a Google OAuth user who never
+        // uploaded a custom photo (only photoURL set) sees null on their own
+        // profile.
+        avatarUrl:
+          (typeof data.avatarUrl === "string" && data.avatarUrl.trim()
+            ? data.avatarUrl.trim()
+            : typeof data.photoURL === "string" && data.photoURL.trim()
+              ? data.photoURL.trim()
+              : null),
         authProvider,
         onboardingStep,
         onboardingCompleted,
@@ -383,12 +394,68 @@ export async function PATCH(req: NextRequest) {
         },
         { merge: true }
       );
+      // Keep the public profile mirror in step with the new name so other
+      // users' realtime listeners see it immediately (Phase 25.4).
+      await mirrorUserProfileFromUserDoc(user.uid);
       if (composed) {
         try {
           await getAuth().updateUser(user.uid, { displayName: composed });
         } catch (e) {
           console.warn("PATCH /api/users: Auth.updateUser displayName failed:", e);
         }
+      }
+
+      // Sync the denormalized displayName on every workspace member doc so
+      // dropdowns/badges that read members/{uid} don't show a stale name.
+      // Other denormalized copies (feedback.creatorName, comment.userName)
+      // are intentionally NOT synced — historical attributions stay as-is;
+      // read APIs resolve fresh names via resolveUserName.
+      try {
+        const newDisplayName = resolveUserName({
+          firstName,
+          lastName,
+          email: user.email ?? null,
+        });
+        const userSnap = await adminDb.doc(`users/${user.uid}`).get();
+        const userData = (userSnap.data() ?? {}) as Record<string, unknown>;
+        const memberships: string[] = Array.isArray(
+          userData.workspaceMemberships
+        )
+          ? (userData.workspaceMemberships as unknown[]).filter(
+              (v): v is string => typeof v === "string" && v.trim() !== ""
+            )
+          : [];
+        const storedWid =
+          typeof userData.workspaceId === "string"
+            ? userData.workspaceId.trim()
+            : "";
+        if (storedWid && !memberships.includes(storedWid)) {
+          memberships.push(storedWid);
+        }
+        if (memberships.length > 0) {
+          const batch = adminDb.batch();
+          for (const wid of memberships) {
+            const memberRef = adminDb
+              .collection("workspaces")
+              .doc(wid)
+              .collection("members")
+              .doc(user.uid);
+            batch.set(
+              memberRef,
+              {
+                displayName: newDisplayName,
+                updatedAt: FieldValue.serverTimestamp(),
+              },
+              { merge: true }
+            );
+          }
+          await batch.commit();
+        }
+      } catch (e) {
+        console.warn(
+          "PATCH /api/users: member-doc displayName sync failed:",
+          e
+        );
       }
     }
     if (role || companySize) {

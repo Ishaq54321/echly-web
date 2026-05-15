@@ -7,11 +7,13 @@ import dynamic from "next/dynamic";
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 import type { Comment } from "@/lib/domain/comment";
 import { formatCommentDate } from "@/lib/utils/formatCommentDate";
+import { NAME_FALLBACK } from "@/lib/utils/nameSplit";
 import { CommentAttachmentCard } from "@/components/discussion/CommentAttachmentCard";
 import { ImageViewer } from "@/components/ImageViewer";
 import { Modal } from "@/components/ui/Modal";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { UserAvatar } from "@/components/ui/UserAvatar";
+import { useUserAvatar } from "@/lib/hooks/useUserAvatars";
 import { toggleReaction } from "@/lib/comments";
 
 export interface CommentItemProps {
@@ -118,6 +120,15 @@ function CommentItemBase({
   const reactionButtonRef = useRef<HTMLButtonElement>(null);
   const reactionPickerRef = useRef<HTMLDivElement>(null);
 
+  // Phase 25.3: the comments realtime listener only carries the stale
+  // denormalized comment.userAvatar snapshot (frozen at write time). Resolve
+  // the commenter's avatar LIVE from users/{uid} so it updates the instant
+  // they change their photo. Falls back to the snapshot while the user doc
+  // is still loading or if the read is denied, so we never flash to initials
+  // for a user who does have a photo.
+  const liveAvatar = useUserAvatar(comment.userId);
+  const resolvedAvatar = liveAvatar ?? comment.userAvatar ?? null;
+
   const isPending = (comment as { isOptimistic?: boolean }).isOptimistic === true;
   const canEditDelete = comment.userId === currentUserId && !isPending;
   const showActionBar = (canEditDelete && (onUpdate || onDelete)) || Boolean(additionalMenuItems) || Boolean(onResolveToggle) || Boolean(onReactionsChanged);
@@ -207,8 +218,9 @@ function CommentItemBase({
   return (
     <div className={`flex gap-2.5 group/item relative ${className} ${(comment.resolved || isThreadResolved) ? "opacity-60" : ""}`}>
       <UserAvatar
-        photoURL={comment.userAvatar}
+        avatarUrl={resolvedAvatar}
         name={comment.userName}
+        colorSeed={comment.userId}
         className={`${avatarSize} text-xs`}
       />
 
@@ -219,7 +231,7 @@ function CommentItemBase({
               <span
                 className={`font-semibold text-discussion-title text-[14px] truncate`}
               >
-                {comment.userName ?? "User"}
+                {comment.userName ?? NAME_FALLBACK.UNKNOWN}
               </span>
               <span className={`text-meta ${metaSize} whitespace-nowrap flex-shrink-0`}>
                 {formatCommentDate(comment.createdAt)}
@@ -408,14 +420,15 @@ function CommentItemBase({
             <div className="mt-4 p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)]/80">
               <div className="flex gap-3">
                 <UserAvatar
-                  photoURL={comment.userAvatar}
+                  avatarUrl={resolvedAvatar}
                   name={comment.userName}
+                  colorSeed={comment.userId}
                   className={`${avatarSize} text-xs`}
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium text-[var(--text-heading)]">
-                      {comment.userName ?? "User"}
+                      {comment.userName ?? NAME_FALLBACK.UNKNOWN}
                     </span>
                     <span className={`text-meta ${metaSize}`}>
                       {formatCommentDate(comment.createdAt)}
