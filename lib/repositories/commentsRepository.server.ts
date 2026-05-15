@@ -21,6 +21,11 @@ import { dispatchNotifications } from "@/lib/server/notificationFanOut.server";
 /** Thrown when the feedback doc is missing (e.g. hard-deleted); map to HTTP 404 in API routes. */
 export const ADD_COMMENT_FEEDBACK_MISSING = "ADD_COMMENT_FEEDBACK_MISSING";
 
+/** Thrown when a clientId collides with an existing comment doc; map to HTTP 409 (duplicate POST retry). */
+export const ADD_COMMENT_DUPLICATE_ID = "ADD_COMMENT_DUPLICATE_ID";
+
+const CLIENT_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
+
 const COMMENT_QUERY_BY_FEEDBACK_CHUNK = 500;
 
 /** All comment docs for a ticket (paginated); used when hard-deleting feedback. */
@@ -81,7 +86,8 @@ export async function addCommentRepo(
   userId: string,
   sessionId: string,
   feedbackId: string,
-  data: AddCommentData
+  data: AddCommentData,
+  clientId?: string
 ): Promise<string> {
   const resolvedUserId = requireUserId(userId, "addCommentRepo");
   const session = await getSessionByIdRepo(sessionId);
@@ -117,13 +123,27 @@ export async function addCommentRepo(
   if (data.attachments != null && data.attachments.length > 0) payload.attachments = data.attachments;
   if (filteredMentionedUserIds.length > 0) payload.mentionedUserIds = filteredMentionedUserIds;
 
-  const commentRef = adminDb.collection("comments").doc();
+  const trimmedClientId = typeof clientId === "string" ? clientId.trim() : "";
+  const useClientId = trimmedClientId !== "" && CLIENT_ID_RE.test(trimmedClientId);
+  const commentRef = useClientId
+    ? adminDb.collection("comments").doc(trimmedClientId)
+    : adminDb.collection("comments").doc();
+  if (useClientId) {
+    const existing = await commentRef.get();
+    if (existing.exists) {
+      throw new Error(ADD_COMMENT_DUPLICATE_ID);
+    }
+  }
   const sessionRef = adminDb.doc(`sessions/${sessionId}`);
   const workspaceRef = adminDb.doc(`workspaces/${workspaceId}`);
   const preview = data.message.trim().slice(0, 120);
 
   const batch = adminDb.batch();
-  batch.set(commentRef, payload);
+  if (useClientId) {
+    batch.create(commentRef, payload);
+  } else {
+    batch.set(commentRef, payload);
+  }
   batch.update(sessionRef, {
     commentCount: FieldValue.increment(1),
   });

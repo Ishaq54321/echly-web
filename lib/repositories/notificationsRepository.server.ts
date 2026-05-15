@@ -7,6 +7,8 @@ import type { NotificationRow, NotificationType } from "@/lib/domain/notificatio
  * Required Firestore composite indexes (notifications):
  *   1. userId ASC, createdAt DESC, __name__ DESC
  *   2. userId ASC, read ASC, createdAt DESC, __name__ DESC
+ *   3. userId ASC, workspaceId ASC, createdAt DESC, __name__ DESC
+ *   4. userId ASC, workspaceId ASC, read ASC, createdAt DESC, __name__ DESC
  */
 
 const COLLECTION = "notifications";
@@ -92,6 +94,8 @@ export interface GetNotificationsOptions {
   limit?: number;
   cursor?: NotificationsCursor | null;
   unreadOnly?: boolean;
+  /** When set, only notifications for this workspace are returned. */
+  workspaceId?: string;
 }
 
 export interface GetNotificationsResult {
@@ -151,6 +155,11 @@ export async function getNotifications(
     .collection(COLLECTION)
     .where("userId", "==", uid);
 
+  const wid = options?.workspaceId?.trim();
+  if (wid) {
+    query = query.where("workspaceId", "==", wid);
+  }
+
   if (options?.unreadOnly) {
     query = query.where("read", "==", false);
   }
@@ -184,15 +193,21 @@ export async function getNotifications(
   return { notifications, nextCursor };
 }
 
-export async function getUnreadCount(userId: string): Promise<number> {
+export async function getUnreadCount(
+  userId: string,
+  workspaceId?: string
+): Promise<number> {
   const uid = userId.trim();
   if (!uid) return 0;
-  const snap = await adminDb
+  let query: FirebaseFirestore.Query = adminDb
     .collection(COLLECTION)
     .where("userId", "==", uid)
-    .where("read", "==", false)
-    .count()
-    .get();
+    .where("read", "==", false);
+  const wid = workspaceId?.trim();
+  if (wid) {
+    query = query.where("workspaceId", "==", wid);
+  }
+  const snap = await query.count().get();
   return snap.data().count;
 }
 

@@ -11,7 +11,7 @@ import { adminDb } from "@/lib/server/firebaseAdmin";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue } from "firebase-admin/firestore";
 import { corsHeaders } from "@/lib/server/cors";
-import { setWorkspaceClaim } from "@/lib/server/setWorkspaceClaim";
+import { setWorkspaceClaims } from "@/lib/server/setWorkspaceClaim";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { NextResponse } from "next/server";
 import { composeFullName } from "@/lib/utils/nameSplit";
@@ -162,7 +162,13 @@ async function ensureUserAndRespond(
       const firstName = typeof data.firstName === "string" ? data.firstName : "";
       const lastName = typeof data.lastName === "string" ? data.lastName : "";
       if (storedWorkspaceId) {
-        await setWorkspaceClaim(user.uid, storedWorkspaceId);
+        const memberships: string[] = Array.isArray(data.workspaceMemberships)
+          ? (data.workspaceMemberships as unknown[]).filter(
+              (v): v is string => typeof v === "string" && v.trim() !== ""
+            )
+          : [];
+        if (!memberships.includes(storedWorkspaceId)) memberships.push(storedWorkspaceId);
+        await setWorkspaceClaims(user.uid, storedWorkspaceId, memberships);
         const headers = await buildHeadersWithOnboardedCookie(
           req,
           user.uid,
@@ -208,7 +214,15 @@ async function ensureUserAndRespond(
       authDisplayName: user.displayName ?? null,
     });
     if (workspaceId) {
-      await setWorkspaceClaim(user.uid, workspaceId);
+      const ensuredSnap = await adminDb.doc(`users/${user.uid}`).get();
+      const ensuredData = (ensuredSnap.data() ?? {}) as Record<string, unknown>;
+      const memberships: string[] = Array.isArray(ensuredData.workspaceMemberships)
+        ? (ensuredData.workspaceMemberships as unknown[]).filter(
+            (v): v is string => typeof v === "string" && v.trim() !== ""
+          )
+        : [];
+      if (!memberships.includes(workspaceId)) memberships.push(workspaceId);
+      await setWorkspaceClaims(user.uid, workspaceId, memberships);
     }
     // Re-read so the freshly-seeded firstName/lastName are returned to the client.
     const freshSnap = await adminDb.doc(`users/${user.uid}`).get();

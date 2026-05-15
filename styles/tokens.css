@@ -3,7 +3,7 @@
    Single source of truth. Legacy aliases keep old code unbroken.
 ====================================================================== */
 
-:root, :host {
+:root {
 
   /* ─── BRAND ─────────────────────────────── */
   --brand:              #5A49BF;
@@ -12,6 +12,416 @@
   --brand-subtle:       #F0ECFB;
   --brand-muted:        #DCD5F0;
   --brand-text:         #3D2F73;
+  /* RGB triplets for use inside rgba() — keeps brand opacity overlays
+     in sync with --brand. */
+  --brand-rgb:          90, 73, 191;
+
+  /* ─── DARK OVERLAY (voice / transcript popovers) ──
+     Centralised so the dark UI flows through tokens
+     and renders identically in dashboard + extension. */
+  --overlay-dark-bg:           rgba(26, 26, 26, 0.92);
+  --overlay-dark-bg-strong:    rgba(26, 26, 26, 0.95);
+  --overlay-dark-border:       rgba(255, 255, 255, 0.08);
+  --overlay-dark-border-strong:rgba(255, 255, 255, 0.10);
+  --overlay-dark-divider:      rgba(255, 255, 255, 0.15);
+  --overlay-dark-text:         #FFFFFF;
+  --overlay-dark-text-muted:   rgba(255, 255, 255, 0.60);
+  --overlay-dark-text-soft:    rgba(255, 255, 255, 0.75);
+  --overlay-dark-hover-bg:     rgba(255, 255, 255, 0.10);
+  --overlay-dark-active-bg:    rgba(255, 255, 255, 0.15);
+  --overlay-dark-inset-hi:     rgba(255, 255, 255, 0.08);
+  --overlay-dark-inset-lo:     rgba(255, 255, 255, 0.05);
+  --overlay-dark-shadow:       0 20px 40px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3);
+  --overlay-dark-shadow-pill:  0 4px 20px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.05);
+  --overlay-dark-shadow-menu:  0 8px 32px rgba(0,0,0,0.4),  0 0 0 1px rgba(255,255,255,0.05);
+
+  /* ─── AI STREAMING ─────────────────────────
+     Tokens for AI improve dim/cursor states. */
+  --ai-dim-text:        rgba(26, 26, 26, 0.30);
+  --ai-dim-code-bg:     rgba(0, 0, 0, 0.03);
+  --ai-cursor-bg:       #1A1A1A;
+  --ai-cursor-text:     #FFFFFF;
+
+  /* ─── TEXT ───────────────────────────────── */
+  --text-heading:       #15101F;
+  --text-body:          #54495F;
+  --text-secondary:     #54495F;
+  --text-body-strong: #15101F;
+  --text-tertiary:      #8A8096;
+  --text-placeholder:   #B5AEBE;
+  --text-on-dark:       #F3F4F6;
+
+  /* ─── SURFACES ───────────────────────────── */
+  --surface:            #FFFFFF;
+  --surface-page:       #F5F5F5;
+  --surface-card:       #FFFFFF;
+  --surface-subtle:     #F5F5F5;
+  --surface-hover:      #FAFAF7;
+  --surface-active:     #F0ECFB;
+  --surface-input:      #FAFAFA;
+  --surface-overlay:    rgba(15, 15, 20, 0.45);
+
+  /* ─── BORDERS ────────────────────────────── */
+  --border:             #E5E7EB;
+  --border-strong:      #D5D5D5;
+  --border-focus:       #5A49BF;
+
+  /* ─── SEMANTIC ───────────────────────────── */
+  --color-success:        #18794E;
+  --color-success-bg:     #E9F9EE;
+  --color-success-border: #A7F3D0;
+  --color-success-solid:  #18794E;
+  --color-success-dot:    #18794E;
+  --color-danger:         #E5484D;
+  --color-danger-bg:      #FEF2F2;
+  --color-danger-border:  #FECACA;
+  --color-danger-solid:   #E5484D;
+  --color-warning:        #F77E2C;
+  --color-warning-bg:     #FFEDD5;
+  --color-warning-border: #FED7AA;
+  --color-warning-text:   #9B573E;
+  --color-warning-dot:    #FFC53D;
+  --color-info:           #3D2F73;
+  --color-info-bg:        #F0ECFB;
+  --color-info-border:    #DCD5F0;
+  --color-insight:        #6049E7;
+  --color-insight-bg:     #F0F1FF;
+  --color-insight-border: #C4B5FD;
+  --color-insight-dot:    #6049E7;
+
+  /* Activity avatar fallback palette */
+  --avatar-warm-orange: #E8835D;
+  --avatar-blue:        #5B7BD3;
+  --avatar-purple:      #6049E7;
+  --avatar-green:       #4A8B6F;
+  --avatar-pink:        #B47BC7;
+  --avatar-gold:        #D4A843;
+  --avatar-teal:        #5EA3C8;
+
+  /* ─── RADIUS ─────────────────────────────── */
+  --radius-xs:    6px;
+  --radius-sm:    9px;
+  --radius-md:    12px;
+  --radius-lg:    16px;
+  --radius-xl:    22px;
+  --radius-pill:  9999px;
+  --radius-btn:   20px;
+
+  /* ─── TYPOGRAPHY ─────────────────────────── */
+  --text-xs:      12px;
+  --text-sm:      14px;
+  --text-base:    15px;
+  --text-md:      16px;
+  --text-lg:      20px;
+  --text-xl:      24px;
+  --text-2xl:      28px;
+  --text-3xl:      32px;
+  --text-display:  44px;
+  --font-sans:    'DM Sans', sans-serif;
+
+  /* ─── SHADOWS ────────────────────────────── */
+  --shadow-sm:    0 1px 3px rgba(0,0,0,0.06),
+                  0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md:    0 4px 12px rgba(0,0,0,0.08),
+                  0 2px 4px rgba(0,0,0,0.04);
+  --shadow-lg:    0 8px 32px rgba(0,0,0,0.10),
+                  0 2px 8px rgba(0,0,0,0.06);
+  --shadow-xl:    0 16px 48px rgba(0,0,0,0.14),
+                  0 4px 14px rgba(0,0,0,0.08);
+  --shadow-card:  0 1px 0 rgba(28,25,23,0.04),
+                  0 6px 24px -16px rgba(28,25,23,0.10);
+  --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.03);
+
+  /* ─── WARM BORDERS (session page) ────────── */
+  --hair:         #E7E5E4;
+  --hair-strong:  #D6D3D1;
+
+  /* ─── Z-INDEX ────────────────────────────── */
+  --z-base:       1;
+  --z-sticky:     20;
+  --z-dropdown:   100;
+  --z-tooltip:    200;
+  --z-modal:      300;
+  --z-toast:      400;
+
+  /* ─── MOTION ─────────────────────────────── */
+  --duration-fast:  120ms;
+  --duration-base:  200ms;
+  --ease:           cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ─── SPACING ────────────────────────────── */
+  --page-px:        24px;
+  --page-max-w:     1280px;
+
+  /* ─── LAYOUT ─────────────────────────────── */
+  --rail-width: 220px;
+  --rail-collapsed: 64px;
+  --rail-expanded:  220px;
+  --content-card-radius: 14px;
+  --topbar-height: 60px;
+  --content-max-width: 1280px;
+
+  /* ─── WEIGHT SCALE ───────────────────────── */
+  --weight-normal:   400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+
+  /* ─── LEGACY ALIASES (for gradual migration) ─
+     Keep these so any file not yet updated
+     doesn't break. Remove after all files
+     are migrated.                             */
+  --color-primary:        var(--brand);
+  --color-primary-hover:  var(--brand-hover);
+  --color-primary-soft:   var(--brand-subtle);
+  --color-primary-ring:   rgba(90,73,191,0.18);
+  --brand-blue:           var(--brand);
+  --ink-900: var(--text-heading);
+  --ink-800: #15101F;
+  --ink-700: #15101F;
+  --ink-600: var(--text-secondary);
+  --ink-500: var(--text-tertiary);
+  --ink-400: var(--text-placeholder);
+  --ink-300: #B5AEBE;
+  --ink-200: var(--border);
+  --ink-150: var(--border-strong);
+  --ink-100: var(--surface-subtle);
+  --ink-50:  var(--surface-hover);
+  --ink-25:  var(--surface-input);
+  --white:   #FFFFFF;
+  --ink-1: var(--text-heading);
+  --ink-2: var(--text-body);
+  --ink-3: var(--text-secondary);
+  --ink-4: var(--text-tertiary);
+  --ink-5: var(--text-placeholder);
+  --ink-6: var(--border);
+  --ink-7: var(--border-strong);
+  --ink-8: var(--surface-subtle);
+  --ink-9: var(--surface-hover);
+  --surface-app:    var(--surface-page);
+  --surface-raised: var(--surface-card);
+  --surface-inset:  var(--surface-subtle);
+  --surface-sunken: var(--surface-subtle);
+  --border-soft:    #FAFAF7;
+  --border-default: var(--border);
+  --border-brand:   var(--brand);
+  --border-focus:   var(--brand);
+  --border-muted:   var(--border);
+  --border-subtle:  rgba(0,0,0,0.05);
+  --border-default-old: rgba(0,0,0,0.06);
+  --layer-1-bg:     var(--surface-card);
+  --layer-1-border: var(--border);
+  --layer-2-bg:     var(--surface-page);
+  --layer-2-border: var(--border);
+  --layer-2-hover-bg: var(--surface-hover);
+  --structural-gray:       var(--surface-subtle);
+  --structural-gray-rail:  var(--surface-card);
+  --structural-gray-ticket: var(--surface-page);
+  --r-xs:   var(--radius-xs);
+  --r-sm:   var(--radius-sm);
+  --r-md:   var(--radius-md);
+  --r-lg:   var(--radius-lg);
+  --r-xl:   var(--radius-lg);
+  --r-2xl:  var(--radius-xl);
+  --r-3xl:  var(--radius-xl);
+  --r-full: var(--radius-pill);
+  --radius-card: var(--radius-xl);
+  --radius-2xl: var(--radius-xl);
+  --radius-3xl: var(--radius-xl);
+  --radius-full: var(--radius-pill);
+  --shadow-xs:  var(--shadow-sm);
+  --shadow-xs-alias: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
+  --sh-xs: var(--shadow-sm);
+  --sh-sm: var(--shadow-sm);
+  --sh-md: var(--shadow-md);
+  --sh-lg: var(--shadow-lg);
+  --sh-focus: 0 0 0 3px rgba(90,73,191,0.20);
+  --sh-popover: 0 16px 48px rgba(0,0,0,0.14), 0 4px 14px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.05);
+  --shadow-focus: 0 0 0 3px rgba(90,73,191,0.12);
+  --shadow-popover: var(--shadow-xl);
+  --shadow-level-1: var(--shadow-sm);
+  --shadow-level-2: var(--shadow-sm);
+  --shadow-level-3: var(--shadow-md);
+  --shadow-level-3-lift: var(--shadow-sm);
+  --shadow-level-4: var(--shadow-lg);
+  --shadow-level-5: var(--shadow-lg);
+  --elevation-1:    var(--shadow-sm);
+  --elevation-2:    var(--shadow-md);
+  --layer-2-shadow:       var(--shadow-sm);
+  --layer-2-shadow-hover: var(--shadow-md);
+  --settings-card-shadow: var(--shadow-sm);
+  --t-fast: var(--duration-fast);
+  --t-base: var(--duration-base);
+  --t-normal: var(--duration-base);
+  --t-slow:   220ms;
+  --t-sm:   14px;
+  --t-md:   16px;
+  --t-lg:   20px;
+  --t-xl:   24px;
+  --t-2xl:  28px;
+  --t-3xl:  32px;
+  --t-4xl:  44px;
+  --text-2xl:  28px;
+  --text-3xl:  32px;
+  --text-4xl:  44px;
+  --motion-duration:      var(--duration-base);
+  --motion-duration-fast: var(--duration-fast);
+  --motion-fast:          var(--duration-fast);
+  --motion-standard:      var(--duration-base);
+  --motion-ease:          var(--ease);
+  --motion-ease-out:      var(--ease);
+  --ease-premium:         var(--ease);
+  --ease-default:         var(--ease);
+  --ease-in:              cubic-bezier(0.4, 0, 1, 1);
+  --ease-out:             cubic-bezier(0, 0, 0.2, 1);
+  --sidebar-width:     var(--rail-width);
+  --sidebar-collapsed: var(--rail-collapsed);
+  --bg-app:    var(--surface-page);
+  --bg-card:   var(--surface-card);
+  --bg-raised: var(--surface-card);
+  --bg-subtle: var(--surface-subtle);
+  --bg-inset:  var(--surface-subtle);
+  --overlay:   var(--surface-overlay);
+  --sp-1: 4px;   --sp-2: 8px;   --sp-3: 12px;  --sp-4: 18px;
+  --sp-5: 24px;  --sp-6: 28px;  --sp-8: 36px;  --sp-10: 48px;
+  --sp-12: 56px; --sp-16: 72px;
+  --space-1:  4px;  --space-2:  8px;  --space-3:  12px;
+  --space-4:  18px; --space-5:  24px; --space-6:  28px;
+  --space-8:  36px; --space-10: 48px; --space-12: 56px;
+  --space-16: 72px;
+  --font-size-xs:   var(--text-xs);
+  --font-size-sm:   var(--text-sm);
+  --font-size-base: var(--text-base);
+  --font-size-md:   var(--text-md);
+  --font-size-lg:   var(--text-lg);
+  --font-size-xl:   var(--text-xl);
+  --font-size-2xl:  var(--text-2xl);
+  --font-size-3xl:  var(--text-3xl);
+  --font-weight-normal:   var(--weight-normal);
+  --font-weight-medium:   var(--weight-medium);
+  --font-weight-semibold: var(--weight-semibold);
+  --line-height-tight:   1.25;
+  --line-height-normal:  1.5;
+  --line-height-relaxed: 1.625;
+  --duration-normal: var(--duration-base);
+  --duration-slow:   220ms;
+  --brand-500: #5A49BF;
+  --brand-400: #7B6ACC;
+  --brand-600: #4A3BA0;
+  --brand-700: #2C1F52;
+  --brand-50:  #F7F5FD;
+  --brand-100: #F0ECFB;
+  --brand-200: #DCD5F0;
+  --brand-300: #9B8FD6;
+  --brand-active: #2C1F52;
+  --brand-tint:   var(--brand-subtle);
+  --brand-light:  var(--brand-muted);
+  --button-primary-bg:   var(--brand);
+  --accent-operational:  var(--brand);
+  --accent-operational-border: rgba(90,73,191,0.22);
+  --accent-operational-muted:  var(--brand-subtle);
+  --ai-accent: var(--brand);
+  --gray-950: var(--text-heading);
+  --gray-900: var(--text-heading);
+  --gray-800: var(--text-body);
+  --gray-700: #15101F;
+  --gray-600: var(--text-secondary);
+  --gray-500: var(--text-tertiary);
+  --gray-400: var(--text-placeholder);
+  --gray-300: #B5AEBE;
+  --gray-200: var(--border);
+  --gray-150: var(--border-strong);
+  --gray-100: var(--surface-subtle);
+  --gray-50:  var(--surface-hover);
+  --green-text:   var(--color-success);
+  --green-bg:     var(--color-success-bg);
+  --green-border: var(--color-success-border);
+  --green-dot:    var(--color-success-dot);
+  --green:        var(--color-success-solid);
+  --green-tint:   var(--color-success-bg);
+  --green-light:  var(--color-success-border);
+  --amber-text:   var(--color-warning);
+  --amber-bg:     var(--color-warning-bg);
+  --amber-border: var(--color-warning-border);
+  --amber-dot:    var(--color-warning-dot);
+  --red-text:     var(--color-danger);
+  --red-bg:       var(--color-danger-bg);
+  --red-border:   var(--color-danger-border);
+  --red-dot:      var(--color-danger);
+  --purple-text:  var(--color-insight);
+  --purple-bg:    var(--color-insight-bg);
+  --purple-border:var(--color-insight-border);
+  --orange:       var(--color-warning);
+  --orange-hover: var(--color-warning);
+  --orange-tint:  var(--color-warning-bg);
+  --orange-light: var(--color-warning-border);
+  --orange-text:  var(--color-warning);
+  --color-success-text:    var(--color-success);
+  --color-success-soft:    rgba(24,121,78,0.10);
+  --color-danger-text:     var(--color-danger);
+  --color-danger-soft:     rgba(229,72,77,0.08);
+  --color-danger-bg-hover: var(--color-danger-bg);
+  --color-alert:           var(--color-danger);
+  --color-info-text:       var(--brand-text);
+  --color-insight-text:    var(--color-insight);
+  --color-attention-text:  var(--color-warning);
+  --color-attention-bg:    var(--color-warning-bg);
+  --text-primary:   var(--text-heading);
+  --text-disabled:  var(--text-placeholder);
+  --text-inverse:   #FFFFFF;
+  --text-brand:     var(--brand-text);
+  --text-link:      var(--brand-text);
+  --text-meta:      var(--text-tertiary);
+  --text-muted:     var(--text-tertiary);
+  --discussion-title:      var(--text-heading);
+  --discussion-body:       var(--text-heading);
+  --discussion-supporting: var(--text-secondary);
+  --text-primary-strong:   220 17% 10%;
+  --text-secondary-soft:   220 10% 33%;
+  --nav-icon:        var(--text-tertiary);
+  --nav-label:       var(--text-body);
+  --nav-hover-icon:  var(--text-heading);
+  --nav-hover-label: var(--text-heading);
+  --topbar-icon:     var(--text-tertiary);
+}
+
+/* Duplicate of the :root block above, scoped to :host so shadow DOM
+   roots (e.g. the extension widget) also inherit the design tokens.
+   Keep both blocks identical. */
+:host {
+
+  /* ─── BRAND ─────────────────────────────── */
+  --brand:              #5A49BF;
+  --brand-secondary:    #7B6ACC;
+  --brand-hover:        #4A3BA0;
+  --brand-subtle:       #F0ECFB;
+  --brand-muted:        #DCD5F0;
+  --brand-text:         #3D2F73;
+  --brand-rgb:          90, 73, 191;
+
+  /* ─── DARK OVERLAY (voice / transcript popovers) ── */
+  --overlay-dark-bg:           rgba(26, 26, 26, 0.92);
+  --overlay-dark-bg-strong:    rgba(26, 26, 26, 0.95);
+  --overlay-dark-border:       rgba(255, 255, 255, 0.08);
+  --overlay-dark-border-strong:rgba(255, 255, 255, 0.10);
+  --overlay-dark-divider:      rgba(255, 255, 255, 0.15);
+  --overlay-dark-text:         #FFFFFF;
+  --overlay-dark-text-muted:   rgba(255, 255, 255, 0.60);
+  --overlay-dark-text-soft:    rgba(255, 255, 255, 0.75);
+  --overlay-dark-hover-bg:     rgba(255, 255, 255, 0.10);
+  --overlay-dark-active-bg:    rgba(255, 255, 255, 0.15);
+  --overlay-dark-inset-hi:     rgba(255, 255, 255, 0.08);
+  --overlay-dark-inset-lo:     rgba(255, 255, 255, 0.05);
+  --overlay-dark-shadow:       0 20px 40px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3);
+  --overlay-dark-shadow-pill:  0 4px 20px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.05);
+  --overlay-dark-shadow-menu:  0 8px 32px rgba(0,0,0,0.4),  0 0 0 1px rgba(255,255,255,0.05);
+
+  /* ─── AI STREAMING ─────────────────────────
+     Tokens for AI improve dim/cursor states. */
+  --ai-dim-text:        rgba(26, 26, 26, 0.30);
+  --ai-dim-code-bg:     rgba(0, 0, 0, 0.03);
+  --ai-cursor-bg:       #1A1A1A;
+  --ai-cursor-text:     #FFFFFF;
 
   /* ─── TEXT ───────────────────────────────── */
   --text-heading:       #15101F;
@@ -399,9 +809,10 @@ body {
 }
 
 /* ─── SELECTION ──────────────────────────── */
+:host ::selection,
 ::selection {
-  background: var(--brand-subtle);
-  color: var(--brand-text);
+  background-color: rgba(51, 144, 255, 0.3);
+  color: inherit !important;
 }
 
 /* ─── MODAL OVERLAY ──────────────────────── */

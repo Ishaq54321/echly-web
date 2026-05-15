@@ -296,6 +296,19 @@ if (window.__ECHLY_BOOTSTRAP_LOADED__) {
       return false;
     }
 
+    if (type === "ECHLY_SHAKE_PILL") {
+      // Forward to widget (or buffer until widget loads — though widget
+      // must already be loaded if we're getting this message).
+      dispatchOrBuffer("ECHLY_SHAKE_PILL");
+      return false;
+    }
+
+    if (type === "ECHLY_REFRESH_SESSION") {
+      // Dashboard switched workspace — invalidate widget-side caches.
+      dispatchOrBuffer("ECHLY_REFRESH_SESSION");
+      return false;
+    }
+
     if (type === "ECHLY_START_SESSION") {
       loadWidget()
         .then(() => {

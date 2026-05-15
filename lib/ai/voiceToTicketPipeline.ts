@@ -464,9 +464,9 @@ export async function extractStructuredFeedback(
     { role: "user", content: userMessage },
   ];
   const completion = await client.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: "gpt-5.4-nano",
     temperature: 0.0, // Deterministic output for reliable Ring 1 reliance
-    max_tokens: 500,
+    max_completion_tokens: 500,
     response_format: {
       type: "json_schema",
       json_schema: {

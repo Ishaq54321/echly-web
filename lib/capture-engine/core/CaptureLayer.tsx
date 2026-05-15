@@ -63,6 +63,8 @@ export type CaptureLayerProps = {
   __extensionSavingState?: boolean;
   /** Called when user switches mode from within an overlay — syncs the header toggle. */
   onModeChange?: (mode: "voice" | "text") => void;
+  /** When true, mouse is over the Echly tray UI; suspend hover highlights and click capture. */
+  captureSuspended?: boolean;
 };
 
 /**
@@ -106,6 +108,7 @@ export function CaptureLayer({
   theme = "dark",
   __extensionSavingState,
   onModeChange,
+  captureSuspended = false,
 }: CaptureLayerProps) {
   if (extensionMode && (!sessionMode || (!sessionIdProp && !optimisticSessionStarting))) return null;
   const showSessionOverlay =
@@ -151,6 +154,7 @@ export function CaptureLayer({
           theme={theme}
           __extensionSavingState={__extensionSavingState}
           onModeChange={onModeChange}
+          captureSuspended={captureSuspended}
         />
       )}
       {showDimOverlay && (

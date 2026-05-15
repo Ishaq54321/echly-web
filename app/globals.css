@@ -181,7 +181,7 @@ button[aria-disabled="true"],
 
 /* Micro-interactions: 150–250ms, refined easing. No bounce. */
 * {
-  transition-property: background-color, border-color, color, box-shadow, transform, opacity, filter;
+  transition-property: border-color, color, box-shadow, transform, opacity, filter;
   transition-duration: var(--motion-duration-fast);
   transition-timing-function: var(--motion-ease);
 }
@@ -224,6 +224,26 @@ button[aria-disabled="true"],
 }
 .discussion-list-scroll::-webkit-scrollbar-thumb:hover {
   background: var(--text-tertiary);
+}
+
+/* Feedback detail panel: slim scrollbar with breathing room */
+.feedback-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.feedback-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.feedback-scroll::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 8px 0;
+}
+.feedback-scroll::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+.feedback-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
 }
 
 /* Integrations (Settings) — align logo with title */
@@ -729,7 +749,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 1px var(--brand);
+  box-shadow: 0 0 0 1px var(--border-strong);
 }
 
 /* Auth pages own their focus styles — opt out of global ring */
@@ -2326,6 +2346,10 @@ input.session-title-input.session-title-input--light-surface:focus-visible {
   pointer-events: auto !important;
 }
 
+.description-editor-portal {
+  pointer-events: auto;
+}
+
 .echly-dim-layer {
   position: fixed;
   inset: 0;
@@ -2727,6 +2751,15 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
   right: 24px;
   z-index: 50;
 }
+
+@keyframes echly-shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+  20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+.echly-shake {
+  animation: echly-shake 0.5s ease-in-out;
+}
 .echly-floating-trigger {
   font-family: var(--echly-font);
   display: inline-flex;
@@ -2755,7 +2788,7 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
   transform: translateY(0);
 }
 
-/* Minimized launcher: bigger logo, transparent background, soft glow */
+/* Minimized launcher: bigger logo, frosted-glass background visible on dark sites */
 .echly-launcher {
   width: 64px;
   height: 64px;
@@ -2763,22 +2796,28 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
   min-height: 64px;
   padding: 0;
   overflow: visible;
-  background: transparent !important;
-  border: none !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
   border-radius: 16px;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08), 0 4px 24px rgba(0, 0, 0, 0.04);
+  backdrop-filter: blur(30px) saturate(1.4);
+  -webkit-backdrop-filter: blur(30px) saturate(1.4);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 4px 16px rgba(0, 0, 0, 0.12),
+    0 8px 32px rgba(0, 0, 0, 0.08);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: transform 200ms ease, box-shadow 200ms ease;
+  transition: transform 200ms ease, box-shadow 200ms ease, background 200ms ease;
 }
 .echly-launcher:hover {
-  background: transparent !important;
-  border: none !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
   transform: scale(1.05);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12), 0 8px 32px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.8) inset,
+    0 6px 22px rgba(0, 0, 0, 0.16),
+    0 12px 40px rgba(0, 0, 0, 0.10);
 }
 .echly-launcher-logo {
   width: 43px;
@@ -5338,12 +5377,19 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
   transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
-.description-editor-shell:focus-within {
-  border-color: var(--brand);
+.description-editor-shell [role="toolbar"] {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--surface-card);
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  border-bottom: 1px solid var(--border) !important;
 }
 
-.description-editor-shell:focus-within > [role="toolbar"] {
-  border-bottom-color: transparent;
+.description-editor-shell:focus-within {
+  border-color: var(--border-strong);
 }
 
 .description-editor-shell:focus-within .description-editor-content:focus,
@@ -5361,11 +5407,11 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
   font-size: 15px;
   line-height: 1.65;
   color: var(--text-heading);
-  min-height: 180px;
+  min-height: 0;
 }
 
 .description-editor-content .fake-selection {
-  background: rgba(123, 106, 204, 0.3);
+  background: rgba(var(--brand-rgb), 0.30);
   border-radius: 2px;
 }
 
@@ -5376,7 +5422,7 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
 .ai-touched-mark,
 [data-ai-touched="true"] {
   text-decoration: underline;
-  text-decoration-color: rgba(139, 92, 246, 0.25);
+  text-decoration-color: rgba(var(--brand-rgb), 0.25);
   text-decoration-thickness: 1px;
   text-underline-offset: 4px;
 }
@@ -5394,7 +5440,7 @@ h3 [data-ai-touched="true"],
 h4 [data-ai-touched="true"],
 h5 [data-ai-touched="true"],
 h6 [data-ai-touched="true"] {
-  text-decoration-color: rgba(139, 92, 246, 0.3);
+  text-decoration-color: rgba(var(--brand-rgb), 0.30);
 }
 
 /* Dim the original range being replaced — applies to ALL descendants */
@@ -5418,7 +5464,7 @@ h6 [data-ai-touched="true"] {
 .ai-dim-range pre,
 .ai-dim-range blockquote,
 .ai-dim-range span {
-  color: rgba(26, 26, 26, 0.3) !important;
+  color: var(--ai-dim-text) !important;
   pointer-events: none !important;
   user-select: none !important;
   transition: color 200ms ease-out;
@@ -5438,47 +5484,58 @@ h6 [data-ai-touched="true"] {
 /* Code blocks inside dim range */
 .ai-dim-range pre code,
 .ai-dim-range code {
-  background-color: rgba(0, 0, 0, 0.03) !important;
-  color: rgba(26, 26, 26, 0.3) !important;
+  background-color: var(--ai-dim-code-bg) !important;
+  color: var(--ai-dim-text) !important;
 }
 
+/* AI writing cursor — gradient ink-flow caret followed by a dark pill
+   labelled "Annoting" while the AI is streaming. The wrapper bobs gently;
+   the caret animates its gradient to suggest flowing ink. */
 .ai-annote-cursor {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  background: #1a1a1a;
-  color: white;
-  font-size: 10px;
-  font-weight: 600;
-  padding: 1px 5px 1px 3px;
-  border-radius: 3px;
-  line-height: 1.4;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  letter-spacing: 0.02em;
+  gap: 5px;
   vertical-align: middle;
-  margin: 0 1px;
-  position: relative;
-  top: -1px;
+  margin-left: 3px;
   user-select: none;
   pointer-events: none;
+  animation: ai-annote-bob 1.8s ease-in-out infinite;
 }
 
 .ai-annote-caret {
-  width: 2px;
-  height: 0.95em;
-  background: linear-gradient(180deg, var(--brand), var(--brand-secondary));
-  border-radius: 1px;
+  width: 2.5px;
+  height: 16px;
+  background: linear-gradient(180deg, #974B89, #5148C7, #FD0C63, #974B89);
+  background-size: 100% 300%;
+  border-radius: 1.25px;
   flex-shrink: 0;
-  animation: ai-cursor-pulse 1s ease-in-out infinite;
+  animation: ai-annote-flow 1.6s linear infinite;
 }
 
-.ai-annote-label {
-  display: inline-block;
+.ai-annote-pill {
+  display: inline-flex;
+  align-items: center;
+  background: #1a1a1a;
+  color: #ffffff;
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.12);
+  border: 0.5px solid rgba(255, 255, 255, 0.06);
+  white-space: nowrap;
 }
 
-@keyframes ai-cursor-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+@keyframes ai-annote-flow {
+  0%   { background-position: 0% 100%; }
+  100% { background-position: 0% 0%; }
+}
+
+@keyframes ai-annote-bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-0.5px); }
 }
 
 .description-editor-content p {
@@ -5646,7 +5703,7 @@ h6 [data-ai-touched="true"] {
   transition: opacity 150ms ease, background-color 150ms ease, height 150ms ease;
   cursor: ew-resize;
   z-index: 10;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-sm);
 }
 
 .image-block:hover .image-resize-handle-right {
@@ -5811,6 +5868,22 @@ h6 [data-ai-touched="true"] {
   cursor: pointer;
   color: inherit;
   padding: 0;
+}
+
+/* The description editor (mounted inside the extension's .echly-v2 widget) uses
+   Tailwind utilities for its toolbar/menu styling. Those utilities live in
+   @layer utilities, so the unlayered .echly-v2 button rule above would
+   otherwise win on the cascade and wipe out icon color, background, padding,
+   and border. Revert the reset for description-editor descendants AND any
+   portaled menu/popover/pill tagged with .description-editor-portal so the
+   Tailwind text-[var(--...)] / bg / border utilities take effect. */
+.echly-v2 .description-editor-shell button,
+.echly-v2 .description-editor-portal,
+.echly-v2 .description-editor-portal button {
+  color: revert-layer;
+  background: revert-layer;
+  border: revert-layer;
+  padding: revert-layer;
 }
 
 /* ── Pill shared chrome ─────────────────────────────────── */
@@ -8246,7 +8319,7 @@ h6 [data-ai-touched="true"] {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.45);
-  z-index: 2147483646;
+  z-index: 2147483639;
   pointer-events: auto;
 }
 
@@ -8256,7 +8329,7 @@ h6 [data-ai-touched="true"] {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 2147483647;
+  z-index: 2147483640;
   pointer-events: auto;
   width: 598px;        /* 520 × 1.15 */
   max-height: 80vh;
@@ -8402,18 +8475,30 @@ h6 [data-ai-touched="true"] {
   position: relative;
   margin: 12px 0 14px 0;
   border-radius: 14px;  /* 12 × 1.15 */
-  min-height: 120px;
   background: var(--surface-subtle);
   overflow: hidden;
-  background: var(--surface-subtle);
   border: 1px solid var(--hair);
   cursor: pointer;
+  /* Reserve a fixed-height slot up front so the layout doesn't jump
+     when the image finishes loading. The image is centered inside the
+     slot so as the viewport shortens it contracts symmetrically from
+     the middle rather than clipping from the bottom. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 45vh;
+  min-height: 120px;
+  max-height: 400px;
 }
 .echly-v2 .editor-screenshot img {
+  /* Image fills the panel width and the height-capped slot. `cover`
+     with center positioning crops the top and bottom equally as the
+     viewport shrinks, so the visible window stays centered on the
+     screenshot. */
   width: 100%;
-  height: auto;
-  max-height: 60vh;
-  object-fit: contain;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
   display: block;
   filter: blur(8px);
   opacity: 0;
@@ -9402,6 +9487,42 @@ h6 [data-ai-touched="true"] {
 @keyframes echly-tooltip-fade-in {
   from { opacity: 0; transform: translateX(-50%) translateY(4px); }
   to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* Transient toast for auto-pause / auto-resume on ticket edit.
+   Portals into the capture root so it floats above the session controls. */
+.echly-auto-toast {
+  position: fixed;
+  bottom: 110px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2147483646;
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: 10px;
+  background: rgba(20, 22, 28, 0.92);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  color: #fff;
+  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 12px 28px -8px rgba(0, 0, 0, 0.45);
+  animation: echly-auto-toast-cycle 3s ease forwards;
+}
+
+@keyframes echly-auto-toast-cycle {
+  0% { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  90% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(6px); }
 }
 
 .echly-v2 .tl-share-spinner {

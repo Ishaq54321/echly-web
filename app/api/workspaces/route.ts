@@ -17,6 +17,12 @@ import { defaultWorkspaceDoc } from "@/lib/domain/workspace";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { NextResponse } from "next/server";
 import { generateSlug, isValidSlug } from "@/lib/utils/slugify";
+import { setWorkspaceClaims } from "@/lib/server/setWorkspaceClaim";
+import {
+  MAX_WORKSPACES_PER_USER,
+  assertCanJoinAnotherWorkspace,
+  WorkspaceLimitError,
+} from "@/lib/domain/workspaceLimits";
 
 /**
  * Atomically reserves `slug` for `workspaceId` (writing slugs/{slug}) and
@@ -132,7 +138,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const userSnap = await adminDb.doc(`users/${user.uid}`).get();
+    const userRef = adminDb.doc(`users/${user.uid}`);
+    const userSnap = await userRef.get();
     if (!userSnap.exists) {
       return apiError({
         code: "NOT_FOUND",
@@ -150,6 +157,32 @@ export async function POST(req: NextRequest) {
     const ownerName = composedName || null;
     const ownerAvatarUrl =
       typeof userData.avatarUrl === "string" ? userData.avatarUrl : null;
+
+    const currentMemberships: string[] = Array.isArray(userData.workspaceMemberships)
+      ? (userData.workspaceMemberships as unknown[]).filter(
+          (v): v is string => typeof v === "string" && v.trim() !== ""
+        )
+      : [];
+    try {
+      // Pass a sentinel that won't be in the array so creating a NEW workspace
+      // always counts as adding one (forces the cap check).
+      assertCanJoinAnotherWorkspace(currentMemberships, "__new__");
+    } catch (err) {
+      if (err instanceof WorkspaceLimitError) {
+        return apiError({
+          code: "FORBIDDEN",
+          message: `You're in the maximum ${MAX_WORKSPACES_PER_USER} workspaces. Please contact the Annote team to be added to more, or leave one of your current workspaces.`,
+          status: 403,
+          data: {
+            reason: "WORKSPACE_LIMIT_REACHED",
+            currentCount: err.currentCount,
+            max: MAX_WORKSPACES_PER_USER,
+          },
+          init: { headers: corsHeaders(req) },
+        });
+      }
+      throw err;
+    }
 
     const newRef = adminDb.collection("workspaces").doc();
 
@@ -195,8 +228,23 @@ export async function POST(req: NextRequest) {
     });
     await addWorkspaceMembershipRepo(user.uid, newRef.id);
 
+    // The newly created workspace becomes the user's active workspace
+    // (matches "default to most recently used").
+    await userRef.set(
+      {
+        workspaceId: newRef.id,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    const updatedMemberships = currentMemberships.includes(newRef.id)
+      ? currentMemberships
+      : [...currentMemberships, newRef.id];
+    await setWorkspaceClaims(user.uid, newRef.id, updatedMemberships);
+
     return apiSuccess(
-      { workspaceId: newRef.id },
+      { workspaceId: newRef.id, name, logoUrl: null },
       null,
       { headers: corsHeaders(req) }
     );

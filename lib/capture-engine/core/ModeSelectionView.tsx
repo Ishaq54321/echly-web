@@ -1,7 +1,34 @@
 "use client";
 
-import React from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { X, Mic, Pen, ChevronLeft, Loader2 } from "lucide-react";
+import { useMicPermission } from "./hooks/useMicPermission";
+import { useAudioLevels } from "./hooks/useAudioLevels";
+
+const STORED_MIC_KEY = "echly:selectedMic";
+
+function readStoredMicId(): string | null {
+  try {
+    return typeof localStorage !== "undefined"
+      ? localStorage.getItem(STORED_MIC_KEY)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistMicId(id: string | null): void {
+  try {
+    if (typeof localStorage === "undefined") return;
+    if (id) {
+      localStorage.setItem(STORED_MIC_KEY, id);
+    } else {
+      localStorage.removeItem(STORED_MIC_KEY);
+    }
+  } catch {
+    /* noop */
+  }
+}
 
 type ModeSelectionViewProps = {
   captureMode: "voice" | "text";
@@ -37,6 +64,59 @@ export default function ModeSelectionView({
     }
   } catch {}
   const faviconInitial = host ? host.charAt(0).toUpperCase() : "W";
+
+  const [storedMicId] = useState<string | null>(() => readStoredMicId());
+  const handleValidatedDeviceId = useCallback((id: string | null) => {
+    persistMicId(id);
+  }, []);
+  const {
+    state: micPermissionState,
+    requestPermission,
+    openSiteSettings,
+  } = useMicPermission({
+    storedDeviceId: storedMicId,
+    onValidatedDeviceId: handleValidatedDeviceId,
+  });
+
+  useEffect(() => {
+    if (micPermissionState === "idle") {
+      void requestPermission();
+    }
+  }, [micPermissionState, requestPermission]);
+
+  /** Preview stream for the audio-reactive bars while on mode selection. */
+  const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
+  useEffect(() => {
+    if (micPermissionState !== "granted") return;
+    let cancelled = false;
+    let activeStream: MediaStream | null = null;
+
+    navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then((s) => {
+        if (cancelled) {
+          s.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        activeStream = s;
+        setPreviewStream(s);
+      })
+      .catch((err) => {
+        console.warn("[ECHLY:MIC] preview stream failed", err);
+      });
+
+    return () => {
+      cancelled = true;
+      activeStream?.getTracks().forEach((t) => t.stop());
+      setPreviewStream(null);
+    };
+  }, [micPermissionState]);
+
+  const { bars } = useAudioLevels(previewStream);
+  const isDeniedRetryable = micPermissionState === "denied";
+  const isDeniedPermanent = micPermissionState === "denied-permanent";
+  const isVoiceDisabled =
+    isDeniedRetryable || isDeniedPermanent || micPermissionState === "granting";
 
   return (
     <div className="pill pill-mode">
@@ -115,28 +195,78 @@ export default function ModeSelectionView({
       <div className="mode-grid">
         <button
           type="button"
-          className={`mode-card${captureMode === "voice" ? " active" : ""}`}
-          onClick={() => onModeChange("voice")}
+          className={`mode-card${captureMode === "voice" ? " active" : ""}${isVoiceDisabled ? " mode-card-disabled" : ""}`}
+          onClick={() => {
+            if (isVoiceDisabled) return;
+            onModeChange("voice");
+          }}
           aria-pressed={captureMode === "voice"}
+          aria-disabled={isVoiceDisabled || undefined}
+          disabled={isVoiceDisabled}
         >
-          <span className="mode-card-check" aria-hidden="true">
-            <svg width="9" height="9" viewBox="0 0 16 16" fill="none">
-              <path d="M3 8l3.5 3.5L13 5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-          <span className="mode-card-glyph">
-            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-              <rect x="6" y="2" width="4" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </span>
-          <div>
-            <div className="mode-card-title">Voice</div>
-            <div className="mode-card-sub">Speak the change. AI cleans and structures it.</div>
-          </div>
-          <span className="voice-wave" aria-hidden="true">
-            <span /><span /><span /><span /><span />
-          </span>
+          {isDeniedRetryable || isDeniedPermanent ? (
+            <div className="mode-card-denied" onClick={(e) => e.stopPropagation()}>
+              <div className="mode-card-denied-icon" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 16 16" fill="none">
+                  <rect x="6" y="2" width="4" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  <path d="M2 2l12 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </div>
+              <p className="mode-card-denied-title">Microphone access blocked</p>
+              <button
+                type="button"
+                className="mode-card-cta"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isDeniedPermanent) {
+                    openSiteSettings();
+                  } else {
+                    void requestPermission();
+                  }
+                }}
+              >
+                {isDeniedPermanent ? "Open mic settings" : "Give access"}
+              </button>
+              <p className="mode-card-denied-hint">
+                You can also click the lock icon in your URL bar and allow microphone access.
+              </p>
+            </div>
+          ) : (
+            <>
+              <span className="mode-card-check" aria-hidden="true">
+                <svg width="9" height="9" viewBox="0 0 16 16" fill="none">
+                  <path d="M3 8l3.5 3.5L13 5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+              <span className="mode-card-glyph">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                  <rect x="6" y="2" width="4" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </span>
+              <div>
+                <div className="mode-card-title">Voice</div>
+                <div className="mode-card-sub">
+                  {micPermissionState === "granting"
+                    ? "Requesting microphone…"
+                    : "Speak the change. AI cleans and structures it."}
+                </div>
+              </div>
+              <span className="voice-wave" aria-hidden="true">
+                {bars.map((level, i) => (
+                  <span
+                    key={i}
+                    style={{
+                      transform: `scaleY(${Math.max(0.15, Math.min(1.6, level * 2.4))})`,
+                      transformOrigin: "bottom",
+                      transition: "transform 70ms ease-out",
+                    }}
+                  />
+                ))}
+              </span>
+            </>
+          )}
         </button>
 
         <button
@@ -177,7 +307,13 @@ export default function ModeSelectionView({
                   strokeLinejoin="round"
                 />
               </svg>
-              Mic permission required
+              {isDeniedRetryable || isDeniedPermanent
+                ? "Mic access blocked — pick Write or allow mic"
+                : micPermissionState === "granted"
+                  ? "Mic ready"
+                  : micPermissionState === "granting"
+                    ? "Requesting microphone…"
+                    : "Mic permission required"}
             </>
           )}
         </div>
@@ -186,7 +322,7 @@ export default function ModeSelectionView({
           className="begin-btn"
           style={{ backgroundColor: "#5A49BF" }}
           onClick={onBegin}
-          disabled={isStarting}
+          disabled={isStarting || (captureMode === "voice" && isVoiceDisabled)}
         >
           {isStarting ? (
             <>

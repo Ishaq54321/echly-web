@@ -194,9 +194,8 @@ export const SessionWorkspaceRow = memo(function SessionWorkspaceRow({
   const total = (counts.open ?? 0) + (counts.resolved ?? 0);
   const updatedShort = formatSessionDateShort(session);
   const resolvedForPie = resolved ?? 0;
-  let progress =
+  const progress =
     total == null || total === 0 ? 0 : (resolvedForPie / total) * 100;
-  if (progress >= 100) progress = 99.999;
 
   return (
     <>

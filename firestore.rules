@@ -8,7 +8,8 @@ service cloud.firestore {
 
     function isWorkspaceMember(wid) {
       return isAuthed()
-        && request.auth.token.workspaceId == wid;
+        && request.auth.token.workspaceIds is list
+        && wid in request.auth.token.workspaceIds;
     }
 
     // Phase 6b helper — checks the flat sessionAccess mirror collection.

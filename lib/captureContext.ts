@@ -231,6 +231,64 @@ export function getSemanticIdentifier(el: Element | null): string {
 }
 
 /**
+ * Returns true if the element has at least one direct (non-whitespace)
+ * text node as a child.
+ *
+ * Different from hasVisibleText which walks the entire subtree. Direct text
+ * nodes are what actually paint with the element's own text properties
+ * (color, font-size, etc.). When text lives in a child element, that child's
+ * properties win — the parent's are phantom.
+ *
+ * Pattern mirrors isMeaningfulChild and isPureWrapper which already detect
+ * direct text nodes.
+ */
+function hasDirectTextNode(el: Element): boolean {
+  for (const node of Array.from(el.childNodes)) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = (node.textContent ?? "").trim();
+      if (text.length > 0) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Walks descendants to find the first element with a direct text node that's
+ * actually rendered. Used to compute "effective text color" when the clicked
+ * element wraps inner text via child elements.
+ *
+ * Returns null if no descendant has direct text. Skips hidden descendants.
+ */
+function findEffectiveTextElement(el: Element): Element | null {
+  if (hasDirectTextNode(el)) {
+    return el;
+  }
+
+  const doc = el.ownerDocument;
+  if (!doc) return null;
+
+  try {
+    const walker = doc.createTreeWalker(el, NodeFilter.SHOW_ELEMENT, {
+      acceptNode(node) {
+        const elNode = node as Element;
+        if (isHidden(elNode)) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        if (hasDirectTextNode(elNode)) {
+          return NodeFilter.FILTER_ACCEPT;
+        }
+        return NodeFilter.FILTER_SKIP;
+      },
+    });
+    return walker.nextNode() as Element | null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Returns true if the element contains at least one non-whitespace text node
  * descendant. Used to decide whether text-related computed styles
  * (color, font-size, font-weight) are meaningful for the element.
@@ -293,7 +351,12 @@ export function extractComputedStyles(win: Window, el: Element | null): string {
       (meaningfulChildren.length === 1 &&
         isVisuallyDistinctFromParent(meaningfulChildren[0], el));
 
-    const elementHasText = hasVisibleText(el);
+    // Gate text-family properties on DIRECT text nodes, not subtree text.
+    // An element wrapping inner text via child elements doesn't actually paint
+    // its own color/font — the children do. Also suppress when opacity:0.
+    const opacityValue = parseFloat(cs.opacity);
+    const isInvisible = opacityValue === 0;
+    const elementHasText = !isInvisible && hasDirectTextNode(el);
 
     // Buttons, links, and interactive elements have their own visual identity
     // (background, padding, border) that IS the visible content — even when
@@ -372,6 +435,20 @@ export function extractComputedStyles(win: Window, el: Element | null): string {
       !shouldStripTextProperties
     ) {
       parts.push(`text-align: ${textAlign}`);
+    }
+
+    // Effective text color: when this element has no direct text, walk to the
+    // first text-bearing descendant and emit its color. Gives the AI a clear
+    // signal about what color is actually rendered, avoiding phantom values.
+    if (!isInvisible && !hasDirectTextNode(el)) {
+      const textBearing = findEffectiveTextElement(el);
+      if (textBearing && textBearing !== el) {
+        const effectiveCs = win.getComputedStyle(textBearing);
+        const effectiveColor = rgbToHex(effectiveCs.color);
+        if (effectiveColor) {
+          parts.push(`effective-text-color: ${effectiveColor}`);
+        }
+      }
     }
 
     // === LAYOUT/VISUAL PROPERTIES (always captured) ===
@@ -958,7 +1035,11 @@ function extractBriefStyles(el: Element): string {
     if (!win) return "";
     const cs = win.getComputedStyle(el);
     const rect = el.getBoundingClientRect();
-    const elementHasText = hasVisibleText(el);
+    // Gate text properties on direct text nodes only — wrapping a child div
+    // that holds the visible text means the parent's color is phantom.
+    const opacityValue = parseFloat(cs.opacity);
+    const isInvisible = opacityValue === 0;
+    const elementHasText = !isInvisible && hasDirectTextNode(el);
     const parts: string[] = [];
 
     const color = cs.color;

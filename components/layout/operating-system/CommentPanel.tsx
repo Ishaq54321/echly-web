@@ -24,6 +24,32 @@ const AttachmentUploadModal = dynamic(
 
 const PANEL_WIDTH = 380;
 
+// Position a portal'd popover (e.g. emoji picker) anchored to a button rect.
+// Prefers placing below; flips above if there's not enough room below AND
+// more space above. Horizontally clamped to viewport.
+function computePopoverPlacement(
+  anchorRect: DOMRect | null,
+  popoverWidth: number,
+  popoverHeight: number,
+  gap = 6
+): { top: number; left: number; placement: "above" | "below" } {
+  if (!anchorRect) return { top: 0, left: 0, placement: "below" };
+  const viewportHeight = window.innerHeight;
+  const viewportWidth = window.innerWidth;
+  const spaceBelow = viewportHeight - anchorRect.bottom;
+  const spaceAbove = anchorRect.top;
+  const placeBelow =
+    spaceBelow >= popoverHeight + gap || spaceBelow >= spaceAbove;
+  const top = placeBelow
+    ? anchorRect.bottom + gap
+    : Math.max(gap, anchorRect.top - popoverHeight - gap);
+  const left = Math.max(
+    gap,
+    Math.min(anchorRect.left, viewportWidth - popoverWidth - gap)
+  );
+  return { top, left, placement: placeBelow ? "below" : "above" };
+}
+
 function getUploadBoxColor(fileName: string): string {
   const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
   if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"].includes(ext)) return "var(--brand)";
@@ -44,6 +70,12 @@ export type CommentPanelThreadCounts = {
 export interface CommentPanelProps {
   isOpen: boolean;
   onClose: () => void;
+  /**
+   * The currently selected ticket. When null/undefined the panel shows a
+   * "select a ticket" empty state instead of the composer + list, since
+   * comments are now scoped per-ticket.
+   */
+  selectedTicketId?: string | null;
   comments: Comment[];
   loading: boolean;
   sendReply: (threadId: string, message: string, attachment?: CommentAttachment, attachments?: CommentAttachment[], mentionedUserIds?: string[]) => Promise<void>;
@@ -61,8 +93,6 @@ export interface CommentPanelProps {
   threadCounts?: CommentPanelThreadCounts | null;
   participants?: { uid: string; displayName: string; email: string; avatarUrl: string | null }[];
   showToast?: (message: string) => void;
-  ticketTitleMap?: Map<string, string>;
-  selectedTicketTitle?: string;
   onNavigateToTicket?: (feedbackId: string) => void;
   onAnimatePin?: (commentId: string) => void;
   animatingCommentId?: string | null;
@@ -80,8 +110,6 @@ const CommentRow = memo(function CommentRow({
   deleteComment,
   onReactionsChanged,
   showResolve,
-  ticketTitle,
-  onNavigateToTicket,
   isThreadResolved,
 }: {
   comment: Comment;
@@ -92,8 +120,6 @@ const CommentRow = memo(function CommentRow({
   deleteComment?: (id: string) => Promise<void>;
   onReactionsChanged?: (commentId: string, reactions: Record<string, { userIds: string[]; userNames: string[] }>) => void;
   showResolve?: boolean;
-  ticketTitle?: string;
-  onNavigateToTicket?: () => void;
   isThreadResolved?: boolean;
 }) {
   const onResolveToggle =
@@ -112,8 +138,6 @@ const CommentRow = memo(function CommentRow({
         onResolveToggle={onResolveToggle}
         onReactionsChanged={onReactionsChanged}
         size={size === "root" ? "default" : "compact"}
-        ticketTitle={ticketTitle}
-        onNavigateToTicket={onNavigateToTicket}
         isThreadResolved={isThreadResolved}
       />
     </div>
@@ -140,7 +164,6 @@ const ThreadBlock = memo(function ThreadBlock({
   onReplyToggle,
   participants,
   showToast,
-  ticketTitleMap,
   onNavigateToTicket,
   onAnimatePin,
   animatingCommentId,
@@ -163,7 +186,6 @@ const ThreadBlock = memo(function ThreadBlock({
   onReplyToggle: (open: boolean) => void;
   participants?: Participant[];
   showToast?: (message: string) => void;
-  ticketTitleMap?: Map<string, string>;
   onNavigateToTicket?: (feedbackId: string) => void;
   onAnimatePin?: (commentId: string) => void;
   animatingCommentId?: string | null;
@@ -216,8 +238,17 @@ const ThreadBlock = memo(function ThreadBlock({
         setReplyEmojiOpen(false);
       }
     }
+    function handleScroll(e: Event) {
+      // Don't close when the user is scrolling inside the emoji picker itself.
+      if (replyEmojiRef.current && replyEmojiRef.current.contains(e.target as Node)) return;
+      setReplyEmojiOpen(false);
+    }
     document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    window.addEventListener("scroll", handleScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
   }, [replyEmojiOpen]);
 
   return (
@@ -261,8 +292,6 @@ const ThreadBlock = memo(function ThreadBlock({
         deleteComment={deleteComment}
         onReactionsChanged={onReactionsChanged}
         showResolve={Boolean(updateComment)}
-        ticketTitle={ticketTitleMap?.get(root.feedbackId) ?? undefined}
-        onNavigateToTicket={onNavigateToTicket ? () => onNavigateToTicket(root.feedbackId) : undefined}
       />
       {replies.length > 0 && (
         <div className="ml-[19px] mt-1 pl-[21px] border-l border-[var(--text-tertiary)]/20 space-y-0.5">
@@ -303,7 +332,7 @@ const ThreadBlock = memo(function ThreadBlock({
               onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.stopPropagation()}
             >
-              <div className="rounded-[var(--radius-md)] bg-[var(--surface-card)] border border-[var(--border)] overflow-hidden focus-within:border-[var(--brand)] focus-within:ring-0 transition-all">
+              <div className="rounded-[var(--radius-md)] bg-[var(--surface-card)] border border-[var(--border)] overflow-hidden focus-within:border-[var(--border-strong)] transition-colors duration-150">
 
                 {/* Row 1: Avatar + Tiptap Editor */}
                 <div className="flex items-start gap-3 px-4 pt-4">
@@ -566,28 +595,32 @@ const ThreadBlock = memo(function ThreadBlock({
         />
       )}
       {replyEmojiOpen &&
-        createPortal(
-          <div
-            ref={replyEmojiRef}
-            className="fixed z-[2147480001]"
-            style={{
-              top: (replyEmojiAnchorRect?.bottom ?? 0) + 4,
-              left: Math.min(replyEmojiAnchorRect?.left ?? 0, window.innerWidth - 320),
-            }}
-          >
-            <EmojiPicker
-              onEmojiClick={(emojiData) => {
-                replyEditorRef.current?.chain().focus().insertContent(emojiData.emoji).run();
-                setReplyEmojiOpen(false);
-              }}
-              width={300}
-              height={380}
-              searchPlaceHolder="Search emoji..."
-              previewConfig={{ showPreview: false }}
-            />
-          </div>,
-          document.body
-        )}
+        (() => {
+          const { top, left } = computePopoverPlacement(
+            replyEmojiAnchorRect,
+            300,
+            380
+          );
+          return createPortal(
+            <div
+              ref={replyEmojiRef}
+              className="fixed z-[2147480001]"
+              style={{ top, left }}
+            >
+              <EmojiPicker
+                onEmojiClick={(emojiData) => {
+                  replyEditorRef.current?.chain().focus().insertContent(emojiData.emoji).run();
+                  setReplyEmojiOpen(false);
+                }}
+                width={300}
+                height={380}
+                searchPlaceHolder="Search emoji..."
+                previewConfig={{ showPreview: false }}
+              />
+            </div>,
+            document.body
+          );
+        })()}
     </div>
   );
 });
@@ -611,7 +644,6 @@ const CommentThreadList = memo(function CommentThreadList({
   onSelectThread,
   participants,
   showToast,
-  ticketTitleMap,
   onNavigateToTicket,
   onAnimatePin,
   animatingCommentId,
@@ -633,7 +665,6 @@ const CommentThreadList = memo(function CommentThreadList({
   onSelectThread?: (threadId: string) => void;
   participants?: Participant[];
   showToast?: (message: string) => void;
-  ticketTitleMap?: Map<string, string>;
   onNavigateToTicket?: (feedbackId: string) => void;
   onAnimatePin?: (commentId: string) => void;
   animatingCommentId?: string | null;
@@ -717,7 +748,6 @@ const CommentThreadList = memo(function CommentThreadList({
     onReplyToggle: (open: boolean) => setOpenReplyThreadId(open ? root.id : null),
     participants,
     showToast,
-    ticketTitleMap,
     onNavigateToTicket,
     onAnimatePin,
     animatingCommentId,
@@ -776,6 +806,7 @@ function computeAutoPin(existingPins: { xPercent: number; yPercent: number }[]):
 export function CommentPanel({
   isOpen,
   onClose,
+  selectedTicketId,
   comments,
   loading,
   sendReply,
@@ -793,8 +824,6 @@ export function CommentPanel({
   threadCounts: threadCountsProp,
   participants,
   showToast,
-  ticketTitleMap,
-  selectedTicketTitle,
   onNavigateToTicket,
   onAnimatePin,
   animatingCommentId,
@@ -850,8 +879,16 @@ export function CommentPanel({
         setComposeEmojiOpen(false);
       }
     }
+    function handleScroll(e: Event) {
+      if (composeEmojiRef.current && composeEmojiRef.current.contains(e.target as Node)) return;
+      setComposeEmojiOpen(false);
+    }
     document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    window.addEventListener("scroll", handleScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
   }, [composeEmojiOpen]);
 
   useEffect(() => {
@@ -886,6 +923,8 @@ export function CommentPanel({
 
   if (!isOpen) return null;
 
+  const hasSelectedTicket = Boolean(selectedTicketId);
+
   const rootsForCounts = comments.filter((c) => !c.threadId);
   let openC = 0;
   let resolvedC = 0;
@@ -905,13 +944,31 @@ export function CommentPanel({
 
   const panelContent = (
     <>
-      {/* Composer at top — pill-shaped */}
+      {!hasSelectedTicket ? (
+        <div className="flex-1 min-h-0 flex items-center justify-center px-5 py-8">
+          <CanvasEmptyState
+            illustration={<NoCommentsIllu />}
+            title="Select a ticket to see its comments"
+            description="Comments are scoped to each ticket. Pick one from the list to view or add comments."
+          />
+        </div>
+      ) : (
+      <>
+      {/* Composer at top */}
       {!composeExpanded ? (
         <div className="shrink-0 px-5 pt-4 pb-3.5">
           <div
-            className="grid items-center gap-2.5 border border-[var(--hair-strong)] rounded-full px-2.5 py-1.5 bg-white transition-all cursor-text hover:border-[var(--hair)] focus-within:border-[var(--brand)] focus-within:shadow-[0_0_0_3px_var(--brand-subtle)]"
-            style={{ gridTemplateColumns: '26px 1fr auto' }}
+            role="button"
+            tabIndex={0}
+            className="flex items-center gap-3 border border-[var(--hair-strong)] rounded-[var(--radius-md)] px-4 bg-white transition-colors duration-150 cursor-text hover:border-[var(--border-strong)]"
+            style={{ minHeight: 56 }}
             onClick={() => setComposeExpanded(true)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setComposeExpanded(true);
+              }
+            }}
           >
             <div className="w-[26px] h-[26px] rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold text-[10.5px] flex items-center justify-center shrink-0 overflow-hidden">
               {currentUserAvatarUrl && !avatarError ? (
@@ -925,17 +982,43 @@ export function CommentPanel({
                 currentUserInitial || "?"
               )}
             </div>
-            <span className="text-[13.5px] text-[var(--text-tertiary)] min-w-0 truncate">Leave a comment...</span>
-            <span className="flex items-center gap-[2px]">
-              <button type="button" onClick={(e) => e.stopPropagation()} className="w-[26px] h-[26px] rounded-lg grid place-items-center text-[var(--text-secondary)] border-0 bg-transparent cursor-pointer hover:bg-black/[0.04]">
-                <Smile className="h-3.5 w-3.5" strokeWidth={1.4} />
-              </button>
+            <span className="flex-1 min-w-0 truncate text-[13.5px] text-[var(--text-tertiary)]">
+              Leave a comment...
+            </span>
+            <span className="flex items-center gap-0.5 shrink-0">
+              <Tooltip content="Mention someone">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setComposeExpanded(true); }}
+                  className="w-[26px] h-[26px] rounded-md grid place-items-center text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] transition-colors duration-120 border-0 bg-transparent cursor-pointer"
+                >
+                  <AtSign className="h-3.5 w-3.5" strokeWidth={1.5} />
+                </button>
+              </Tooltip>
+              <Tooltip content="Add emoji">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setComposeExpanded(true); }}
+                  className="w-[26px] h-[26px] rounded-md grid place-items-center text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] transition-colors duration-120 border-0 bg-transparent cursor-pointer"
+                >
+                  <Smile className="h-3.5 w-3.5" strokeWidth={1.5} />
+                </button>
+              </Tooltip>
+              <Tooltip content="Attach file">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setComposeExpanded(true); }}
+                  className="w-[26px] h-[26px] rounded-md grid place-items-center text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] transition-colors duration-120 border-0 bg-transparent cursor-pointer"
+                >
+                  <Paperclip className="h-3.5 w-3.5" strokeWidth={1.5} />
+                </button>
+              </Tooltip>
             </span>
           </div>
         </div>
       ) : (
         <div className="shrink-0 px-5 pt-4 pb-3.5">
-          <div className="rounded-[var(--radius-md)] bg-white border border-[var(--hair-strong)] overflow-hidden focus-within:border-[var(--brand)] focus-within:shadow-[0_0_0_3px_var(--brand-subtle)] transition-all">
+          <div className="rounded-[var(--radius-md)] bg-white border border-[var(--hair-strong)] overflow-hidden focus-within:border-[var(--border-strong)] transition-colors duration-150">
 
             {/* Row 1: Avatar + Tiptap editor */}
             <div className="flex items-start gap-3 px-4 pt-4">
@@ -1183,32 +1266,36 @@ export function CommentPanel({
           </div>
 
           {composeEmojiOpen &&
-            createPortal(
-              <div
-                ref={composeEmojiRef}
-                className="fixed z-[2147480001]"
-                style={{
-                  top: composeEmojiAnchorRect?.bottom ?? 0,
-                  right: window.innerWidth - (composeEmojiAnchorRect?.right ?? 0),
-                }}
-              >
-                <EmojiPicker
-                  onEmojiClick={(emojiData) => {
-                    composeEditorRef.current
-                      ?.chain()
-                      .focus()
-                      .insertContent(emojiData.emoji)
-                      .run();
-                    setComposeEmojiOpen(false);
-                  }}
-                  width={320}
-                  height={400}
-                  searchPlaceHolder="Search emoji..."
-                  previewConfig={{ showPreview: false }}
-                />
-              </div>,
-              document.body
-            )}
+            (() => {
+              const { top, left } = computePopoverPlacement(
+                composeEmojiAnchorRect,
+                320,
+                400
+              );
+              return createPortal(
+                <div
+                  ref={composeEmojiRef}
+                  className="fixed z-[2147480001]"
+                  style={{ top, left }}
+                >
+                  <EmojiPicker
+                    onEmojiClick={(emojiData) => {
+                      composeEditorRef.current
+                        ?.chain()
+                        .focus()
+                        .insertContent(emojiData.emoji)
+                        .run();
+                      setComposeEmojiOpen(false);
+                    }}
+                    width={320}
+                    height={400}
+                    searchPlaceHolder="Search emoji..."
+                    previewConfig={{ showPreview: false }}
+                  />
+                </div>,
+                document.body
+              );
+            })()}
         </div>
       )}
 
@@ -1254,13 +1341,14 @@ export function CommentPanel({
             onSelectThread={onSelectThread}
             participants={participants}
             showToast={showToast}
-            ticketTitleMap={ticketTitleMap}
             onNavigateToTicket={onNavigateToTicket}
             onAnimatePin={onAnimatePin}
             animatingCommentId={animatingCommentId}
           />
         </div>
       </div>
+      </>
+      )}
     </>
   );
 

@@ -41,8 +41,10 @@ export function extractFromDoc(doc: {
       (block.content ?? [])
         .map((node) => {
           if (node.type === "mention") {
-            if (node.attrs?.id) mentionedUserIds.push(node.attrs.id);
-            return `@${node.attrs?.label ?? node.attrs?.id ?? ""}`;
+            const id = node.attrs?.id ?? "";
+            const label = node.attrs?.label ?? id;
+            if (id) mentionedUserIds.push(id);
+            return `@[${label}](${id})`;
           }
           return node.text ?? "";
         })

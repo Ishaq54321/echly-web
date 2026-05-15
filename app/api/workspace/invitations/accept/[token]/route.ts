@@ -16,7 +16,12 @@ import {
   updateWorkspaceInvitationRepo,
 } from "@/lib/repositories/workspaceMembersRepository.server";
 import { addWorkspaceMembershipRepo } from "@/lib/repositories/usersRepository.server";
-import { setWorkspaceClaim } from "@/lib/server/setWorkspaceClaim";
+import { setWorkspaceClaims } from "@/lib/server/setWorkspaceClaim";
+import {
+  assertCanJoinAnotherWorkspace,
+  WorkspaceLimitError,
+  MAX_WORKSPACES_PER_USER,
+} from "@/lib/domain/workspaceLimits";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { getPaymentProvider } from "@/lib/billing/payments";
 import { checkPlanLimit } from "@/lib/billing/checkPlanLimit";
@@ -140,6 +145,30 @@ export async function POST(
     const profileSnap = await adminDb.doc(`users/${user.uid}`).get();
     const profile = (profileSnap.data() ?? {}) as Record<string, unknown>;
 
+    // Enforce per-user workspace cap
+    const currentMemberships: string[] = Array.isArray(profile.workspaceMemberships)
+      ? (profile.workspaceMemberships as unknown[]).filter(
+          (v): v is string => typeof v === "string" && v.trim() !== ""
+        )
+      : [];
+    try {
+      assertCanJoinAnotherWorkspace(currentMemberships, invitation.workspaceId);
+    } catch (err) {
+      if (err instanceof WorkspaceLimitError) {
+        return apiError({
+          code: "FORBIDDEN",
+          message: `You're in the maximum ${MAX_WORKSPACES_PER_USER} workspaces. Please contact the Annote team to be added to more, or leave one of your current workspaces.`,
+          status: 403,
+          data: {
+            reason: "WORKSPACE_LIMIT_REACHED",
+            currentCount: err.currentCount,
+            max: MAX_WORKSPACES_PER_USER,
+          },
+        });
+      }
+      throw err;
+    }
+
     const composedProfileName = composeFullName(
       typeof profile.firstName === "string" ? profile.firstName : null,
       typeof profile.lastName === "string" ? profile.lastName : null
@@ -198,7 +227,10 @@ export async function POST(
       },
       { merge: true }
     );
-    await setWorkspaceClaim(user.uid, invitation.workspaceId);
+    const updatedMemberships = currentMemberships.includes(invitation.workspaceId)
+      ? currentMemberships
+      : [...currentMemberships, invitation.workspaceId];
+    await setWorkspaceClaims(user.uid, invitation.workspaceId, updatedMemberships);
 
     return apiSuccess({
       workspaceId: invitation.workspaceId,

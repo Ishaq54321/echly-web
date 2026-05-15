@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Info, X, PencilLine } from "lucide-react";
 import type { StructuredFeedback } from "./types";
 import { getTicketIconFromTags } from "@/lib/utils/getTicketIconFromTags";
 import { parseDeviceInfo, formatLocalDateTime } from "@/lib/utils/captureInfo";
+import { DescriptionEditor } from "@/components/session/feedbackDetail/DescriptionEditor/DescriptionEditor";
 
 function priorityFromType(type: string | undefined): "critical" | "high" | "medium" | "low" {
   const t = (type ?? "").toLowerCase();
@@ -68,6 +69,21 @@ function FeedbackItem({
     }
   }, [ticket.id, onDelete, isDeleting]);
 
+  const handleRowClick = useCallback(() => {
+    if (isDeleting) return;
+    onEditRequest(ticket.id);
+  }, [ticket.id, onEditRequest, isDeleting]);
+
+  const handleRowKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        handleRowClick();
+      }
+    },
+    [handleRowClick],
+  );
+
   const tagCount = ticket.tags?.length ?? 0;
   const tagLabel = tagCount === 1 ? "tag" : "tags";
 
@@ -76,6 +92,11 @@ function FeedbackItem({
       className={`ticket${highlighted ? " success-flash" : ""}`}
       data-priority={priority}
       data-id={ticket.id}
+      role="button"
+      tabIndex={0}
+      onClick={handleRowClick}
+      onKeyDown={handleRowKeyDown}
+      style={{ cursor: "pointer" }}
     >
       <span className={`ticket-thumb${highlighted ? " ticket-thumb--highlighted" : ""}`} aria-hidden>
         <IconComponent size={14} strokeWidth={2} />
@@ -93,7 +114,10 @@ function FeedbackItem({
       <div className="ticket-actions">
         <button
           type="button"
-          onClick={() => onEditRequest(ticket.id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onEditRequest(ticket.id);
+          }}
           className="ticket-action-btn"
           aria-label="Edit"
         >
@@ -103,7 +127,10 @@ function FeedbackItem({
         </button>
         <button
           type="button"
-          onClick={handleDelete}
+          onClick={(e) => {
+            e.stopPropagation();
+            void handleDelete();
+          }}
           disabled={isDeleting}
           className="ticket-action-btn ticket-action-btn--danger"
           aria-label={isDeleting ? "Deleting…" : "Delete"}
@@ -137,6 +164,17 @@ export type TicketEditorOverlayProps = {
   onUpdate: (id: string, payload: { title: string; description?: string; tags?: string[] }) => Promise<void>;
   onClose: () => void;
   onPauseForEditor?: () => void | Promise<void>;
+  /**
+   * Optional fetch wrapper for DescriptionEditor's API calls (AI improve,
+   * voice transcription). Extension builds pass an authenticated client.
+   */
+  fetchClient?: (url: string, init?: RequestInit) => Promise<Response>;
+  /**
+   * Container element used as the destination for editor portals (toolbar
+   * dropdowns, voice popover, transcript pill). Extension builds pass the
+   * shadow-root container so portals stay inside the shadow tree.
+   */
+  portalContainer?: HTMLElement | null;
 };
 
 export function TicketEditorOverlay({
@@ -145,6 +183,8 @@ export function TicketEditorOverlay({
   onUpdate,
   onClose,
   onPauseForEditor,
+  fetchClient,
+  portalContainer,
 }: TicketEditorOverlayProps) {
   const [editedTitle, setEditedTitle] = useState(ticket.title);
   const [editedDescription, setEditedDescription] = useState<string>(ticket.description ?? "");
@@ -154,7 +194,6 @@ export function TicketEditorOverlay({
   const [isSaving, setIsSaving] = useState(false);
   const [screenshotExpanded, setScreenshotExpanded] = useState(false);
   const [screenshotLoaded, setScreenshotLoaded] = useState(false);
-  const descriptionRef = useRef<HTMLTextAreaElement>(null);
 
   const IconComponent = getTicketIconFromTags(ticket.tags ?? null, ticket.title);
   const screenshotUrl =
@@ -188,17 +227,6 @@ export function TicketEditorOverlay({
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose, screenshotExpanded]);
-
-  // Auto-resize a textarea to fit its content
-  const resizeTextarea = useCallback((el: HTMLTextAreaElement | null) => {
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, []);
-
-  useEffect(() => {
-    resizeTextarea(descriptionRef.current);
-  }, [editedDescription, resizeTextarea]);
 
   const handleSave = useCallback(async () => {
     setIsSaving(true);
@@ -279,7 +307,18 @@ export function TicketEditorOverlay({
 
           {/* Screenshot (only when URL can be built) */}
           {screenshotUrl && (
-            <div className="editor-screenshot">
+            <div
+              className="editor-screenshot"
+              role="button"
+              tabIndex={0}
+              onClick={() => setScreenshotExpanded(true)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setScreenshotExpanded(true);
+                }
+              }}
+            >
               <img
                 src={screenshotUrl}
                 alt=""
@@ -302,7 +341,8 @@ export function TicketEditorOverlay({
                   type="button"
                   className="editor-screenshot-btn"
                   title="Edit in dashboard"
-                  onClick={async () => {
+                  onClick={async (e) => {
+                    e.stopPropagation();
                     await onPauseForEditor?.();
                     const base = (typeof process !== "undefined" ? process.env.ECHLY_WEB_APP_URL : "") || "http://localhost:3000";
                     window.open(`${base}/session/${sessionId}?ticket=${ticket.id}&edit=true`, "_blank");
@@ -371,19 +411,31 @@ export function TicketEditorOverlay({
 
           <div className="editor-divider" />
 
-          {/* Description */}
+          {/* Description — full TipTap editor (toolbar, AI Improve, voice dictate). */}
           <div className="editor-steps">
             <div className="editor-steps-label">Description</div>
-            <textarea
-              ref={descriptionRef}
-              className="step-text"
+            <DescriptionEditor
               value={editedDescription}
-              rows={3}
-              placeholder="Description…"
-              onChange={(e) => {
-                setEditedDescription(e.target.value);
-                resizeTextarea(e.target);
+              onSave={async () => {
+                // The outer overlay owns the Save button. The editor's
+                // internal save is hidden via hideInternalActions; this
+                // handler is required by the prop type but won't be hit.
               }}
+              onCancel={() => {
+                // Outer overlay handles Cancel. The editor's Escape key
+                // routes through here — close the overlay so it matches
+                // user expectation.
+                onClose();
+              }}
+              placeholder="Description..."
+              autoFocus={false}
+              isEditing
+              participants={[]}
+              onContentChange={(markdown) => setEditedDescription(markdown)}
+              fetchClient={fetchClient}
+              hideInternalActions
+              portalContainer={portalContainer}
+              appearance="extension"
             />
           </div>
         </div>
@@ -414,24 +466,21 @@ export function TicketEditorOverlay({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            cursor: "zoom-out",
+            pointerEvents: "auto",
           }}
           onClick={() => setScreenshotExpanded(false)}
+          onMouseDown={(e) => e.stopPropagation()}
         >
-          <img
-            src={screenshotUrl}
-            alt="Screenshot (expanded)"
-            style={{
-              maxWidth: "90vw",
-              maxHeight: "90vh",
-              borderRadius: 12,
-              objectFit: "contain",
-              boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
-            }}
-          />
+          {/* Close button rendered FIRST so it wins any z-stacking tie-break
+              with the image, and given an explicit z-index + pointer-events
+              so global resets can't strip it. */}
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); setScreenshotExpanded(false); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setScreenshotExpanded(false);
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
             style={{
               position: "absolute",
               top: 20,
@@ -445,6 +494,8 @@ export function TicketEditorOverlay({
               cursor: "pointer",
               display: "grid",
               placeItems: "center",
+              zIndex: 2,
+              pointerEvents: "auto",
             }}
             aria-label="Close"
           >
@@ -452,6 +503,20 @@ export function TicketEditorOverlay({
               <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
           </button>
+          <img
+            src={screenshotUrl}
+            alt="Screenshot (expanded)"
+            style={{
+              maxWidth: "90vw",
+              maxHeight: "90vh",
+              borderRadius: 12,
+              objectFit: "contain",
+              boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
+              pointerEvents: "none",
+              position: "relative",
+              zIndex: 1,
+            }}
+          />
         </div>
       )}
     </div>

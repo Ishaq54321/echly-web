@@ -21,6 +21,7 @@ import { uploadScreenshot, generateFeedbackId } from "./contentScreenshot";
 import CaptureWidget from "@/lib/capture-engine/core/CaptureWidget";
 import type { StructuredFeedback, CaptureContext, FeedbackJob } from "@/lib/capture-engine/core/types";
 import { ExtensionCaptureEnvironment } from "@/lib/capture-engine/ExtensionCaptureEnvironment";
+import { extensionFetchClient } from "./lib/extensionFetchClient";
 import { ECHLY_DEBUG } from "@/lib/utils/logger";
 import { echlyLog } from "@/lib/debug/echlyLogger";
 import { ECHLY_STRICT_MODE } from "@/lib/guardrails";
@@ -591,6 +592,20 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     const handler = () => setOpenResumeModalFromMessage(true);
     window.addEventListener("ECHLY_OPEN_PREVIOUS_SESSIONS", handler);
     return () => window.removeEventListener("ECHLY_OPEN_PREVIOUS_SESSIONS", handler);
+  }, []);
+
+  /* Dashboard switched workspace — drop cached sessions so the next open
+     refetches against the user's new active workspace. */
+  React.useEffect(() => {
+    const handler = () => {
+      try {
+        invalidateSessionsCache();
+      } catch (err) {
+        console.warn("[ECHLY] invalidateSessionsCache on workspace switch failed", err);
+      }
+    };
+    window.addEventListener("ECHLY_REFRESH_SESSION", handler);
+    return () => window.removeEventListener("ECHLY_REFRESH_SESSION", handler);
   }, []);
 
   /* Extension: when background forwards ECHLY_RESUME_SESSION to this tab, set the active session and enter session mode (skip the picker). */
@@ -1457,6 +1472,7 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           sessionId={effectiveSessionId ?? ""}
           userId={user.uid}
           extensionMode={true}
+          fetchClient={extensionFetchClient}
           __extensionSavingState={isSaving}
           onExtensionSavingSignalsChange={onExtensionSavingSignalsChange}
           captureMode={uiGlobal.captureMode}

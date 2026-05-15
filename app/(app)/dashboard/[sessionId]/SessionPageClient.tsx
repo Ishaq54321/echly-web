@@ -48,7 +48,7 @@ import {
   usePresenceStore,
 } from "@/lib/realtime/presenceStore";
 import { retainAccessRequestsListener } from "@/lib/realtime/accessRequestStore";
-import { useCommentsStore } from "@/lib/realtime/commentsStore";
+import { useSessionCommentsAggregate } from "@/lib/realtime/commentsStore";
 import { usePresenceHeartbeat } from "@/lib/hooks/usePresenceHeartbeat";
 import { Timestamp } from "firebase/firestore";
 import { warn } from "@/lib/utils/logger";
@@ -291,7 +291,7 @@ export default function SessionPageClient({
   // Subscribe to comments + presence stores so the accessRevoked watcher below
   // sees a permission-denied from any of the four listeners. These hooks only
   // call useSyncExternalStore — they do NOT retain listeners on their own.
-  const commentsStoreState = useCommentsStore(sessionId);
+  const commentsStoreState = useSessionCommentsAggregate(sessionId);
   const presenceStoreState = usePresenceStore(sessionId);
   /**
    * Effective session = listener data when present, else local optimistic overlay.
@@ -1187,11 +1187,6 @@ export default function SessionPageClient({
   );
   const stableCanonicalFeedback = stableScopedFeedback;
 
-  const ticketTitleMap = useMemo(
-    () => new Map(stableScopedFeedback.map((f) => [f.id, f.title ?? "Untitled"])),
-    [stableScopedFeedback]
-  );
-
   useEffect(() => {
     if (process.env.NODE_ENV !== "development") return;
     const legacyScreenshotUrlKey = `screenshot${"Url"}`;
@@ -1228,8 +1223,6 @@ export default function SessionPageClient({
     }
     return null;
   }, [ticketIdFromUrl, stableScopedFeedback, selectedId, sessionId]);
-
-  const selectedTicketTitle = ticketTitleMap.get(effectiveSelectedId ?? "") ?? "Untitled";
 
   /**
    * Guarded ticket switch. If the description editor on the current ticket is
@@ -3212,9 +3205,17 @@ export default function SessionPageClient({
         }}
         impactScore={(selectedItem as { impactScore?: number } | null)?.impactScore}
         comments={comments}
+        loadingComments={loadingComments}
         participants={participants}
         sendPinComment={sendPinComment}
         sendReply={sendReply}
+        sendComment={sendComment}
+        deleteComment={deleteComment}
+        onReactionsChanged={handleReactionsChanged}
+        currentUserId={authUid}
+        currentUserName={displayName || undefined}
+        currentUserInitial={firstName ? firstName.charAt(0).toUpperCase() : "?"}
+        currentUserAvatarUrl={avatarUrl || authPhotoUrl || undefined}
         activePinIdForPopover={activePinIdForPopover}
         activeThreadId={activeThreadId}
         onPinClick={(commentId: string) => {
@@ -3428,6 +3429,7 @@ export default function SessionPageClient({
                     setIsCommentPanelOpen(false);
                     setIsCommentMode(false);
                   }}
+                  selectedTicketId={effectiveSelectedId}
                   comments={comments}
                   loading={loadingComments}
                   threadCounts={displayCommentThreadCounts}
@@ -3444,8 +3446,6 @@ export default function SessionPageClient({
                   onReactionsChanged={handleReactionsChanged}
                   participants={participants}
                   showToast={showToast}
-                  ticketTitleMap={ticketTitleMap}
-                  selectedTicketTitle={selectedTicketTitle}
                   onNavigateToTicket={(fid: string) =>
                     trySwitchToTicket(fid, () => setSelectedId(fid))
                   }

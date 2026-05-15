@@ -216,7 +216,7 @@ export function useCaptureWidget({
   const pauseWaitTimeoutRef = useRef<number | null>(null);
   const endWaitTimeoutRef = useRef<number | null>(null);
   const micDeviceOverrideRef = useRef<string | null>(null);
-  /** [VOICE] Diagnostic: timestamp when UI recording started (startListening called). */
+  /** Timestamp when UI recording started (startListening called). */
   const voiceStartTimeRef = useRef<number | null>(null);
   /** True while in voice_listening (or equivalent) so overlay/effects do not tear down during recording. */
   const recordingActiveRef = useRef(false);
@@ -572,13 +572,30 @@ export function useCaptureWidget({
         label: d.label || `Microphone ${inputs.indexOf(d) + 1}`,
       }));
       onDevicesEnumerated?.(deviceList);
-      const effectiveMicId = micDeviceOverrideRef.current ?? selectedMicrophoneId ?? undefined;
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio:
-          effectiveMicId && effectiveMicId.length > 0
-            ? { deviceId: { exact: effectiveMicId } }
-            : true,
-      });
+      const requestedMicId = micDeviceOverrideRef.current ?? selectedMicrophoneId ?? undefined;
+      const micExistsInList =
+        requestedMicId != null &&
+        requestedMicId.length > 0 &&
+        inputs.some((d) => d.deviceId === requestedMicId);
+      const effectiveMicId = micExistsInList ? requestedMicId : undefined;
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio:
+            effectiveMicId && effectiveMicId.length > 0
+              ? { deviceId: { exact: effectiveMicId } }
+              : true,
+        });
+      } catch (err) {
+        // Selected mic may have been unplugged between enumeration and use; fall back to system default.
+        if (effectiveMicId) {
+          console.warn("[ECHLY:MIC] selected mic failed, falling back to default", err);
+          try { localStorage.removeItem("echly:selectedMic"); } catch { /* noop */ }
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } else {
+          throw err;
+        }
+      }
       mediaStreamRef.current = stream;
       const ctx = new AudioContext();
       const analyser = ctx.createAnalyser();

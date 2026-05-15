@@ -48,6 +48,8 @@ export type SessionOverlayProps = {
   theme?: "light" | "dark";
   __extensionSavingState?: boolean;
   onModeChange?: (mode: "voice" | "text") => void;
+  /** When true, suspend hover highlighting and click capture (e.g. mouse is over the Echly tray). */
+  captureSuspended?: boolean;
 };
 
 /**
@@ -83,11 +85,20 @@ export function SessionOverlay({
   theme = "dark",
   __extensionSavingState,
   onModeChange,
+  captureSuspended = false,
 }: SessionOverlayProps) {
   const cleanupRef = useRef<(() => void)[]>([]);
   const voiceStartedForPendingRef = useRef(false);
   const sessionActionPending = pausePending || endPending;
-  const sessionCursorActive = sessionMode && !sessionPaused && !sessionActionPending;
+  const sessionCursorActive = sessionMode && !sessionPaused && !sessionActionPending && !captureSuspended;
+  /**
+   * Highlighter + click-capture use a stable getActive() closure that mutates
+   * via this ref, so toggling captureSuspended doesn't tear down listeners.
+   */
+  const captureSuspendedRef = useRef(captureSuspended);
+  useEffect(() => {
+    captureSuspendedRef.current = captureSuspended;
+  }, [captureSuspended]);
 
   /**
    * First-capture-per-session tooltip: shows "Click anywhere to capture" near the cursor
@@ -168,7 +179,8 @@ export function SessionOverlay({
       sessionMode &&
       !sessionPaused &&
       !sessionActionPending &&
-      sessionFeedbackPending == null;
+      sessionFeedbackPending == null &&
+      !captureSuspendedRef.current;
     cleanupRef.current.push(
       attachElementHighlighter(captureRoot, { getActive })
     );

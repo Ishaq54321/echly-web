@@ -13,7 +13,7 @@ import {
   buildOnboardedCookieString,
 } from "@/lib/server/onboardingCookie";
 import { isValidSlug } from "@/lib/utils/slugify";
-import { setWorkspaceClaim } from "@/lib/server/setWorkspaceClaim";
+import { setWorkspaceClaims } from "@/lib/server/setWorkspaceClaim";
 import { composeFullName } from "@/lib/utils/nameSplit";
 import { defaultWorkspaceDoc } from "@/lib/domain/workspace";
 
@@ -281,7 +281,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Auth claim — non-Firestore, can't batch. Idempotent on retry.
-    await setWorkspaceClaim(user.uid, wid);
+    // Read post-write user doc to pick up the freshly-unioned memberships array.
+    const postSnap = await userRef.get();
+    const postData = (postSnap.data() ?? {}) as Record<string, unknown>;
+    const memberships: string[] = Array.isArray(postData.workspaceMemberships)
+      ? (postData.workspaceMemberships as unknown[]).filter(
+          (v): v is string => typeof v === "string" && v.trim() !== ""
+        )
+      : [];
+    if (!memberships.includes(wid)) memberships.push(wid);
+    await setWorkspaceClaims(user.uid, wid, memberships);
 
     const token = await signOnboardedToken(user.uid);
     const headers = new Headers(corsHeaders(req));

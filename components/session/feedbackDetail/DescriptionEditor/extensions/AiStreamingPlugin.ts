@@ -58,12 +58,12 @@ function buildDecorations(
         caret.className = "ai-annote-caret";
         caret.setAttribute("aria-hidden", "true");
 
-        const label = document.createElement("span");
-        label.className = "ai-annote-label";
-        label.textContent = "Annote";
+        const pill = document.createElement("span");
+        pill.className = "ai-annote-pill";
+        pill.textContent = "Annoting";
 
         wrap.appendChild(caret);
-        wrap.appendChild(label);
+        wrap.appendChild(pill);
         return wrap;
       },
       {
@@ -160,15 +160,6 @@ export const AiStreamingPlugin = Extension.create({
           },
 
           handleKeyDown(view, event) {
-            // PHASE_13_6_DIAG
-            if (event.key === "z" && (event.metaKey || event.ctrlKey)) {
-              const ps = aiStreamingPluginKey.getState(view.state);
-              console.log("[AI-DIAG]", "CMD-Z-PRESSED-AT-PLUGIN", {
-                pluginActive: ps?.active,
-                wouldSwallow: ps?.active === true,
-                shift: event.shiftKey,
-              });
-            }
             const pluginState = aiStreamingPluginKey.getState(view.state);
             if (pluginState?.active) {
               event.preventDefault();

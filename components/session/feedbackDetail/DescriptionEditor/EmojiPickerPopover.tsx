@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
+import { usePortalHost } from "./PortalHost";
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
@@ -14,7 +16,7 @@ export interface EmojiPickerPopoverProps {
 
 const POPOVER_WIDTH = 320;
 const POPOVER_HEIGHT = 360;
-const GAP = 8;
+const GAP = 4;
 
 export function EmojiPickerPopover({
   anchorEl,
@@ -26,30 +28,40 @@ export function EmojiPickerPopover({
     null,
   );
   const popoverRef = useRef<HTMLDivElement>(null);
+  const portalHost = usePortalHost();
 
   useEffect(() => {
     if (!open || !anchorEl) {
       setPosition(null);
       return;
     }
-    const rect = anchorEl.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
+    const compute = () => {
+      const rect = anchorEl.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
 
-    let top = rect.bottom + GAP;
-    let left = rect.left;
+      let top = rect.bottom + GAP;
+      let left = rect.left;
 
-    if (left + POPOVER_WIDTH > viewportWidth - 16) {
-      left = viewportWidth - POPOVER_WIDTH - 16;
-    }
-    if (left < 16) left = 16;
+      if (left + POPOVER_WIDTH > viewportWidth - 16) {
+        left = viewportWidth - POPOVER_WIDTH - 16;
+      }
+      if (left < 16) left = 16;
 
-    if (top + POPOVER_HEIGHT > viewportHeight - 16) {
-      top = rect.top - POPOVER_HEIGHT - GAP;
-    }
-    if (top < 16) top = 16;
+      if (top + POPOVER_HEIGHT > viewportHeight - 16) {
+        top = rect.top - POPOVER_HEIGHT - GAP;
+      }
+      if (top < 16) top = 16;
 
-    setPosition({ top, left });
+      setPosition({ top, left });
+    };
+    compute();
+    window.addEventListener("resize", compute);
+    window.addEventListener("scroll", compute, true);
+    return () => {
+      window.removeEventListener("resize", compute);
+      window.removeEventListener("scroll", compute, true);
+    };
   }, [open, anchorEl]);
 
   useEffect(() => {
@@ -85,13 +97,18 @@ export function EmojiPickerPopover({
     };
   }, [open, anchorEl, onClose]);
 
-  if (!open || !position) return null;
+  if (!open || !position || !portalHost) return null;
 
-  return (
+  return createPortal(
     <div
       ref={popoverRef}
-      className="fixed z-50 rounded-[var(--radius-btn)] border border-[var(--border)] bg-[var(--surface-card)] shadow-lg overflow-hidden"
-      style={{ top: position.top, left: position.left }}
+      className="description-editor-portal fixed rounded-[var(--radius-btn)] border border-[var(--border)] bg-[var(--surface-card)] overflow-hidden"
+      style={{
+        top: position.top,
+        left: position.left,
+        zIndex: 2147483700,
+        boxShadow: "var(--shadow-panel)",
+      }}
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
     >
@@ -104,6 +121,7 @@ export function EmojiPickerPopover({
         searchPlaceHolder="Search emoji..."
         previewConfig={{ showPreview: false }}
       />
-    </div>
+    </div>,
+    portalHost,
   );
 }

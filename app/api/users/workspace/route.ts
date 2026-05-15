@@ -6,7 +6,7 @@ import {
 } from "@/lib/server/auth/authorize";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { getWorkspaceMemberRepo } from "@/lib/repositories/workspaceMembersRepository.server";
-import { setWorkspaceClaim } from "@/lib/server/setWorkspaceClaim";
+import { setWorkspaceClaims } from "@/lib/server/setWorkspaceClaim";
 import { apiSuccess, apiError } from "@/lib/server/apiResponse";
 import { corsHeaders } from "@/lib/server/cors";
 
@@ -70,7 +70,13 @@ export async function PATCH(req: NextRequest) {
       updatedAt: new Date(),
     });
 
-    await setWorkspaceClaim(user.uid, newWorkspaceId);
+    const userDoc = await adminDb.collection("users").doc(user.uid).get();
+    const memberships: string[] = Array.isArray(userDoc.data()?.workspaceMemberships)
+      ? (userDoc.data()!.workspaceMemberships as unknown[]).filter(
+          (v): v is string => typeof v === "string" && v.trim() !== ""
+        )
+      : [];
+    await setWorkspaceClaims(user.uid, newWorkspaceId, memberships);
 
     return apiSuccess({ workspaceId: newWorkspaceId }, null, {
       headers: corsHeaders(req),

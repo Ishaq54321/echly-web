@@ -51,7 +51,11 @@ export async function middleware(request: NextRequest) {
 
   // STEP 3 — preserved: /api/* CORS handling (handlers do their own auth)
   if (pathname.startsWith("/api/")) {
-    if (pathname === "/api/transcribe-audio") {
+    if (
+      pathname === "/api/transcribe-audio" ||
+      pathname.startsWith("/api/ai/improve") ||
+      pathname === "/api/upload-attachment"
+    ) {
       return NextResponse.next();
     }
     const headers = corsHeaders(request);

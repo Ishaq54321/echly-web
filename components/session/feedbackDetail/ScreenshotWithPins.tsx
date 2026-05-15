@@ -142,7 +142,8 @@ const PinMarker = memo(function PinMarker({
     [onClick]
   );
 
-  const preview = message.length > TOOLTIP_MAX_LEN ? message.slice(0, TOOLTIP_MAX_LEN) + "…" : message;
+  const flattenedMessage = message.replace(/@\[([^\]]+)\]\([^)]*\)/g, "@$1");
+  const preview = flattenedMessage.length > TOOLTIP_MAX_LEN ? flattenedMessage.slice(0, TOOLTIP_MAX_LEN) + "…" : flattenedMessage;
 
   return (
     <div
@@ -504,7 +505,7 @@ const ScreenshotWithPinsInner = ({
               onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.stopPropagation()}
             >
-              <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-card)] overflow-hidden focus-within:border-[var(--brand)] focus-within:ring-2 focus-within:ring-[var(--brand)]/20 transition-colors">
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-card)] overflow-hidden focus-within:border-[var(--border-strong)] transition-colors duration-150">
 
                 {/* Row 1: Avatar + textarea */}
                 <div className="flex items-start gap-3 px-4 pt-4">

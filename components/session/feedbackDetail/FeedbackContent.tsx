@@ -4,9 +4,10 @@ import { useState, type Ref } from "react";
 import { ScreenshotBlock } from "./ScreenshotBlock";
 import { ScreenshotWithPins } from "./ScreenshotWithPins";
 import { ActionItemsSection, type ActionItemsSectionHandle } from "./ActionItemsSection";
+import { CommentsSection } from "./CommentsSection";
 import { Tag } from "@/components/ui/Tag";
 import type { FeedbackItemShape } from "./types";
-import type { Comment } from "@/lib/domain/comment";
+import type { Comment, CommentAttachment, CommentPosition } from "@/lib/domain/comment";
 
 interface FeedbackContentProps {
   item: FeedbackItemShape & { index?: number; total?: number };
@@ -38,6 +39,31 @@ interface FeedbackContentProps {
   participants?: { uid: string; displayName: string; email: string; avatarUrl?: string | null }[];
   /** Imperative handle so the parent can guard navigation against unsaved edits. */
   actionItemsRef?: Ref<ActionItemsSectionHandle>;
+  // ── inline Comments section (below Tags) ──
+  loadingComments?: boolean;
+  sendComment?: (
+    message: string,
+    attachment?: CommentAttachment,
+    attachments?: CommentAttachment[],
+    position?: CommentPosition,
+    mentionedUserIds?: string[]
+  ) => Promise<string>;
+  sendReply?: (
+    threadId: string,
+    message: string,
+    attachment?: CommentAttachment,
+    attachments?: CommentAttachment[],
+    mentionedUserIds?: string[]
+  ) => Promise<void>;
+  deleteComment?: (commentId: string) => Promise<void>;
+  onReactionsChanged?: (
+    commentId: string,
+    reactions: Record<string, { userIds: string[]; userNames: string[] }>
+  ) => void;
+  currentUserId?: string | null;
+  currentUserName?: string;
+  currentUserInitial?: string;
+  currentUserAvatarUrl?: string;
 }
 
 export function FeedbackContent({
@@ -67,6 +93,15 @@ export function FeedbackContent({
   animatingPinId,
   participants,
   actionItemsRef,
+  loadingComments = false,
+  sendComment,
+  sendReply,
+  deleteComment,
+  onReactionsChanged,
+  currentUserId = null,
+  currentUserName,
+  currentUserInitial,
+  currentUserAvatarUrl,
 }: FeedbackContentProps) {
   const description =
     typeof item.description === "string" ? item.description : "";
@@ -233,6 +268,23 @@ export function FeedbackContent({
           </div>
         </section>
       )}
+      {item.id ? (
+        <CommentsSection
+          selectedTicketId={item.id}
+          comments={comments}
+          loading={loadingComments}
+          sendComment={sendComment}
+          sendReply={sendReply}
+          updateComment={updateComment}
+          deleteComment={deleteComment}
+          onReactionsChanged={onReactionsChanged}
+          currentUserId={currentUserId}
+          currentUserName={currentUserName}
+          currentUserInitial={currentUserInitial}
+          currentUserAvatarUrl={currentUserAvatarUrl}
+          participants={participants}
+        />
+      ) : null}
     </div>
   );
 }

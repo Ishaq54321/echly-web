@@ -52,6 +52,12 @@ export const ActionItemsSection = forwardRef<
   const [isSaving, setIsSaving] = useState(false);
   const [hexEdit, setHexEdit] = useState<HexEditState | null>(null);
 
+  const heading = (
+    <h2 className="text-[17px] font-semibold text-[var(--text-heading)] mb-3">
+      Description
+    </h2>
+  );
+
   // Baseline = markdown TipTap emits on mount (after its own normalization).
   // Compare current against baseline rather than the raw `description` prop so
   // whitespace/format normalization isn't mistaken for user edits.
@@ -97,45 +103,29 @@ export const ActionItemsSection = forwardRef<
 
   const startEdit = () => {
     if (isReadOnly) return;
-    // PHASE_13_6_DIAG
-    console.log("[AI-DIAG]", "SET-IS-EDITING", { newValue: true, source: "startEdit" });
     setIsEditing(true);
   };
 
   const cancelEdit = () => {
-    // PHASE_13_6_DIAG
-    console.log("[AI-DIAG]", "SET-IS-EDITING", { newValue: false, source: "cancelEdit" });
     setIsEditing(false);
   };
 
   const handleEditorSave = async (next: string) => {
     if (!onSave) return;
     const trimmed = next.trim();
-    // PHASE_13_6_DIAG
-    console.log("[AI-DIAG]", "HANDLE-EDITOR-SAVE-CALLED", {
-      descriptionLength: trimmed.length,
-      isStreamingAtCall: isAiStreamingRef.current,
-    });
     if (trimmed === (description ?? "").trim()) {
-      // PHASE_13_6_DIAG
-      console.log("[AI-DIAG]", "SET-IS-EDITING", { newValue: false, source: "handleEditorSave-noop" });
       setIsEditing(false);
       return;
     }
 
     // Flip out of edit mode IMMEDIATELY — trust the optimistic update.
     // Parent sets description optimistically; server response syncs later.
-    // PHASE_13_6_DIAG
-    console.log("[AI-DIAG]", "SET-IS-EDITING", { newValue: false, source: "handleEditorSave-success" });
     setIsEditing(false);
     setIsSaving(true);
 
     try {
       await onSave(trimmed);
     } catch (err) {
-      // Re-enter edit mode on failure so user can retry
-      // PHASE_13_6_DIAG
-      console.log("[AI-DIAG]", "SET-IS-EDITING", { newValue: true, source: "handleEditorSave-error" });
       setIsEditing(true);
       console.error("Failed to save description:", err);
     } finally {
@@ -179,7 +169,7 @@ export const ActionItemsSection = forwardRef<
   if (!description.trim() && isReadOnly) {
     return (
       <div className={cardClass}>
-        <h2 className={titleClass}>Description</h2>
+        {heading}
         <p className="text-[15px] leading-[1.7] text-[var(--text-tertiary)]">
           No description
         </p>
@@ -190,7 +180,7 @@ export const ActionItemsSection = forwardRef<
   if (isEditing && !isReadOnly) {
     return (
       <div className={cardClass}>
-        <h2 className={titleClass}>Description</h2>
+        {heading}
         <DescriptionEditor
           value={description}
           onSave={handleEditorSave}
@@ -214,9 +204,13 @@ export const ActionItemsSection = forwardRef<
 
   return (
     <div className={cardClass}>
-      <h2 className={titleClass}>Description</h2>
+      {heading}
       <div
-        className={`group relative flex items-start justify-between gap-2 ${isReadOnly ? "" : "cursor-pointer"}`}
+        className={`group relative flex items-start justify-between gap-2 ${
+          isReadOnly
+            ? ""
+            : "cursor-pointer -mx-3 px-3 -my-2 py-2 transition-all duration-[120ms] ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-[var(--surface-hover)] hover:translate-x-[3px]"
+        }`}
         onClick={isReadOnly ? undefined : startEdit}
         onKeyDown={
           isReadOnly
@@ -238,10 +232,10 @@ export const ActionItemsSection = forwardRef<
           onHexEdit={isReadOnly ? undefined : handleHexEdit}
         />
         {!isReadOnly && !isSaving && (
-          <span className="absolute top-0 right-0 flex items-center gap-1.5">
+          <span className="absolute top-2 right-2 flex items-center gap-1.5">
             <Pencil
               size={14}
-              className="opacity-0 group-hover:opacity-60 transition-[opacity] duration-[120ms] ease text-[var(--text-secondary)] shrink-0"
+              className="opacity-0 group-hover:opacity-80 transition-[opacity] duration-[120ms] ease text-[var(--text-secondary)] shrink-0"
               aria-hidden
             />
           </span>

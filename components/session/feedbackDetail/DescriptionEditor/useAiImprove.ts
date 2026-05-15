@@ -32,12 +32,50 @@ function getMarkdownInRange(editor: Editor, from: number, to: number): string {
   return slice.content.textBetween(0, slice.content.size, "\n");
 }
 
+function unwrapSingleParagraph(html: string): string {
+  const trimmed = html.trim();
+
+  const singleParagraphMatch = trimmed.match(
+    /^<p(?:\s[^>]*)?>([\s\S]*?)<\/p>$/i,
+  );
+
+  if (!singleParagraphMatch) {
+    return html;
+  }
+
+  const inner = singleParagraphMatch[1];
+  const hasBlockTags = /<(p|h[1-6]|ul|ol|li|blockquote|pre|hr|table)\b/i.test(
+    inner,
+  );
+
+  if (hasBlockTags) {
+    return html;
+  }
+
+  return inner;
+}
+
+function stripBlockMarkdown(md: string): string {
+  return md
+    .split('\n')
+    .map(line => {
+      let stripped = line.replace(/^(\s*)[*\-+]\s+/, '$1');
+      stripped = stripped.replace(/^(\s*)\d+\.\s+/, '$1');
+      stripped = stripped.replace(/^#+\s+/, '');
+      stripped = stripped.replace(/^(\s*)>\s*/, '$1');
+      stripped = stripped.replace(/^(\s*)([-*_])\2{2,}\s*$/, '$1');
+      return stripped;
+    })
+    .join('\n');
+}
+
 interface StreamingSession {
   abortController: AbortController;
   pendingText: string;
   accumulatedMarkdown: string;
   rafScheduled: boolean;
   finalizing: boolean;
+  originalMarkdown: string;
 }
 
 export interface UseAiImproveResult {
@@ -45,7 +83,15 @@ export interface UseAiImproveResult {
   performImprove: (action: ImproveAction) => Promise<void>;
 }
 
-export function useAiImprove(editor: Editor | null): UseAiImproveResult {
+export interface UseAiImproveOptions {
+  fetchClient?: (url: string, init?: RequestInit) => Promise<Response>;
+}
+
+export function useAiImprove(
+  editor: Editor | null,
+  options?: UseAiImproveOptions,
+): UseAiImproveResult {
+  const fetchClient = options?.fetchClient;
   const [isStreaming, setIsStreaming] = useState(false);
   const editorRef = useRef<Editor | null>(editor);
   const sessionRef = useRef<StreamingSession | null>(null);
@@ -77,54 +123,22 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
     const dimFrom = pluginState.dimmedFrom;
     const dimTo = pluginState.dimmedTo;
 
-    let html: string;
-    try {
-      html = marked.parse(session.accumulatedMarkdown, {
-        async: false,
-        breaks: true,
-        gfm: true,
-      }) as string;
-      html = html
-        .replace(/^(\s*<p>\s*<\/p>\s*)+/, "")
-        .replace(/(\s*<p>\s*<\/p>\s*)+$/, "")
-        .trim();
-    } catch (parseErr) {
-      console.warn("Mid-stream parse failed:", parseErr);
-      return;
-    }
-
-    if (!html) return;
+    if (!session.accumulatedMarkdown) return;
 
     const sizeBefore = ed.state.doc.content.size;
     const previouslyInsertedSize = currentCursor - insertedStart;
 
+    const inlineMarkdown = stripBlockMarkdown(session.accumulatedMarkdown);
+
     try {
-      // PHASE_13_6_DIAG
-      console.log("[AI-DIAG]", "flush-chain-START", {
-        insertedStart,
-        currentCursor,
-        htmlLen: html.length,
-      });
-      const chainResult = ed.chain()
-        .deleteRange({ from: insertedStart, to: currentCursor })
-        .insertContentAt(insertedStart, html, {
-          parseOptions: { preserveWhitespace: "full" },
-          updateSelection: false,
-        })
-        .command(({ tr }) => {
-          // PHASE_13_6_DIAG
-          console.log("[AI-DIAG]", "flush-chain-tr", {
-            docChanged: tr.docChanged,
-            addToHistory: tr.getMeta("addToHistory"),
-            hasAiMeta: !!tr.getMeta(aiStreamingPluginKey),
-            stepsCount: tr.steps.length,
-          });
-          return true;
-        })
+      ed.chain()
+        .insertContentAt(
+          { from: insertedStart, to: currentCursor },
+          inlineMarkdown,
+          { updateSelection: false },
+        )
         .setMeta("addToHistory", false)
         .run();
-      // PHASE_13_6_DIAG
-      console.log("[AI-DIAG]", "flush-chain-DONE", { success: chainResult });
     } catch (chainErr) {
       console.warn("Mid-stream chain failed:", chainErr);
       return;
@@ -146,14 +160,6 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
         const deleteTr = ed.state.tr;
         deleteTr.delete(newCursorPos, newCursorPos + consumeAmount);
         deleteTr.setMeta("addToHistory", false);
-        // PHASE_13_6_DIAG
-        console.log("[AI-DIAG]", "flush-dim-consume", {
-          docChanged: deleteTr.docChanged,
-          addToHistory: deleteTr.getMeta("addToHistory"),
-          hasAiMeta: !!deleteTr.getMeta(aiStreamingPluginKey),
-          stepsCount: deleteTr.steps.length,
-          selection: deleteTr.selection.from,
-        });
         ed.view.dispatch(deleteTr);
       } catch (deleteErr) {
         console.warn("Dim consume failed (non-fatal):", deleteErr);
@@ -169,14 +175,6 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
       dimmedFrom: newDimFrom,
     });
     updateTr.setMeta("addToHistory", false);
-    // PHASE_13_6_DIAG
-    console.log("[AI-DIAG]", "flush-cursor-update", {
-      docChanged: updateTr.docChanged,
-      addToHistory: updateTr.getMeta("addToHistory"),
-      hasAiMeta: !!updateTr.getMeta(aiStreamingPluginKey),
-      stepsCount: updateTr.steps.length,
-      selection: updateTr.selection.from,
-    });
     ed.view.dispatch(updateTr);
   }, []);
 
@@ -205,14 +203,6 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
       const tr = ed.state.tr;
       tr.setMeta(aiStreamingPluginKey, { action: "stop" });
       tr.setMeta("addToHistory", false);
-      // PHASE_13_6_DIAG
-      console.log("[AI-DIAG]", "cleanup-stop", {
-        docChanged: tr.docChanged,
-        addToHistory: tr.getMeta("addToHistory"),
-        hasAiMeta: !!tr.getMeta(aiStreamingPluginKey),
-        stepsCount: tr.steps.length,
-        selection: tr.selection.from,
-      });
       ed.view.dispatch(tr);
       ed.setEditable(true);
     }
@@ -266,14 +256,6 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
           tr.delete(safeStart, safeEnd);
         }
         tr.setMeta(aiStreamingPluginKey, { action: "stop" });
-        // PHASE_13_6_DIAG
-        console.log("[AI-DIAG]", "finalize-empty-path", {
-          docChanged: tr.docChanged,
-          addToHistory: tr.getMeta("addToHistory"),
-          hasAiMeta: !!tr.getMeta(aiStreamingPluginKey),
-          stepsCount: tr.steps.length,
-          selection: tr.selection.from,
-        });
         ed2.view.dispatch(tr);
         ed2.setEditable(true);
         setIsStreaming(false);
@@ -294,55 +276,84 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
           .replace(/^(\s*<p>\s*<\/p>\s*)+/, "")
           .replace(/(\s*<p>\s*<\/p>\s*)+$/, "")
           .trim();
+        html = unwrapSingleParagraph(html);
       } catch (parseErr) {
         console.error("Markdown parse failed in finalize:", parseErr);
         const escaped = normalizedMd
           .replace(/&/g, "&amp;")
           .replace(/</g, "&lt;")
           .replace(/>/g, "&gt;");
-        html = `<p>${escaped}</p>`;
+        html = escaped;
       }
 
-      const deleteTr = ed2.state.tr;
-      if (safeEnd > safeStart) {
-        deleteTr.delete(safeStart, safeEnd);
-      }
-      deleteTr.setMeta(aiStreamingPluginKey, { action: "stop" });
-      // PHASE_13_6_DIAG
-      console.log("[AI-DIAG]", "finalize-delete-stop", {
-        docChanged: deleteTr.docChanged,
-        addToHistory: deleteTr.getMeta("addToHistory"),
-        hasAiMeta: !!deleteTr.getMeta(aiStreamingPluginKey),
-        stepsCount: deleteTr.steps.length,
-        selection: deleteTr.selection.from,
-        safeStart,
-        safeEnd,
-      });
-      ed2.view.dispatch(deleteTr);
-
+      // Phase 13.8: Snapshot-restore-replace for clean undo
+      // ────────────────────────────────────────────────────
+      // Convert original markdown back to HTML for reinsertion
+      let originalHtml: string;
       try {
-        // PHASE_13_6_DIAG
-        console.log("[AI-DIAG]", "finalize-insert-chain-START", { safeStart, safeEnd });
-        const chainResult = ed2
+        originalHtml = marked.parse(session2.originalMarkdown, {
+          async: false,
+          breaks: true,
+          gfm: true,
+        }) as string;
+        originalHtml = originalHtml
+          .replace(/^(\s*<p>\s*<\/p>\s*)+/, "")
+          .replace(/(\s*<p>\s*<\/p>\s*)+$/, "")
+          .trim();
+      } catch (parseOrigErr) {
+        console.warn("Original markdown parse failed:", parseOrigErr);
+        const escaped = session2.originalMarkdown
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+        originalHtml = `<p>${escaped}</p>`;
+      }
+
+      // Capture trailing content size BEFORE any finalize TXes
+      const trailingSize = ed2.state.doc.content.size - safeEnd;
+
+      // ── TX1a: Stop plugin + delete post-streaming content (untracked) ──
+      const stopAndDeleteTr = ed2.state.tr;
+      if (safeEnd > safeStart) {
+        stopAndDeleteTr.delete(safeStart, safeEnd);
+      }
+      stopAndDeleteTr.setMeta("addToHistory", false);
+      stopAndDeleteTr.setMeta("finalize-phase", "restore");
+      stopAndDeleteTr.setMeta(aiStreamingPluginKey, { action: "stop" });
+      ed2.view.dispatch(stopAndDeleteTr);
+
+      // ── TX1b: Insert original content back (untracked) ──
+      try {
+        ed2
           .chain()
-          .focus()
-          .setTextSelection(safeStart)
-          .insertContent(html, {
-            parseOptions: { preserveWhitespace: "full" },
-          })
           .command(({ tr }) => {
-            // PHASE_13_6_DIAG
-            console.log("[AI-DIAG]", "finalize-chain-tr", {
-              docChanged: tr.docChanged,
-              addToHistory: tr.getMeta("addToHistory"),
-              hasAiMeta: !!tr.getMeta(aiStreamingPluginKey),
-              stepsCount: tr.steps.length,
-            });
+            tr.setMeta("addToHistory", false);
+            tr.setMeta("finalize-phase", "restore");
             return true;
           })
+          .insertContentAt(safeStart, originalHtml, {
+            parseOptions: { preserveWhitespace: false },
+            updateSelection: false,
+          })
           .run();
-        // PHASE_13_6_DIAG
-        console.log("[AI-DIAG]", "finalize-insert-chain-DONE", { success: chainResult });
+      } catch (restoreErr) {
+        console.warn("Original restore failed:", restoreErr);
+      }
+
+      // Compute restored content end position
+      const restoredEnd = ed2.state.doc.content.size - trailingSize;
+
+      // ── TX2: Tracked replacement — THE SINGLE UNDO EVENT ──
+      try {
+        ed2
+          .chain()
+          .focus()
+          .insertContentAt(
+            { from: safeStart, to: restoredEnd },
+            html,
+            { parseOptions: { preserveWhitespace: "full" } },
+          )
+          .run();
       } catch (insertErr) {
         console.error(
           "Final insert failed, falling back to plain markdown:",
@@ -367,14 +378,6 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
         const cleanupTr = ed2.state.tr;
         cleanupTr.removeMark(safeStart, insertEndPos, markType);
         cleanupTr.setMeta("addToHistory", false);
-        // PHASE_13_6_DIAG
-        console.log("[AI-DIAG]", "finalize-mark-cleanup", {
-          docChanged: cleanupTr.docChanged,
-          addToHistory: cleanupTr.getMeta("addToHistory"),
-          hasAiMeta: !!cleanupTr.getMeta(aiStreamingPluginKey),
-          stepsCount: cleanupTr.steps.length,
-          selection: cleanupTr.selection.from,
-        });
         ed2.view.dispatch(cleanupTr);
       }
 
@@ -384,60 +387,17 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
 
       ed2.commands.focus(ed2.state.selection.from);
 
-      // PHASE_13_6_DIAG: snapshot history state right after finalize
-      setTimeout(() => {
-        const ed3 = editorRef.current;
-        if (!ed3) return;
-
-        const plugins = ed3.state.plugins;
-        const historyPlugin = plugins.find((p: unknown) => {
-          const spec = (p as { spec?: { key?: unknown } }).spec;
-          const key = spec?.key as { key?: string } | string | undefined;
-          const keyName =
-            typeof key === "string"
-              ? key
-              : (key as { key?: string } | undefined)?.key ?? "";
-          return typeof keyName === "string" && keyName.startsWith("history$");
-        });
-
-        const historyState = (historyPlugin as { getState?: (s: unknown) => unknown } | undefined)?.getState?.(ed3.state) as
-          | { done?: { eventCount?: number }; undone?: { eventCount?: number } }
-          | undefined;
-
-        console.log("[AI-DIAG]", "POST-FINALIZE-SNAPSHOT", {
-          isEditable: ed3.isEditable,
-          isFocused: ed3.isFocused,
-          doneEventCount: historyState?.done?.eventCount ?? "no-history-plugin",
-          undoneEventCount: historyState?.undone?.eventCount ?? "no-history-plugin",
-          canUndo: ed3.can?.()?.undo?.() ?? "unknown",
-          pluginsCount: plugins.length,
-          pluginKeys: plugins.map((p: unknown) => {
-            const k = (p as { spec?: { key?: unknown } }).spec?.key as
-              | { key?: string }
-              | string
-              | undefined;
-            return typeof k === "string"
-              ? k
-              : (k as { key?: string } | undefined)?.key ?? "anonymous";
-          }),
-          aiStreamingActive: (() => {
-            const aiState = aiStreamingPluginKey.getState(ed3.state);
-            return aiState?.active ?? "no-state";
-          })(),
-          docSize: ed3.state.doc.content.size,
-          currentMarkdownPreview: (() => {
-            const storage = ed3.storage as unknown as {
-              markdown?: { getMarkdown?: () => string };
-            };
-            const getter = storage?.markdown?.getMarkdown;
-            return typeof getter === "function"
-              ? getter().slice(0, 100)
-              : "no-markdown-storage";
-          })(),
-        });
-      }, 100);
-
-      toast.success("Improved");
+      toast.success("Improved", {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            const ed4 = editorRef.current;
+            if (ed4 && !ed4.isDestroyed) {
+              ed4.commands.undo();
+            }
+          },
+        },
+      });
     });
   }, [flushPending]);
 
@@ -454,7 +414,7 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
 
       const text = empty
         ? getMarkdown(ed)
-        : getMarkdownInRange(ed, selFrom, selTo);
+        : getMarkdownInRange(ed, targetFrom, targetTo);
 
       if (text.trim().length < 3) {
         toast.error("Nothing to improve", {
@@ -463,6 +423,9 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
         return;
       }
 
+      // Phase 13.8: Capture original content for undo
+      const originalMarkdown = getMarkdownInRange(ed, targetFrom, targetTo);
+
       const abortController = new AbortController();
       sessionRef.current = {
         abortController,
@@ -470,14 +433,9 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
         accumulatedMarkdown: "",
         rafScheduled: false,
         finalizing: false,
+        originalMarkdown,
       };
 
-      // PHASE_13_6_DIAG
-      console.log("[AI-DIAG]", "perform-improve-selection-collapse", {
-        targetFrom,
-        targetTo,
-        empty,
-      });
       ed.commands.setTextSelection(targetFrom);
 
       ed.setEditable(false);
@@ -493,18 +451,11 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
         targetEnd: targetTo,
       });
       startTr.setMeta("addToHistory", false);
-      // PHASE_13_6_DIAG
-      console.log("[AI-DIAG]", "start-meta", {
-        docChanged: startTr.docChanged,
-        addToHistory: startTr.getMeta("addToHistory"),
-        hasAiMeta: !!startTr.getMeta(aiStreamingPluginKey),
-        stepsCount: startTr.steps.length,
-        selection: startTr.selection.from,
-      });
       ed.view.dispatch(startTr);
 
       try {
-        const response = await fetch("/api/ai/improve", {
+        const client = fetchClient ?? fetch;
+        const response = await client("/api/ai/improve", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action, text }),
@@ -555,6 +506,7 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
               } else if (event.type === "end") {
                 fullTextFromEnd = event.fullText ?? "";
               } else if (event.type === "error") {
+                console.error("[AI IMPROVE] SSE error event:", event);
                 throw new Error(event.message ?? "Stream error");
               }
             } catch (parseErr) {
@@ -574,7 +526,7 @@ export function useAiImprove(editor: Editor | null): UseAiImproveResult {
         }
       }
     },
-    [appendChunk, finalize, cleanup],
+    [appendChunk, finalize, cleanup, fetchClient],
   );
 
   useEffect(() => {

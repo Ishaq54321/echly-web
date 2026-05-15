@@ -90,6 +90,7 @@ export default function CaptureWidget({
   feedbackLimitReached,
   feedbackUsage,
   feedbackLimit,
+  fetchClient,
 }: CaptureWidgetProps) {
   const [resumeModalOpen, setResumeModalOpen] = useState(false);
   const showResumeModal = resumeModalOpen || (openResumeModalProp ?? false);
@@ -124,6 +125,28 @@ export default function CaptureWidget({
   const [editPauseTooltipVisible, setEditPauseTooltipVisible] = useState<boolean>(
     editPauseTooltipVisibleProp ?? false
   );
+  /** True while the mouse is over the Echly sidebar/tray; suspends capture hover/click. */
+  const [trayHovered, setTrayHovered] = useState(false);
+  /** Transient toast shown above the session controls when we auto-pause/resume. */
+  const [autoToast, setAutoToast] = useState<"paused" | "resumed" | null>(null);
+  const autoToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** True when WE auto-paused on edit overlay open (so we know to auto-resume on close). */
+  const wasAutoPausedRef = useRef(false);
+
+  const showAutoToast = useCallback((kind: "paused" | "resumed") => {
+    if (autoToastTimerRef.current) clearTimeout(autoToastTimerRef.current);
+    setAutoToast(kind);
+    autoToastTimerRef.current = setTimeout(() => {
+      setAutoToast(null);
+      autoToastTimerRef.current = null;
+    }, 3000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (autoToastTimerRef.current) clearTimeout(autoToastTimerRef.current);
+    };
+  }, []);
 
   const triggerUpgradeShake = useCallback(() => {
     const el = upgradeInlineRef.current;
@@ -220,6 +243,31 @@ export default function CaptureWidget({
   const [scrollListMountEpoch, setScrollListMountEpoch] = useState(0);
   const isFetchingRef = useRef(false);
   const dataReceivedRef = useRef(false);
+
+  const [isShaking, setIsShaking] = useState(false);
+  const shakeTimeoutRef = useRef<number | null>(null);
+  useEffect(() => {
+    const handler = () => {
+      if (shakeTimeoutRef.current !== null) {
+        window.clearTimeout(shakeTimeoutRef.current);
+      }
+      setIsShaking(false);
+      window.requestAnimationFrame(() => {
+        setIsShaking(true);
+        shakeTimeoutRef.current = window.setTimeout(() => {
+          setIsShaking(false);
+          shakeTimeoutRef.current = null;
+        }, 520);
+      });
+    };
+    window.addEventListener("ECHLY_SHAKE_PILL", handler);
+    return () => {
+      window.removeEventListener("ECHLY_SHAKE_PILL", handler);
+      if (shakeTimeoutRef.current !== null) {
+        window.clearTimeout(shakeTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const listScrollRefCallback = useCallback((node: HTMLDivElement | null) => {
     listScrollRef.current = node;
@@ -495,6 +543,34 @@ export default function CaptureWidget({
     handlers.setExpandedId(null);
   }, [handlers]);
 
+  /**
+   * Auto-pause when the ticket editor overlay opens, auto-resume when it closes —
+   * but only if WE auto-paused (i.e. don't resume a session the user manually paused).
+   * Toast above the session controls confirms the transition.
+   */
+  useEffect(() => {
+    if (!extensionMode) return;
+    if (editingTicketId) {
+      if (globalSessionModeActive && !globalSessionPaused) {
+        wasAutoPausedRef.current = true;
+        handlers.pauseSession();
+        showAutoToast("paused");
+      }
+    } else {
+      if (wasAutoPausedRef.current) {
+        wasAutoPausedRef.current = false;
+        if (globalSessionModeActive && globalSessionPaused) {
+          handlers.resumeSession();
+          showAutoToast("resumed");
+        }
+      }
+    }
+    // We intentionally only react to editingTicketId; the pause/resume calls
+    // are idempotent and we don't want to re-fire if globalSessionPaused
+    // changes for other reasons mid-edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingTicketId, extensionMode]);
+
   const handleTitleSave = useCallback(() => {
     const trimmed = localEditTitle.trim() || "Untitled Session";
     setIsEditingTitle(false);
@@ -599,13 +675,28 @@ export default function CaptureWidget({
           onSessionFeedbackCancel={handlers.handleSessionFeedbackCancel}
           theme={theme}
           onModeChange={(mode) => setMode(mode)}
+          captureSuspended={trayHovered || editingTicketId != null}
         />
       )}
+
+      {/* Auto-pause/resume toast: floats just above the session controls bar. */}
+      {extensionMode && autoToast && captureRootEl &&
+        createPortal(
+          <div
+            className={`echly-auto-toast echly-auto-toast--${autoToast}`}
+            role="status"
+            aria-live="polite"
+          >
+            Session {autoToast === "paused" ? "paused" : "resumed"}
+          </div>,
+          captureRootEl
+        )
+      }
 
       {showFloatingButton && (
         <div
           ref={extensionMode ? refs.widgetRef : undefined}
-          className="echly-floating-trigger-wrapper"
+          className={`echly-floating-trigger-wrapper${isShaking ? " echly-shake" : ""}`}
           onMouseDown={handleHeaderMouseDown}
           style={
             extensionMode
@@ -661,7 +752,9 @@ export default function CaptureWidget({
           )}
           <div
             ref={refs.widgetRef}
-            className="echly-sidebar-container"
+            className={`echly-sidebar-container${isShaking ? " echly-shake" : ""}`}
+            onMouseEnter={() => setTrayHovered(true)}
+            onMouseLeave={() => setTrayHovered(false)}
             style={
               extensionMode
                 ? state.position
@@ -1468,6 +1561,8 @@ export default function CaptureWidget({
                 await onSetEditPauseTooltip?.(true);
               }
             }}
+            fetchClient={fetchClient}
+            portalContainer={captureRootEl}
           />,
           captureRootEl
         );

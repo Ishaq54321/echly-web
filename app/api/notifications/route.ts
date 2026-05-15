@@ -6,6 +6,7 @@ import {
   markNotificationRead,
   type NotificationsCursor,
 } from "@/lib/repositories/notificationsRepository.server";
+import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 
 function badRequest(message: string) {
   return apiError({ code: "INVALID_INPUT", message, status: 400 });
@@ -60,9 +61,10 @@ export const GET = withAuthorization(
     }
 
     try {
+      const workspaceId = await getUserWorkspaceIdRepo(userId);
       const [result, unreadCount] = await Promise.all([
-        getNotifications(userId, { limit, cursor, unreadOnly }),
-        getUnreadCount(userId),
+        getNotifications(userId, { limit, cursor, unreadOnly, workspaceId }),
+        getUnreadCount(userId, workspaceId),
       ]);
 
       return apiSuccess({

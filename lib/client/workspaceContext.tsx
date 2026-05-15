@@ -26,6 +26,7 @@ import {
 import type { Workspace } from "@/lib/domain/workspace";
 import { PLANS, type PlanId } from "@/lib/billing/plans";
 import { composeFullName } from "@/lib/utils/nameSplit";
+import { setActiveWorkspaceForNotifications } from "@/lib/store/notificationStore";
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([
@@ -432,10 +433,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!authUid || !workspaceId) {
       setActiveWorkspaceId(null);
+      setActiveWorkspaceForNotifications(null);
       return;
     }
     localStorage.setItem(`echly_active_workspace_${authUid}`, workspaceId);
     setActiveWorkspaceId(workspaceId);
+    setActiveWorkspaceForNotifications(workspaceId);
   }, [authUid, workspaceId]);
 
   // Fetch all workspace memberships when identity is ready, or when an external
@@ -460,11 +463,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           setAllWorkspaces(list);
           const currentWid = workspaceIdRef.current;
           // UX-1: if the user has been removed from the active workspace,
-          // redirect to a remaining workspace or onboarding so they don't
+          // redirect to a remaining workspace or sign them out so they don't
           // sit on a blank dashboard with no error.
           if (currentWid && list.length === 0) {
             missingActiveRetriesRef.current = 0;
-            window.location.href = "/onboarding";
+            void (async () => {
+              try {
+                const { signOut } = await import("firebase/auth");
+                await signOut(auth);
+              } catch {
+                /* non-fatal */
+              }
+              window.location.href = "/login?reason=workspace_access_revoked";
+            })();
             return;
           }
           if (
@@ -588,6 +599,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       // 4. Force Firebase token refresh to pick up new workspaceId claim
       if (auth.currentUser) {
         await auth.currentUser.getIdToken(true);
+      }
+
+      // 4b. Signal the extension (if installed) — broadcast via window.postMessage
+      // so the extension's content script can pick it up and propagate to its
+      // background worker. Regular web pages can't write to chrome.storage.local
+      // directly.
+      try {
+        window.postMessage(
+          {
+            type: "ANNOTE_WORKSPACE_SWITCH",
+            workspaceId: wid,
+            uid: auth.currentUser?.uid ?? null,
+            timestamp: Date.now(),
+          },
+          window.location.origin
+        );
+      } catch {
+        /* extension not installed or postMessage failed — non-fatal */
       }
 
       // 5. Reload to re-bootstrap with new workspace

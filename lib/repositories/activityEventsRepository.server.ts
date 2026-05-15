@@ -119,7 +119,8 @@ export function normalizeFeedbackTitleForActivity(raw: unknown): string {
 }
 
 export function truncateActivityCommentPreview(message: string, maxLen = 80): string {
-  const t = message.trim();
+  const flattened = message.replace(/@\[([^\]]+)\]\([^)]*\)/g, "@$1");
+  const t = flattened.trim();
   if (!t) return "";
   if (t.length <= maxLen) return t;
   return `${t.slice(0, maxLen)}…`;

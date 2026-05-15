@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { streamText } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { requireAuth, toAuthorizationResponse } from "@/lib/server/auth/authorize";
@@ -11,12 +12,35 @@ export const maxDuration = 30;
 
 const MAX_INPUT_CHARS = 16_000;
 
+function improveCorsHeaders(_request: NextRequest): Record<string, string> {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Max-Age": "86400",
+  };
+}
+
+export async function OPTIONS(req: NextRequest) {
+  return new Response(null, {
+    status: 204,
+    headers: improveCorsHeaders(req),
+  });
+}
+
 export async function POST(req: NextRequest): Promise<Response> {
+  const corsHeaders = improveCorsHeaders(req);
+
   let user;
   try {
     user = await requireAuth(req);
   } catch (err) {
-    return toAuthorizationResponse(err);
+    const errRes = toAuthorizationResponse(err);
+    return new NextResponse(errRes.body, {
+      status: errRes.status,
+      statusText: errRes.statusText,
+      headers: { ...Object.fromEntries(errRes.headers), ...corsHeaders },
+    });
   }
 
   const rateLimit = checkAiImproveRateLimit(user.uid);
@@ -31,6 +55,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         headers: {
           "Content-Type": "application/json",
           "Retry-After": String(rateLimit.retryAfterSeconds ?? 60),
+          ...corsHeaders,
         },
       },
     );
@@ -47,7 +72,7 @@ export async function POST(req: NextRequest): Promise<Response> {
           limit: quotaResult.limit,
           resetDate: quotaResult.resetDate,
         },
-        { status: 429 },
+        { status: 429, headers: corsHeaders },
       );
     }
     incrementAiQuotaAsync(user.uid);
@@ -59,17 +84,26 @@ export async function POST(req: NextRequest): Promise<Response> {
   try {
     body = (await req.json()) as { action?: unknown; text?: unknown };
   } catch {
-    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+    return Response.json(
+      { error: "Invalid JSON body" },
+      { status: 400, headers: corsHeaders },
+    );
   }
 
   const { action, text } = body;
 
   if (!isImproveAction(action)) {
-    return Response.json({ error: "Invalid action" }, { status: 400 });
+    return Response.json(
+      { error: "Invalid action" },
+      { status: 400, headers: corsHeaders },
+    );
   }
 
   if (typeof text !== "string" || text.length === 0) {
-    return Response.json({ error: "Missing text" }, { status: 400 });
+    return Response.json(
+      { error: "Missing text" },
+      { status: 400, headers: corsHeaders },
+    );
   }
 
   if (text.length > MAX_INPUT_CHARS) {
@@ -80,12 +114,20 @@ export async function POST(req: NextRequest): Promise<Response> {
         currentLength: text.length,
         maxLength: MAX_INPUT_CHARS,
       },
-      { status: 400 },
+      { status: 400, headers: corsHeaders },
     );
   }
 
+  console.log("\n═══ AI IMPROVE REQUEST ═══");
+  console.log("Action:", action);
+  console.log("Input text (" + text.length + " chars):");
+  console.log(text);
+  console.log("System prompt:");
+  console.log(buildSystemPrompt(action));
+  console.log("═══════════════════════\n");
+
   const result = streamText({
-    model: openai("gpt-4o-mini"),
+    model: openai("gpt-5.4-nano"),
     system: buildSystemPrompt(action),
     prompt: text,
     temperature: 0.3,
@@ -110,6 +152,10 @@ export async function POST(req: NextRequest): Promise<Response> {
         }
 
         const fullText = await result.text;
+        console.log("\n═══ AI IMPROVE RESPONSE ═══");
+        console.log("Output (" + fullText.length + " chars):");
+        console.log(fullText);
+        console.log("═══════════════════════════\n");
         controller.enqueue(
           encoder.encode(
             `data: ${JSON.stringify({ type: "end", fullText })}\n\n`,
@@ -132,6 +178,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
+      ...corsHeaders,
     },
   });
 }

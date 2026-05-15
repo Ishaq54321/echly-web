@@ -40,6 +40,39 @@ export function createMentionSuggestion({
       let currentItems: MentionParticipant[] = [];
       let selectedIndex = 0;
       let savedCommand: ((attrs: { id: string; label: string }) => void) | null = null;
+      let scrollCleanup: (() => void) | null = null;
+
+      const DROPDOWN_WIDTH = 280;
+      const GAP = 6;
+
+      function positionDropdown(rect: DOMRect) {
+        if (!dropdownEl) return;
+        const viewportHeight = window.innerHeight;
+        const viewportWidth = window.innerWidth;
+        // Measure actual rendered height; fall back to estimate before paint.
+        const measured = dropdownEl.offsetHeight;
+        const popoverHeight = measured > 0 ? measured : Math.min(currentItems.length * 56 + 8, 300);
+
+        const spaceBelow = viewportHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        const placeBelow =
+          spaceBelow >= popoverHeight + GAP || spaceBelow >= spaceAbove;
+
+        dropdownEl.style.position = "fixed";
+        dropdownEl.style.zIndex = "2147480001";
+        const left = Math.max(
+          GAP,
+          Math.min(rect.left, viewportWidth - DROPDOWN_WIDTH - GAP)
+        );
+        dropdownEl.style.left = `${left}px`;
+        if (placeBelow) {
+          dropdownEl.style.top = `${rect.bottom + GAP}px`;
+          dropdownEl.style.bottom = "auto";
+        } else {
+          dropdownEl.style.top = "auto";
+          dropdownEl.style.bottom = `${viewportHeight - rect.top + GAP}px`;
+        }
+      }
 
       function renderDropdownItems(
         items: MentionParticipant[],
@@ -104,29 +137,42 @@ export function createMentionSuggestion({
           document.body.appendChild(dropdownEl);
           currentItems = (props.items as MentionParticipant[]) ?? [];
           selectedIndex = 0;
-          const rect = props.clientRect?.() as DOMRect | null;
-          if (rect && dropdownEl) {
-            dropdownEl.style.position = "fixed";
-            dropdownEl.style.left = `${rect.left}px`;
-            dropdownEl.style.bottom = `${window.innerHeight - rect.top + 4}px`;
-            dropdownEl.style.top = "auto";
-            dropdownEl.style.zIndex = "2147480001";
-          }
           savedCommand = props.command;
           renderDropdownItems(currentItems, selectedIndex, props.command);
+          const rect = props.clientRect?.() as DOMRect | null;
+          if (rect) positionDropdown(rect);
+
+          // Dismiss the mention popover on any scroll — capture phase so it
+          // catches scrolls inside the comment panel as well as the window.
+          // We dispatch Escape to the editor's DOM so Tiptap closes the
+          // suggestion (which fires onExit and cleans up listeners).
+          const handleScroll = () => {
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const editorDom: HTMLElement | undefined = (props.editor as any)?.view?.dom;
+              editorDom?.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
+              );
+            } catch {
+              /* noop */
+            }
+            // Belt-and-suspenders: also hide the dropdown immediately in case
+            // Escape didn't propagate (e.g. mid-IME).
+            if (dropdownEl) dropdownEl.style.display = "none";
+          };
+          window.addEventListener("scroll", handleScroll, true);
+          scrollCleanup = () => {
+            window.removeEventListener("scroll", handleScroll, true);
+          };
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onUpdate(props: any) {
           currentItems = (props.items as MentionParticipant[]) ?? [];
           selectedIndex = 0;
-          const rect = props.clientRect?.() as DOMRect | null;
-          if (rect && dropdownEl) {
-            dropdownEl.style.left = `${rect.left}px`;
-            dropdownEl.style.bottom = `${window.innerHeight - rect.top + 4}px`;
-            dropdownEl.style.top = "auto";
-          }
           savedCommand = props.command;
           renderDropdownItems(currentItems, selectedIndex, props.command);
+          const rect = props.clientRect?.() as DOMRect | null;
+          if (rect) positionDropdown(rect);
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onKeyDown(props: any) {
@@ -151,6 +197,8 @@ export function createMentionSuggestion({
         },
         onExit() {
           if (mentionOpenRef) mentionOpenRef.current = false;
+          scrollCleanup?.();
+          scrollCleanup = null;
           dropdownEl?.remove();
           dropdownEl = null;
           savedCommand = null;

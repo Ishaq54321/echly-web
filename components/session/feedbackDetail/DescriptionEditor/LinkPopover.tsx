@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { usePortalHost } from "./PortalHost";
 
 export interface LinkPopoverProps {
   anchorEl: HTMLElement | null;
@@ -43,6 +45,7 @@ export function LinkPopover({
   );
   const popoverRef = useRef<HTMLDivElement>(null);
   const urlInputRef = useRef<HTMLInputElement>(null);
+  const portalHost = usePortalHost();
 
   useEffect(() => {
     if (open) {
@@ -57,24 +60,33 @@ export function LinkPopover({
       return;
     }
 
-    const rect = anchorEl.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
+    const compute = () => {
+      const rect = anchorEl.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
 
-    let top = rect.bottom + GAP;
-    let left = rect.left;
+      let top = rect.bottom + GAP;
+      let left = rect.left;
 
-    if (left + POPOVER_WIDTH > viewportWidth - 16) {
-      left = viewportWidth - POPOVER_WIDTH - 16;
-    }
-    if (left < 16) left = 16;
+      if (left + POPOVER_WIDTH > viewportWidth - 16) {
+        left = viewportWidth - POPOVER_WIDTH - 16;
+      }
+      if (left < 16) left = 16;
 
-    if (top + POPOVER_HEIGHT_EST > viewportHeight - 16) {
-      top = rect.top - POPOVER_HEIGHT_EST - GAP;
-    }
-    if (top < 16) top = 16;
+      if (top + POPOVER_HEIGHT_EST > viewportHeight - 16) {
+        top = rect.top - POPOVER_HEIGHT_EST - GAP;
+      }
+      if (top < 16) top = 16;
 
-    setPosition({ top, left });
+      setPosition({ top, left });
+    };
+    compute();
+    window.addEventListener("resize", compute);
+    window.addEventListener("scroll", compute, true);
+    return () => {
+      window.removeEventListener("resize", compute);
+      window.removeEventListener("scroll", compute, true);
+    };
   }, [open, anchorEl]);
 
   useEffect(() => {
@@ -110,7 +122,7 @@ export function LinkPopover({
     };
   }, [open, anchorEl, onCancel]);
 
-  if (!open || !position) return null;
+  if (!open || !position || !portalHost) return null;
 
   const isEditing = !!initialUrl;
   const showTextField = !hasSelection || isEditing;
@@ -123,11 +135,17 @@ export function LinkPopover({
     onSave(normalized, showTextField ? text.trim() || undefined : undefined);
   };
 
-  return (
+  return createPortal(
     <div
       ref={popoverRef}
-      className="fixed z-50 rounded-[var(--radius-btn)] border border-[var(--border)] bg-[var(--surface-card)] shadow-lg p-3"
-      style={{ top: position.top, left: position.left, width: POPOVER_WIDTH }}
+      className="description-editor-portal fixed rounded-[var(--radius-btn)] border border-[var(--border)] bg-[var(--surface-card)] p-3"
+      style={{
+        top: position.top,
+        left: position.left,
+        width: POPOVER_WIDTH,
+        zIndex: 2147483700,
+        boxShadow: "var(--shadow-panel)",
+      }}
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
@@ -148,7 +166,25 @@ export function LinkPopover({
             }
           }}
           placeholder="https://example.com"
-          className="px-2.5 py-1.5 text-[13px] rounded bg-[var(--layer-1-bg)] text-[var(--text-primary-strong)] border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)]"
+          style={{
+            width: "100%",
+            padding: "8px 12px",
+            fontSize: "13px",
+            border: "1px solid #E5E7EB",
+            borderRadius: "6px",
+            outline: "none",
+            background: "var(--surface-card, white)",
+            color: "var(--text-heading, #15101F)",
+            transition: "border-color 120ms ease, box-shadow 120ms ease",
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = "var(--brand, #5A49BF)";
+            e.currentTarget.style.boxShadow = "0 0 0 1px var(--brand, #5A49BF)";
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = "#E5E7EB";
+            e.currentTarget.style.boxShadow = "none";
+          }}
         />
 
         {showTextField ? (
@@ -167,7 +203,25 @@ export function LinkPopover({
                 }
               }}
               placeholder="Link text"
-              className="px-2.5 py-1.5 text-[13px] rounded bg-[var(--layer-1-bg)] text-[var(--text-primary-strong)] border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)]"
+              style={{
+                width: "100%",
+                padding: "8px 12px",
+                fontSize: "13px",
+                border: "1px solid #E5E7EB",
+                borderRadius: "6px",
+                outline: "none",
+                background: "var(--surface-card, white)",
+                color: "var(--text-heading, #15101F)",
+                transition: "border-color 120ms ease, box-shadow 120ms ease",
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "var(--brand, #5A49BF)";
+                e.currentTarget.style.boxShadow = "0 0 0 1px var(--brand, #5A49BF)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "#E5E7EB";
+                e.currentTarget.style.boxShadow = "none";
+              }}
             />
           </>
         ) : null}
@@ -177,7 +231,7 @@ export function LinkPopover({
             <button
               type="button"
               onClick={() => onRemove()}
-              className="inline-flex h-[30px] items-center px-3 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--color-danger,#dc2626)] text-[13px] font-medium hover:bg-[var(--surface-hover)] cursor-pointer"
+              className="inline-flex h-[30px] items-center px-3 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--color-danger)] text-[13px] font-medium hover:bg-[var(--surface-hover)] cursor-pointer"
             >
               Remove
             </button>
@@ -203,6 +257,7 @@ export function LinkPopover({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    portalHost,
   );
 }

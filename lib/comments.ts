@@ -196,8 +196,14 @@ export interface AddCommentOptions {
 
 export type OptimisticComment = Comment & {
   isOptimistic: true;
-  optimisticCreatedAtMs: number;
 };
+
+function generateClientId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+}
 
 export function createOptimisticComment(args: {
   sessionId: string;
@@ -205,12 +211,11 @@ export function createOptimisticComment(args: {
   data: AddCommentOptions;
 }): OptimisticComment {
   const { sessionId, feedbackId, data } = args;
-  const optimisticCreatedAtMs = Date.now();
-  const tempId = `temp-${optimisticCreatedAtMs}-${Math.random().toString(36).slice(2, 10)}`;
-  const optimisticDate = new Date(optimisticCreatedAtMs);
+  const nowMs = Date.now();
+  const optimisticDate = new Date(nowMs);
 
   return {
-    id: tempId,
+    id: generateClientId(),
     sessionId,
     feedbackId,
     userId: data.userId,
@@ -218,8 +223,8 @@ export function createOptimisticComment(args: {
     userAvatar: data.userAvatar,
     message: data.message,
     createdAt: {
-      seconds: Math.floor(optimisticCreatedAtMs / 1000),
-      nanoseconds: (optimisticCreatedAtMs % 1000) * 1_000_000,
+      seconds: Math.floor(nowMs / 1000),
+      nanoseconds: (nowMs % 1000) * 1_000_000,
       toDate: () => optimisticDate,
     } as Comment["createdAt"],
     type: data.type ?? "general",
@@ -228,8 +233,8 @@ export function createOptimisticComment(args: {
     threadId: data.threadId,
     attachment: data.attachment,
     attachments: data.attachments,
+    mentionedUserIds: data.mentionedUserIds,
     isOptimistic: true,
-    optimisticCreatedAtMs,
   };
 }
 
@@ -239,82 +244,32 @@ export function isOptimisticLocalComment(c: LocalComment): c is OptimisticCommen
   return "isOptimistic" in c && c.isOptimistic === true;
 }
 
-function readCommentTimeMs(comment: Comment): number | null {
-  const createdAt = comment.createdAt as unknown;
-  if (!createdAt) return null;
-  if (
-    typeof createdAt === "object" &&
-    createdAt != null &&
-    "toDate" in (createdAt as { toDate?: unknown }) &&
-    typeof (createdAt as { toDate: () => Date }).toDate === "function"
-  ) {
-    return (createdAt as { toDate: () => Date }).toDate().getTime();
-  }
-  if (
-    typeof createdAt === "object" &&
-    createdAt != null &&
-    "seconds" in (createdAt as { seconds?: unknown }) &&
-    typeof (createdAt as { seconds: number }).seconds === "number"
-  ) {
-    return (createdAt as { seconds: number }).seconds * 1000;
-  }
-  return null;
-}
-
-/** True while this row is a client-only pending write (optimistic or legacy temp id). */
-function isPendingLocalComment(c: LocalComment): boolean {
-  if (isOptimisticLocalComment(c)) return true;
-  const id = c.id || "";
-  return id.startsWith("temp-") || id.startsWith("temp_");
-}
-
-export function sameCommentPayload(
-  optimistic: Comment | OptimisticComment,
-  incoming: Comment
-): boolean {
-  if (optimistic.id === incoming.id) return true;
-  if ((incoming.id || "").startsWith("temp_") || (incoming.id || "").startsWith("temp-")) {
-    return false;
-  }
-  if ((optimistic.message || "").trim() !== (incoming.message || "").trim()) return false;
-  if (optimistic.userId !== incoming.userId) return false;
-  if ((optimistic.threadId ?? null) !== (incoming.threadId ?? null)) return false;
-  if ((optimistic.type ?? "general") !== (incoming.type ?? "general")) return false;
-
-  const incomingMs = readCommentTimeMs(incoming);
-  if (incomingMs == null) return true;
-  if (isOptimisticLocalComment(optimistic)) {
-    return Math.abs(incomingMs - optimistic.optimisticCreatedAtMs) <= 30_000;
-  }
-  return true;
-}
-
 /**
- * Merge server-fetched list with in-flight optimistic rows; pending locals drop once a matching real row appears.
+ * Merge server-fetched list with in-flight optimistic rows. Dedupe is id-based:
+ * the optimistic row uses the same uuid we send to the server, so when the real
+ * doc arrives the listener entry wins automatically.
  */
 export function mergeRealtimeCommentsWithOptimistic(
   prev: LocalComment[],
   incoming: Comment[]
 ): LocalComment[] {
-  const incomingNonTemp = incoming.filter((c) => {
-    const id = c.id || "";
-    return !id.startsWith("temp_") && !id.startsWith("temp-");
-  });
-  const optimisticPending = prev
-    .filter(isPendingLocalComment)
-    .filter((opt) => !incomingNonTemp.some((real) => sameCommentPayload(opt, real)));
-  return [...incomingNonTemp, ...optimisticPending];
+  const incomingIds = new Set(incoming.map((c) => c.id));
+  const stillPending = prev.filter(
+    (c) => isOptimisticLocalComment(c) && !incomingIds.has(c.id)
+  );
+  return [...incoming, ...stillPending];
 }
 
 export async function addComment(
   sessionId: string,
   feedbackId: string,
+  clientId: string,
   data: AddCommentOptions
 ): Promise<string> {
   const res = await authFetch("/api/comments", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sessionId, feedbackId, data }),
+    body: JSON.stringify({ sessionId, feedbackId, clientId, data }),
   });
   if (!res) throw new Error("Not authenticated");
   if (!res.ok) {

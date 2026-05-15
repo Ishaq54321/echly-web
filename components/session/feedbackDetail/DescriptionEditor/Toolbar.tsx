@@ -1,23 +1,23 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useEditorState, type Editor } from "@tiptap/react";
 import {
-  Sparkles,
-  Wand2,
-  SpellCheck,
-  BookType,
   Smile as SmileIcon,
-  ArrowUpWideNarrow,
-  ArrowDownNarrowWide,
-  BriefcaseBusiness,
-  Laugh,
   Image as ImageIcon,
   Code2,
   Link as LinkIcon,
   Undo2,
   Redo2,
   Baseline,
+  Sparkles,
+  Wand2,
+  SpellCheck,
+  BookType,
+  ArrowUpWideNarrow,
+  ArrowDownNarrowWide,
+  BriefcaseBusiness,
+  Laugh,
 } from "lucide-react";
 import { ToolbarButton } from "./ToolbarButton";
 import {
@@ -26,19 +26,191 @@ import {
   ToolbarMenuLabel,
   ToolbarMenuSeparator,
 } from "./ToolbarMenu";
-import { SplitButton } from "./SplitButton";
-import { TextStylesDropdown } from "./TextStylesDropdown";
 import { FormattingDropdown } from "./FormattingDropdown";
 import { ListsDropdown } from "./ListsDropdown";
 import { EmojiPickerPopover } from "./EmojiPickerPopover";
+import { SplitButton } from "./SplitButton";
 import type { ImproveAction } from "@/lib/ai/prompts/improveDescription";
 
 interface ToolbarProps {
   editor: Editor | null;
   onLink?: (anchorEl: HTMLElement) => void;
   onImageUpload?: (file: File) => void;
+  /** When provided, renders an inline "Improve description" split-button at
+   *  the top-right of the toolbar (dashboard appearance). The extension
+   *  appearance leaves this undefined and uses the floating pill instead. */
   onAiAction?: (action: ImproveAction) => void;
   aiIsImproving?: boolean;
+}
+
+function ToneSubmenuItem({
+  onClose,
+  onChoose,
+}: {
+  onClose: () => void;
+  onChoose: (action: ImproveAction) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const itemRef = useRef<HTMLButtonElement>(null);
+  const [submenuPos, setSubmenuPos] = useState<{ top: number; left: number } | null>(null);
+  // Grace timer so the cursor can travel from the parent row to the
+  // floating submenu without it snapping closed in transit.
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelHide = () => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  };
+
+  const scheduleHide = (delay: number) => {
+    cancelHide();
+    hideTimerRef.current = setTimeout(() => setOpen(false), delay);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    };
+  }, []);
+
+  const openSubmenu = () => {
+    cancelHide();
+    const el = itemRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setSubmenuPos({ top: r.top, left: r.right + 4 });
+    setOpen(true);
+  };
+
+  const choose = (action: ImproveAction) => {
+    cancelHide();
+    onChoose(action);
+    setOpen(false);
+    onClose();
+  };
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={openSubmenu}
+      onMouseLeave={() => scheduleHide(200)}
+    >
+      <button
+        ref={itemRef}
+        type="button"
+        role="menuitem"
+        onMouseDown={(e) => e.preventDefault()}
+        onFocus={openSubmenu}
+        className="flex items-center gap-2.5 w-full px-2 py-[7px] rounded-[5px] text-left text-[13px] font-normal text-[var(--text-heading)] hover:bg-[var(--surface-hover)]"
+      >
+        <BookType size={15} strokeWidth={2} className="text-[var(--brand)]" />
+        <span className="flex-1 font-medium">Change tone</span>
+        <span className="ml-auto text-[var(--text-tertiary)] text-[12px]">›</span>
+      </button>
+      {/* Invisible bridge over the 4px gap between the parent item and the
+          submenu so the cursor never lands on "neither" while crossing. */}
+      {open ? (
+        <div
+          aria-hidden
+          className="absolute"
+          style={{ left: "100%", top: 0, width: 12, height: "100%" }}
+          onMouseEnter={cancelHide}
+        />
+      ) : null}
+      {open && submenuPos && typeof document !== "undefined" ? (
+        <div
+          role="menu"
+          className="fixed rounded-lg border border-[var(--border)] bg-[var(--surface-card)] shadow-lg p-1"
+          style={{
+            zIndex: 1000,
+            top: submenuPos.top,
+            left: submenuPos.left,
+            minWidth: 200,
+          }}
+          onMouseEnter={cancelHide}
+          onMouseLeave={() => scheduleHide(150)}
+        >
+          <ToolbarMenuItem onClick={() => choose("tone-professional")}>
+            <BriefcaseBusiness size={15} strokeWidth={2} className="text-[var(--brand)]" />
+            <span className="flex-1 font-medium">More professional</span>
+          </ToolbarMenuItem>
+          <ToolbarMenuItem onClick={() => choose("tone-casual")}>
+            <Laugh size={15} strokeWidth={2} className="text-[var(--brand)]" />
+            <span className="flex-1 font-medium">More casual</span>
+          </ToolbarMenuItem>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function AiImproveButton({
+  editor,
+  onAiAction,
+  aiIsImproving,
+}: {
+  editor: Editor | null;
+  onAiAction?: (action: ImproveAction) => void;
+  aiIsImproving?: boolean;
+}) {
+  const trigger = (action: ImproveAction) => {
+    if (aiIsImproving) return;
+    onAiAction?.(action);
+  };
+  return (
+    <SplitButton
+      isAi
+      labelled
+      tooltip={aiIsImproving ? "Improving..." : "Improve description"}
+      chevronTooltip="More AI options"
+      disabled={!editor || !onAiAction || aiIsImproving}
+      chevronDisabled={!editor || !onAiAction || aiIsImproving}
+      onMainClick={() => trigger("improve")}
+      menuMinWidth={248}
+      icon={
+        <>
+          <Sparkles
+            size={15}
+            strokeWidth={2}
+            className={
+              aiIsImproving
+                ? "animate-pulse"
+                : "animate-[shimmer_2s_ease-in-out_infinite]"
+            }
+          />
+          <span className="font-medium">
+            {aiIsImproving ? "Improving..." : "Improve description"}
+          </span>
+        </>
+      }
+      menu={(close) => (
+        <>
+          <ToolbarMenuItem onClick={() => { trigger("polish"); close(); }}>
+            <Wand2 size={15} strokeWidth={2} className="text-[var(--brand)]" />
+            <span className="flex-1 font-medium">Add polish</span>
+          </ToolbarMenuItem>
+          <ToolbarMenuSeparator />
+          <ToolbarMenuItem onClick={() => { trigger("spelling"); close(); }}>
+            <SpellCheck size={15} strokeWidth={2} className="text-[var(--brand)]" />
+            <span className="flex-1 font-medium">Fix spelling &amp; grammar</span>
+          </ToolbarMenuItem>
+          <ToolbarMenuSeparator />
+          <ToneSubmenuItem onClose={close} onChoose={trigger} />
+          <ToolbarMenuSeparator />
+          <ToolbarMenuItem onClick={() => { trigger("shorter"); close(); }}>
+            <ArrowUpWideNarrow size={15} strokeWidth={2} className="text-[var(--brand)]" />
+            <span className="flex-1 font-medium">Make shorter</span>
+          </ToolbarMenuItem>
+          <ToolbarMenuItem onClick={() => { trigger("longer"); close(); }}>
+            <ArrowDownNarrowWide size={15} strokeWidth={2} className="text-[var(--brand)]" />
+            <span className="flex-1 font-medium">Make longer</span>
+          </ToolbarMenuItem>
+        </>
+      )}
+    />
+  );
 }
 
 function Divider() {
@@ -110,141 +282,6 @@ function ColorSwatch({
         />
       ) : null}
     </button>
-  );
-}
-
-function ToneSubmenuItem({
-  onClose,
-  onChoose,
-}: {
-  onClose: () => void;
-  onChoose: (action: ImproveAction) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const itemRef = useRef<HTMLButtonElement>(null);
-  const [submenuPos, setSubmenuPos] = useState<{ top: number; left: number } | null>(null);
-
-  const openSubmenu = () => {
-    const el = itemRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    setSubmenuPos({ top: r.top, left: r.right + 4 });
-    setOpen(true);
-  };
-
-  const choose = (action: ImproveAction) => {
-    onChoose(action);
-    setOpen(false);
-    onClose();
-  };
-
-  return (
-    <div
-      className="relative"
-      onMouseEnter={openSubmenu}
-      onMouseLeave={() => setOpen(false)}
-    >
-      <button
-        ref={itemRef}
-        type="button"
-        role="menuitem"
-        onMouseDown={(e) => e.preventDefault()}
-        onFocus={openSubmenu}
-        className="flex items-center gap-2.5 w-full px-2 py-[7px] rounded-[5px] text-left text-[13px] font-normal text-[var(--text-heading)] hover:bg-[var(--surface-hover)]"
-      >
-        <BookType size={15} strokeWidth={2} className="text-[var(--brand)]" />
-        <span className="flex-1 font-medium">Change tone</span>
-        <span className="ml-auto text-[var(--text-tertiary)] text-[12px]">›</span>
-      </button>
-      {open && submenuPos && typeof document !== "undefined" ? (
-        <div
-          role="menu"
-          className="fixed rounded-lg border border-[var(--border)] bg-[var(--surface-card)] shadow-lg p-1"
-          style={{
-            zIndex: 1000,
-            top: submenuPos.top,
-            left: submenuPos.left,
-            minWidth: 200,
-          }}
-          onMouseEnter={() => setOpen(true)}
-          onMouseLeave={() => setOpen(false)}
-        >
-          <ToolbarMenuItem onClick={() => choose("tone-professional")}>
-            <BriefcaseBusiness size={15} strokeWidth={2} className="text-[var(--brand)]" />
-            <span className="flex-1 font-medium">More professional</span>
-          </ToolbarMenuItem>
-          <ToolbarMenuItem onClick={() => choose("tone-casual")}>
-            <Laugh size={15} strokeWidth={2} className="text-[var(--brand)]" />
-            <span className="flex-1 font-medium">More casual</span>
-          </ToolbarMenuItem>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function AiImproveButton({
-  editor,
-  onAiAction,
-  aiIsImproving,
-}: {
-  editor: Editor | null;
-  onAiAction?: (action: ImproveAction) => void;
-  aiIsImproving?: boolean;
-}) {
-  const trigger = (action: ImproveAction) => {
-    if (aiIsImproving) return;
-    onAiAction?.(action);
-  };
-  return (
-    <SplitButton
-      isAi
-      labelled
-      tooltip={aiIsImproving ? "Improving..." : "Add polish"}
-      chevronTooltip="More AI options"
-      disabled={!editor || !onAiAction || aiIsImproving}
-      chevronDisabled={!editor || !onAiAction || aiIsImproving}
-      onMainClick={() => trigger("polish")}
-      menuMinWidth={248}
-      icon={
-        <>
-          <Sparkles
-            size={15}
-            strokeWidth={2}
-            className={
-              aiIsImproving
-                ? "animate-pulse"
-                : "animate-[shimmer_2s_ease-in-out_infinite]"
-            }
-          />
-          <span className="font-medium">
-            {aiIsImproving ? "Improving..." : "Improve description"}
-          </span>
-        </>
-      }
-      menu={(close) => (
-        <>
-          <ToolbarMenuItem onClick={() => { trigger("polish"); close(); }}>
-            <Wand2 size={15} strokeWidth={2} className="text-[var(--brand)]" />
-            <span className="flex-1 font-medium">Add polish</span>
-          </ToolbarMenuItem>
-          <ToolbarMenuItem onClick={() => { trigger("spelling"); close(); }}>
-            <SpellCheck size={15} strokeWidth={2} className="text-[var(--brand)]" />
-            <span className="flex-1 font-medium">Fix spelling &amp; grammar</span>
-          </ToolbarMenuItem>
-          <ToneSubmenuItem onClose={close} onChoose={trigger} />
-          <ToolbarMenuSeparator />
-          <ToolbarMenuItem onClick={() => { trigger("shorter"); close(); }}>
-            <ArrowUpWideNarrow size={15} strokeWidth={2} className="text-[var(--brand)]" />
-            <span className="flex-1 font-medium">Make shorter</span>
-          </ToolbarMenuItem>
-          <ToolbarMenuItem onClick={() => { trigger("longer"); close(); }}>
-            <ArrowDownNarrowWide size={15} strokeWidth={2} className="text-[var(--brand)]" />
-            <span className="flex-1 font-medium">Make longer</span>
-          </ToolbarMenuItem>
-        </>
-      )}
-    />
   );
 }
 
@@ -356,13 +393,15 @@ export function Toolbar({
       aria-label="Description formatting"
       className="flex items-center gap-0.5 flex-wrap px-2.5 py-2 border-b border-[var(--border)] rounded-t-[12px]"
     >
-      <AiImproveButton
-        editor={editor}
-        onAiAction={onAiAction}
-        aiIsImproving={aiIsImproving}
-      />
-      <Divider />
-      <TextStylesDropdown editor={editor} />
+      {onAiAction ? (
+        <div className="pr-2 mr-1 border-r border-[var(--border)]">
+          <AiImproveButton
+            editor={editor}
+            onAiAction={onAiAction}
+            aiIsImproving={aiIsImproving}
+          />
+        </div>
+      ) : null}
       <FormattingDropdown editor={editor} />
       <ListsDropdown editor={editor} />
       <Divider />

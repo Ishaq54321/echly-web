@@ -36,6 +36,9 @@ function makeAliasPlugin(useContentAuthFetch = false) {
         build.onResolve({ filter: /^@\/lib\/authFetch$/ }, () => ({
           path: path.resolve(extDir, "src", "contentAuthFetch.ts"),
         }));
+        build.onResolve({ filter: /^@\/lib\/uploadAttachment$/ }, () => ({
+          path: path.resolve(extDir, "stubs", "uploadAttachment.ts"),
+        }));
       }
       build.onResolve({ filter: /^next\/image$/ }, () => ({
         path: path.resolve(extDir, "stubs", "next-image.tsx"),
@@ -83,6 +86,7 @@ await esbuild.build({
   minify: true,
   treeShaking: true,
   sourcemap: false,
+  jsx: "automatic",
   loader: {
     ".ts": "ts",
     ".tsx": "tsx",
@@ -104,6 +108,7 @@ await esbuild.build({
   minify: isProd,
   treeShaking: true,
   sourcemap: !isProd,
+  jsx: "automatic",
   loader: {
     ".tsx": "tsx",
     ".ts": "ts",

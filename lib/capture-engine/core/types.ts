@@ -261,6 +261,14 @@ export type CaptureWidgetProps = {
   onOpenDashboard?: () => void;
   /** Extension: resolve asset URL (e.g. chrome.runtime.getURL). Replaces chrome.runtime.getURL in core. */
   getAssetUrl?: (path: string) => string;
+  /**
+   * Extension: fetch wrapper used by the TicketEditorOverlay's DescriptionEditor
+   * for API calls (AI improve, voice transcription). The dashboard build leaves
+   * this undefined and the editor uses same-origin `fetch`; the extension
+   * passes an authenticated client that prepends API_BASE and attaches the
+   * bearer token.
+   */
+  fetchClient?: (url: string, init?: RequestInit) => Promise<Response>;
   /** Extension: derived “still saving” for session chrome (content script); optional everywhere else. */
   __extensionSavingState?: boolean;
   /** Extension: lift pause/end/session-feedback saving flags from the widget for derived saving UI in the host. */

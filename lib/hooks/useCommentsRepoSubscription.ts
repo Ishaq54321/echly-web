@@ -13,7 +13,11 @@ import { useWorkspace } from "@/lib/client/workspaceContext";
 
 type Args = {
   sessionId: string | null | undefined;
-  /** Accepted for source-compat with existing call sites; ignored — store is whole-session. */
+  /**
+   * Per-ticket scope. When provided, the Firestore listener filters comments by
+   * `feedbackId` so each ticket gets its own real-time feed. Omitting falls back
+   * to REST-only mode (used by anon viewers that can't run the listener anyway).
+   */
   feedbackId?: string | null | undefined;
   enabled?: boolean;
   /**
@@ -41,6 +45,7 @@ type Args = {
  */
 export function useCommentsRepoSubscription({
   sessionId,
+  feedbackId,
   enabled = true,
   canSubscribeToFirestore = true,
   onComments,
@@ -52,6 +57,7 @@ export function useCommentsRepoSubscription({
   }, [onComments]);
 
   const sid = typeof sessionId === "string" ? sessionId.trim() : "";
+  const fid = typeof feedbackId === "string" ? feedbackId.trim() : "";
   const uid = typeof authUid === "string" ? authUid.trim() : "";
 
   const sessionState = useSessionStore(sid);
@@ -61,29 +67,34 @@ export function useCommentsRepoSubscription({
       : "";
 
   const useListener =
-    enabled && canSubscribeToFirestore && !!sid && !!uid && !!sessionWorkspaceId;
+    enabled &&
+    canSubscribeToFirestore &&
+    !!sid &&
+    !!fid &&
+    !!uid &&
+    !!sessionWorkspaceId;
   const useRest = enabled && !!sid && !useListener;
 
   // ── Listener mode (authenticated workspace members) ───────────────────────
   useEffect(() => {
     if (!useListener) return;
-    const release = retainCommentsListener(sid, sessionWorkspaceId);
-    const unsubscribe = subscribeToComments(sid, () => {
-      onCommentsRef.current(getCommentsSnapshot(sid).comments);
+    const release = retainCommentsListener(sid, fid, sessionWorkspaceId);
+    const unsubscribe = subscribeToComments(sid, fid, () => {
+      onCommentsRef.current(getCommentsSnapshot(sid, fid).comments);
     });
     // Initial emit: deliver whatever's in the store right now (could be empty).
-    onCommentsRef.current(getCommentsSnapshot(sid).comments);
+    onCommentsRef.current(getCommentsSnapshot(sid, fid).comments);
     return () => {
       unsubscribe();
       release();
     };
-  }, [useListener, sid, sessionWorkspaceId]);
+  }, [useListener, sid, fid, sessionWorkspaceId]);
 
   // ── REST mode (anonymous share-link viewers) ──────────────────────────────
   const initialDoneRef = useRef("");
   const inFlightRef = useRef(false);
   const queuedRefetchRef = useRef(false);
-  const restScopeKey = useRest ? sid : "";
+  const restScopeKey = useRest ? `${sid}:${fid}` : "";
 
   useEffect(() => {
     if (!restScopeKey) {
@@ -94,8 +105,8 @@ export function useCommentsRepoSubscription({
     let cancelled = false;
     void (async () => {
       try {
-        const scoped = await fetchComments(restScopeKey, {
-          feedbackId: undefined,
+        const scoped = await fetchComments(sid, {
+          feedbackId: fid || undefined,
           force: false,
         });
         if (cancelled) return;
@@ -108,14 +119,14 @@ export function useCommentsRepoSubscription({
     return () => {
       cancelled = true;
     };
-  }, [restScopeKey]);
+  }, [restScopeKey, sid, fid]);
 
   const refetch = useCallback(async () => {
     if (!sid) return;
     if (useListener) {
       // Listener already streams updates; re-emit current snapshot for any consumer
       // whose manual "Refresh" button wants to flush stuck local state.
-      onCommentsRef.current(getCommentsSnapshot(sid).comments);
+      onCommentsRef.current(getCommentsSnapshot(sid, fid).comments);
       return;
     }
     if (inFlightRef.current) {
@@ -127,10 +138,10 @@ export function useCommentsRepoSubscription({
       do {
         queuedRefetchRef.current = false;
         const scoped = await fetchComments(sid, {
-          feedbackId: undefined,
+          feedbackId: fid || undefined,
           force: true,
         });
-        initialDoneRef.current = sid;
+        initialDoneRef.current = `${sid}:${fid}`;
         onCommentsRef.current(scoped);
       } while (queuedRefetchRef.current);
     } catch (e) {
@@ -138,7 +149,7 @@ export function useCommentsRepoSubscription({
     } finally {
       inFlightRef.current = false;
     }
-  }, [sid, useListener]);
+  }, [sid, fid, useListener]);
 
   return useMemo(() => ({ refetch }), [refetch]);
 }

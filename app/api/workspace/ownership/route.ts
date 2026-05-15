@@ -8,7 +8,8 @@ import {
   getWorkspaceMemberRepo,
   transferWorkspaceOwnershipRepo,
 } from "@/lib/repositories/workspaceMembersRepository.server";
-import { setWorkspaceClaim } from "@/lib/server/setWorkspaceClaim";
+import { setWorkspaceClaims } from "@/lib/server/setWorkspaceClaim";
+import { adminDb } from "@/lib/server/firebaseAdmin";
 
 export const dynamic = "force-dynamic";
 
@@ -61,10 +62,25 @@ export async function PATCH(req: NextRequest) {
 
     await transferWorkspaceOwnershipRepo(workspaceId, user.uid, newOwnerUid);
 
-    // Refresh claims for both users
+    // Refresh claims for both users (memberships unchanged on transfer, but
+    // we still re-issue so token shape stays consistent).
+    const [callerSnap, newOwnerSnap] = await Promise.all([
+      adminDb.collection("users").doc(user.uid).get(),
+      adminDb.collection("users").doc(newOwnerUid).get(),
+    ]);
+    function readMemberships(snap: FirebaseFirestore.DocumentSnapshot, activeWid: string): string[] {
+      const raw = snap.data()?.workspaceMemberships;
+      const list: string[] = Array.isArray(raw)
+        ? (raw as unknown[]).filter(
+            (v): v is string => typeof v === "string" && v.trim() !== ""
+          )
+        : [];
+      if (!list.includes(activeWid)) list.push(activeWid);
+      return list;
+    }
     await Promise.allSettled([
-      setWorkspaceClaim(user.uid, workspaceId),
-      setWorkspaceClaim(newOwnerUid, workspaceId),
+      setWorkspaceClaims(user.uid, workspaceId, readMemberships(callerSnap, workspaceId)),
+      setWorkspaceClaims(newOwnerUid, workspaceId, readMemberships(newOwnerSnap, workspaceId)),
     ]);
 
     return apiSuccess({ success: true });

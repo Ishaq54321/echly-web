@@ -1199,8 +1199,40 @@ async function createFeedbackInternal({
   return res;
 }
 
+/**
+ * Dashboard signaled a workspace switch. Drop the cached extension token so the
+ * next request forces /api/extension/session to re-resolve the user's active
+ * workspace, and notify active tabs to refresh their in-memory state.
+ */
+async function handleWorkspaceSwitch(): Promise<void> {
+  extensionToken = null;
+  extensionTokenExpiresAt = null;
+  setExtensionToken(null);
+  sw.extensionToken = null;
+
+  try {
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+      if (tab.id == null) continue;
+      chrome.tabs
+        .sendMessage(tab.id, { type: "ECHLY_REFRESH_SESSION" })
+        .catch(() => {
+          /* tab may not have the content script — ignore */
+        });
+    }
+  } catch (err) {
+    if (ECHLY_DEBUG) console.warn("[ECHLY] workspace_switch tab broadcast failed", err);
+  }
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (ECHLY_DEBUG) echlyLog("MESSAGE", "received", request.type);
+
+  if (request.type === "WORKSPACE_SWITCHED") {
+    void handleWorkspaceSwitch();
+    sendResponse({ ok: true });
+    return false;
+  }
 
   if (request.type === "ECHLY_LOAD_WIDGET") {
     const tabId = sender.tab?.id;
@@ -1289,6 +1321,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "OPEN_RECORDER") {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tab = tabs[0];
+      const isAlreadyOpen = trayOpen === true && globalUIState.visible === true;
+      if (isAlreadyOpen && tab?.id) {
+        chrome.tabs
+          .sendMessage(tab.id, { type: "ECHLY_SHAKE_PILL" })
+          .catch((error) => logMessageDeliveryError("ECHLY_SHAKE_PILL", error));
+        sendResponse({ ok: true, alreadyOpen: true });
+        return;
+      }
       (async () => {
         const opened = await openRecorderUI(tab?.id);
         if (opened && tab?.id) {

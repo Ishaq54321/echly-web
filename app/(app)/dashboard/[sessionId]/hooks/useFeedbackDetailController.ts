@@ -155,11 +155,11 @@ export function useFeedbackDetailController(args: {
     if (!sessionId) return;
     setComments([]);
     setLoadingComments(true);
-  }, [sessionId]);
+  }, [sessionId, feedbackId]);
 
   const { refetch: refetchComments } = useCommentsRepoSubscription({
     sessionId,
-    feedbackId: undefined,
+    feedbackId,
     enabled: commentsPollEnabled,
     canSubscribeToFirestore,
     onComments: (incomingComments) => {
@@ -211,23 +211,7 @@ export function useFeedbackDetailController(args: {
     setComments((prev) => [optimistic, ...prev]);
     void (async () => {
       try {
-        const id = await addComment(sessionId, feedbackId, payload);
-        setComments((prev) => {
-          const withoutListenerDup = prev.filter(
-            (c) => !(c.id === id && !isOptimisticLocalComment(c))
-          );
-          return withoutListenerDup.map((c) =>
-            c.id === optimistic.id && isOptimisticLocalComment(c)
-              ? {
-                  ...c,
-                  id,
-                  isOptimistic: true,
-                  optimisticCreatedAtMs: c.optimisticCreatedAtMs,
-                }
-              : c
-          );
-        });
-        void refetchComments();
+        await addComment(sessionId, feedbackId, optimistic.id, payload);
       } catch (err) {
         console.error("[ECHLY] addComment failed", err);
         setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
@@ -266,23 +250,7 @@ export function useFeedbackDetailController(args: {
     setComments((prev) => [...prev, optimistic]);
     void (async () => {
       try {
-        const id = await addComment(sessionId, feedbackId, payload);
-        setComments((prev) => {
-          const withoutListenerDup = prev.filter(
-            (c) => !(c.id === id && !isOptimisticLocalComment(c))
-          );
-          return withoutListenerDup.map((c) =>
-            c.id === optimistic.id && isOptimisticLocalComment(c)
-              ? {
-                  ...c,
-                  id,
-                  isOptimistic: true,
-                  optimisticCreatedAtMs: c.optimisticCreatedAtMs,
-                }
-              : c
-          );
-        });
-        void refetchComments();
+        await addComment(sessionId, feedbackId, optimistic.id, payload);
       } catch (err) {
         console.error("[ECHLY] addComment reply failed", err);
         setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
@@ -317,20 +285,7 @@ export function useFeedbackDetailController(args: {
     setComments((prev) => [optimistic, ...prev]);
     void (async () => {
       try {
-        const id = await addComment(sessionId, feedbackId, payload);
-        setComments((prev) =>
-          prev.map((c) =>
-            c.id === optimistic.id && isOptimisticLocalComment(c)
-              ? {
-                  ...c,
-                  id,
-                  isOptimistic: true,
-                  optimisticCreatedAtMs: c.optimisticCreatedAtMs,
-                }
-              : c
-          )
-        );
-        void refetchComments();
+        await addComment(sessionId, feedbackId, optimistic.id, payload);
       } catch (err) {
         console.error("[ECHLY] sendPinComment failed", err);
         setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
@@ -364,20 +319,7 @@ export function useFeedbackDetailController(args: {
     setComments((prev) => [optimistic, ...prev]);
     void (async () => {
       try {
-        const id = await addComment(sessionId, feedbackId, payload);
-        setComments((prev) =>
-          prev.map((c) =>
-            c.id === optimistic.id && isOptimisticLocalComment(c)
-              ? {
-                  ...c,
-                  id,
-                  isOptimistic: true,
-                  optimisticCreatedAtMs: c.optimisticCreatedAtMs,
-                }
-              : c
-          )
-        );
-        void refetchComments();
+        await addComment(sessionId, feedbackId, optimistic.id, payload);
       } catch (err) {
         console.error("[ECHLY] sendTextComment failed", err);
         setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
@@ -516,7 +458,8 @@ export function useFeedbackDetailController(args: {
   const deleteCommentHandler = async (commentId: string) => {
     if (!isIdentityResolved) return;
 
-    if (commentId.startsWith("temp-") || commentId.startsWith("temp_")) {
+    const target = comments.find((c) => c.id === commentId);
+    if (target && isOptimisticLocalComment(target)) {
       setComments((prev) => prev.filter((c) => c.id !== commentId));
       return;
     }

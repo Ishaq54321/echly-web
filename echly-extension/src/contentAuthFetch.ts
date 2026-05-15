@@ -58,7 +58,6 @@ export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}
     return fetch(url, {
       ...init,
       headers,
-      credentials: "include",
     });
   } catch (err) {
     console.error("[ECHLY] API request failed", err);

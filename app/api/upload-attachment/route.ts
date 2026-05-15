@@ -5,9 +5,28 @@ import {
 } from "@/lib/server/auth/authorize";
 import { randomUUID } from "crypto";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
+import { NextResponse } from "next/server";
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15 MB
 const STORAGE_PREFIX = "discussion-attachments";
+
+const UPLOAD_CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Max-Age": "86400",
+};
+
+function withCors(res: Response): Response {
+  Object.entries(UPLOAD_CORS_HEADERS).forEach(([key, value]) => {
+    res.headers.set(key, value);
+  });
+  return res;
+}
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: UPLOAD_CORS_HEADERS });
+}
 
 // Slack/Loom-style coverage. Excludes SVG, HTML, JS, executables (XSS / malware risk).
 const ALLOWED_ATTACHMENT_TYPES = new Set<string>([
@@ -67,46 +86,61 @@ export async function POST(req: Request) {
     try {
       user = await requireAuth(req);
     } catch (err) {
-      return toAuthorizationResponse(err);
+      const errRes = toAuthorizationResponse(err);
+      return withCors(
+        new NextResponse(errRes.body, {
+          status: errRes.status,
+          statusText: errRes.statusText,
+          headers: errRes.headers,
+        }),
+      );
     }
 
     const formData = await req.formData();
     const file = formData.get("file");
 
     if (!file || !(file instanceof File)) {
-      return apiError({
-        code: "INVALID_INPUT",
-        message: "No file provided",
-        status: 400,
-      });
+      return withCors(
+        apiError({
+          code: "INVALID_INPUT",
+          message: "No file provided",
+          status: 400,
+        }),
+      );
     }
 
     const fileMime = (file.type ?? "").trim().toLowerCase();
     if (!ALLOWED_ATTACHMENT_TYPES.has(fileMime)) {
-      return apiError({
-        code: "INVALID_INPUT",
-        message:
-          "File type not supported. Allowed: images, PDF, Office docs, audio, video, ZIP.",
-        status: 400,
-      });
+      return withCors(
+        apiError({
+          code: "INVALID_INPUT",
+          message:
+            "File type not supported. Allowed: images, PDF, Office docs, audio, video, ZIP.",
+          status: 400,
+        }),
+      );
     }
 
     // Defense-in-depth: file.type can be spoofed, also check extension.
     const ext = (file.name || "").split(".").pop()?.toLowerCase() ?? "";
     if (!ALLOWED_ATTACHMENT_EXTENSIONS.has(ext)) {
-      return apiError({
-        code: "INVALID_INPUT",
-        message: "File extension not supported.",
-        status: 400,
-      });
+      return withCors(
+        apiError({
+          code: "INVALID_INPUT",
+          message: "File extension not supported.",
+          status: 400,
+        }),
+      );
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      return apiError({
-        code: "INVALID_INPUT",
-        message: "File must be smaller than 15 MB.",
-        status: 400,
-      });
+      return withCors(
+        apiError({
+          code: "INVALID_INPUT",
+          message: "File must be smaller than 15 MB.",
+          status: 400,
+        }),
+      );
     }
 
     const originalName = (file.name || "file").replace(/[/\\]/g, "").slice(0, 200);
@@ -126,18 +160,22 @@ export async function POST(req: Request) {
     const encodedPath = encodeURIComponent(storagePath);
     const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${adminBucket.name}/o/${encodedPath}?alt=media&token=${token}`;
 
-    return apiSuccess({
-      storagePath,
-      url: publicUrl,
-      name: originalName,
-      size: file.size,
-    });
+    return withCors(
+      apiSuccess({
+        storagePath,
+        url: publicUrl,
+        name: originalName,
+        size: file.size,
+      }),
+    );
   } catch (err) {
     console.error("upload-attachment error:", err);
-    return apiError({
-      code: "INTERNAL_ERROR",
-      message: "Upload failed",
-      status: 500,
-    });
+    return withCors(
+      apiError({
+        code: "INTERNAL_ERROR",
+        message: "Upload failed",
+        status: 500,
+      }),
+    );
   }
 }

@@ -109,10 +109,12 @@ export function buildDescriptionExtensions({
 }: BuildDescriptionExtensionsOptions) {
   return [
     StarterKit.configure({
-      heading: { levels: [1, 2, 3, 4, 5, 6] },
+      heading: false,
       codeBlock: false,
       horizontalRule: false,
       hardBreak: false,
+      link: false,
+      underline: false,
     }),
     CodeBlock.configure({
       HTMLAttributes: {

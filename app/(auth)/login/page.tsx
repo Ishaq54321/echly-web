@@ -42,6 +42,14 @@ function LoginPageContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const reason = searchParams.get("reason");
+  const reasonMessage =
+    reason === "workspace_access_revoked"
+      ? "You've been removed from your workspace. Please sign in again."
+      : reason === "no_workspaces"
+      ? "You're not currently a member of any workspace. Please sign in to continue."
+      : null;
+
   async function handlePostLogin(user: { getIdToken: () => Promise<string> }) {
     await createSessionCookie(user);
     const returnPath = getReturnPath(searchParams);
@@ -108,6 +116,16 @@ function LoginPageContent() {
             <p className="auth-sub">
               Pick up your sessions, tickets, and reviews — exactly where the team left off.
             </p>
+
+            {reasonMessage && (
+              <p
+                className="auth-error"
+                role="status"
+                style={{ marginTop: 8, marginBottom: 14 }}
+              >
+                {reasonMessage}
+              </p>
+            )}
 
             <button
               className="btn btn-google btn-block"

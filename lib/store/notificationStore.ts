@@ -34,6 +34,7 @@ const listeners = new Set<() => void>();
 let unreadUnsubscribe: (() => void) | null = null;
 let authUnsubscribe: (() => void) | null = null;
 let currentUserId: string | null = null;
+let currentWorkspaceId: string | null = null;
 let retainCount = 0;
 let inFlightFetchKey: string | null = null;
 
@@ -67,14 +68,22 @@ function tearDownUnreadListener() {
     unreadUnsubscribe = null;
   }
   currentUserId = null;
+  currentWorkspaceId = null;
 }
 
 /**
- * Real-time unread badge: Firestore onSnapshot of unread notifications for the current user.
- * Only the count is consumed here — full notification data is fetched via REST when the panel opens.
+ * Real-time unread badge: Firestore onSnapshot of unread notifications for the current
+ * user *in their active workspace*. Only the count is consumed here — full notification
+ * data is fetched via REST when the panel opens.
  */
-function startUnreadListener(userId: string) {
-  if (currentUserId === userId && unreadUnsubscribe) return;
+function startUnreadListener(userId: string, workspaceId: string | null) {
+  if (
+    currentUserId === userId &&
+    currentWorkspaceId === workspaceId &&
+    unreadUnsubscribe
+  ) {
+    return;
+  }
 
   if (unreadUnsubscribe) {
     unreadUnsubscribe();
@@ -82,26 +91,49 @@ function startUnreadListener(userId: string) {
   }
 
   currentUserId = userId;
+  currentWorkspaceId = workspaceId;
+
+  if (!workspaceId) {
+    // No active workspace — nothing to show, but track userId so a later
+    // setActiveWorkspaceForNotifications() call re-attaches the listener.
+    setSnapshot({ unreadCount: 0 });
+    return;
+  }
 
   const q = query(
     collection(db, "notifications"),
     where("userId", "==", userId),
+    where("workspaceId", "==", workspaceId),
     where("read", "==", false)
   );
 
   unreadUnsubscribe = onSnapshot(
     q,
     (snap) => {
-      if (currentUserId !== userId) return;
+      if (currentUserId !== userId || currentWorkspaceId !== workspaceId) return;
       setSnapshot({ unreadCount: snap.size });
     },
     (err) => {
-      if (currentUserId !== userId) return;
+      if (currentUserId !== userId || currentWorkspaceId !== workspaceId) return;
       setSnapshot({
         error: err instanceof Error ? err.message : String(err),
       });
     }
   );
+}
+
+/** Called by the workspace context whenever the active workspace changes. */
+export function setActiveWorkspaceForNotifications(
+  workspaceId: string | null
+): void {
+  const user = auth.currentUser;
+  if (!user) return;
+  if (retainCount === 0) {
+    // No listener requested yet — just remember the value for when retain happens.
+    currentWorkspaceId = workspaceId;
+    return;
+  }
+  startUnreadListener(user.uid, workspaceId);
 }
 
 function ensureAuthListener() {
@@ -112,7 +144,7 @@ function ensureAuthListener() {
       return;
     }
     if (retainCount === 0) return;
-    startUnreadListener(user.uid);
+    startUnreadListener(user.uid, currentWorkspaceId);
   });
 }
 
@@ -125,7 +157,7 @@ export function retainNotificationListener(): () => void {
   ensureAuthListener();
   const user = auth.currentUser;
   if (user) {
-    startUnreadListener(user.uid);
+    startUnreadListener(user.uid, currentWorkspaceId);
   }
 
   let released = false;

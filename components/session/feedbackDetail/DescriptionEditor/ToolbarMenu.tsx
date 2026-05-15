@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { PORTAL_DROPDOWN_Z_INDEX } from "@/lib/ui/zIndex";
+import { usePortalHost } from "./PortalHost";
 
 interface ToolbarMenuProps {
   trigger: ReactNode;
@@ -34,6 +34,7 @@ export function ToolbarMenu({
   const wrapRef = useRef<HTMLSpanElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const portalHost = usePortalHost();
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -83,24 +84,32 @@ export function ToolbarMenu({
       >
         {trigger}
       </span>
-      {open && pos && typeof document !== "undefined"
+      {open && pos && typeof document !== "undefined" && portalHost
         ? createPortal(
             <div
               ref={menuRef}
               role="menu"
-              className="fixed rounded-lg border border-[var(--border)] bg-[var(--surface-card)] shadow-lg p-1"
+              className="description-editor-portal fixed rounded-lg border border-[var(--border)] bg-[var(--surface-card)] p-1"
               style={{
-                zIndex: PORTAL_DROPDOWN_Z_INDEX,
+                zIndex: 2147483700,
                 top: pos.top,
                 ...(align === "end"
                   ? { right: document.documentElement.clientWidth - pos.left }
                   : { left: pos.left }),
                 minWidth,
+                boxShadow: "var(--shadow-panel)",
               }}
+              /* Inside the extension's shadow DOM, the document-level
+                 mousedown handler above sees `e.target` retargeted to the
+                 shadow host — so `menuRef.contains(target)` is false and
+                 the outside-click logic closes the menu before the swatch
+                 click can fire. Stopping mousedown here keeps the event
+                 from ever reaching that handler. */
+              onMouseDown={(e) => e.stopPropagation()}
             >
               {children(close)}
             </div>,
-            document.body,
+            portalHost,
           )
         : null}
     </>

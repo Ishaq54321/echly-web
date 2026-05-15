@@ -7,7 +7,7 @@ import type { ActionItemsSectionHandle } from "@/components/session/feedbackDeta
 import { SessionFeedbackHeader } from "@/components/session/FeedbackHeader";
 import { CanvasEmptyState } from "@/components/empty/CanvasEmptyState";
 import { NoTicketSelectedIllu } from "@/components/empty/canvasIllustrations";
-import type { Comment } from "@/lib/domain/comment";
+import type { Comment, CommentAttachment, CommentPosition } from "@/lib/domain/comment";
 import type { ShareSurfacePermissions } from "@/lib/access/resolveAccess";
 import type { Priority } from "@/lib/domain/feedback";
 
@@ -29,9 +29,32 @@ export interface ExecutionViewProps {
   resolveSubmitting?: boolean;
   impactScore?: number | null;
   comments?: Comment[];
+  loadingComments?: boolean;
   sendPinComment?: (position: { xPercent: number; yPercent: number }, message: string, mentionedUserIds?: string[]) => Promise<string | null>;
   participants?: { uid: string; displayName: string; email: string; avatarUrl?: string | null }[];
-  sendReply?: (threadId: string, message: string) => Promise<void>;
+  sendReply?: (
+    threadId: string,
+    message: string,
+    attachment?: CommentAttachment,
+    attachments?: CommentAttachment[],
+    mentionedUserIds?: string[]
+  ) => Promise<void>;
+  sendComment?: (
+    message: string,
+    attachment?: CommentAttachment,
+    attachments?: CommentAttachment[],
+    position?: CommentPosition,
+    mentionedUserIds?: string[]
+  ) => Promise<string>;
+  deleteComment?: (commentId: string) => Promise<void>;
+  onReactionsChanged?: (
+    commentId: string,
+    reactions: Record<string, { userIds: string[]; userNames: string[] }>
+  ) => void;
+  currentUserId?: string | null;
+  currentUserName?: string;
+  currentUserInitial?: string;
+  currentUserAvatarUrl?: string;
   activePinIdForPopover?: string | null;
   activeThreadId?: string | null;
   onPinClick?: (commentId: string) => void;
@@ -94,8 +117,16 @@ export function ExecutionView({
   resolveSubmitting = false,
   impactScore,
   comments = [],
+  loadingComments = false,
   sendPinComment,
-  sendReply: _sendReply,
+  sendReply,
+  sendComment,
+  deleteComment,
+  onReactionsChanged,
+  currentUserId = null,
+  currentUserName,
+  currentUserInitial,
+  currentUserAvatarUrl,
   activePinIdForPopover,
   activeThreadId,
   onPinClick,
@@ -168,7 +199,7 @@ export function ExecutionView({
       />
 
       <div
-        className="main-content flex-1 min-h-0 overflow-y-auto"
+        className="main-content flex-1 min-h-0 overflow-y-auto pr-4"
         data-comment-mode={
           !isPublicReadOnly && !isShareSurface && isCommentMode ? true : undefined
         }
@@ -217,6 +248,15 @@ export function ExecutionView({
               onCommentPlaced={onCommentPlaced}
               updatePinPosition={updatePinPosition}
               participants={participants}
+              loadingComments={loadingComments}
+              sendComment={isPublicReadOnly || isShareSurface ? undefined : sendComment}
+              sendReply={isPublicReadOnly || isShareSurface ? undefined : sendReply}
+              deleteComment={isPublicReadOnly || isShareSurface ? undefined : deleteComment}
+              onReactionsChanged={isPublicReadOnly || isShareSurface ? undefined : onReactionsChanged}
+              currentUserId={currentUserId}
+              currentUserName={currentUserName}
+              currentUserInitial={currentUserInitial}
+              currentUserAvatarUrl={currentUserAvatarUrl}
             />
           )}
         </div>

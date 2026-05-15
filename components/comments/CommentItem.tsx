@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { memo, useState, useEffect, useCallback, useRef } from "react";
+import { memo, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Pencil, Trash2, CircleCheck, SmilePlus } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -28,25 +28,70 @@ export interface CommentItemProps {
   /** Visual size variant */
   size?: "default" | "compact";
   className?: string;
-  /** Ticket title badge (root comments only) */
-  ticketTitle?: string;
-  onNavigateToTicket?: () => void;
   isThreadResolved?: boolean;
+}
+
+const MENTION_TOKEN_RE = /@\[([^\]]+)\]\(([^)]*)\)|@\S+/g;
+const MENTION_MARKER_RE = /@\[([^\]]+)\]\(([^)]*)\)/g;
+
+function flattenMentionsForEdit(message: string): { text: string; idByLabel: Map<string, string> } {
+  const idByLabel = new Map<string, string>();
+  const text = message.replace(MENTION_MARKER_RE, (_full, label: string, id: string) => {
+    if (label && id && !idByLabel.has(label)) idByLabel.set(label, id);
+    return `@${label}`;
+  });
+  return { text, idByLabel };
+}
+
+function restitchMentionsAfterEdit(text: string, idByLabel: Map<string, string>): string {
+  if (idByLabel.size === 0) return text;
+  const labels = [...idByLabel.keys()].sort((a, b) => b.length - a.length);
+  let out = "";
+  let i = 0;
+  while (i < text.length) {
+    if (text[i] === "@") {
+      let matched: string | null = null;
+      for (const label of labels) {
+        if (text.startsWith(label, i + 1)) {
+          matched = label;
+          break;
+        }
+      }
+      if (matched) {
+        out += `@[${matched}](${idByLabel.get(matched)})`;
+        i += matched.length + 1;
+        continue;
+      }
+    }
+    out += text[i];
+    i += 1;
+  }
+  return out;
 }
 
 function renderMessageWithMentions(message: string) {
   if (!message) return null;
-  const parts = message.split(/(@\S+)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith("@") && part.length > 1) {
-      return (
-        <span key={i} className="mention-chip">
-          {part}
-        </span>
-      );
+  const out: React.ReactNode[] = [];
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+  MENTION_TOKEN_RE.lastIndex = 0;
+  while ((match = MENTION_TOKEN_RE.exec(message)) !== null) {
+    if (match.index > cursor) {
+      out.push(message.slice(cursor, match.index));
     }
-    return part;
-  });
+    const label = match[1] ?? match[0].slice(1);
+    out.push(
+      <span key={`m-${key++}`} className="mention-chip">
+        {`@${label}`}
+      </span>
+    );
+    cursor = match.index + match[0].length;
+  }
+  if (cursor < message.length) {
+    out.push(message.slice(cursor));
+  }
+  return out;
 }
 
 function CommentItemBase({
@@ -60,12 +105,11 @@ function CommentItemBase({
   onResolveToggle,
   size = "default",
   className = "",
-  ticketTitle,
-  onNavigateToTicket,
   isThreadResolved,
 }: CommentItemProps) {
+  const editFlattened = useMemo(() => flattenMentionsForEdit(comment.message), [comment.message]);
   const [editing, setEditing] = useState(false);
-  const [editDraft, setEditDraft] = useState(comment.message);
+  const [editDraft, setEditDraft] = useState(editFlattened.text);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<{ url: string; fileName: string } | null>(null);
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
@@ -74,13 +118,13 @@ function CommentItemBase({
   const reactionButtonRef = useRef<HTMLButtonElement>(null);
   const reactionPickerRef = useRef<HTMLDivElement>(null);
 
-  const isPending = comment.id.startsWith("temp-") || comment.id.startsWith("temp_");
+  const isPending = (comment as { isOptimistic?: boolean }).isOptimistic === true;
   const canEditDelete = comment.userId === currentUserId && !isPending;
   const showActionBar = (canEditDelete && (onUpdate || onDelete)) || Boolean(additionalMenuItems) || Boolean(onResolveToggle) || Boolean(onReactionsChanged);
 
   useEffect(() => {
-    setEditDraft(comment.message);
-  }, [comment.message]);
+    setEditDraft(editFlattened.text);
+  }, [editFlattened]);
 
   useEffect(() => {
     if (editing && editRef.current) {
@@ -106,13 +150,14 @@ function CommentItemBase({
 
   const handleSaveEdit = useCallback(() => {
     const trimmed = editDraft.trim();
-    if (trimmed === comment.message || !onUpdate) {
+    const restitched = restitchMentionsAfterEdit(trimmed, editFlattened.idByLabel);
+    if (restitched === comment.message || !onUpdate) {
       setEditing(false);
       return;
     }
     setEditing(false);
-    void onUpdate(comment.id, { message: trimmed });
-  }, [comment.id, comment.message, editDraft, onUpdate]);
+    void onUpdate(comment.id, { message: restitched });
+  }, [comment.id, comment.message, editDraft, editFlattened, onUpdate]);
 
   const handleDelete = useCallback(() => {
     if (!onDelete) return;
@@ -170,7 +215,7 @@ function CommentItemBase({
       <div className="flex-1 min-w-0">
         {!editing && (
           <div className="flex items-center gap-2 min-w-0">
-            <div className={`flex items-center gap-2 min-w-0 ${!comment.threadId && ticketTitle ? 'group-hover/item:hidden' : ''}`}>
+            <div className="flex items-center gap-2 min-w-0">
               <span
                 className={`font-semibold text-discussion-title text-[14px] truncate`}
               >
@@ -180,15 +225,6 @@ function CommentItemBase({
                 {formatCommentDate(comment.createdAt)}
               </span>
             </div>
-            {!comment.threadId && ticketTitle && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onNavigateToTicket?.(); }}
-                className="hidden group-hover/item:flex items-center min-w-0 flex-1 text-[14px] font-semibold text-[var(--brand)] truncate text-left cursor-pointer"
-              >
-                <span className="truncate">{ticketTitle}</span>
-              </button>
-            )}
             {showActionBar && (
               <div className="flex items-center gap-1 ml-auto opacity-0 group-hover/item:opacity-100 transition-opacity flex-shrink-0">
                 {onReactionsChanged && (
@@ -252,14 +288,14 @@ function CommentItemBase({
 
         {editing ? (
           <div className="flex-1 min-w-0">
-            <div className="relative rounded-xl border border-[var(--border-strong)] bg-[var(--surface-input)] overflow-hidden focus-within:border-[var(--brand)] focus-within:ring-2 focus-within:ring-[var(--brand)]/20 transition">
+            <div className="relative rounded-xl border border-[var(--border-strong)] bg-[var(--surface-input)] overflow-hidden focus-within:border-[var(--border-strong)] transition-colors duration-150">
               <textarea
                 ref={editRef}
                 value={editDraft}
                 onChange={(e) => setEditDraft(e.target.value)}
                 onKeyDown={(e) => {
                   e.stopPropagation();
-                  if (e.key === "Escape") { setEditing(false); setEditDraft(comment.message); }
+                  if (e.key === "Escape") { setEditing(false); setEditDraft(editFlattened.text); }
                   if (e.key === "Enter" && !e.shiftKey && editDraft.trim()) { e.preventDefault(); handleSaveEdit(); }
                 }}
                 className="block w-full min-h-[60px] px-3 pt-2.5 pb-10 text-[14px] leading-relaxed text-[var(--text-body)] placeholder:text-[var(--text-tertiary)] bg-transparent border-none outline-none resize-none"
@@ -267,7 +303,7 @@ function CommentItemBase({
               <div className="absolute bottom-2 right-2 flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => { setEditing(false); setEditDraft(comment.message); }}
+                  onClick={() => { setEditing(false); setEditDraft(editFlattened.text); }}
                   className="text-[12px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-heading)] px-2 py-1 rounded-md transition-colors cursor-pointer"
                 >
                   Cancel
@@ -386,7 +422,7 @@ function CommentItemBase({
                     </span>
                   </div>
                   <p className="mt-1 text-sm text-[var(--text-body)] line-clamp-2 break-words">
-                    {comment.message}
+                    {comment.message.replace(/@\[([^\]]+)\]\([^)]*\)/g, "@$1")}
                   </p>
                 </div>
               </div>

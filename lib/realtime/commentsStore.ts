@@ -36,6 +36,8 @@ interface CommentsEntry {
   unsubscribe: (() => void) | null;
   retainCount: number;
   workspaceId: string | null;
+  sessionId: string;
+  feedbackId: string;
 }
 
 const initialState = (): CommentsState => ({
@@ -55,26 +57,54 @@ const EMPTY_COMMENTS_STATE: CommentsState = Object.freeze({
   version: 0,
 }) as CommentsState;
 
+/** Entries are keyed by `${sessionId}:${feedbackId}` so each ticket gets its own listener + state. */
 const entries = new Map<string, CommentsEntry>();
-const listenersBySession = new Map<string, Set<() => void>>();
+const listenersByKey = new Map<string, Set<() => void>>();
+/** sessionId -> set of entry keys, so session-wide consumers (e.g. accessRevoked watcher) can fan out emits. */
+const keysBySession = new Map<string, Set<string>>();
+const sessionListeners = new Map<string, Set<() => void>>();
 
-function getOrCreateEntry(sessionId: string): CommentsEntry {
-  let e = entries.get(sessionId);
+function entryKey(sessionId: string, feedbackId: string): string {
+  return `${sessionId}:${feedbackId}`;
+}
+
+function getOrCreateEntry(sessionId: string, feedbackId: string): CommentsEntry {
+  const key = entryKey(sessionId, feedbackId);
+  let e = entries.get(key);
   if (!e) {
-    e = { state: initialState(), unsubscribe: null, retainCount: 0, workspaceId: null };
-    entries.set(sessionId, e);
+    e = {
+      state: initialState(),
+      unsubscribe: null,
+      retainCount: 0,
+      workspaceId: null,
+      sessionId,
+      feedbackId,
+    };
+    entries.set(key, e);
+    let set = keysBySession.get(sessionId);
+    if (!set) {
+      set = new Set();
+      keysBySession.set(sessionId, set);
+    }
+    set.add(key);
   }
   return e;
 }
 
-function emitFor(sessionId: string) {
-  listenersBySession.get(sessionId)?.forEach((l) => l());
+function emitFor(sessionId: string, feedbackId: string) {
+  const key = entryKey(sessionId, feedbackId);
+  listenersByKey.get(key)?.forEach((l) => l());
+  sessionListeners.get(sessionId)?.forEach((l) => l());
 }
 
-function setState(sessionId: string, patch: Partial<CommentsState>) {
-  const e = getOrCreateEntry(sessionId);
+function setState(
+  sessionId: string,
+  feedbackId: string,
+  patch: Partial<CommentsState>
+) {
+  const e = getOrCreateEntry(sessionId, feedbackId);
   e.state = { ...e.state, ...patch, version: e.state.version + 1 };
-  emitFor(sessionId);
+  emitFor(sessionId, feedbackId);
 }
 
 function asTimestamp(value: unknown): Timestamp | null {
@@ -155,19 +185,21 @@ function mapCommentFromSnap(snap: QueryDocumentSnapshot<DocumentData>): Comment 
   };
 }
 
-function attachListener(sessionId: string, workspaceId: string) {
-  const e = getOrCreateEntry(sessionId);
+function attachListener(sessionId: string, feedbackId: string, workspaceId: string) {
+  const e = getOrCreateEntry(sessionId, feedbackId);
   if (e.unsubscribe) return;
   e.workspaceId = workspaceId;
 
   const q = query(
     collection(db, "comments"),
-    where("sessionId", "==", sessionId),
     where("workspaceId", "==", workspaceId),
-    orderBy("createdAt", "desc"),
+    where("sessionId", "==", sessionId),
+    where("feedbackId", "==", feedbackId),
+    orderBy("createdAt", "asc"),
     limit(200)
   );
 
+  const key = entryKey(sessionId, feedbackId);
   const unsub = onSnapshot(
     q,
     (snap) => {
@@ -182,15 +214,15 @@ function attachListener(sessionId: string, workspaceId: string) {
           if (diff !== 0) return diff;
           return a.id.localeCompare(b.id);
         });
-        setState(sessionId, { comments: list, loading: false, error: null });
-        recordListenerUpdate("comments", sessionId, {
+        setState(sessionId, feedbackId, { comments: list, loading: false, error: null });
+        recordListenerUpdate("comments", key, {
           count: list.length,
           fromCache: snap.metadata.fromCache,
         });
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
-        setState(sessionId, { error, loading: false });
-        recordListenerError("comments", sessionId, error, { workspaceId });
+        setState(sessionId, feedbackId, { error, loading: false });
+        recordListenerError("comments", key, error, { workspaceId });
       }
     },
     (err) => {
@@ -199,23 +231,24 @@ function attachListener(sessionId: string, workspaceId: string) {
       if (code !== undefined && (error as { code?: unknown }).code === undefined) {
         (error as { code?: unknown }).code = code;
       }
-      const wasLoaded = !getOrCreateEntry(sessionId).state.loading;
+      const wasLoaded = !getOrCreateEntry(sessionId, feedbackId).state.loading;
       const accessRevoked = code === "permission-denied" && wasLoaded;
-      setState(sessionId, { error, loading: false, accessRevoked });
-      recordListenerError("comments", sessionId, error, { workspaceId });
+      setState(sessionId, feedbackId, { error, loading: false, accessRevoked });
+      recordListenerError("comments", key, error, { workspaceId });
     }
   );
 
   e.unsubscribe = unsub;
-  recordListenerAttach("comments", sessionId, { workspaceId });
+  recordListenerAttach("comments", key, { workspaceId });
 }
 
-function detachListener(sessionId: string) {
-  const e = entries.get(sessionId);
+function detachListener(sessionId: string, feedbackId: string) {
+  const key = entryKey(sessionId, feedbackId);
+  const e = entries.get(key);
   if (!e?.unsubscribe) return;
   e.unsubscribe();
   e.unsubscribe = null;
-  recordListenerDetach("comments", sessionId);
+  recordListenerDetach("comments", key);
 }
 
 /**
@@ -223,13 +256,17 @@ function detachListener(sessionId: string) {
  * Consumers' effects re-run when isIdentityReady flips and call retain themselves.
  */
 function tearDownAllOnSignOut() {
-  for (const sid of Array.from(entries.keys())) {
-    detachListener(sid);
-    const e = entries.get(sid);
-    if (!e) continue;
+  for (const [key, e] of Array.from(entries.entries())) {
+    if (e.unsubscribe) {
+      e.unsubscribe();
+      e.unsubscribe = null;
+      recordListenerDetach("comments", key);
+    }
     e.retainCount = 0;
     e.state = { ...initialState(), version: e.state.version + 1 };
-    emitFor(sid);
+    aggregateCache.delete(e.sessionId);
+    listenersByKey.get(key)?.forEach((l) => l());
+    sessionListeners.get(e.sessionId)?.forEach((l) => l());
   }
 }
 
@@ -240,58 +277,148 @@ if (typeof window !== "undefined") {
 }
 
 /**
- * Increment retain count and ensure the `comments` query is listened to for this session.
- * Always call the returned function on unmount so other surfaces (if any) keep the listener alive.
+ * Increment retain count and ensure the per-ticket `comments` query is listened
+ * to. Always call the returned function on unmount.
  */
 export function retainCommentsListener(
   sessionId: string,
+  feedbackId: string,
   workspaceId: string
 ): () => void {
   const sid = typeof sessionId === "string" ? sessionId.trim() : "";
+  const fid = typeof feedbackId === "string" ? feedbackId.trim() : "";
   const wid = typeof workspaceId === "string" ? workspaceId.trim() : "";
-  if (!sid || !wid) return () => {};
+  if (!sid || !fid || !wid) return () => {};
 
-  const e = getOrCreateEntry(sid);
+  const e = getOrCreateEntry(sid, fid);
   e.retainCount += 1;
-  attachListener(sid, wid);
+  attachListener(sid, fid, wid);
 
   let released = false;
   return () => {
     if (released) return;
     released = true;
-    const cur = entries.get(sid);
+    const cur = entries.get(entryKey(sid, fid));
     if (!cur) return;
     cur.retainCount = Math.max(0, cur.retainCount - 1);
     if (cur.retainCount === 0) {
-      detachListener(sid);
+      detachListener(sid, fid);
     }
   };
 }
 
-export function getCommentsSnapshot(sessionId: string): CommentsState {
-  return entries.get(sessionId)?.state ?? EMPTY_COMMENTS_STATE;
+export function getCommentsSnapshot(
+  sessionId: string,
+  feedbackId: string
+): CommentsState {
+  return entries.get(entryKey(sessionId, feedbackId))?.state ?? EMPTY_COMMENTS_STATE;
 }
 
 export function subscribeToComments(
   sessionId: string,
+  feedbackId: string,
   listener: () => void
 ): () => void {
-  let set = listenersBySession.get(sessionId);
+  const key = entryKey(sessionId, feedbackId);
+  let set = listenersByKey.get(key);
   if (!set) {
     set = new Set();
-    listenersBySession.set(sessionId, set);
+    listenersByKey.set(key, set);
   }
   set.add(listener);
   return () => {
-    const s = listenersBySession.get(sessionId);
+    const s = listenersByKey.get(key);
     if (!s) return;
     s.delete(listener);
-    if (s.size === 0) listenersBySession.delete(sessionId);
+    if (s.size === 0) listenersByKey.delete(key);
   };
 }
 
-export function useCommentsStore(sessionId: string): CommentsState {
-  const subscribe = (l: () => void) => subscribeToComments(sessionId, l);
-  const get = () => getCommentsSnapshot(sessionId);
+/**
+ * Session-wide accessRevoked watcher. Used by SessionPageClient's revocation
+ * effect — it doesn't care about a specific ticket, it just needs to know if
+ * any comments listener for this session has been revoked.
+ *
+ * Result is cached per-session and only invalidated when the aggregate changes,
+ * so `useSyncExternalStore`'s identity check doesn't spin into an infinite loop.
+ */
+const aggregateCache = new Map<string, CommentsState>();
+
+function getSessionAggregateState(sessionId: string): CommentsState {
+  const keys = keysBySession.get(sessionId);
+  if (!keys || keys.size === 0) {
+    const cached = aggregateCache.get(sessionId);
+    if (cached === EMPTY_COMMENTS_STATE) return cached;
+    aggregateCache.set(sessionId, EMPTY_COMMENTS_STATE);
+    return EMPTY_COMMENTS_STATE;
+  }
+  let accessRevoked = false;
+  let error: Error | null = null;
+  let loading = true;
+  let version = 0;
+  for (const k of keys) {
+    const e = entries.get(k);
+    if (!e) continue;
+    if (e.state.accessRevoked) accessRevoked = true;
+    if (e.state.error && !error) error = e.state.error;
+    if (!e.state.loading) loading = false;
+    version += e.state.version;
+  }
+  const cached = aggregateCache.get(sessionId);
+  if (
+    cached &&
+    cached.accessRevoked === accessRevoked &&
+    cached.error === error &&
+    cached.loading === loading &&
+    cached.version === version
+  ) {
+    return cached;
+  }
+  const next: CommentsState = {
+    comments: EMPTY_COMMENTS_LIST as Comment[],
+    loading,
+    error,
+    accessRevoked,
+    version,
+  };
+  aggregateCache.set(sessionId, next);
+  return next;
+}
+
+/**
+ * Per-ticket store hook. Pass a falsy feedbackId to get the empty state (no listener attached).
+ */
+export function useCommentsStore(
+  sessionId: string,
+  feedbackId: string | null | undefined
+): CommentsState {
+  const fid = typeof feedbackId === "string" ? feedbackId : "";
+  const subscribe = (l: () => void) =>
+    fid ? subscribeToComments(sessionId, fid, l) : () => {};
+  const get = () =>
+    fid ? getCommentsSnapshot(sessionId, fid) : EMPTY_COMMENTS_STATE;
+  return useSyncExternalStore(subscribe, get, get);
+}
+
+/**
+ * Session-wide aggregate hook — emits when any per-ticket entry for this
+ * session changes. Used by SessionPageClient's accessRevoked watcher.
+ */
+export function useSessionCommentsAggregate(sessionId: string): CommentsState {
+  const subscribe = (l: () => void) => {
+    let set = sessionListeners.get(sessionId);
+    if (!set) {
+      set = new Set();
+      sessionListeners.set(sessionId, set);
+    }
+    set.add(l);
+    return () => {
+      const s = sessionListeners.get(sessionId);
+      if (!s) return;
+      s.delete(l);
+      if (s.size === 0) sessionListeners.delete(sessionId);
+    };
+  };
+  const get = () => getSessionAggregateState(sessionId);
   return useSyncExternalStore(subscribe, get, get);
 }

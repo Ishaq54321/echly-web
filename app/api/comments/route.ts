@@ -1,4 +1,5 @@
 import {
+  ADD_COMMENT_DUPLICATE_ID,
   ADD_COMMENT_FEEDBACK_MISSING,
   addCommentRepo,
   deleteCommentRepo,
@@ -24,6 +25,7 @@ export const POST = withAuthorization(
     let body: {
       sessionId?: string;
       feedbackId?: string;
+      clientId?: string;
       data?: AddCommentData;
     };
     try {
@@ -34,6 +36,7 @@ export const POST = withAuthorization(
 
     const sessionId = body.sessionId?.trim();
     const feedbackId = body.feedbackId?.trim();
+    const clientId = typeof body.clientId === "string" ? body.clientId.trim() : undefined;
     const data = body.data;
     if (!sessionId || !feedbackId || !data) {
       return badRequest("Missing required fields");
@@ -62,11 +65,19 @@ export const POST = withAuthorization(
       return apiError({ code: "INVALID_INPUT", message: "Session mismatch", status: 400 });
     }
     try {
-      const id = await addCommentRepo(user.uid, sessionId, feedbackId, data);
+      const id = await addCommentRepo(user.uid, sessionId, feedbackId, data, clientId);
       return apiSuccess({ id });
     } catch (err) {
       if (err instanceof Error && err.message === ADD_COMMENT_FEEDBACK_MISSING) {
         return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
+      }
+      if (
+        clientId &&
+        ((err instanceof Error && err.message === ADD_COMMENT_DUPLICATE_ID) ||
+          (err as { code?: number | string } | null)?.code === 6 ||
+          (err as { code?: number | string } | null)?.code === "already-exists")
+      ) {
+        return apiSuccess({ id: clientId });
       }
       console.error("POST /api/comments:", err);
       return apiError({ code: "INTERNAL_ERROR", message: "Server error", status: 500 });

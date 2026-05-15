@@ -713,6 +713,13 @@ export default function GlobalRail({ forceExpanded = false, expandedWidthClass =
                     refreshMemberships();
                     setCreateWorkspaceOpen(false);
                     setCreateWorkspaceName("");
+                    try {
+                      const { getAuth } = await import("firebase/auth");
+                      await getAuth().currentUser?.getIdToken(true);
+                    } catch {
+                      /* non-fatal */
+                    }
+                    window.location.href = "/dashboard";
                   } catch {
                     setCreateWorkspaceError("Failed to create workspace.");
                   } finally {

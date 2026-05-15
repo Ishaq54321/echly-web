@@ -2,11 +2,15 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
+import { Mic, Loader2, Check } from "lucide-react";
 import { buildDescriptionExtensions } from "./extensions";
 import { Toolbar } from "./Toolbar";
 import { LinkPopover } from "./LinkPopover";
 import { setFakeSelection } from "./FakeSelection";
 import { useAiImprove } from "./useAiImprove";
+import { ImproveDescriptionPill } from "./ImproveDescriptionPill";
+import { VoiceRecordingPopover, type VoiceStatus } from "./VoiceRecordingPopover";
+import { PortalHostProvider } from "./PortalHost";
 import { uploadAttachmentWithProgress } from "@/lib/uploadAttachment";
 import type { MentionParticipant } from "@/lib/tiptap/mentionSuggestion";
 
@@ -31,6 +35,36 @@ interface DescriptionEditorProps {
   onContentChange?: (markdown: string) => void;
   /** Called when the AI improve stream starts/stops. Use for guarding navigation. */
   onStreamingChange?: (isStreaming: boolean) => void;
+  /**
+   * Optional fetch wrapper for API calls (AI improve, transcription, etc.).
+   * Extension builds inject one that prepends the API base URL and attaches
+   * the user's bearer token. Same-origin dashboard usage leaves it undefined
+   * and falls back to global `fetch`.
+   */
+  fetchClient?: (url: string, init?: RequestInit) => Promise<Response>;
+  /**
+   * Hide the editor's internal Save/Cancel buttons. Useful when an outer
+   * container (e.g. the extension's TicketEditorOverlay) provides its own
+   * save/cancel UI and just needs `onContentChange` for live state sync.
+   */
+  hideInternalActions?: boolean;
+  /**
+   * Container element used as the destination for portalled UI (toolbar
+   * dropdowns, voice popover, transcript pill submenus). The dashboard
+   * leaves this undefined and portals fall back to `document.body`. The
+   * extension passes the shadow-root container so portals stay inside
+   * the shadow tree and inherit its styles + click-outside scope.
+   */
+  portalContainer?: HTMLElement | null;
+  /**
+   * Mount target affects where the AI Improve control renders:
+   *   - "dashboard" (default): inline split-button in the toolbar (white
+   *     surface + purple icon, top-right of the toolbar row).
+   *   - "extension": floating dark pill anchored to the bottom-left of
+   *     the description box (draggable, hover-to-expand).
+   * The Dictate pill is unaffected by this switch.
+   */
+  appearance?: "dashboard" | "extension";
 }
 
 interface MarkdownStorage {
@@ -122,6 +156,10 @@ export function DescriptionEditor({
   isEditing = true,
   onContentChange,
   onStreamingChange,
+  fetchClient,
+  hideInternalActions = false,
+  portalContainer,
+  appearance = "dashboard",
 }: DescriptionEditorProps) {
   const onContentChangeRef = useRef(onContentChange);
   useLayoutEffect(() => {
@@ -163,6 +201,9 @@ export function DescriptionEditor({
   });
 
   const [uploadingImages, setUploadingImages] = useState<Array<{ id: string }>>([]);
+  const [isVoicePopoverOpen, setIsVoicePopoverOpen] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>(null);
+  const dictatePillRef = useRef<HTMLButtonElement>(null);
 
   const handleImageUpload = useCallback(async (file: File) => {
     const ed = editorRef.current;
@@ -243,7 +284,12 @@ export function DescriptionEditor({
     extensions,
     content: value || "",
     autofocus: autoFocus ? "end" : false,
-    onUpdate: ({ editor: ed }) => {
+    onUpdate: ({ editor: ed, transaction }) => {
+      // Phase 13.8: Suppress onUpdate during finalize restore to prevent
+      // value-sync cascade that would wipe undo history
+      if (transaction.getMeta("finalize-phase") === "restore") {
+        return;
+      }
       onContentChangeRef.current?.(getMarkdown(ed as Editor));
     },
     editorProps: {
@@ -309,14 +355,7 @@ export function DescriptionEditor({
     editorRef.current = editor;
   }, [editor]);
 
-  // PHASE_13_6_DIAG: expose editor for browser console debugging
-  useEffect(() => {
-    if (typeof window !== "undefined" && editor) {
-      (window as unknown as { __editor: Editor }).__editor = editor;
-    }
-  }, [editor]);
-
-  const { isStreaming, performImprove } = useAiImprove(editor);
+  const { isStreaming, performImprove } = useAiImprove(editor, { fetchClient });
 
   useEffect(() => {
     onStreamingChange?.(isStreaming);
@@ -335,28 +374,10 @@ export function DescriptionEditor({
   // Guarded against AI streaming so we don't clobber an in-flight improvement.
   useEffect(() => {
     if (!editor) return;
-    // PHASE_13_6_DIAG
-    console.log("[AI-DIAG]", "VALUE-SYNC-EFFECT-FIRED", {
-      isStreaming,
-      isEditing,
-      valueLength: (value ?? "").length,
-      currentMarkdownLength: editor ? getMarkdown(editor).length : 0,
-      willSkipBecauseStreaming: isStreaming,
-      willSkipBecauseEditing: isEditing,
-    });
     if (isStreaming) return;
     if (isEditing) return;
     const current = getMarkdown(editor).trim();
-    if (current === (value ?? "").trim()) {
-      // PHASE_13_6_DIAG
-      console.log("[AI-DIAG]", "VALUE-SYNC-NO-CHANGE-NEEDED");
-      return;
-    }
-    // PHASE_13_6_DIAG: setContent is about to fire — this CLEARS HISTORY
-    console.log("[AI-DIAG]", "VALUE-SYNC-CALLING-SETCONTENT", {
-      currentPreview: current.slice(0, 100),
-      newValuePreview: (value ?? "").slice(0, 100),
-    });
+    if (current === (value ?? "").trim()) return;
     editor.commands.setContent(value || "", { emitUpdate: false });
   }, [editor, value, isStreaming, isEditing]);
 
@@ -560,47 +581,152 @@ export function DescriptionEditor({
 
   if (disabled) {
     return (
-      <div className="description-editor-shell description-editor-shell--readonly">
-        <div className="px-[18px] py-4">
-          <EditorContent editor={editor} />
+      <PortalHostProvider container={portalContainer ?? null}>
+        <div className="description-editor-shell description-editor-shell--readonly">
+          <div className="px-[18px] py-4">
+            <EditorContent editor={editor} />
+          </div>
         </div>
-      </div>
+      </PortalHostProvider>
     );
   }
 
   return (
+    <PortalHostProvider container={portalContainer ?? null}>
     <div
       className="description-editor-shell"
       ref={editorContainerRef}
+      style={{ position: "relative" }}
     >
       <Toolbar
         editor={editor}
         onLink={(anchor) => openLinkPopover(anchor)}
         onImageUpload={(file) => void handleImageUpload(file)}
-        onAiAction={performImprove}
-        aiIsImproving={isStreaming}
+        onAiAction={
+          appearance === "dashboard" ? performImprove : undefined
+        }
+        aiIsImproving={appearance === "dashboard" ? isStreaming : undefined}
       />
-      <div
-        className="description-editor-content-wrapper px-[18px] py-4 relative"
-      >
+      <div className="description-editor-content-wrapper px-[18px] pt-4 pb-16">
         <EditorContent editor={editor} />
       </div>
+
+      {isVoicePopoverOpen ? (
+        <VoiceRecordingPopover
+          anchorRef={dictatePillRef}
+          editor={editor}
+          onClose={() => {
+            setIsVoicePopoverOpen(false);
+            setVoiceStatus(null);
+          }}
+          onStatusChange={setVoiceStatus}
+          fetchClient={fetchClient}
+        />
+      ) : null}
+      {/* Improve description pill — absolute-positioned inside the shell so it
+          can be dragged anywhere within the description box. Only rendered
+          in extension appearance; dashboard mode uses the inline toolbar
+          split-button instead. */}
+      {appearance === "extension" ? (
+        <ImproveDescriptionPill
+          onImprove={performImprove}
+          isImproving={isStreaming}
+          containerRef={editorContainerRef}
+          dictateRef={dictatePillRef}
+        />
+      ) : null}
       <div className="description-editor-actions flex items-center gap-2 px-[18px] pb-3">
-        <button
-          type="button"
-          onClick={handleCancel}
-          className="inline-flex h-[32px] items-center px-3.5 rounded-md border border-[var(--border)] bg-[var(--surface-card)] text-[var(--text-heading)] text-[13px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] cursor-pointer transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={() => void handleSave()}
-          disabled={isSaving || uploadingImages.length > 0 || isStreaming}
-          className="inline-flex h-[32px] items-center px-3.5 rounded-md bg-[var(--text-heading)] text-white text-[13px] font-medium hover:opacity-85 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
-        >
-          {uploadingImages.length > 0 ? "Uploading..." : isSaving ? "Saving..." : "Save"}
-        </button>
+        {!hideInternalActions ? (
+          <>
+            <button
+              type="button"
+              onClick={handleCancel}
+              className="inline-flex h-[32px] items-center px-3.5 rounded-md border border-[var(--border)] bg-[var(--surface-card)] text-[var(--text-heading)] text-[13px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] cursor-pointer transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={isSaving || uploadingImages.length > 0 || isStreaming}
+              className="inline-flex h-[32px] items-center px-3.5 rounded-md bg-[var(--text-heading)] text-white text-[13px] font-medium hover:opacity-85 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+            >
+              {uploadingImages.length > 0 ? "Uploading..." : isSaving ? "Saving..." : "Save"}
+            </button>
+          </>
+        ) : null}
+        {/* Dictate pill — bottom-RIGHT (secondary, opposite corner). The
+            same pill renders the transcribing/done state inline once the
+            recording popover dismisses itself, so the lifecycle stays in
+            the corner instead of floating above the editor. */}
+        <div className="ml-auto">
+          <button
+            type="button"
+            ref={dictatePillRef}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              if (isStreaming || isVoicePopoverOpen) return;
+              setIsVoicePopoverOpen(true);
+            }}
+            disabled={
+              isStreaming ||
+              voiceStatus === "transcribing" ||
+              voiceStatus === "done"
+            }
+            aria-hidden={voiceStatus === "recording"}
+            aria-label={
+              voiceStatus === "transcribing"
+                ? "Transcribing"
+                : voiceStatus === "done"
+                ? "Transcription complete"
+                : "Dictate"
+            }
+            className="group flex items-center
+                       h-[38px] rounded-full bg-[var(--surface-card)]
+                       border border-[var(--border)] cursor-pointer
+                       overflow-hidden transition-all duration-300
+                       ease-[cubic-bezier(0.16,1,0.3,1)]
+                       disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
+            style={{
+              padding: "0 5px",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+              opacity: voiceStatus === "recording" ? 0 : undefined,
+              pointerEvents:
+                voiceStatus === "recording" ? "none" : undefined,
+            }}
+          >
+            <div className="w-[27px] h-[27px] rounded-full bg-[var(--brand)]
+                            flex items-center justify-center shrink-0">
+              {voiceStatus === "transcribing" ? (
+                <Loader2 size={15} className="text-white animate-spin" strokeWidth={2.5} />
+              ) : voiceStatus === "done" ? (
+                <Check size={15} className="text-white" strokeWidth={3} />
+              ) : (
+                <Mic size={15} className="text-white" strokeWidth={2.5} />
+              )}
+            </div>
+            {voiceStatus === "transcribing" || voiceStatus === "done" ? (
+              <span
+                className="text-[14px] font-medium text-[var(--brand)]
+                           whitespace-nowrap overflow-hidden
+                           ml-1.5 mr-1.5"
+              >
+                {voiceStatus === "transcribing" ? "Transcribing..." : "Done"}
+              </span>
+            ) : (
+              <span
+                className="text-[14px] font-medium text-[var(--brand)]
+                           whitespace-nowrap overflow-hidden transition-all
+                           duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
+                           max-w-0 opacity-0 group-hover:max-w-[99px]
+                           group-hover:opacity-100 group-hover:ml-1.5
+                           group-hover:mr-1.5"
+              >
+                Dictate
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       <LinkPopover
@@ -613,6 +739,8 @@ export function DescriptionEditor({
         onRemove={linkPopoverState.initialUrl ? handleLinkRemove : undefined}
         onCancel={handleLinkCancel}
       />
+
     </div>
+    </PortalHostProvider>
   );
 }

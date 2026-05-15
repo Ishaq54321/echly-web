@@ -45,8 +45,7 @@ export function WorkspaceCard({
   const isOptimistic = Boolean(session.isOptimistic);
   const total = (counts.open ?? 0) + (counts.resolved ?? 0);
   const resolvedForPie = counts.resolved ?? 0;
-  let progress = total === 0 ? 0 : (resolvedForPie / total) * 100;
-  if (progress >= 100) progress = 99.999;
+  const progress = total === 0 ? 0 : (resolvedForPie / total) * 100;
   const updatedAtDate = sessionUpdatedToDate(session.updatedAt);
   const updatedAtLabel =
     updatedAtDate && !Number.isNaN(updatedAtDate.getTime())

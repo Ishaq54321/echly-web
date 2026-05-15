@@ -1,8 +1,20 @@
 import "server-only";
 import { getUserWorkspaceIdRepo, invalidateUserWorkspaceIdCache } from "@/lib/repositories/usersRepository.server";
 import { getWorkspace, invalidateWorkspaceDocCache } from "@/lib/repositories/workspacesRepository.server";
+import { getWorkspaceMemberRepo } from "@/lib/repositories/workspaceMembersRepository.server";
 import { assertWorkspaceActive } from "@/lib/server/assertWorkspaceActive";
 import { AuthorizationError } from "@/lib/server/auth/authorize";
+
+/**
+ * Thrown when the user's active workspace exists but the user is no longer
+ * a member of it (removed by admin, workspace deleted, etc.). The dashboard
+ * fetch wrapper intercepts this and signs the user out.
+ */
+export class WorkspaceAccessRevokedError extends AuthorizationError {
+  constructor() {
+    super("WORKSPACE_ACCESS_REVOKED", 403, "FORBIDDEN");
+  }
+}
 
 type RequestWithWorkspace = Request & { __workspaceId?: string };
 
@@ -37,6 +49,8 @@ export async function resolveWorkspaceForUserLight(
 
 /**
  * Resolve workspace and enforce suspension checks for server routes.
+ * Also verifies that `uid` is still a member of the active workspace. If not,
+ * throws WorkspaceAccessRevokedError so the dashboard signs the user out.
  */
 export async function resolveWorkspaceForUser(
   uid: string,
@@ -44,7 +58,15 @@ export async function resolveWorkspaceForUser(
 ): Promise<{ workspaceId: string }> {
   const { workspaceId } = await resolveWorkspaceForUserLight(uid, req);
   const workspace = await getWorkspace(workspaceId);
+  if (!workspace) {
+    // Active workspace doc is gone — treat as revoked access.
+    throw new WorkspaceAccessRevokedError();
+  }
   assertWorkspaceActive(workspace);
+  const member = await getWorkspaceMemberRepo(workspaceId, uid);
+  if (!member) {
+    throw new WorkspaceAccessRevokedError();
+  }
   return { workspaceId };
 }
 

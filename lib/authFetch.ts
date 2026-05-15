@@ -145,14 +145,35 @@ export async function authFetch(
       res
         .clone()
         .json()
-        .then((data: { error?: { code?: string; message?: string } }) => {
-          if (
-            data?.error?.code === "FORBIDDEN" &&
-            data?.error?.message === "Workspace suspended"
-          ) {
-            window.location.href = "/workspace-suspended";
+        .then(
+          async (
+            data: {
+              error?: { code?: string; message?: string };
+              data?: { reason?: string } | null;
+            }
+          ) => {
+            if (
+              data?.error?.code === "FORBIDDEN" &&
+              data?.error?.message === "Workspace suspended"
+            ) {
+              window.location.href = "/workspace-suspended";
+              return;
+            }
+            if (
+              data?.error?.code === "FORBIDDEN" &&
+              (data?.data?.reason === "WORKSPACE_ACCESS_REVOKED" ||
+                data?.error?.message === "WORKSPACE_ACCESS_REVOKED")
+            ) {
+              try {
+                const { getAuth, signOut } = await import("firebase/auth");
+                await signOut(getAuth());
+              } catch {
+                /* sign-out can fail silently; proceed with redirect */
+              }
+              window.location.href = "/login?reason=workspace_access_revoked";
+            }
           }
-        })
+        )
         .catch(() => {});
     }
     return res;

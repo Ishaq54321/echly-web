@@ -631,6 +631,17 @@ export default function InviteAcceptPage() {
       await createSessionCookie(cred.user);
       const idToken = await cred.user.getIdToken();
 
+      // Trigger the verification email immediately — without this, the user
+      // lands on /check-email (via the middleware gate) but no email has been
+      // sent yet, so they only receive one after clicking "Resend".
+      fetch("/api/auth/send-verification", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+      }).catch(() => {
+        /* non-fatal — user can resend from check-email */
+      });
+
       setState((s) => ({
         ...s,
         phase: "accepting",

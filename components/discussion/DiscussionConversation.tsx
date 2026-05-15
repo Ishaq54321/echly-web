@@ -19,6 +19,7 @@ import { handlePermissionError } from "@/lib/client/permissionError";
 import {
   addComment,
   createOptimisticComment,
+  isOptimisticLocalComment,
   mergeRealtimeCommentsWithOptimistic,
   updateComment,
   deleteComment,
@@ -44,6 +45,7 @@ import { GlobalNotificationButton } from "@/components/layout/GlobalNotification
 import { ProfileDropdown } from "@/components/layout/ProfileDropdown";
 import { useBillingStore } from "@/lib/store/billingStore";
 import { retainNotificationListener } from "@/lib/store/notificationStore";
+import { retainSessionListener } from "@/lib/realtime/sessionStore";
 import { ActionItemsSection } from "@/components/session/feedbackDetail/ActionItemsSection";
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
@@ -160,6 +162,7 @@ export function DiscussionConversation({
   const { showToast } = useToast();
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [sessionName, setSessionName] = useState<string>("");
+  const [sessionWorkspaceId, setSessionWorkspaceId] = useState<string>("");
   const [access, setAccess] = useState<SessionAccess | null>(null);
   const [comments, setComments] = useState<LocalComment[]>([]);
   const [commentsInitialized, setCommentsInitialized] = useState(false);
@@ -222,6 +225,7 @@ export function DiscussionConversation({
     if (!feedbackId) {
       setTicket(null);
       setSessionName("");
+      setSessionWorkspaceId("");
       setAccess(null);
       setLoading(false);
       return;
@@ -244,6 +248,7 @@ export function DiscussionConversation({
         isResolved: initialTicket.isResolved,
       });
       setSessionName("");
+      setSessionWorkspaceId("");
       setAccess(null);
       setLoading(false);
 
@@ -261,10 +266,12 @@ export function DiscussionConversation({
           const accessRoot = sessionRaw as { access?: SessionAccess };
           setAccess(accessRoot.access ?? null);
           const sessionPayload = requireApiSuccessData<{
-            session: { title?: string };
+            session: { title?: string; workspaceId?: string | null };
           }>(sessionRaw);
           const title = sessionPayload.session.title;
           if (typeof title === "string" && title.trim()) setSessionName(title);
+          const wid = sessionPayload.session.workspaceId;
+          if (typeof wid === "string" && wid.trim()) setSessionWorkspaceId(wid.trim());
         } catch (err) {
           if (err instanceof Error && err.name === "AbortError") return;
           console.error("[DiscussionConversation] session fetch error:", err);
@@ -276,6 +283,7 @@ export function DiscussionConversation({
     // Fallback: thread isn't in the listener window (or no seed provided).
     setTicket(null);
     setSessionName("");
+    setSessionWorkspaceId("");
     setAccess(null);
     if (!authUid) {
       setLoading(false);
@@ -306,12 +314,15 @@ export function DiscussionConversation({
           const accessRoot = sessionRaw as { access?: SessionAccess };
           setAccess(accessRoot.access ?? null);
           const sessionPayload = requireApiSuccessData<{
-            session: { title?: string };
+            session: { title?: string; workspaceId?: string | null };
           }>(sessionRaw);
           const title = sessionPayload.session.title;
           if (typeof title === "string" && title.trim()) setSessionName(title);
+          const wid = sessionPayload.session.workspaceId;
+          if (typeof wid === "string" && wid.trim()) setSessionWorkspaceId(wid.trim());
         } else {
           setSessionName("");
+          setSessionWorkspaceId("");
           setAccess(null);
         }
       } catch (err) {
@@ -356,6 +367,17 @@ export function DiscussionConversation({
       cancelled = true;
     };
   }, [ticket?.sessionId]);
+
+  // Realtime session listener — populates sessionStore so the comments hook
+  // can attach its own Firestore listener. Without this, useCommentsRepoSubscription
+  // falls back to REST mode (one fetch, no auto-refetch), and optimistic comments
+  // never get replaced with server-confirmed versions on this surface.
+  useEffect(() => {
+    const sid = ticket?.sessionId?.trim();
+    if (!sid || !hasDirectSessionGrant || !sessionWorkspaceId) return;
+    const release = retainSessionListener(sid, sessionWorkspaceId);
+    return () => release();
+  }, [ticket?.sessionId, hasDirectSessionGrant, sessionWorkspaceId]);
 
   useEffect(() => {
     if (!feedbackId || !ticket?.sessionId || !commentsPollEnabled) {
@@ -445,7 +467,7 @@ export function DiscussionConversation({
       void (async () => {
         setSending(true);
         try {
-          await addComment(sid, feedbackId, {
+          await addComment(sid, feedbackId, optimisticComment.id, {
             userId: authUid,
             userName: displayName || "User",
             userAvatar: authPhotoUrl || "",
@@ -453,7 +475,6 @@ export function DiscussionConversation({
             type: "general",
             attachment,
           });
-          void refetchComments();
         } catch (err) {
           console.error("[DiscussionConversation] send attachment:", err);
           setComments((prev) =>
@@ -506,7 +527,7 @@ export function DiscussionConversation({
       onCommentAdded?.();
       void (async () => {
         try {
-          await addComment(sid, feedbackId, {
+          await addComment(sid, feedbackId, optimisticComment.id, {
             userId: authUid,
             userName: displayName || "User",
             userAvatar: authPhotoUrl || "",
@@ -515,7 +536,6 @@ export function DiscussionConversation({
             attachments: atts.length > 0 ? atts : undefined,
             mentionedUserIds: mentionedUserIds.length > 0 ? mentionedUserIds : undefined,
           });
-          void refetchComments();
         } catch (err) {
           console.error("[DiscussionConversation] send comment:", err);
           setComments((prev) =>
@@ -540,17 +560,17 @@ export function DiscussionConversation({
 
   const handleReactionsChanged = useCallback(
     (commentId: string, reactions: Record<string, { userIds: string[]; userNames: string[] }>) => {
-      if (commentId.startsWith("temp-") || commentId.startsWith("temp_")) return;
-      setComments((prev) =>
-        prev.map((c) => (c.id === commentId ? { ...c, reactions } : c))
-      );
+      setComments((prev) => {
+        const target = prev.find((c) => c.id === commentId);
+        if (!target || isOptimisticLocalComment(target)) return prev;
+        return prev.map((c) => (c.id === commentId ? { ...c, reactions } : c));
+      });
     },
     []
   );
 
   const handleUpdateComment = useCallback(
     async (commentId: string, data: PendingCommentPatch) => {
-      if (commentId.startsWith("temp-") || commentId.startsWith("temp_")) return;
       const trimmedMessage =
         typeof data.message === "string" ? data.message.trim() : undefined;
       const patch: PendingCommentPatch = {
@@ -565,7 +585,7 @@ export function DiscussionConversation({
 
       setComments((prev) => {
         const target = prev.find((c) => c.id === commentId);
-        if (!target) return prev;
+        if (!target || isOptimisticLocalComment(target)) return prev;
         found = true;
         if (trimmedMessage !== undefined) previousMessage = target.message;
         if (data.resolved !== undefined) previousResolved = Boolean(target.resolved);
@@ -603,10 +623,7 @@ export function DiscussionConversation({
 
   const handleDeleteComment = useCallback(
     async (commentId: string) => {
-      if (commentId.startsWith("temp-") || commentId.startsWith("temp_")) {
-        setComments((prev) => prev.filter((c) => c.id !== commentId));
-        return;
-      }
+      let wasOptimistic = false;
       pendingDeletedCommentIdsRef.current.add(commentId);
       setComments((prev) => {
         const idx = prev.findIndex((c) => c.id === commentId);
@@ -614,12 +631,18 @@ export function DiscussionConversation({
           pendingDeletedCommentIdsRef.current.delete(commentId);
           return prev;
         }
+        if (isOptimisticLocalComment(prev[idx])) {
+          wasOptimistic = true;
+          pendingDeletedCommentIdsRef.current.delete(commentId);
+          return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
+        }
         deleteRevertSnapshotRef.current.set(commentId, {
           comment: prev[idx],
           index: idx,
         });
         return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
       });
+      if (wasOptimistic) return;
       try {
         await deleteComment(commentId);
         deleteRevertSnapshotRef.current.delete(commentId);
@@ -670,7 +693,7 @@ export function DiscussionConversation({
       onCommentAdded?.();
       void (async () => {
         try {
-          await addComment(sid, feedbackId, {
+          await addComment(sid, feedbackId, optimisticComment.id, {
             userId: authUid,
             userName: displayName || "User",
             userAvatar: authPhotoUrl || "",
@@ -680,7 +703,6 @@ export function DiscussionConversation({
             attachments: atts.length > 0 ? atts : undefined,
             mentionedUserIds: mentionedUserIds.length > 0 ? mentionedUserIds : undefined,
           });
-          void refetchComments();
         } catch (err) {
           console.error("[DiscussionConversation] thread reply failed", err);
           setComments((prev) => prev.filter((c) => c.id !== optimisticComment.id));
@@ -899,7 +921,7 @@ export function DiscussionConversation({
 
           {/* Reply composer (TiptapCommentEditor with mention/emoji/attach) */}
           <div className="px-4 py-3">
-            <div className="rounded-[var(--radius-md)] bg-[var(--surface-card)] border border-[var(--border)] overflow-hidden focus-within:border-[var(--brand)] transition-all">
+            <div className="rounded-[var(--radius-md)] bg-[var(--surface-card)] border border-[var(--border)] overflow-hidden focus-within:border-[var(--border-strong)] transition-colors duration-150">
               <div className="px-4 pt-3">
                 <TiptapCommentEditor
                   placeholder="Leave a comment..."
@@ -1180,9 +1202,9 @@ export function DiscussionConversation({
                         currentUserName={displayName ?? undefined}
                         onUpdate={handleUpdateComment}
                         onDelete={handleDeleteComment}
-                        onReactionsChanged={root.id.startsWith("temp-") || root.id.startsWith("temp_") ? undefined : handleReactionsChanged}
+                        onReactionsChanged={isOptimisticLocalComment(root) ? undefined : handleReactionsChanged}
                         onResolveToggle={
-                          canResolve && !root.id.startsWith("temp-") && !root.id.startsWith("temp_")
+                          canResolve && !isOptimisticLocalComment(root)
                             ? () => void handleUpdateComment(root.id, { resolved: !root.resolved })
                             : undefined
                         }
@@ -1197,9 +1219,9 @@ export function DiscussionConversation({
                                 currentUserName={displayName ?? undefined}
                                 onUpdate={handleUpdateComment}
                                 onDelete={handleDeleteComment}
-                                onReactionsChanged={r.id.startsWith("temp-") || r.id.startsWith("temp_") ? undefined : handleReactionsChanged}
+                                onReactionsChanged={isOptimisticLocalComment(r) ? undefined : handleReactionsChanged}
                                 onResolveToggle={
-                                  canResolve && !r.id.startsWith("temp-") && !r.id.startsWith("temp_")
+                                  canResolve && !isOptimisticLocalComment(r)
                                     ? () => void handleUpdateComment(r.id, { resolved: !r.resolved })
                                     : undefined
                                 }
@@ -1373,7 +1395,7 @@ function DiscussionInlineReplyComposer({
   );
 
   return (
-    <div className="rounded-[var(--radius-md)] bg-[var(--surface-card)] border border-[var(--border)] overflow-hidden focus-within:border-[var(--brand)] transition-all">
+    <div className="rounded-[var(--radius-md)] bg-[var(--surface-card)] border border-[var(--border)] overflow-hidden focus-within:border-[var(--border-strong)] transition-colors duration-150">
       <div className="flex items-start gap-3 px-3 pt-3">
         <div className="w-[24px] h-[24px] rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold text-[12px] flex items-center justify-center shrink-0 overflow-hidden mt-0.5">
           {currentUserAvatarUrl && !avatarError ? (

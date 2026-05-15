@@ -264,7 +264,7 @@ export function DiscussionThreadList({
             <span className="ml-1.5 text-[var(--text-tertiary)] font-normal">· {totalCount}</span>
           </h2>
         </div>
-        <div className="h-8 bg-white border border-[var(--border)] rounded-full flex items-center px-3 gap-2 transition-all focus-within:border-[var(--brand)]">
+        <div className="h-8 bg-white border border-[var(--border)] rounded-full flex items-center px-3 gap-2 transition-all focus-within:border-[var(--border-strong)]">
           <Search className="w-3.5 h-3.5 text-[var(--text-tertiary)] shrink-0" strokeWidth={2} />
           <input
             type="search"

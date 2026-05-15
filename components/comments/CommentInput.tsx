@@ -25,10 +25,10 @@ export default function CommentInput({ onSend }: Props) {
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          className="focus-ring-brand flex-1 w-full rounded-3xl bg-[var(--surface-2)] border border-transparent px-5 py-3.5 text-sm outline-none
+          className="flex-1 w-full rounded-3xl bg-[var(--surface-2)] border border-transparent px-5 py-3.5 text-sm outline-none
             placeholder:text-[var(--text-muted)]
-            focus:ring-1 focus:ring-brand-accent focus:border-brand-accent
-            transition-all duration-150"
+            focus:border-[var(--border-strong)]
+            transition-colors duration-150"
         />
         <button
           type="button"

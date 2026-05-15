@@ -15,12 +15,11 @@ export default function ProgressPie({
 }: ProgressPieProps) {
   const radius = size / 2;
   const normalizedValue = Math.max(0, Math.min(100, value));
-  const brandBlue = "#5A49BF"; // blue-500
+  const brandBlue = "#5A49BF";
+  const isComplete = normalizedValue >= 100;
 
-  // Convert percentage to angle
   const angle = (normalizedValue / 100) * 360;
 
-  // Convert polar to cartesian
   const polarToCartesian = (
     cx: number,
     cy: number,
@@ -34,7 +33,6 @@ export default function ProgressPie({
     };
   };
 
-  // Describe arc path
   const describeArc = (
     x: number,
     y: number,
@@ -66,11 +64,20 @@ export default function ProgressPie({
     ].join(" ");
   };
 
-  return (
-    <div style={{ width: size, height: size }}>
-      <svg width={size} height={size}>
+  const wedgeRadius = Math.max(0, radius - strokeWidth - 2);
 
-        {/* OUTER STROKE */}
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        position: "relative",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <svg width={size} height={size} style={{ position: "absolute", inset: 0 }}>
         <circle
           cx={radius}
           cy={radius}
@@ -80,16 +87,39 @@ export default function ProgressPie({
           fill="none"
           opacity={0.2}
         />
-
-        {/* INNER PIE FILL */}
-        {normalizedValue > 0 && (
-          <path
-            d={describeArc(radius, radius, radius - strokeWidth, 0, angle)}
-            fill={brandBlue}
-          />
+        {isComplete ? (
+          <circle cx={radius} cy={radius} r={wedgeRadius} fill={brandBlue} />
+        ) : (
+          normalizedValue > 0 &&
+          wedgeRadius > 0 && (
+            <path
+              d={describeArc(radius, radius, wedgeRadius, 0, angle)}
+              fill={brandBlue}
+            />
+          )
         )}
-
       </svg>
+      {isComplete && (
+        <>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="white"
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{
+              width: wedgeRadius * 0.9,
+              height: wedgeRadius * 0.9,
+              position: "relative",
+              animation: "progressPieCheckFade 200ms ease-out both",
+            }}
+          >
+            <polyline points="20 7 10 17 5 12" />
+          </svg>
+          <style>{`@keyframes progressPieCheckFade { from { opacity: 0; } to { opacity: 1; } }`}</style>
+        </>
+      )}
     </div>
   );
 }
