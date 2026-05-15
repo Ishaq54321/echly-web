@@ -346,6 +346,231 @@ button[aria-disabled="true"],
   opacity: 0;
 }
 
+/* ── Phase 26.1: Per-ticket activity timeline panel ──
+   Colors map to styles/tokens.css. The reference mockup used
+   hardcoded hex; every value below is the corresponding token. */
+.ticket-activity-panel {
+  background: var(--surface);
+  width: 360px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-sans);
+}
+
+.ticket-activity-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 0.5px solid var(--hair);
+  flex-shrink: 0;
+}
+
+.ticket-activity-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-heading);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.ticket-activity-close {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition: background 120ms ease, color 120ms ease;
+}
+.ticket-activity-close:hover {
+  background: var(--surface-hover);
+  color: var(--text-heading);
+}
+
+.ticket-activity-timeline {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.ticket-activity-day-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 14px 20px 8px;
+  margin: 0;
+}
+
+.ticket-activity-row {
+  display: flex;
+  gap: 12px;
+  padding: 12px 20px;
+  position: relative;
+  align-items: flex-start;
+  transition: background 80ms ease;
+  animation: activity-feed-row-enter 160ms ease-out forwards;
+}
+
+.ticket-activity-row:hover {
+  background: var(--surface-hover);
+}
+
+/* Subtle nudge so the avatar/icon aligns with the text baseline of the
+   first line rather than its top — accounts for the event-text
+   line-height (Phase 26.9). Targets the row's first child directly,
+   which is either the UserAvatar span or .ticket-activity-icon-wrap. */
+.ticket-activity-row > *:first-child {
+  margin-top: 2px;
+}
+
+/* Vertical connector between consecutive rows. Recalibrated for the
+   28px top-aligned avatar (Phase 26.9): center line still passes
+   through left = 20px padding + 14px (half of 28) = 34px; 1px line at
+   33px. top = 12px row padding + 2px nudge + 28px avatar + 2px gap. */
+.ticket-activity-row::before {
+  content: "";
+  position: absolute;
+  left: 33px;
+  top: 44px;
+  bottom: -10px;
+  width: 1px;
+  background: var(--hair);
+}
+
+.ticket-activity-row:last-of-type::before {
+  display: none;
+}
+
+.ticket-activity-icon-wrap {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.ticket-activity-icon-wrap--created {
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  color: var(--brand);
+}
+
+.ticket-activity-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.ticket-activity-text {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-heading);
+  margin: 0;
+  letter-spacing: -0.005em;
+}
+
+.ticket-activity-actor {
+  font-weight: 500;
+  color: var(--text-heading);
+}
+
+.ticket-activity-time {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+  margin-bottom: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status / priority pills — inline, baseline aligned. */
+.ticket-activity-value-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  margin: 0 1px;
+  vertical-align: baseline;
+}
+
+.ticket-activity-value--resolved {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.ticket-activity-value--priority-high {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.ticket-activity-value--priority-medium {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+.ticket-activity-value--priority-low {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+/* Assignee mention pill with mini inline avatar. */
+.ticket-activity-mention {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+  color: var(--brand);
+  padding: 2px 7px 2px 4px;
+  border-radius: 5px;
+  font-weight: 500;
+  font-size: 13px;
+  margin: 0 1px;
+  vertical-align: baseline;
+}
+
+/* Loading and empty states share one centered slot so they occupy the
+   exact same position (vertically centered in the timeline area, like
+   the old CommentPanel "no comments" placement) — only the content
+   swaps, no layout shift between loading → empty/list. */
+.ticket-activity-centered {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+/* Smaller variant of the brand loader (BrandLoader is a fixed 48px
+   SVG used app-wide; scale it down here instead of forking it). The
+   inner BrandLoader div keeps its natural 48px box; the wrapper clamps
+   the laid-out size to 26px so the scaled SVG centers without pushing
+   layout. */
+.ticket-activity-spinner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+}
+.ticket-activity-spinner > div {
+  width: 48px;
+  height: 48px;
+  transform: scale(0.75); /* 36 / 48 */
+  transform-origin: center;
+}
+
 @keyframes activity-expand-dot {
   0%,
   80%,
@@ -2423,29 +2648,6 @@ html.dark .echly-capture-card {
 }
 
 
-
-.echly-chatgpt-waveform {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  max-width: 100%;
-  filter: none;
-  -webkit-mask-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(0, 0, 0, 1) 7%,
-    rgba(0, 0, 0, 1) 93%,
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(0, 0, 0, 1) 7%,
-    rgba(0, 0, 0, 1) 93%,
-    transparent 100%
-  );
-}
 
 .waveform-placeholder {
   height: 64px;
@@ -5799,6 +6001,29 @@ h6 [data-ai-touched="true"] {
   animation: ticket-border-glow 1s ease-in-out forwards;
 }
 
+/* Phase 26.7: clicking a screenshot pin scrolls the matching comment
+   into view and briefly tints it. The 2s animation matches the parent's
+   auto-clear timer; the row settles back to its normal (transparent)
+   state. scroll-margin keeps the centered row clear of sticky chrome. */
+.comment-row {
+  scroll-margin-top: 80px;
+  scroll-margin-bottom: 80px;
+  transition: background 200ms ease-out;
+}
+
+.comment-row--highlighted {
+  animation: comment-highlight-pulse 2s ease-out;
+}
+
+@keyframes comment-highlight-pulse {
+  0% {
+    background: color-mix(in srgb, var(--brand) 14%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
 .comment-mode-cursor {
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='-2 -2 28 28'%3E%3Cdefs%3E%3Cfilter id='s' x='-20%25' y='-20%25' width='140%25' height='140%25'%3E%3CfeDropShadow dx='0' dy='0' stdDeviation='1.5' flood-color='white' flood-opacity='0.9'/%3E%3C/filter%3E%3C/defs%3E%3Cpath d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' fill='%231C1B1F' stroke='white' stroke-width='1.5' filter='url(%23s)'/%3E%3C/svg%3E") 14 14, pointer;
 }
@@ -6144,6 +6369,13 @@ h6 [data-ai-touched="true"] {
   color: var(--muted);
   font-weight: 500;
   letter-spacing: -0.003em;
+  min-width: 0;
+}
+.echly-v2 .workspace-name-display {
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .echly-v2 .ai-dot {
   width: 7px; height: 7px;
@@ -7135,14 +7367,6 @@ h6 [data-ai-touched="true"] {
   justify-content: center;
   position: relative;
 }
-.echly-v2 .vc-wave-track .echly-chatgpt-waveform {
-  width: 100%;
-  height: 100%;
-}
-.echly-v2 .vc-wave-track .echly-chatgpt-waveform canvas {
-  display: block;
-}
-
 .echly-v2 .vc-reset-btn {
   position: relative;
   width: 36px;
@@ -9558,5 +9782,686 @@ h6 [data-ai-touched="true"] {
 @keyframes dashboard-tooltip-enter {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+/* ═══════════════════════════════════════════════════
+ * PILL UI — voice/text capture (Phase 22)
+ * ═══════════════════════════════════════════════════
+ * All component-specific CSS for the extension lives in this file.
+ * Component-folder CSS files are NOT bundled — esbuild has
+ * `".css": "empty"` (esbuild-extension.mjs), so any `import "./foo.css"`
+ * from a .tsx file is dropped at build time. Append new component
+ * styles below with a clearly-labeled section header; do not create
+ * new .css files in component folders expecting them to load.
+ */
+
+.echly-pill-root {
+  --pill-brand: #5A49BF;
+  --pill-brand-soft: #F0ECFB;
+  --pill-brand-ink: #3D2F73;
+  --pill-ink: #15101F;
+  --pill-body: #54495F;
+  --pill-soft: #8A8096;
+  --pill-hair: #E5E7EB;
+  --pill-surface: #FFFFFF;
+  --pill-surface-hover: #FAFAF7;
+  --pill-danger: #E5484D;
+  --pill-waveform: rgba(90, 73, 191, 0.85);
+
+  position: fixed;
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  pointer-events: none;
+}
+
+.echly-pill-root > * {
+  pointer-events: auto;
+  /* Children fade in (root keeps its inline transform for centering). */
+  animation: echly-pill-enter 240ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes echly-pill-enter {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* ── Persistent selection outline on the captured element ──
+ * Mounts when the pill mounts, dismisses when the pill dismisses.
+ * pointer-events: none so the underlying page stays interactive.
+ * Three visual layers: 2px brand border, 4px outer glow, 1px inner highlight. */
+.echly-selected-overlay {
+  position: fixed;
+  z-index: 2147483646;
+  pointer-events: none;
+  border: 2px solid var(--pill-brand, #5A49BF);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--pill-brand, #5A49BF) 6%, transparent);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--pill-brand, #5A49BF) 12%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--pill-brand, #5A49BF) 30%, transparent);
+  transition:
+    top 80ms ease-out,
+    left 80ms ease-out,
+    width 80ms ease-out,
+    height 80ms ease-out;
+  animation: echly-selected-appear 400ms ease-out;
+}
+
+@keyframes echly-selected-appear {
+  0% {
+    opacity: 0;
+    box-shadow:
+      0 0 0 0 color-mix(in srgb, var(--pill-brand, #5A49BF) 12%, transparent),
+      inset 0 0 0 1px color-mix(in srgb, var(--pill-brand, #5A49BF) 30%, transparent);
+  }
+  50% {
+    opacity: 1;
+    box-shadow:
+      0 0 0 8px color-mix(in srgb, var(--pill-brand, #5A49BF) 8%, transparent),
+      inset 0 0 0 1px color-mix(in srgb, var(--pill-brand, #5A49BF) 30%, transparent);
+  }
+  100% {
+    opacity: 1;
+    box-shadow:
+      0 0 0 4px color-mix(in srgb, var(--pill-brand, #5A49BF) 12%, transparent),
+      inset 0 0 0 1px color-mix(in srgb, var(--pill-brand, #5A49BF) 30%, transparent);
+  }
+}
+
+/* ── Hint pill above the recorder ──
+ * Dark "premium tooltip" variant, matching the inline mic-tooltip aesthetic.
+ * Auto-dismisses after 4s for default-state hints (listening / typing) — the
+ * fade-out is driven by the .echly-pill-hint--dismissing modifier added in
+ * PillHintText.tsx. Functional alerts (warning / limit_reached / error)
+ * ignore the session tracker and stay until the underlying state clears.
+ */
+.echly-pill-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  animation: echly-pill-hint-fade-in 200ms ease-out;
+}
+
+.echly-pill-hint--dark {
+  background: rgba(21, 16, 31, 0.92);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  color: rgba(255, 255, 255, 0.96);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  /* Same design-system shadow family as .echly-pill-content for a cohesive
+   * shadow language. --shadow-depth (no ring) is used here since this dark
+   * pill already carries its own 0.5px border — avoids a doubled ring. */
+  box-shadow: var(--shadow-depth);
+}
+
+.echly-pill-hint--dismissing {
+  animation: echly-pill-hint-fade-out 280ms ease-out forwards;
+}
+
+.echly-pill-hint-pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #FF6B6B;
+  animation: echly-pill-heartbeat 1.4s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.echly-pill-hint--dark .echly-pill-hint-secondary {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.62);
+  font-weight: 400;
+}
+
+.echly-pill-hint--error .echly-pill-hint-primary {
+  color: #FF8A8E;
+}
+
+@keyframes echly-pill-hint-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes echly-pill-hint-fade-out {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-2px); }
+}
+
+@keyframes echly-pill-heartbeat {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.8); }
+}
+
+/* ── Pill body ──
+ * Compact-by-default width (360px). The CSS-fixed compact width eliminates
+ * measurement race conditions on first paint — CapturePill's positioning
+ * math uses this same value. On hover, the pill widens to ~440px to reveal
+ * mode-switch icons on the LEFT; right-edge anchoring (Fix 6) keeps primary
+ * action buttons (send/reset/trash) glued to their viewport position.
+ */
+.echly-pill-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  background: var(--pill-surface);
+  border-radius: 999px;
+  padding: 8px 8px 8px 12px;
+  gap: 12px;
+  /* Design-system floating-element shadow. --shadow-depth-recording bundles
+   * both the soft drop shadow and a 1px ring, so it replaces all three
+   * hand-rolled layers (incl. the old --pill-hair ring) in one token and
+   * adapts per theme (dark/light/default). */
+  box-shadow: var(--shadow-depth-recording);
+  height: 52px;
+  width: 360px;
+  box-sizing: border-box;
+  transition: width 220ms cubic-bezier(0.2, 0, 0, 1), transform 200ms cubic-bezier(0.2, 0, 0, 1);
+  font-family: inherit;
+}
+.echly-pill-content--voice:hover,
+.echly-pill-content--voice:focus-within {
+  width: 440px;
+}
+/* Text pill is content-sized (not the 360px voice width). The textarea
+ * wrapper has a fixed width, so revealing the left-side mic/divider on hover
+ * grows the pill leftward via the right-edge anchor — trash, input and send
+ * keep their exact viewport position (no jump). */
+.echly-pill-content--text {
+  width: auto;
+}
+
+.echly-pill-content--shake {
+  animation: echly-pill-shake 0.5s ease-in-out;
+}
+@keyframes echly-pill-shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+/* ── Bare icon buttons (trash, reset) ── */
+.echly-pill-icon-btn {
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  width: 26px;
+  height: 26px;
+  color: var(--pill-soft);
+  transition: color 140ms ease, transform 140ms ease;
+  flex-shrink: 0;
+  font-family: inherit;
+}
+.echly-pill-icon-btn:hover { color: var(--pill-ink); }
+.echly-pill-icon-btn:active { transform: scale(0.9); }
+.echly-pill-icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Hover-revealed actions (LEFT side, divider after) ──
+ * Hidden by default — expand the pill from the LEFT (right edge anchored).
+ * Voice pill reveals on hover OR focus-within (keyboard nav).
+ * Text pill reveals on hover ONLY — focus-within is the typing state and the
+ * mic icon should NOT appear while typing unless the user explicitly hovers.
+ */
+.echly-pill-action {
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  width: 26px;
+  height: 26px;
+  color: var(--pill-soft);
+  opacity: 0;
+  max-width: 0;
+  /* Negative margin cancels the parent's 12px flex gap on both sides while
+   * hidden, so a collapsed action leaves ZERO dead space — the pill is truly
+   * compact at rest. Margin animates back to 0 on reveal so the gap appears
+   * smoothly together with the icon. */
+  margin: 0 -6px;
+  overflow: hidden;
+  transition: opacity 200ms ease-out, max-width 200ms ease-out, margin 200ms ease-out, color 140ms ease;
+  flex-shrink: 0;
+  font-family: inherit;
+  vertical-align: middle;
+}
+.echly-pill-action:hover { color: var(--pill-ink); }
+
+/* Voice pill: reveal on hover OR focus-within */
+.echly-pill-content--voice:hover .echly-pill-action,
+.echly-pill-content--voice:focus-within .echly-pill-action {
+  opacity: 1;
+  max-width: 26px;
+  margin: 0;
+}
+
+/* Text pill: reveal on hover only (NOT focus-within) — so the mic stays
+ * hidden while the user is typing, but still reveals if they hover the pill
+ * mid-typing. */
+.echly-pill-content--text:hover .echly-pill-action {
+  opacity: 1;
+  max-width: 26px;
+  margin: 0;
+}
+
+/* ── Divider between hover-revealed left actions and primary controls ──
+ * Same reveal logic as the actions themselves: visible only when the actions
+ * are visible, so the pill collapses cleanly to its idle state.
+ */
+.echly-pill-divider {
+  width: 1px;
+  height: 24px;
+  background: rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+  align-self: center;
+  opacity: 0;
+  max-width: 0;
+  /* Same gap-collapse as .echly-pill-action: cancel the parent's 12px flex
+   * gap on both sides while hidden. */
+  margin: 0 -6px;
+  overflow: hidden;
+  transition: opacity 200ms ease-out, max-width 200ms ease-out, margin 200ms ease-out;
+}
+.echly-pill-content--voice:hover .echly-pill-divider,
+.echly-pill-content--voice:focus-within .echly-pill-divider {
+  opacity: 1;
+  max-width: 1px;
+  margin: 0 4px;
+}
+.echly-pill-content--text:hover .echly-pill-divider {
+  opacity: 1;
+  max-width: 1px;
+  margin: 0 4px;
+}
+
+/* ── Recording indicators ── */
+.echly-pill-rec-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--pill-danger);
+  flex-shrink: 0;
+  animation: echly-pill-heartbeat 1.4s ease-in-out infinite;
+}
+
+.echly-pill-timer {
+  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
+  font-size: 13px;
+  color: var(--pill-ink);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  min-width: 30px;
+  flex-shrink: 0;
+}
+
+/* ── Waveform (30 bars) ── */
+.echly-pill-waveform {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  width: 140px;
+  flex-shrink: 0;
+  overflow: hidden;
+  padding: 0 4px;
+}
+
+.echly-pill-wave-bar {
+  width: 2px;
+  background: var(--pill-waveform, var(--brand, rgba(90, 73, 191, 0.85)));
+  border-radius: 1px;
+  flex-shrink: 0;
+  transition: height 80ms ease-out;
+}
+
+/* ── Send button (brand circle) ── */
+.echly-pill-send-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--pill-brand);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  cursor: pointer;
+  flex-shrink: 0;
+  border: none;
+  outline: none;
+  padding: 0;
+  margin-left: 2px;
+  transition: background 120ms ease, transform 120ms cubic-bezier(0.2, 0, 0, 1.2);
+  box-shadow: 0 2px 6px rgba(90, 73, 191, 0.25);
+  font-family: inherit;
+}
+.echly-pill-send-btn:hover { background: var(--pill-brand-ink); }
+.echly-pill-send-btn:active { transform: scale(0.94); }
+.echly-pill-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--pill-soft);
+  box-shadow: none;
+}
+
+/* ── Text-mode input ── */
+.echly-pill-text-input {
+  flex: 1;
+  min-width: 220px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--pill-ink);
+  font-size: 14px;
+  font-family: inherit;
+  padding: 0 4px;
+}
+.echly-pill-text-input::placeholder {
+  color: var(--pill-soft);
+}
+
+/* ── Error state — single-row pill, content-driven width ── */
+.echly-pill-content--error {
+  padding: 8px 8px 8px 16px;
+  height: 52px;
+  width: auto;
+  border-radius: 999px;
+  box-sizing: border-box;
+  justify-content: flex-start;
+}
+
+.echly-pill-error-msg {
+  font-size: 13px;
+  color: var(--pill-ink);
+  font-weight: 500;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+.echly-pill-error-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  background: var(--pill-brand-soft);
+  border: none;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pill-brand-ink);
+  cursor: pointer;
+  transition: background 120ms ease;
+  font-family: inherit;
+}
+.echly-pill-error-action:hover {
+  background: var(--pill-brand);
+  color: #FFFFFF;
+}
+
+/* ── Hint strip rendered BELOW the error pill (frosted glass, mirrors hint above) ── */
+.echly-pill-error-hint-below {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border-radius: 999px;
+  border: 0.5px solid var(--pill-hair);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--pill-ink);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.echly-pill-error-hint-below svg {
+  flex-shrink: 0;
+  color: var(--pill-soft);
+}
+
+/* ── Pill tooltip (shadow-DOM-safe, inline variant) ── */
+.echly-pill-tooltip-anchor {
+  position: relative;
+  display: inline-flex;
+}
+.echly-pill-tooltip {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #15101F;
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2147483648;
+  animation: echly-pill-tooltip-enter 140ms ease-out both;
+  font-family: inherit;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+.echly-pill-tooltip--top {
+  bottom: calc(100% + 8px);
+}
+.echly-pill-tooltip--bottom {
+  top: calc(100% + 8px);
+}
+@keyframes echly-pill-tooltip-enter {
+  from { opacity: 0; transform: translateX(-50%) translateY(2px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ── Text-mode pill ── */
+.echly-pill-content--text {
+  align-items: center;
+  padding: 8px 8px 8px 12px;
+  min-height: 52px;
+  height: auto;
+  gap: 12px;
+  border-radius: 999px;
+  transition: border-radius 220ms cubic-bezier(0.2, 0, 0, 1), padding 220ms cubic-bezier(0.2, 0, 0, 1);
+}
+.echly-pill-content--text > * {
+  align-self: center;
+}
+
+/* Textarea wrapper: SINGLE focus state — invisible border by default, very
+ * subtle on hover (only when not focused), brand purple + tint on focus.
+ * Explicit `outline: none` + `box-shadow: none` on the wrapper and its
+ * descendants kills any browser default rings that would otherwise compete
+ * with the brand focus state. */
+.echly-pill-text-input-wrap {
+  flex: 0 0 auto;
+  width: 240px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  outline: none;
+  box-shadow: none;
+  transition: border-color 140ms ease, background-color 140ms ease, height 220ms cubic-bezier(0.2, 0, 0, 1), border-radius 220ms cubic-bezier(0.2, 0, 0, 1);
+  box-sizing: border-box;
+}
+.echly-pill-text-input-wrap:hover:not(:focus-within) {
+  border-color: rgba(21, 16, 31, 0.08);
+}
+.echly-pill-text-input-wrap:focus-within {
+  border-color: var(--pill-brand);
+  background: color-mix(in srgb, var(--pill-brand) 4%, transparent);
+}
+/* Kill any default browser focus ring on children — wrapper handles focus. */
+.echly-pill-text-input-wrap *:focus,
+.echly-pill-text-input-wrap *:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.echly-pill-text-textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 22px;
+  max-height: 22px;
+  background: transparent;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  resize: none;
+  color: var(--pill-ink);
+  font-size: 14px;
+  font-family: inherit;
+  padding: 0;
+  line-height: 1.5;
+  overflow-y: hidden;
+}
+.echly-pill-text-textarea::placeholder {
+  color: var(--pill-soft);
+}
+
+/* ── Grown state: rounded composer, toolbar-anchored controls ──
+ * Unlocks the height (set to auto) so the pill can expand vertically with
+ * the textarea's content. All icons + send + the divider follow the trash
+ * icon — bottom-aligned with the same 4px bottom margin — so the controls
+ * sit on the same "toolbar line" along the pill's bottom edge.
+ */
+.echly-pill-content--text-grown {
+  align-items: stretch;
+  border-radius: 22px;
+  padding: 10px 8px 10px 12px;
+  height: auto;
+  max-height: 320px;
+}
+.echly-pill-content--text-grown .echly-pill-text-input-wrap {
+  align-items: flex-start;
+  height: auto;
+  min-height: 40px;
+  max-height: 264px;
+  padding: 8px 12px;
+  border-radius: 16px;
+}
+.echly-pill-content--text-grown .echly-pill-text-textarea {
+  min-height: 22px;
+  max-height: 244px;
+  overflow-y: auto;
+}
+.echly-pill-content--text-grown .echly-pill-icon-btn,
+.echly-pill-content--text-grown .echly-pill-action,
+.echly-pill-content--text-grown .echly-pill-divider,
+.echly-pill-content--text-grown .echly-pill-send-btn {
+  align-self: flex-end;
+  margin-bottom: 4px;
+}
+/* Char counter (remaining). Hidden until value.length >= 1800; turns red
+ * when <=100 chars remaining. Fades in so its appearance isn't startling. */
+.echly-pill-text-meta {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--pill-soft);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  pointer-events: none;
+  padding: 0 2px;
+  animation: echly-pill-meta-fade-in 200ms ease-out;
+}
+.echly-pill-text-meta--warning {
+  color: var(--pill-danger);
+}
+@keyframes echly-pill-meta-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* In grown state, the counter still anchors to the bottom edge for visual
+   alignment with the action icons. */
+.echly-pill-content--text-grown .echly-pill-text-meta {
+  align-self: flex-end;
+  margin-bottom: 6px;
+}
+
+/* ── Waveform mask (left-edge fade for rolling history) ── */
+.echly-pill-waveform {
+  mask-image: linear-gradient(to right, transparent 0%, black 8%, black 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 8%, black 100%);
+}
+.echly-pill-wave-bar {
+  transition: none;
+}
+
+/* ── Selection overlay: drop position transitions for perfect rAF tracking ── */
+.echly-selected-overlay {
+  width: 0;
+  height: 0;
+  transition: none;
+  will-change: transform, width, height;
+}
+
+/* ── Mic selector popover (anchored above mic icon) ── */
+.echly-mic-popover {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: auto;
+  isolation: isolate;
+  padding: 6px;
+  border-radius: 14px;
+  background: #FFFFFF;
+  border: 1px solid rgba(28, 25, 23, 0.06);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 2px 4px rgba(28, 25, 23, 0.04),
+    0 8px 24px -4px rgba(28, 25, 23, 0.12),
+    0 20px 48px -8px rgba(28, 25, 23, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 300px;
+  max-width: 360px;
+  max-height: 320px;
+  overflow-y: auto;
+  z-index: 2147483648;
+  animation: echly-mic-popover-enter 160ms cubic-bezier(0.2, 0, 0, 1);
+}
+@keyframes echly-mic-popover-enter {
+  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ── Pill entrance: pure opacity fade ──
+ * No transform animation — the pill's position is computed synchronously in
+ * the render path (useMemo in CapturePill) using the CSS-fixed pill width, so
+ * the first paint is at the correct location. A scale/slide animation here
+ * would visually shift the pill *from* the wrong location *to* the right one.
+ */
+.echly-pill-root {
+  animation: echly-pill-root-fade-in 200ms ease-out;
+}
+@keyframes echly-pill-root-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 

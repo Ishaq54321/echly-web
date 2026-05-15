@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useRef, memo, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
-import { Expand, Info, Loader2, Pencil, Smile, Paperclip, X, AtSign } from "lucide-react";
+import { Expand, Info, Loader2, MessageSquare, Pencil, Smile, Paperclip, X, AtSign } from "lucide-react";
 import EmojiPicker from "emoji-picker-react";
 import type { Editor } from "@tiptap/react";
 import type { Timestamp } from "firebase/firestore";
@@ -24,6 +24,17 @@ function getUploadBoxColor(fileName: string): string {
 
 const PIN_SIZE_PX = 24;
 const POPOVER_GAP_PX = 8;
+
+// Shared chrome for the on-screenshot hover actions (comment / edit /
+// expand / cancel). Phase 26.9: rounded-xl 36px pill (not a circle —
+// circles read as pin markers on the canvas; pills read as actions),
+// 16px icon. Down from the 44px / 18px of Phase 26.8 — that read as
+// oversized; shadow lightened to match the smaller scale. Gentle scale
+// micro-interactions retained.
+// Positioning/visibility is owned by the wrapping div (see usage) — this
+// is button chrome only, since Tooltip wraps the child in a bare span.
+const HOVER_ACTION_CLASS =
+  "flex items-center justify-center h-9 w-9 rounded-xl bg-[var(--text-heading)] text-white/90 hover:text-white hover:bg-[var(--text-body)] ring-1 ring-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.18)] backdrop-blur-sm transition-all duration-150 cursor-pointer focus:outline-none hover:scale-105 active:scale-95";
 const TOOLTIP_MAX_LEN = 60;
 const POPOVER_Z_INDEX = 10050;
 const POPOVER_STYLE =
@@ -37,6 +48,19 @@ interface ScreenshotWithPinsProps {
   screenshotUrlError: string | null;
   onExpand: () => void;
   isCommentMode?: boolean;
+  /**
+   * Toggles click-to-place pin mode (Phase 26.7). Driven by the
+   * MessageSquare hover action on the screenshot. When undefined the
+   * button is hidden (e.g. read-only / share surfaces that can't comment).
+   */
+  onTogglePinMode?: () => void;
+  /**
+   * Force-exit comment mode (idempotent — safe to call when already
+   * off). Fired when the draft is cancelled, Escape is pressed, or the
+   * user clicks anywhere outside the screenshot. Distinct from
+   * onTogglePinMode so cancelling never accidentally re-enters mode.
+   */
+  onExitCommentMode?: () => void;
   pins?: Comment[];
   comments?: Comment[];
   /** Which pin's inline popover is open (root-only view). */
@@ -190,6 +214,8 @@ const ScreenshotWithPinsInner = ({
   screenshotUrlError: screenshotError,
   onExpand,
   isCommentMode = false,
+  onTogglePinMode,
+  onExitCommentMode,
   pins = [],
   comments = [],
   activePinId,
@@ -303,7 +329,10 @@ const ScreenshotWithPinsInner = ({
     setDraftPendingAttachments([]);
     setDraftFileError(null);
     pinEditorRef.current?.commands.clearContent();
-  }, []);
+    // Cancelling the draft (button, Escape, or click-outside) also drops
+    // the user out of comment mode entirely, per product spec.
+    onExitCommentMode?.();
+  }, [onExitCommentMode]);
 
   // Click-outside: dismiss draft compose when clicking outside the popover and outside the screenshot
   useEffect(() => {
@@ -382,6 +411,7 @@ const ScreenshotWithPinsInner = ({
     <div className={outerCard}>
       <div
         ref={containerRef}
+        data-screenshot-canvas
         className={`group relative overflow-visible rounded-lg max-h-[317px] bg-white ${innerBorder} shadow-none ${isCommentMode ? "comment-mode-cursor" : ""}`}
         onClick={handleImageClick}
         onMouseMove={(e) => {
@@ -494,6 +524,7 @@ const ScreenshotWithPinsInner = ({
           createPortal(
             <div
               ref={draftPopoverRef}
+              data-comment-popover
               className="rounded-2xl bg-white shadow-[var(--shadow-lg)] w-[420px]"
               style={{
                 position: "fixed",
@@ -649,32 +680,80 @@ const ScreenshotWithPinsInner = ({
             document.body
           )}
 
-        {!isCommentMode && url && (
-          <>
-            {canEdit && onEdit && (
+        {/* In comment mode the only action is Cancel — a black chip in
+            the Expand slot (right-2), matching the other hover controls.
+            NOTE: positioning lives on the wrapper div, not the button —
+            Tooltip wraps its child in an unstyled span, so an `absolute`
+            button would anchor to that span and collapse out of view. */}
+        {isCommentMode && url && onTogglePinMode && (
+          <div className="absolute top-3 right-3 z-10">
+            <Tooltip content="Cancel comment">
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onEdit();
+                  handleCancelDraft();
                 }}
-                className="absolute top-2.5 right-[50px] flex items-center justify-center h-[38px] w-[38px] rounded-[var(--radius-btn)] bg-[var(--text-heading)] text-white hover:bg-[var(--text-body)] opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer focus:outline-none z-10 shadow-sm"
-                aria-label="Edit screenshot"
+                className={HOVER_ACTION_CLASS}
+                aria-label="Cancel comment"
               >
-                <Pencil className="h-4 w-4" strokeWidth={2} />
+                <X className="h-4 w-4" strokeWidth={1.75} />
               </button>
+            </Tooltip>
+          </div>
+        )}
+
+        {!isCommentMode && url && (
+          <>
+            {onTogglePinMode && (
+              <div className="absolute top-3 right-[100px] z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                <Tooltip content="Add a comment">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onTogglePinMode();
+                    }}
+                    className={HOVER_ACTION_CLASS}
+                    aria-label="Add a comment"
+                  >
+                    <MessageSquare className="h-4 w-4" strokeWidth={1.75} />
+                  </button>
+                </Tooltip>
+              </div>
             )}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onExpand();
-              }}
-              className="absolute top-2.5 right-2.5 flex items-center justify-center h-[38px] w-[38px] rounded-[var(--radius-btn)] bg-[var(--text-heading)] text-white hover:bg-[var(--text-body)] opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer focus:outline-none z-10 shadow-sm"
-              aria-label="Expand screenshot"
-            >
-              <Expand className="h-4 w-4" strokeWidth={2} />
-            </button>
+            {canEdit && onEdit && (
+              <div className="absolute top-3 right-[56px] z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                <Tooltip content="Edit screenshot">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit();
+                    }}
+                    className={HOVER_ACTION_CLASS}
+                    aria-label="Edit screenshot"
+                  >
+                    <Pencil className="h-4 w-4" strokeWidth={1.75} />
+                  </button>
+                </Tooltip>
+              </div>
+            )}
+            <div className="absolute top-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              <Tooltip content="Expand">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onExpand();
+                  }}
+                  className={HOVER_ACTION_CLASS}
+                  aria-label="Expand screenshot"
+                >
+                  <Expand className="h-4 w-4" strokeWidth={1.75} />
+                </button>
+              </Tooltip>
+            </div>
           </>
         )}
 
@@ -752,6 +831,7 @@ const ScreenshotWithPinsInner = ({
       {draftEmojiOpen && typeof document !== "undefined" && createPortal(
         <div
           ref={draftEmojiPickerRef}
+          data-comment-popover
           className="fixed z-[2147480001]"
           style={{
             top: (draftEmojiAnchorRect?.bottom ?? 0) + 4,
