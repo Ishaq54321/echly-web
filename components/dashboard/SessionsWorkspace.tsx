@@ -530,7 +530,6 @@ function ShareModalForSession({ session, onClose, authUid }: ShareModalForSessio
       canResolve
       linkCopied={share.linkCopied}
       onCopyShareLink={() => void share.copyShareLink().catch(() => {})}
-      refetchingAfterApproval={share.refetchingAfterApproval}
       workspaceMembers={share.workspaceMembers}
       loadingWorkspaceMembers={share.loadingWorkspaceMembers}
       currentUserUid={authUid ?? undefined}

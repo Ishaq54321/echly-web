@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { tryBuildRequestContext } from "@/lib/server/requestContext";
+import { adminDb } from "@/lib/server/firebaseAdmin";
 import {
   getAccessRequest,
   listPendingAccessRequests,
@@ -184,19 +185,25 @@ export async function PATCH(
 
       const actor = await resolveActorForActivityEvent(approverId);
       const sessionTitle = sessionTitleFromSessionRow(context.session);
-      await createActivityEvent({
-        workspaceId,
-        sessionId,
-        eventType: "access_request.rejected",
-        actorId: approverId,
-        actorName: actor.actorName,
-        actorPhotoURL: actor.actorPhotoURL,
-        metadata: {
-          sessionTitle,
-          requesterEmail: accessRequest.requesterEmail ?? null,
-          requesterUserId: accessRequest.requesterUserId ?? null,
-          requesterName: rejectedRequesterName ?? null,
-        },
+      // Phase 28.X — request status is already committed (awaited above); the
+      // response does not depend on the activity event. Offload the write so
+      // reject returns immediately; the activity log catches up via the
+      // realtime listener. (Notification/email below are already off-path.)
+      fireAndForget("access_request.rejected:activityEvent", async () => {
+        await createActivityEvent({
+          workspaceId,
+          sessionId,
+          eventType: "access_request.rejected",
+          actorId: approverId,
+          actorName: actor.actorName,
+          actorPhotoURL: actor.actorPhotoURL,
+          metadata: {
+            sessionTitle,
+            requesterEmail: accessRequest.requesterEmail ?? null,
+            requesterUserId: accessRequest.requesterUserId ?? null,
+            requesterName: rejectedRequesterName ?? null,
+          },
+        });
       });
 
       const rejectedRequesterId =
@@ -253,13 +260,16 @@ export async function PATCH(
     });
   }
 
+  const grantedAccess: "view" | "resolve" =
+    accessLevel ?? accessRequest.requestedAccess ?? "resolve";
+
   try {
     await addSessionMember({
       sessionId,
       workspaceId: context.session.workspaceId.trim(),
       userId: accessRequest.requesterUserId.trim(),
       email: accessRequest.requesterEmail.trim(),
-      access: accessLevel ?? accessRequest.requestedAccess ?? "resolve",
+      access: grantedAccess,
       actorId: approverId,
       source: "access_request",
     });
@@ -297,20 +307,26 @@ export async function PATCH(
 
     const actor = await resolveActorForActivityEvent(approverId);
     const sessionTitle = sessionTitleFromSessionRow(context.session);
-    await createActivityEvent({
-      workspaceId,
-      sessionId,
-      eventType: "access_request.approved",
-      actorId: approverId,
-      actorName: actor.actorName,
-      actorPhotoURL: actor.actorPhotoURL,
-      metadata: {
-        sessionTitle,
-        requesterEmail: accessRequest.requesterEmail ?? null,
-        requesterUserId: accessRequest.requesterUserId ?? null,
-        requesterName: approvedRequesterName ?? null,
-        accessLevel: accessLevel ?? null,
-      },
+    // Phase 28.X — the member add + request status are already committed
+    // (awaited above); the canonical-item response does not depend on the
+    // activity event. Offload the write so approve returns immediately; the
+    // activity log catches up via the realtime listener.
+    fireAndForget("access_request.approved:activityEvent", async () => {
+      await createActivityEvent({
+        workspaceId,
+        sessionId,
+        eventType: "access_request.approved",
+        actorId: approverId,
+        actorName: actor.actorName,
+        actorPhotoURL: actor.actorPhotoURL,
+        metadata: {
+          sessionTitle,
+          requesterEmail: accessRequest.requesterEmail ?? null,
+          requesterUserId: accessRequest.requesterUserId ?? null,
+          requesterName: approvedRequesterName ?? null,
+          accessLevel: accessLevel ?? null,
+        },
+      });
     });
 
     const approvedRequesterId =
@@ -363,7 +379,27 @@ export async function PATCH(
     }).catch(() => {});
   }
 
+  // Canonical member row — same shape GET /members produces per item, so the
+  // client can reconcile its optimistic row in place without a re-fetch.
+  const requesterUid = accessRequest.requesterUserId.trim();
+  const approvedUserSnap = await adminDb.doc(`users/${requesterUid}`).get();
+  const approvedUserData = approvedUserSnap.exists
+    ? approvedUserSnap.data()
+    : null;
+  const approvedAvatarUrl =
+    (approvedUserData?.avatarUrl as string | null | undefined) ??
+    (approvedUserData?.photoURL as string | null | undefined) ??
+    null;
+
   return apiSuccess({
     type: "approved" as const,
+    item: {
+      type: "member" as const,
+      id: requesterUid,
+      email: accessRequest.requesterEmail.trim(),
+      access: grantedAccess,
+      status: "active" as const,
+      avatarUrl: approvedAvatarUrl,
+    },
   });
 }

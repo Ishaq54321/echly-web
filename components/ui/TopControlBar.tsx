@@ -309,7 +309,6 @@ export function TopControlBar({
               canResolve={canManageShare}
               linkCopied={share.linkCopied}
               onCopyShareLink={() => void share.copyShareLink().catch(() => {})}
-              refetchingAfterApproval={share.refetchingAfterApproval}
               workspaceMembers={share.workspaceMembers}
               loadingWorkspaceMembers={share.loadingWorkspaceMembers}
               currentUserUid={authUid ?? undefined}

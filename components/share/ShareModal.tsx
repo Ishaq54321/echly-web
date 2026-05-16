@@ -56,7 +56,6 @@ export interface ShareModalProps {
   canResolve: boolean;
   linkCopied: boolean;
   onCopyShareLink: () => void;
-  refetchingAfterApproval?: boolean;
   workspaceMembers?: WorkspaceMember[];
   loadingWorkspaceMembers?: boolean;
   currentUserUid?: string;
@@ -142,7 +141,6 @@ export function ShareModal({
   canResolve,
   linkCopied,
   onCopyShareLink,
-  refetchingAfterApproval = false,
   workspaceMembers = [],
   loadingWorkspaceMembers = false,
   currentUserUid,
@@ -629,8 +627,7 @@ export function ShareModal({
                 updatingId !== null ||
                 removingId !== null ||
                 updatingGeneralAccess ||
-                patchingAccessRequestId !== null ||
-                refetchingAfterApproval
+                patchingAccessRequestId !== null
               }
             >
               Done

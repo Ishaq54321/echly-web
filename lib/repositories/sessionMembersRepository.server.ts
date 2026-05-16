@@ -23,6 +23,7 @@ import {
   deleteSessionAccessDoc,
 } from "@/lib/repositories/sessionAccessRepository.server";
 import { composeFullName } from "@/lib/utils/nameSplit";
+import { fireAndForget } from "@/lib/server/fireAndForget";
 
 function userComposedName(u: { firstName?: unknown; lastName?: unknown } | null | undefined): string {
   if (!u) return "";
@@ -136,66 +137,75 @@ export async function addSessionMember(params: {
 
   const workspaceId = params.workspaceId.trim();
   if (workspaceId) {
-    let targetName: string | null = null;
-    if (params.userId) {
-      try {
-        const targetUser = await getUserByIdRepo(params.userId);
-        targetName =
-          userComposedName(targetUser) ||
-          targetUser?.email?.split("@")[0]?.trim() ||
-          null;
-      } catch {
-        targetName = params.email?.split("@")[0] ?? null;
+    // Phase 28.X — activity event + dependent share notification are off the
+    // mutation critical path. The membership doc + sessionAccess mirror above
+    // are already committed (awaited); nothing in this function's return value
+    // depends on the activity event. The activity log catches up via the
+    // existing realtime listener (ticketActivityStore). dispatchNotifications
+    // here resolves `actor`/`sessionTitle` in the same block, so it rides
+    // along rather than being awaited inline.
+    fireAndForget("addSessionMember:activityEvent", async () => {
+      let targetName: string | null = null;
+      if (params.userId) {
+        try {
+          const targetUser = await getUserByIdRepo(params.userId);
+          targetName =
+            userComposedName(targetUser) ||
+            targetUser?.email?.split("@")[0]?.trim() ||
+            null;
+        } catch {
+          targetName = params.email?.split("@")[0] ?? null;
+        }
       }
-    }
 
-    const actor = await resolveActorForActivityEvent(actorId);
-    const sessionTitle = await sessionTitleForActivityEvent(params.sessionId);
-    await createActivityEvent({
-      workspaceId,
-      sessionId: params.sessionId,
-      eventType: "session.member.added",
-      actorId,
-      actorName: actor.actorName,
-      actorPhotoURL: actor.actorPhotoURL,
-      metadata: {
-        sessionTitle,
-        source: params.source,
-        targetEmail: params.email ?? null,
-        targetUserId: params.userId ?? null,
-        targetName,
-        accessLevel: params.access ?? null,
-      },
+      const actor = await resolveActorForActivityEvent(actorId);
+      const sessionTitle = await sessionTitleForActivityEvent(params.sessionId);
+      await createActivityEvent({
+        workspaceId,
+        sessionId: params.sessionId,
+        eventType: "session.member.added",
+        actorId,
+        actorName: actor.actorName,
+        actorPhotoURL: actor.actorPhotoURL,
+        metadata: {
+          sessionTitle,
+          source: params.source,
+          targetEmail: params.email ?? null,
+          targetUserId: params.userId ?? null,
+          targetName,
+          accessLevel: params.access ?? null,
+        },
+      });
+
+      // Notify the recipient that a session has been shared with them.
+      // Only fire on direct invites (existing user added via invite UI). Skip
+      // invite_redemption (recipient is the actor) and access_request
+      // (recipient already gets access_request.approved).
+      if (params.source === "invite_api" && params.userId !== actorId) {
+        try {
+          const { dispatchNotifications } = await import(
+            "@/lib/server/notificationFanOut.server"
+          );
+          await dispatchNotifications({
+            recipientIds: [params.userId],
+            workspaceId,
+            sessionId: params.sessionId,
+            sessionTitle: sessionTitle || null,
+            type: "session.shared",
+            actor: {
+              id: actorId,
+              name: actor.actorName,
+              photoURL: actor.actorPhotoURL ?? null,
+            },
+            title: `${actor.actorName} shared "${sessionTitle || "a session"}" with you`,
+            entityTitle: sessionTitle || null,
+            body: null,
+          });
+        } catch (err) {
+          console.error("[NOTIFICATION] session.shared failed:", err);
+        }
+      }
     });
-
-    // Notify the recipient that a session has been shared with them.
-    // Only fire on direct invites (existing user added via invite UI). Skip
-    // invite_redemption (recipient is the actor) and access_request (recipient
-    // already gets access_request.approved).
-    if (params.source === "invite_api" && params.userId !== actorId) {
-      try {
-        const { dispatchNotifications } = await import(
-          "@/lib/server/notificationFanOut.server"
-        );
-        await dispatchNotifications({
-          recipientIds: [params.userId],
-          workspaceId,
-          sessionId: params.sessionId,
-          sessionTitle: sessionTitle || null,
-          type: "session.shared",
-          actor: {
-            id: actorId,
-            name: actor.actorName,
-            photoURL: actor.actorPhotoURL ?? null,
-          },
-          title: `${actor.actorName} shared "${sessionTitle || "a session"}" with you`,
-          entityTitle: sessionTitle || null,
-          body: null,
-        });
-      } catch (err) {
-        console.error("[NOTIFICATION] session.shared failed:", err);
-      }
-    }
   }
 }
 
@@ -235,32 +245,37 @@ export async function updateSessionMemberAccessRepo(params: {
   const workspaceId = params.workspaceId.trim();
   const actorId = params.actorId.trim();
   if (workspaceId && actorId) {
-    let targetName: string | null = null;
-    try {
-      const targetUser = await getUserByIdRepo(params.userId);
-      targetName =
-        userComposedName(targetUser) ||
-        targetEmail?.split("@")[0]?.trim() ||
-        null;
-    } catch {
-      targetName = targetEmail?.split("@")[0] ?? null;
-    }
-    const actor = await resolveActorForActivityEvent(actorId);
-    await createActivityEvent({
-      workspaceId,
-      sessionId: params.sessionId,
-      eventType: "session.member.role_changed",
-      actorId,
-      actorName: actor.actorName,
-      actorPhotoURL: actor.actorPhotoURL,
-      metadata: {
-        sessionTitle: params.sessionTitle,
-        previousAccess,
-        newAccess: params.newAccess,
-        targetUserId: params.userId ?? null,
-        targetEmail: targetEmail ?? null,
-        targetName,
-      },
+    // Phase 28.X — off the critical path. The access update + sessionAccess
+    // mirror above are committed (awaited); the return value below derives
+    // only from the pre-update snapshot, never from the activity event.
+    fireAndForget("updateSessionMemberAccessRepo:activityEvent", async () => {
+      let targetName: string | null = null;
+      try {
+        const targetUser = await getUserByIdRepo(params.userId);
+        targetName =
+          userComposedName(targetUser) ||
+          targetEmail?.split("@")[0]?.trim() ||
+          null;
+      } catch {
+        targetName = targetEmail?.split("@")[0] ?? null;
+      }
+      const actor = await resolveActorForActivityEvent(actorId);
+      await createActivityEvent({
+        workspaceId,
+        sessionId: params.sessionId,
+        eventType: "session.member.role_changed",
+        actorId,
+        actorName: actor.actorName,
+        actorPhotoURL: actor.actorPhotoURL,
+        metadata: {
+          sessionTitle: params.sessionTitle,
+          previousAccess,
+          newAccess: params.newAccess,
+          targetUserId: params.userId ?? null,
+          targetEmail: targetEmail ?? null,
+          targetName,
+        },
+      });
     });
   }
   return { ok: true, previousAccess, targetEmail };
@@ -297,30 +312,35 @@ export async function removeSessionMemberRepo(params: {
   const workspaceId = params.workspaceId.trim();
   const actorId = params.actorId.trim();
   if (workspaceId && actorId) {
-    let removedTargetName: string | null = null;
-    try {
-      const targetUser = await getUserByIdRepo(params.userId);
-      removedTargetName =
-        userComposedName(targetUser) ||
-        removedEmail?.split("@")[0]?.trim() ||
-        null;
-    } catch {
-      removedTargetName = removedEmail?.split("@")[0] ?? null;
-    }
-    const actor = await resolveActorForActivityEvent(actorId);
-    await createActivityEvent({
-      workspaceId,
-      sessionId: params.sessionId,
-      eventType: "session.member.removed",
-      actorId,
-      actorName: actor.actorName,
-      actorPhotoURL: actor.actorPhotoURL,
-      metadata: {
-        sessionTitle: params.sessionTitle,
-        targetUserId: params.userId ?? null,
-        targetEmail: removedEmail ?? null,
-        targetName: removedTargetName ?? null,
-      },
+    // Phase 28.X — off the critical path. The member doc delete + sessionAccess
+    // mirror delete above are committed (awaited); `removedEmail` was captured
+    // from the pre-delete snapshot, so the return value never waits on this.
+    fireAndForget("removeSessionMemberRepo:activityEvent", async () => {
+      let removedTargetName: string | null = null;
+      try {
+        const targetUser = await getUserByIdRepo(params.userId);
+        removedTargetName =
+          userComposedName(targetUser) ||
+          removedEmail?.split("@")[0]?.trim() ||
+          null;
+      } catch {
+        removedTargetName = removedEmail?.split("@")[0] ?? null;
+      }
+      const actor = await resolveActorForActivityEvent(actorId);
+      await createActivityEvent({
+        workspaceId,
+        sessionId: params.sessionId,
+        eventType: "session.member.removed",
+        actorId,
+        actorName: actor.actorName,
+        actorPhotoURL: actor.actorPhotoURL,
+        metadata: {
+          sessionTitle: params.sessionTitle,
+          targetUserId: params.userId ?? null,
+          targetEmail: removedEmail ?? null,
+          targetName: removedTargetName ?? null,
+        },
+      });
     });
   }
   return { ok: true, removedEmail };

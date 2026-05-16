@@ -85,7 +85,6 @@ export function useShareController(
     [accessRequestsState.requests]
   );
   const [patchingAccessRequestId, setPatchingAccessRequestId] = useState<string | null>(null);
-  const [refetchingAfterApproval, setRefetchingAfterApproval] = useState(false);
   const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([]);
   const [loadingWorkspaceMembers, setLoadingWorkspaceMembers] = useState(false);
 
@@ -156,6 +155,7 @@ export function useShareController(
 
       const json = (await res.json().catch(() => ({}))) as ApiEnvelope<{
         type?: "member_added" | "invite_created" | "invite_updated" | "already_member";
+        item?: ShareItem;
       }>;
       if (!res.ok || !json.success) {
         setItems((prev) => prev.filter((i) => i.id !== optimisticItem.id));
@@ -171,16 +171,25 @@ export function useShareController(
       }
 
       setInviteEmail("");
-      try {
-        const memRes = await authFetch(`/api/sessions/${encodeURIComponent(sid)}/members`);
-        const mj = memRes?.ok
-          ? ((await memRes.json().catch(() => null)) as ApiEnvelope<{ items?: ShareItem[] }> | null)
-          : null;
-        if (mj?.success && Array.isArray(mj.data?.items)) {
-          setItems(mj.data.items);
-        }
-      } catch (err) {
-        console.error("Failed to refresh members after invite:", err);
+
+      // Reconcile in place: swap the optimistic row for the canonical item
+      // the server returned. No follow-up GET /members — the response IS the
+      // source of truth (Fix A). If the email already had a non-optimistic
+      // row (e.g. invite_updated on an existing invite), collapse to one.
+      const canonical = json.data?.item;
+      if (canonical) {
+        setItems((prev) => {
+          const withoutDupes = prev.filter(
+            (i) =>
+              i.id !== optimisticItem.id &&
+              !(i.type === canonical.type && i.id === canonical.id)
+          );
+          return [canonical, ...withoutDupes];
+        });
+      } else {
+        // No canonical item (shouldn't happen for success types) — drop the
+        // optimistic row rather than leave a permanently-fake entry.
+        setItems((prev) => prev.filter((i) => i.id !== optimisticItem.id));
       }
     } finally {
       setInviting(false);
@@ -288,6 +297,19 @@ export function useShareController(
       const sid = sessionId.trim();
       if (!sid) return;
       const key = itemKey(item);
+
+      // Optimistic: flip the access label immediately. Snapshot the prior
+      // list so a failed PATCH can roll the row back. `updatingId` keeps the
+      // small inline spinner on the row so the user knows it's still settling.
+      let previousItems: ShareItem[] = [];
+      setItems((prev) => {
+        previousItems = prev;
+        return prev.map((row) =>
+          row.type === item.type && row.id === item.id
+            ? { ...row, access }
+            : row
+        );
+      });
       setUpdatingId(key);
       setListError("");
 
@@ -301,6 +323,7 @@ export function useShareController(
         }),
       });
       if (!res) {
+        setItems(previousItems);
         setUpdatingId(null);
         return;
       }
@@ -308,13 +331,12 @@ export function useShareController(
         type?: "member_updated" | "invite_updated";
       }>;
       if (!res.ok || !json.success) {
-        setListError(getErrorMessage(json));
+        setItems(previousItems);
+        setListError(getErrorMessage(json) || "Failed to update access");
         setUpdatingId(null);
         return;
       }
-      setItems((prev) =>
-        prev.map((row) => (row.type === item.type && row.id === item.id ? { ...row, access } : row))
-      );
+      // Success: optimistic value already applied — nothing more to do.
       setUpdatingId(null);
     },
     [sessionId]
@@ -331,6 +353,7 @@ export function useShareController(
       // Optimistic: add new member for approve. Request removal is handled by
       // the realtime accessRequests listener once the server PATCH commits.
       const optimisticRequest = accessRequests.find(r => r.id === rid);
+      const optimisticMemberId = optimisticRequest?.id;
       if (action === "approve" && optimisticRequest) {
         const optimisticMember: ShareItem = {
           id: optimisticRequest.id,
@@ -341,7 +364,6 @@ export function useShareController(
         };
         setItems(prev => [optimisticMember, ...prev]);
       }
-      const optimisticMemberId = optimisticRequest?.id;
 
       const res = await authFetch(`/api/sessions/${encodeURIComponent(sid)}/access-requests`, {
         method: "PATCH",
@@ -359,7 +381,10 @@ export function useShareController(
         setPatchingAccessRequestId(null);
         return;
       }
-      const json = (await res.json().catch(() => ({}))) as ApiEnvelope<{ type?: string }>;
+      const json = (await res.json().catch(() => ({}))) as ApiEnvelope<{
+        type?: string;
+        item?: ShareItem;
+      }>;
       if (!res.ok || !json.success) {
         if (optimisticMemberId) {
           setItems(prev => prev.filter(i => i.id !== optimisticMemberId));
@@ -368,16 +393,28 @@ export function useShareController(
         setPatchingAccessRequestId(null);
         return;
       }
-      setPatchingAccessRequestId(null);
-      setRefetchingAfterApproval(true);
 
-      const memRes = await authFetch(`/api/sessions/${encodeURIComponent(sid)}/members`);
-      const mj = memRes?.ok ? await memRes.json() : null;
-      if (mj?.success && Array.isArray(mj.data?.items)) {
-        setItems(mj.data.items);
+      // Reconcile in place: swap the optimistic (request-id keyed) row for the
+      // canonical member item the server returned. No follow-up GET /members —
+      // the pending request itself disappears via the realtime accessRequests
+      // listener once the server PATCH commits (Fix A).
+      const canonical = json.data?.item;
+      if (action === "approve" && canonical) {
+        setItems((prev) => {
+          const withoutDupes = prev.filter(
+            (i) =>
+              i.id !== optimisticMemberId &&
+              !(i.type === canonical.type && i.id === canonical.id)
+          );
+          return [canonical, ...withoutDupes];
+        });
+      } else if (action === "approve" && optimisticMemberId) {
+        // No canonical item on an approve success (shouldn't happen) — drop
+        // the optimistic row rather than leave a request-id keyed fake.
+        setItems((prev) => prev.filter((i) => i.id !== optimisticMemberId));
       }
 
-      setRefetchingAfterApproval(false);
+      setPatchingAccessRequestId(null);
     },
     [sessionId, accessRequests]
   );
@@ -387,6 +424,17 @@ export function useShareController(
       const sid = sessionId.trim();
       if (!sid) return;
       const key = itemKey(item);
+
+      // Optimistic: drop the row immediately. Snapshot the prior list so a
+      // failed DELETE can re-insert it. `removingId` drives the inline
+      // spinner for the brief window the request is in flight.
+      let previousItems: ShareItem[] = [];
+      setItems((prev) => {
+        previousItems = prev;
+        return prev.filter(
+          (row) => !(row.type === item.type && row.id === item.id)
+        );
+      });
       setRemovingId(key);
       setListError("");
 
@@ -399,6 +447,7 @@ export function useShareController(
         }),
       });
       if (!res) {
+        setItems(previousItems);
         setRemovingId(null);
         return;
       }
@@ -406,11 +455,12 @@ export function useShareController(
         type?: "member_removed" | "invite_removed";
       }>;
       if (!res.ok || !json.success) {
-        setListError(getErrorMessage(json));
+        setItems(previousItems);
+        setListError(getErrorMessage(json) || "Failed to remove access");
         setRemovingId(null);
         return;
       }
-      setItems((prev) => prev.filter((row) => !(row.type === item.type && row.id === item.id)));
+      // Success: row already gone — nothing more to do.
       setRemovingId(null);
     },
     [sessionId]
@@ -464,7 +514,6 @@ export function useShareController(
     canResolve,
     linkCopied,
     copyShareLink,
-    refetchingAfterApproval,
     workspaceMembers,
     loadingWorkspaceMembers,
   };

@@ -17,6 +17,7 @@ import {
 } from "@/lib/repositories/activityEventsRepository.server";
 import { sendSessionInviteEmail } from "@/lib/email/workspaceEmails";
 import { resolveUserName } from "@/lib/utils/nameSplit";
+import { fireAndForget } from "@/lib/server/fireAndForget";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
 
@@ -194,8 +195,25 @@ export async function POST(
       sessionUrl: `${APP_URL}/dashboard/${sessionId}`,
     }).catch(() => {});
 
+    // Canonical member row — same shape GET /members produces per item, so the
+    // client can reconcile its optimistic row in place without a re-fetch.
+    const addedUserSnap = await adminDb.doc(`users/${existingUser.uid}`).get();
+    const addedUserData = addedUserSnap.exists ? addedUserSnap.data() : null;
+    const avatarUrl =
+      (addedUserData?.avatarUrl as string | null | undefined) ??
+      (addedUserData?.photoURL as string | null | undefined) ??
+      null;
+
     return apiSuccess({
       type: "member_added",
+      item: {
+        type: "member" as const,
+        id: existingUser.uid,
+        email,
+        access,
+        status: "active" as const,
+        avatarUrl,
+      },
     });
   }
 
@@ -208,14 +226,30 @@ export async function POST(
       .limit(1)
       .get();
 
+    let updatedStatus: "pending" | "active" = "pending";
     if (!inviteRef.empty) {
       await inviteRef.docs[0].ref.update({
         access,
       });
+      const sData = inviteRef.docs[0].data();
+      updatedStatus =
+        sData.status === "active"
+          ? "active"
+          : sData.status === "pending"
+            ? "pending"
+            : "pending";
     }
 
     return apiSuccess({
       type: "invite_updated",
+      item: {
+        type: "invite" as const,
+        id: email,
+        email,
+        access,
+        status: updatedStatus,
+        avatarUrl: null,
+      },
     });
   }
 
@@ -240,16 +274,24 @@ export async function POST(
       ? context.session.workspaceId.trim()
       : "";
   if (workspaceId) {
-    const actor = await resolveActorForActivityEvent(invitedByUserId);
     const sessionTitle = sessionTitleFromSessionRow(context.session);
-    await createActivityEvent({
-      workspaceId,
-      sessionId,
-      eventType: "invite.sent",
-      actorId: invitedByUserId,
-      actorName: actor.actorName,
-      actorPhotoURL: actor.actorPhotoURL,
-      metadata: { sessionTitle, email, access },
+
+    // Phase 28.X — the invite doc (createSessionInvite) is already committed
+    // above; the response below does not depend on the activity event. Offload
+    // it so the invite POST returns without waiting on actor resolution + the
+    // activityEvents write. The activity log catches up via the realtime
+    // listener. (The invite email is already off-path below.)
+    fireAndForget("invite.sent:activityEvent", async () => {
+      const actor = await resolveActorForActivityEvent(invitedByUserId);
+      await createActivityEvent({
+        workspaceId,
+        sessionId,
+        eventType: "invite.sent",
+        actorId: invitedByUserId,
+        actorName: actor.actorName,
+        actorPhotoURL: actor.actorPhotoURL,
+        metadata: { sessionTitle, email, access },
+      });
     });
 
     void (async () => {
@@ -291,7 +333,21 @@ export async function POST(
     })();
   }
 
+  // Mirror createSessionInvite's status rule exactly: view-access invites are
+  // immediately "active" (link works without acceptance); resolve invites stay
+  // "pending" until the invitee accepts.
+  const createdStatus: "pending" | "active" =
+    access === "view" ? "active" : "pending";
+
   return apiSuccess({
     type: "invite_created",
+    item: {
+      type: "invite" as const,
+      id: email,
+      email,
+      access,
+      status: createdStatus,
+      avatarUrl: null,
+    },
   });
 }
