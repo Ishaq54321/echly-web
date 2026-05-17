@@ -88,7 +88,7 @@ async function resolveOrAssignWorkspaceIdRepo(
   const name = composed || "My Workspace";
 
   await createWorkspaceRepo({
-    userId: uid,
+    workspaceId: uid,
     ownerId: uid,
     name,
     logoUrl: user.photoURL ?? null,

@@ -10,6 +10,8 @@ export interface PlanDoc {
   annualPricePerSeat: number | null;
   maxFeedbackPerMonth: number | null;
   maxMembers: number | null;
+  /** AI improvements allowed per calendar month. null = unlimited. */
+  aiImprovementsPerMonth: number | null;
   insightsEnabled: boolean;
   customBranding: boolean;
   prioritySupport: boolean;

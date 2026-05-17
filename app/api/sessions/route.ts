@@ -10,7 +10,7 @@ import {
   createActivityEvent,
   resolveActorForActivityEvent,
 } from "@/lib/repositories/activityEventsRepository.server";
-import { WORKSPACE_SUSPENDED_MESSAGE } from "@/lib/server/assertWorkspaceActive";
+import { workspaceGuardErrorResponse } from "@/lib/server/workspaceGuardErrorResponse";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { corsHeaders } from "@/lib/server/cors";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
@@ -196,14 +196,9 @@ export async function GET(req: NextRequest) {
         init: { headers: corsHeaders(req) },
       });
     }
-    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return apiError({
-        code: "FORBIDDEN",
-        message: WORKSPACE_SUSPENDED_MESSAGE,
-        status: 403,
-        init: { headers: corsHeaders(req) },
-      });
-    }
+    const guardResponse = workspaceGuardErrorResponse(err);
+    if (guardResponse) return withCors(req, guardResponse);
+
     console.error("GET /api/sessions:", err);
     return apiError({
       code: "INTERNAL_ERROR",
@@ -263,14 +258,9 @@ export async function POST(req: NextRequest) {
         init: { headers: corsHeaders(req) },
       });
     }
-    if (err instanceof Error && err.message === "WORKSPACE_SUSPENDED") {
-      return apiError({
-        code: "FORBIDDEN",
-        message: WORKSPACE_SUSPENDED_MESSAGE,
-        status: 403,
-        init: { headers: corsHeaders(req) },
-      });
-    }
+    const guardResponse = workspaceGuardErrorResponse(err);
+    if (guardResponse) return withCors(req, guardResponse);
+
     console.error("POST /api/sessions:", err);
     return apiError({
       code: "INTERNAL_ERROR",

@@ -11,6 +11,7 @@ export interface PlanCatalogItem {
   annualPricePerSeat: number | null;
   maxFeedbackPerMonth: number | null;
   maxMembers: number | null;
+  aiImprovementsPerMonth: number | null;
   insightsEnabled: boolean;
   customBranding: boolean;
   prioritySupport: boolean;

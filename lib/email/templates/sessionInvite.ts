@@ -1,9 +1,20 @@
+import { emailShell, emailButton, emailColors, plainTextShell } from "../components";
+
 function escapeHtml(str: string): string {
   return str
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+interface SessionInviteProps {
+  invitedByName: string;
+  sessionName: string;
+  workspaceName: string;
+  accessLevel: "view" | "resolve";
+  sessionUrl: string;
+  requiresAccount?: boolean;
 }
 
 export function sessionInviteEmailHtml({
@@ -13,74 +24,54 @@ export function sessionInviteEmailHtml({
   accessLevel,
   sessionUrl,
   requiresAccount = false,
-}: {
-  invitedByName: string;
-  sessionName: string;
-  workspaceName: string;
-  accessLevel: "view" | "resolve";
-  sessionUrl: string;
-  requiresAccount?: boolean;
-}): string {
+}: SessionInviteProps): string {
   const accessLabel =
-    accessLevel === "resolve"
-      ? "view and resolve feedback on"
-      : "view feedback on";
+    accessLevel === "resolve" ? "view and resolve feedback on" : "view feedback on";
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>You've been invited to view ${escapeHtml(sessionName)}</title>
-</head>
-<body style="margin:0;padding:0;background:#F8F8F8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F8F8F8;padding:40px 0;">
-    <tr>
-      <td align="center">
-        <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;max-width:560px;width:100%;">
-          <tr>
-            <td style="background:#5A49BF;padding:28px 40px;">
-              <span style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.02em;">Annote</span>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:40px 40px 32px;">
-              <h1 style="margin:0 0 8px;font-size:24px;font-weight:700;color:#15101F;line-height:1.3;">
-                ${escapeHtml(invitedByName)} invited you to a session
-              </h1>
-              <p style="margin:0 0 4px;font-size:18px;font-weight:600;color:#15101F;">
-                ${escapeHtml(sessionName)}
-              </p>
-              <p style="margin:0 0 24px;font-size:15px;color:#54495F;">
-                You can ${escapeHtml(accessLabel)} this session.
-              </p>
-              <table cellpadding="0" cellspacing="0" style="margin-bottom:${requiresAccount ? "16px" : "32px"};">
-                <tr>
-                  <td>
-                    <a href="${escapeHtml(sessionUrl)}"
-                       style="display:inline-block;padding:14px 28px;background:#5A49BF;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;border-radius:8px;">
-                      Open session
-                    </a>
-                  </td>
-                </tr>
-              </table>
-              ${requiresAccount ? `<p style="margin:0 0 32px;font-size:13px;color:#8A8096;">You'll need to create a free account to access this session.</p>` : ""}
-              <p style="margin:0;font-size:13px;color:#8A8096;">
-                This is a session in ${escapeHtml(workspaceName)}.
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:20px 40px 32px;border-top:1px solid #FAFAF7;">
-              <p style="margin:0;font-size:13px;color:#8A8096;">
-                If you didn't expect this invitation, you can safely ignore this email.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+  const body = `
+    <h1 style="margin:0 0 8px;font-size:24px;font-weight:600;color:${emailColors.textHeading};letter-spacing:-0.02em;line-height:1.3;">
+      ${escapeHtml(invitedByName)} invited you to a session
+    </h1>
+    <p style="margin:0 0 4px;font-size:18px;font-weight:600;color:${emailColors.textHeading};">
+      ${escapeHtml(sessionName)}
+    </p>
+    <p style="margin:0 0 8px;">
+      You can ${escapeHtml(accessLabel)} this session.
+    </p>
+    ${emailButton("Open session", escapeHtml(sessionUrl))}
+    ${
+      requiresAccount
+        ? `<p style="margin:0 0 8px;font-size:13px;color:${emailColors.textMuted};">You'll need to create a free account to access this session.</p>`
+        : ""
+    }
+    <p style="margin:0;font-size:13px;color:${emailColors.textMuted};">
+      This is a session in ${escapeHtml(workspaceName)}. If you didn't expect this invitation, you can safely ignore this email.
+    </p>
+  `;
+
+  return emailShell(body, {
+    preheader: `${invitedByName} invited you to view ${sessionName}.`,
+  });
+}
+
+export function sessionInviteEmailText({
+  invitedByName,
+  sessionName,
+  workspaceName,
+  accessLevel,
+  sessionUrl,
+  requiresAccount = false,
+}: SessionInviteProps): string {
+  const accessLabel =
+    accessLevel === "resolve" ? "view and resolve feedback on" : "view feedback on";
+
+  return plainTextShell(`${invitedByName} invited you to a session
+
+${sessionName}
+
+You can ${accessLabel} this session.
+
+Open session: ${sessionUrl}
+${requiresAccount ? "\nYou'll need to create a free account to access this session.\n" : ""}
+This is a session in ${workspaceName}. If you didn't expect this invitation, you can safely ignore this email.`);
 }

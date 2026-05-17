@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     if (!workspace) {
       return apiError({ code: "NOT_FOUND", message: "Workspace not found", status: 404 });
     }
-    assertWorkspaceActive(workspace);
+    assertWorkspaceActive(workspace, { allowSuspended: true });
 
     if (workspace.ownerId !== user.uid) {
       return apiError({
@@ -42,9 +42,12 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    let body: { billingCycle?: unknown } = {};
+    let body: { billingCycle?: unknown; seatCount?: unknown } = {};
     try {
-      body = (await req.json()) as { billingCycle?: unknown };
+      body = (await req.json()) as {
+        billingCycle?: unknown;
+        seatCount?: unknown;
+      };
     } catch {
       // default to monthly
     }
@@ -52,8 +55,20 @@ export async function POST(req: NextRequest) {
     const billingCycle: "monthly" | "annual" =
       body.billingCycle === "annual" ? "annual" : "monthly";
 
+    // Server is the source of truth for the floor. The client may request a
+    // HIGHER seat count (planning ahead) but never lower than the actual
+    // member count — this defends against client-side seat-count tampering.
     const memberCount = workspace.usage?.members ?? 1;
-    const seatCount = Math.max(memberCount, 1);
+    const floor = Math.max(memberCount, 1);
+    const requested =
+      typeof body.seatCount === "number"
+        ? body.seatCount
+        : typeof body.seatCount === "string"
+        ? parseInt(body.seatCount, 10)
+        : NaN;
+    const seatCount = Number.isFinite(requested)
+      ? Math.max(requested, floor)
+      : floor;
 
     const origin = req.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
     const ownerEmail = user.email ?? "";
@@ -66,12 +81,20 @@ export async function POST(req: NextRequest) {
       ownerUid: user.uid,
       seatCount,
       billingCycle,
-      existingCustomerId: workspace.billing?.stripeCustomerId ?? null,
+      existingCustomerId: workspace.billing?.customerId ?? null,
       successUrl: `${origin}/settings?tab=billing&upgraded=true`,
       cancelUrl: `${origin}/settings?tab=billing`,
     });
 
-    return apiSuccess({ checkoutUrl: result.checkoutUrl });
+    return apiSuccess({
+      priceId: result.priceId,
+      customData: result.customData,
+      customerEmail: result.customerEmail,
+      customerId: result.customerId ?? null,
+      // Propagate the workspace member count so Paddle.Checkout opens at the
+      // right seat quantity (prevents seat-count drift vs. reality).
+      seatCount,
+    });
   } catch (err) {
     console.error("POST /api/billing/checkout:", err);
     return apiError({ code: "INTERNAL_ERROR", message: "Failed to create checkout session", status: 500 });

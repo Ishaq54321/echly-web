@@ -4,6 +4,7 @@ import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 import { assertWorkspaceActive } from "@/lib/server/assertWorkspaceActive";
+import { workspaceGuardErrorResponse } from "@/lib/server/workspaceGuardErrorResponse";
 import {
   getWorkspaceMemberRepo,
   getWorkspaceMembersRepo,
@@ -59,30 +60,33 @@ export async function DELETE(
 
     await removeWorkspaceMemberRepo(workspaceId, targetUid);
 
-    // Re-read workspace after atomic member decrement to get accurate count for Stripe
+    // Re-read workspace after atomic member decrement to get accurate count for the payment provider
     const updatedWorkspace = await getWorkspace(workspaceId);
     const actualMemberCount = updatedWorkspace?.usage?.members ?? 1;
 
     if (
       updatedWorkspace?.billing?.plan === "business" &&
-      updatedWorkspace.billing.stripeSubscriptionId
+      updatedWorkspace.billing.subscriptionId
     ) {
       try {
         const newSeatCount = Math.max(actualMemberCount, 1);
         await getPaymentProvider().updateSubscriptionSeats(
-          updatedWorkspace.billing.stripeSubscriptionId,
+          updatedWorkspace.billing.subscriptionId,
           newSeatCount
         );
         await adminDb.doc(`workspaces/${workspaceId}`).update({
           "billing.seats": newSeatCount,
         });
-      } catch (stripeErr) {
-        console.error("[member remove] failed to sync Stripe seats:", stripeErr);
+      } catch (providerErr) {
+        console.error("[member remove] failed to sync subscription seats:", providerErr);
       }
     }
 
     return apiSuccess({ success: true });
   } catch (err) {
+    const guardResponse = workspaceGuardErrorResponse(err);
+    if (guardResponse) return guardResponse;
+
     console.error("DELETE /api/workspace/members/[uid]:", err);
     return apiError({ code: "INTERNAL_ERROR", message: "Failed to remove member", status: 500 });
   }

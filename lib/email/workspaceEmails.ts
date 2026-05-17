@@ -1,14 +1,26 @@
 import "server-only";
 import { sendEmailOrLog } from "./resend";
-import { workspaceInviteEmailHtml } from "./templates/workspaceInvite";
-import { workspaceInviteReminderHtml } from "./templates/workspaceInviteReminder";
-import { workspaceDeletedConfirmationHtml } from "./templates/workspaceDeletedConfirmation";
-import { sessionInviteEmailHtml } from "./templates/sessionInvite";
-import { accessRequestNotificationEmailHtml } from "./templates/accessRequestNotification";
-import { accessRequestResultEmailHtml } from "./templates/accessRequestResult";
-import { emailChangeEmailHtml } from "./templates/emailChange";
-import { passwordResetEmailHtml } from "./templates/passwordReset";
-import { emailVerificationHtml } from "./templates/emailVerification";
+import { workspaceInviteEmailHtml, workspaceInviteEmailText } from "./templates/workspaceInvite";
+import {
+  workspaceInviteReminderHtml,
+  workspaceInviteReminderText,
+} from "./templates/workspaceInviteReminder";
+import {
+  workspaceDeletedConfirmationHtml,
+  workspaceDeletedConfirmationText,
+} from "./templates/workspaceDeletedConfirmation";
+import { sessionInviteEmailHtml, sessionInviteEmailText } from "./templates/sessionInvite";
+import {
+  accessRequestNotificationEmailHtml,
+  accessRequestNotificationEmailText,
+} from "./templates/accessRequestNotification";
+import {
+  accessRequestResultEmailHtml,
+  accessRequestResultEmailText,
+} from "./templates/accessRequestResult";
+import { emailChangeEmailHtml, emailChangeEmailText } from "./templates/emailChange";
+import { passwordResetEmailHtml, passwordResetEmailText } from "./templates/passwordReset";
+import { emailVerificationHtml, emailVerificationText } from "./templates/emailVerification";
 
 // WS-006 FIX: always use verified sender domain
 // regardless of APP_URL (localhost would break Resend)
@@ -28,16 +40,12 @@ export async function sendWorkspaceInviteEmail({
   token: string;
 }): Promise<void> {
   const acceptUrl = `${APP_URL}/invite/${token}`;
+  const props = { invitedByName, workspaceName, role, acceptUrl, expiresInDays: 30 };
   await sendEmailOrLog({
     to,
     subject: `You've been invited to join ${workspaceName}`,
-    html: workspaceInviteEmailHtml({
-      invitedByName,
-      workspaceName,
-      role,
-      acceptUrl,
-      expiresInDays: 30,
-    }),
+    html: workspaceInviteEmailHtml(props),
+    text: workspaceInviteEmailText(props),
   });
 }
 
@@ -53,10 +61,12 @@ export async function sendWorkspaceInviteReminderEmail({
   expiresInDays: number;
 }): Promise<void> {
   const acceptUrl = `${APP_URL}/invite/${token}`;
+  const props = { workspaceName, acceptUrl, expiresInDays };
   await sendEmailOrLog({
     to,
     subject: `Your invitation to ${workspaceName} expires in ${expiresInDays} days`,
-    html: workspaceInviteReminderHtml({ workspaceName, acceptUrl, expiresInDays }),
+    html: workspaceInviteReminderHtml(props),
+    text: workspaceInviteReminderText(props),
   });
 }
 
@@ -78,17 +88,19 @@ export async function sendSessionInviteEmail({
   requiresAccount?: boolean;
 }): Promise<void> {
   try {
+    const props = {
+      invitedByName,
+      sessionName,
+      workspaceName,
+      accessLevel,
+      sessionUrl,
+      requiresAccount,
+    };
     await sendEmailOrLog({
       to,
       subject: `You've been invited to view ${sessionName}`,
-      html: sessionInviteEmailHtml({
-        invitedByName,
-        sessionName,
-        workspaceName,
-        accessLevel,
-        sessionUrl,
-        requiresAccount,
-      }),
+      html: sessionInviteEmailHtml(props),
+      text: sessionInviteEmailText(props),
     });
   } catch (err) {
     console.error("[sendSessionInviteEmail] failed", err);
@@ -109,17 +121,14 @@ export async function sendAccessRequestNotificationEmail({
   workspaceName: string;
 }): Promise<void> {
   try {
+    const props = { requesterEmail, sessionName, sessionUrl, workspaceName };
     await Promise.allSettled(
       to.map((recipient) =>
         sendEmailOrLog({
           to: recipient,
           subject: `${requesterEmail} requested access to ${sessionName}`,
-          html: accessRequestNotificationEmailHtml({
-            requesterEmail,
-            sessionName,
-            sessionUrl,
-            workspaceName,
-          }),
+          html: accessRequestNotificationEmailHtml(props),
+          text: accessRequestNotificationEmailText(props),
         })
       )
     );
@@ -142,12 +151,14 @@ export async function sendAccessRequestResultEmail({
   workspaceName: string;
 }): Promise<void> {
   try {
+    const props = { approved, sessionName, sessionUrl, workspaceName };
     await sendEmailOrLog({
       to,
       subject: approved
         ? `You now have access to ${sessionName}`
         : `Access request for ${sessionName}`,
-      html: accessRequestResultEmailHtml({ approved, sessionName, sessionUrl, workspaceName }),
+      html: accessRequestResultEmailHtml(props),
+      text: accessRequestResultEmailText(props),
     });
   } catch (err) {
     console.error("[sendAccessRequestResultEmail] failed", err);
@@ -165,10 +176,12 @@ export async function sendEmailChangeConfirmation({
   confirmUrl: string;
   userName: string;
 }): Promise<void> {
+  const props = { newEmail, confirmUrl, userName };
   await sendEmailOrLog({
     to,
     subject: "Confirm your new email address",
-    html: emailChangeEmailHtml({ newEmail, confirmUrl, userName }),
+    html: emailChangeEmailHtml(props),
+    text: emailChangeEmailText(props),
   });
 }
 
@@ -181,10 +194,12 @@ export async function sendPasswordResetEmail({
   resetUrl: string;
   userName: string;
 }): Promise<void> {
+  const props = { resetUrl, userName };
   await sendEmailOrLog({
     to,
     subject: "Reset your Annote password",
-    html: passwordResetEmailHtml({ resetUrl, userName }),
+    html: passwordResetEmailHtml(props),
+    text: passwordResetEmailText(props),
   });
 }
 
@@ -197,10 +212,12 @@ export async function sendEmailVerification({
   verifyUrl: string;
   userName: string;
 }): Promise<void> {
+  const props = { verifyUrl, userName };
   await sendEmailOrLog({
     to,
     subject: "Verify your email — Annote",
-    html: emailVerificationHtml({ verifyUrl, userName }),
+    html: emailVerificationHtml(props),
+    text: emailVerificationText(props),
   });
 }
 
@@ -218,9 +235,11 @@ export async function sendWorkspaceDeletionConfirmationEmail({
     month: "long",
     day: "numeric",
   });
+  const props = { workspaceName, purgeDate: purgeDateStr };
   await sendEmailOrLog({
     to,
     subject: `Your workspace "${workspaceName}" has been scheduled for deletion`,
-    html: workspaceDeletedConfirmationHtml({ workspaceName, purgeDate: purgeDateStr }),
+    html: workspaceDeletedConfirmationHtml(props),
+    text: workspaceDeletedConfirmationText(props),
   });
 }

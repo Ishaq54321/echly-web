@@ -18,6 +18,7 @@ function defaultPlanDoc(id: PlanId): PlanDoc {
     annualPricePerSeat: def.annualPricePerSeat,
     maxFeedbackPerMonth: def.maxFeedbackPerMonth,
     maxMembers: def.maxMembers,
+    aiImprovementsPerMonth: def.aiImprovementsPerMonth,
     insightsEnabled: def.insightsAccess,
     customBranding: def.customBranding,
     prioritySupport: def.prioritySupport,
@@ -56,6 +57,10 @@ export async function GET(req: Request) {
           ? stored.maxFeedbackPerMonth
           : base.maxFeedbackPerMonth,
       maxMembers: stored?.maxMembers !== undefined ? stored.maxMembers : base.maxMembers,
+      aiImprovementsPerMonth:
+        stored?.aiImprovementsPerMonth !== undefined
+          ? stored.aiImprovementsPerMonth
+          : base.aiImprovementsPerMonth,
       insightsEnabled: stored?.insightsEnabled ?? base.insightsEnabled,
       customBranding: stored?.customBranding ?? base.customBranding,
       prioritySupport: stored?.prioritySupport ?? base.prioritySupport,
@@ -94,6 +99,7 @@ export async function PATCH(req: Request) {
   if (updates.annualPricePerSeat !== undefined) payload.annualPricePerSeat = updates.annualPricePerSeat;
   if (updates.maxFeedbackPerMonth !== undefined) payload.maxFeedbackPerMonth = updates.maxFeedbackPerMonth;
   if (updates.maxMembers !== undefined) payload.maxMembers = updates.maxMembers;
+  if (updates.aiImprovementsPerMonth !== undefined) payload.aiImprovementsPerMonth = updates.aiImprovementsPerMonth;
   if (typeof updates.insightsEnabled === "boolean") payload.insightsEnabled = updates.insightsEnabled;
   if (typeof updates.customBranding === "boolean") payload.customBranding = updates.customBranding;
   if (typeof updates.prioritySupport === "boolean") payload.prioritySupport = updates.prioritySupport;

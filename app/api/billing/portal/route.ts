@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     if (!workspace) {
       return apiError({ code: "NOT_FOUND", message: "Workspace not found", status: 404 });
     }
-    assertWorkspaceActive(workspace);
+    assertWorkspaceActive(workspace, { allowSuspended: true });
 
     if (workspace.ownerId !== user.uid) {
       return apiError({
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const customerId = workspace.billing?.stripeCustomerId;
+    const customerId = workspace.billing?.customerId;
     if (!customerId) {
       return apiError({
         code: "INVALID_INPUT",

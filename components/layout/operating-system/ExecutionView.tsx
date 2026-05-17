@@ -100,9 +100,10 @@ export interface ExecutionViewProps {
   screenshotUrl: string | null;
   screenshotUrlLoading: boolean;
   screenshotUrlError: string | null;
-  onAssigned?: (assigneeId: string | null, assigneeName: string | null, assigneeAvatarUrl: string | null) => void;
-  onPriorityChanged?: (priority: Priority | null) => void;
-  onSaveStateChange?: (state: 'saving' | 'saved' | 'error' | 'hidden') => void;
+  onAssigned?: (assigneeId: string | null, assigneeName: string | null, assigneeAvatarUrl: string | null) => void | Promise<void>;
+  onPriorityChanged?: (priority: Priority | null) => void | Promise<void>;
+  assigneeBusy?: boolean;
+  priorityBusy?: boolean;
   canAssignTicket?: boolean;
   isWorkspaceMember?: boolean;
   animatingPinId?: string | null;
@@ -161,7 +162,8 @@ export function ExecutionView({
   screenshotUrlError,
   onAssigned,
   onPriorityChanged,
-  onSaveStateChange,
+  assigneeBusy = false,
+  priorityBusy = false,
   canAssignTicket = false,
   isWorkspaceMember = false,
   animatingPinId,
@@ -202,9 +204,10 @@ export function ExecutionView({
         assigneeName={(displayItem as { assigneeName?: string | null } | null)?.assigneeName ?? null}
         assigneeAvatarUrl={(displayItem as { assigneeAvatarUrl?: string | null } | null)?.assigneeAvatarUrl ?? null}
         onAssigned={(!isPublicReadOnly && !isShareSurface) ? onAssigned : undefined}
+        assigneeBusy={assigneeBusy}
         priority={(displayItem as { priority?: string | null } | null)?.priority as ("high" | "medium" | "low" | null) ?? null}
         onPriorityChanged={(!isPublicReadOnly && !isShareSurface) ? onPriorityChanged : undefined}
-        onSaveStateChange={(!isPublicReadOnly && !isShareSurface) ? onSaveStateChange : undefined}
+        priorityBusy={priorityBusy}
         canAssignTicket={canAssignTicket}
         isWorkspaceMember={isWorkspaceMember}
       />

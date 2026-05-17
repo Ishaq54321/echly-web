@@ -4,6 +4,7 @@ import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 import { assertWorkspaceActive } from "@/lib/server/assertWorkspaceActive";
+import { workspaceGuardErrorResponse } from "@/lib/server/workspaceGuardErrorResponse";
 import {
   getWorkspaceMemberRepo,
   getWorkspaceInvitationRepo,
@@ -47,6 +48,9 @@ export async function DELETE(
 
     return apiSuccess({ success: true });
   } catch (err) {
+    const guardResponse = workspaceGuardErrorResponse(err);
+    if (guardResponse) return guardResponse;
+
     console.error("DELETE /api/workspace/members/invitations/[token]:", err);
     return apiError({ code: "INTERNAL_ERROR", message: "Failed to revoke invitation", status: 500 });
   }

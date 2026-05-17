@@ -6,6 +6,7 @@ import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { getUserWorkspaceIdRepo, getUserByIdRepo, addWorkspaceMembershipRepo } from "@/lib/repositories/usersRepository.server";
 import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 import { assertWorkspaceActive } from "@/lib/server/assertWorkspaceActive";
+import { workspaceGuardErrorResponse } from "@/lib/server/workspaceGuardErrorResponse";
 import {
   getWorkspaceMemberRepo,
   addWorkspaceMemberRepo,
@@ -203,6 +204,9 @@ export async function POST(req: NextRequest) {
 
     return apiSuccess({ invitation });
   } catch (err) {
+    const guardResponse = workspaceGuardErrorResponse(err);
+    if (guardResponse) return guardResponse;
+
     console.error("POST /api/workspace/members/invite:", err);
     return apiError({ code: "INTERNAL_ERROR", message: "Failed to send invitation", status: 500 });
   }

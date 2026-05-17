@@ -1,20 +1,17 @@
 ﻿"use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { UserPlus, UserPen, UserMinus, Check, ChevronDown, Search } from "lucide-react";
-import { authFetch } from "@/lib/authFetch";
 import { NAME_FALLBACK } from "@/lib/utils/nameSplit";
-import { useToast } from "@/components/dashboard/context/ToastContext";
 import { InviteMemberModal } from "@/components/workspace/InviteMemberModal";
 import { UserAvatar } from "@/components/ui/UserAvatar";
-
-interface WorkspaceMemberRow {
-  uid: string;
-  displayName?: string | null;
-  email?: string | null;
-  avatarUrl?: string | null;
-  role?: string;
-}
+import { useWorkspace } from "@/lib/client/workspaceContext";
+import {
+  useWorkspaceMembers,
+  fetchMembers as fetchWorkspaceMembers,
+  invalidateMembers,
+  type WorkspaceMemberRow,
+} from "@/lib/client/workspaceMembersStore";
 
 interface AssignDropdownProps {
   feedbackId: string;
@@ -22,15 +19,21 @@ interface AssignDropdownProps {
   currentAssigneeId: string | null;
   currentAssigneeName: string | null;
   currentAssigneeAvatarUrl: string | null;
+  /**
+   * Owns the server PATCH + optimistic state. May be async; when it is, the
+   * dropdown awaits it so the in-flight lock is observed. Read-only call
+   * sites pass a no-op.
+   */
   onAssigned: (
     assigneeId: string | null,
     assigneeName: string | null,
     assigneeAvatarUrl: string | null
-  ) => void;
-  onSaveStateChange?: (state: 'saving' | 'saved' | 'error' | 'hidden') => void;
+  ) => void | Promise<void>;
   disabled?: boolean;
   readOnly?: boolean;
   iconOnly?: boolean;
+  /** Page-level in-flight lock — survives this dropdown's remount. */
+  busy?: boolean;
 }
 
 /** Thin adapter over the canonical UserAvatar so colors stay consistent
@@ -62,52 +65,51 @@ function getMemberDisplayName(member: WorkspaceMemberRow): string {
 }
 
 export function AssignDropdown({
-  feedbackId,
+  feedbackId: _feedbackId,
   sessionId: _sessionId,
   currentAssigneeId,
   currentAssigneeName,
   currentAssigneeAvatarUrl,
   onAssigned,
-  onSaveStateChange,
   disabled = false,
   readOnly = false,
   iconOnly = false,
+  busy = false,
 }: AssignDropdownProps) {
   const [open, setOpen] = useState(false);
-  const [members, setMembers] = useState<WorkspaceMemberRow[]>([]);
-  const [membersLoaded, setMembersLoaded] = useState(false);
   const [animate, setAnimate] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [query, setQuery] = useState('');
   const [showInviteModal, setShowInviteModal] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { showToast: _showToast } = useToast();
 
-  const fetchMembers = useCallback(async () => {
-    if (membersLoaded) return;
-    try {
-      const res = await authFetch("/api/workspace/members");
-      if (!res?.ok) return;
-      const body = (await res.json()) as { data?: { members?: WorkspaceMemberRow[] } };
-      const list = body.data?.members ?? [];
-      setMembers(list);
-      setMembersLoaded(true);
-    } catch {
-      // silently ignore
-    }
-  }, [membersLoaded]);
+  const { workspaceId } = useWorkspace();
+  // Phase 28.X — members come from the shared cache (warmed by a
+  // WorkspaceProvider prefetch), not a per-mount fetch. This survives the
+  // per-feedback-item remount so the dropdown opens instantly.
+  const { members, isLoading } = useWorkspaceMembers();
+  // First-ever load only: the prefetch hasn't landed yet AND we have nothing
+  // cached. After that this is always false (cache hit).
+  const membersLoaded = members.length > 0 || !isLoading;
 
   useEffect(() => {
     if (!open) return;
-    void fetchMembers();
-    const t = requestAnimationFrame(() => setAnimate(true));
+    // Defer the cache-warm + open animation out of the effect's synchronous
+    // body so the setState calls don't run during commit
+    // (react-hooks/set-state-in-effect). fetchWorkspaceMembers is a no-op /
+    // returns instantly when the cache is fresh (the common case).
+    const t = requestAnimationFrame(() => {
+      if (workspaceId) void fetchWorkspaceMembers(workspaceId);
+      setAnimate(true);
+    });
     return () => cancelAnimationFrame(t);
-  }, [open, fetchMembers]);
+  }, [open, workspaceId]);
 
   useEffect(() => {
     if (open) return;
-    setQuery('');
-    const t = requestAnimationFrame(() => setAnimate(false));
+    const t = requestAnimationFrame(() => {
+      setQuery('');
+      setAnimate(false);
+    });
     return () => cancelAnimationFrame(t);
   }, [open]);
 
@@ -139,72 +141,25 @@ export function AssignDropdown({
     return name.includes(q) || email.includes(q);
   });
 
+  // The page handler (onAssigned) now owns the server PATCH, generation
+  // guard, in-flight lock, rollback and error toast. The dropdown just
+  // closes and delegates — no second PATCH from here.
+  //
+  // Phase 28.X — `busy` is the page-level in-flight lock. We keep it as a
+  // logical double-submit guard (silently ignore a selection while a PATCH
+  // is in flight) but no longer surface it as a visual disabled/dimmed
+  // state: the optimistic value is already shown, so the control should
+  // look settled, not "still working".
   const handleSelect = async (member: WorkspaceMemberRow) => {
-    const prevId = currentAssigneeId;
-    const prevName = currentAssigneeName;
-    const prevAvatar = currentAssigneeAvatarUrl;
     setOpen(false);
-    onAssigned(member.uid, getMemberDisplayName(member), member.avatarUrl ?? null);
-    setIsSaving(true);
-    try {
-      const res = await authFetch(`/api/tickets/${feedbackId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          assigneeId: member.uid,
-          assigneeName: getMemberDisplayName(member),
-          assigneeAvatarUrl: member.avatarUrl ?? null,
-        }),
-      });
-      if (!res?.ok) {
-        onAssigned(prevId, prevName, prevAvatar);
-        onSaveStateChange?.('error');
-      } else {
-        const body = await res.json() as {
-          data?: {
-            ticket?: {
-              assigneeId?: string | null;
-              assigneeName?: string | null;
-              assigneeAvatarUrl?: string | null;
-            };
-          };
-        };
-        const ticket = body.data?.ticket;
-        if (ticket && ticket.assigneeName !== undefined) {
-          onAssigned(ticket.assigneeId ?? null, ticket.assigneeName ?? null, ticket.assigneeAvatarUrl ?? null);
-        }
-      }
-    } catch {
-      onAssigned(prevId, prevName, prevAvatar);
-      onSaveStateChange?.('error');
-    } finally {
-      setIsSaving(false);
-    }
+    if (busy) return;
+    await onAssigned(member.uid, getMemberDisplayName(member), member.avatarUrl ?? null);
   };
 
   const handleUnassign = async () => {
-    const prevId = currentAssigneeId;
-    const prevName = currentAssigneeName;
-    const prevAvatar = currentAssigneeAvatarUrl;
     setOpen(false);
-    onAssigned(null, null, null);
-    setIsSaving(true);
-    try {
-      const res = await authFetch(`/api/tickets/${feedbackId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assigneeId: null }),
-      });
-      if (!res?.ok) {
-        onAssigned(prevId, prevName, prevAvatar);
-        onSaveStateChange?.('error');
-      }
-    } catch {
-      onAssigned(prevId, prevName, prevAvatar);
-      onSaveStateChange?.('error');
-    } finally {
-      setIsSaving(false);
-    }
+    if (busy) return;
+    await onAssigned(null, null, null);
   };
 
   // READ-ONLY MODE
@@ -246,7 +201,10 @@ export function AssignDropdown({
 
   const hasAssignee = Boolean(currentAssigneeId);
 
-  const baseCls = `inline-flex h-[34px] items-center gap-2 px-3.5 rounded-[7px] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[13px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all ${disabled || isSaving ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`;
+  // `busy` is intentionally NOT part of the visual state (Phase 28.X) — only
+  // the explicit `disabled` prop dims/locks the control. The in-flight lock
+  // is enforced logically in handleSelect/handleUnassign instead.
+  const baseCls = `inline-flex h-[34px] items-center gap-2 px-3.5 rounded-[7px] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[13px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`;
 
   const displayName = currentAssigneeName
     ? currentAssigneeName
@@ -254,8 +212,7 @@ export function AssignDropdown({
     ? "Assigned"
     : null;
 
-  const firstName = displayName ? displayName.split(" ")[0] : "Assigned";
-  const tooltipText = displayName ? `Assigned to ${displayName}` : "Assigned";
+  const buttonLabel = displayName || "Assigned";
 
   return (
     <>
@@ -263,14 +220,14 @@ export function AssignDropdown({
         <button
           type="button"
           className={baseCls}
-          disabled={disabled || isSaving}
-          onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
+          disabled={disabled}
+          onClick={() => !disabled && setOpen((o) => !o)}
         >
           {hasAssignee ? (
             <>
               <Avatar name={displayName} avatarUrl={currentAssigneeAvatarUrl} size={20} colorSeed={currentAssigneeId} />
               <span style={{ maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {firstName}
+                {buttonLabel}
               </span>
               {!iconOnly && <ChevronDown size={12} style={{ flexShrink: 0 }} />}
             </>
@@ -527,7 +484,10 @@ export function AssignDropdown({
           onClose={() => setShowInviteModal(false)}
           onInviteSent={() => {
             setShowInviteModal(false);
-            setMembersLoaded(false);
+            // Phase 28.X — drop cache freshness (keeps stale list visible)
+            // then immediately refetch so the new member appears.
+            invalidateMembers();
+            if (workspaceId) void fetchWorkspaceMembers(workspaceId);
           }}
         />
       )}

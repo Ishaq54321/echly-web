@@ -27,6 +27,9 @@ const actionBtn =
 const actionBtnBlack =
   "inline-flex h-[34px] items-center gap-2 px-3.5 rounded-[7px] bg-[var(--brand)] text-white text-[13px] font-medium border border-[var(--brand)] cursor-pointer hover:bg-[var(--brand-hover)] transition-colors disabled:opacity-50 disabled:pointer-events-none";
 
+const actionBtnResolve =
+  "inline-flex h-[34px] items-center gap-2 px-3.5 rounded-[7px] bg-[var(--brand-subtle)] text-[var(--brand)] text-[13px] font-medium border border-[var(--brand-subtle)] cursor-pointer hover:bg-[var(--brand-muted)] transition-colors disabled:opacity-50 disabled:pointer-events-none";
+
 const actionBtnActive =
   "inline-flex h-[34px] items-center gap-2 px-3.5 rounded-[7px] border border-[var(--border)] bg-[var(--surface-hover)] text-[var(--text-heading)] text-[13px] font-medium transition-all cursor-pointer";
 
@@ -96,10 +99,11 @@ export interface SessionFeedbackHeaderProps {
   assigneeId?: string | null;
   assigneeName?: string | null;
   assigneeAvatarUrl?: string | null;
-  onAssigned?: (assigneeId: string | null, assigneeName: string | null, assigneeAvatarUrl: string | null) => void;
+  onAssigned?: (assigneeId: string | null, assigneeName: string | null, assigneeAvatarUrl: string | null) => void | Promise<void>;
+  assigneeBusy?: boolean;
   priority?: Priority | null;
-  onPriorityChanged?: (priority: Priority | null) => void;
-  onSaveStateChange?: (state: 'saving' | 'saved' | 'error' | 'hidden') => void;
+  onPriorityChanged?: (priority: Priority | null) => void | Promise<void>;
+  priorityBusy?: boolean;
   canAssignTicket?: boolean;
   isWorkspaceMember?: boolean;
   onSaveTitle?: (newTitle: string) => Promise<void>;
@@ -124,9 +128,10 @@ export function SessionFeedbackHeader({
   assigneeName,
   assigneeAvatarUrl,
   onAssigned,
+  assigneeBusy = false,
   priority,
   onPriorityChanged,
-  onSaveStateChange,
+  priorityBusy = false,
   canAssignTicket = false,
   isWorkspaceMember = false,
   onSaveTitle,
@@ -278,7 +283,7 @@ export function SessionFeedbackHeader({
                     type="button"
                     onClick={gateResolve}
                     disabled={isResolved}
-                    className={isResolved ? actionBtnActive : actionBtnBlack}
+                    className={isResolved ? actionBtnActive : actionBtnResolve}
                   >
                     <Check size={14} strokeWidth={1.7} />
                     {isResolved ? "Resolved" : "Resolve"}
@@ -310,7 +315,7 @@ export function SessionFeedbackHeader({
                     type="button"
                     onClick={gateResolve}
                     disabled={isResolved}
-                    className={isResolved ? actionBtnActive : actionBtnBlack}
+                    className={isResolved ? actionBtnActive : actionBtnResolve}
                   >
                     <Check size={14} strokeWidth={1.7} />
                     {isResolved ? "Resolved" : "Resolve"}
@@ -491,7 +496,7 @@ export function SessionFeedbackHeader({
                     type="button"
                     onClick={() => onResolvedChange(true)}
                     disabled={resolveSubmitting}
-                    className={actionBtnBlack}
+                    className={actionBtnResolve}
                   >
                     <Check size={14} strokeWidth={1.7} />
                     Resolve
@@ -509,7 +514,7 @@ export function SessionFeedbackHeader({
                     currentAssigneeName={assigneeName ?? null}
                     currentAssigneeAvatarUrl={assigneeAvatarUrl ?? null}
                     onAssigned={onAssigned}
-                    onSaveStateChange={onSaveStateChange}
+                    busy={assigneeBusy}
                     iconOnly
                   />
                 </div>
@@ -536,7 +541,7 @@ export function SessionFeedbackHeader({
                     feedbackId={item.id}
                     currentPriority={priority ?? null}
                     onPriorityChanged={onPriorityChanged}
-                    onSaveStateChange={onSaveStateChange}
+                    busy={priorityBusy}
                     iconOnly
                   />
                 </div>
@@ -561,7 +566,11 @@ export function SessionFeedbackHeader({
                   aria-pressed={isActivityPanelOpen}
                   aria-label={isActivityPanelOpen ? "Close activity panel" : "Open activity panel"}
                 >
-                  <CalendarCheck2 size={14} strokeWidth={1.5} />
+                  <CalendarCheck2
+                    size={14}
+                    strokeWidth={1.5}
+                    className={isActivityPanelOpen ? "text-[var(--orange)]" : undefined}
+                  />
                   Activity
                 </button>
               ) : null}

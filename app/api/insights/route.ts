@@ -7,6 +7,7 @@ import {
   type WorkspaceInsightsDoc,
 } from "@/lib/repositories/insightsRepository.server";
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
+import { workspaceGuardErrorResponse } from "@/lib/server/workspaceGuardErrorResponse";
 
 export interface InsightsApiResponse {
   lifetime: {
@@ -123,6 +124,9 @@ export async function GET(req: Request) {
     insightsCache.set(cacheKey, { data, expiresAt: now + INSIGHTS_CACHE_TTL_MS });
     return apiSuccess(data);
   } catch (error) {
+    const guardResponse = workspaceGuardErrorResponse(error);
+    if (guardResponse) return guardResponse;
+
     console.error("INSIGHTS ERROR FULL:", error);
     throw error;
   }

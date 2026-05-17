@@ -4,6 +4,7 @@ import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 import { assertWorkspaceActive } from "@/lib/server/assertWorkspaceActive";
+import { workspaceGuardErrorResponse } from "@/lib/server/workspaceGuardErrorResponse";
 import {
   getWorkspaceMemberRepo,
   transferWorkspaceOwnershipRepo,
@@ -85,6 +86,9 @@ export async function PATCH(req: NextRequest) {
 
     return apiSuccess({ success: true });
   } catch (err) {
+    const guardResponse = workspaceGuardErrorResponse(err);
+    if (guardResponse) return guardResponse;
+
     console.error("PATCH /api/workspace/ownership:", err);
     return apiError({ code: "INTERNAL_ERROR", message: "Failed to transfer ownership", status: 500 });
   }

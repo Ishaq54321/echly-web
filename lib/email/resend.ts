@@ -25,10 +25,16 @@ function extractFirstUrl(html: string): string | null {
 // Dev/localhost fallback: log email to console.
 // Logs when no API key is configured OR when EMAIL_DEV_LOG=true is set.
 // With API key set and EMAIL_DEV_LOG unset, real emails are sent (even in dev).
+const REPLY_TO = "ishaq@annote.app";
+
 export async function sendEmailOrLog(params: {
   to: string;
   subject: string;
   html: string;
+  /** Plain-text alternative — sent alongside html for deliverability + accessibility. */
+  text?: string;
+  /** Reply-to override. Defaults to ishaq@annote.app so replies reach a human. */
+  replyTo?: string;
 }): Promise<void> {
   if (!resend || DEV_LOG_FORCED || process.env.NODE_ENV === "development") {
     const link = extractFirstUrl(params.html);
@@ -41,10 +47,12 @@ export async function sendEmailOrLog(params: {
     return;
   }
   const { error } = await resend.emails.send({
-    from: "Annote <noreply@echly.com>",
+    from: "Ishaq from Annote <noreply@echly.com>",
     to: params.to,
     subject: params.subject,
     html: params.html,
+    text: params.text,
+    replyTo: params.replyTo ?? REPLY_TO,
   });
   if (error) {
     console.error("[Resend] send failed", { to: params.to, subject: params.subject, error });

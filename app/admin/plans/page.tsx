@@ -55,6 +55,7 @@ export default function AdminPlansPage() {
           pricePerSeat: plan.pricePerSeat,
           annualPricePerSeat: plan.annualPricePerSeat,
           maxFeedbackPerMonth: plan.maxFeedbackPerMonth,
+          aiImprovementsPerMonth: plan.aiImprovementsPerMonth,
           maxMembers: plan.maxMembers,
           insightsEnabled: plan.insightsEnabled,
           customBranding: plan.customBranding,
@@ -99,6 +100,7 @@ export default function AdminPlansPage() {
               <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">$/seat/mo</th>
               <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">$/seat/yr</th>
               <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Tickets/mo</th>
+              <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">AI/mo</th>
               <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Max members</th>
               <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Insights</th>
               <th className="px-4 py-3 font-semibold text-[var(--text-heading)]">Branding</th>
@@ -150,6 +152,18 @@ export default function AdminPlansPage() {
                       value={plan.maxFeedbackPerMonth ?? ""}
                       onChange={(e) =>
                         updateField(plan.id, "maxFeedbackPerMonth", e.target.value === "" ? null : Number(e.target.value) || 0)
+                      }
+                      disabled={isSaving}
+                      className="w-16 rounded-md border border-[var(--border)] px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20 disabled:opacity-50"
+                    />
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <input
+                      type="text"
+                      placeholder="∞"
+                      value={plan.aiImprovementsPerMonth ?? ""}
+                      onChange={(e) =>
+                        updateField(plan.id, "aiImprovementsPerMonth", e.target.value === "" ? null : Number(e.target.value) || 0)
                       }
                       disabled={isSaving}
                       className="w-16 rounded-md border border-[var(--border)] px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20 disabled:opacity-50"

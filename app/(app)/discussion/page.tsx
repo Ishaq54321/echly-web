@@ -270,7 +270,7 @@ export default function DiscussionPage() {
             : "inbox";
 
   return (
-    <div className="flex h-full overflow-hidden bg-[var(--surface-subtle)] gap-[6px]">
+    <div className="flex h-full overflow-hidden bg-[var(--surface-page)] gap-[6px]">
       {/* Col 1: Folders (lg+) */}
       <div className="hidden lg:flex w-[240px] shrink-0">
         <DiscussionFolders

@@ -34,7 +34,7 @@ const POPOVER_GAP_PX = 8;
 // Positioning/visibility is owned by the wrapping div (see usage) — this
 // is button chrome only, since Tooltip wraps the child in a bare span.
 const HOVER_ACTION_CLASS =
-  "flex items-center justify-center h-9 w-9 rounded-xl bg-[var(--text-heading)] text-white/90 hover:text-white hover:bg-[var(--text-body)] ring-1 ring-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.18)] backdrop-blur-sm transition-all duration-150 cursor-pointer focus:outline-none hover:scale-105 active:scale-95";
+  "flex items-center justify-center h-9 w-9 rounded-md bg-black/60 text-white/90 hover:text-white hover:bg-black/70 ring-1 ring-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.18)] backdrop-blur-sm transition-all duration-150 cursor-pointer focus:outline-none hover:scale-105 active:scale-95";
 const TOOLTIP_MAX_LEN = 60;
 const POPOVER_Z_INDEX = 10050;
 const POPOVER_STYLE =

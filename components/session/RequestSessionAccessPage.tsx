@@ -15,6 +15,7 @@ export interface RequestSessionAccessPageProps {
   onSignIn: () => void;
   brandLogoUrl?: string | null;
   brandingEnabled?: boolean;
+  brandingResolved?: boolean;
 }
 
 export function RequestSessionAccessPage({
@@ -27,6 +28,7 @@ export function RequestSessionAccessPage({
   onSignIn,
   brandLogoUrl = null,
   brandingEnabled = false,
+  brandingResolved = true,
 }: RequestSessionAccessPageProps) {
   const iconBg =
     requestStatus === "submitted"
@@ -81,7 +83,11 @@ export function RequestSessionAccessPage({
       }}
     >
       {isPublicRoute !== false && (
-        <PublicSessionNav brandLogoUrl={brandLogoUrl} brandingEnabled={brandingEnabled} />
+        <PublicSessionNav
+          brandLogoUrl={brandLogoUrl}
+          brandingEnabled={brandingEnabled}
+          brandingResolved={brandingResolved}
+        />
       )}
 
       <div

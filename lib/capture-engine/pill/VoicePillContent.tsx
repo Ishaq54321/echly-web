@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
-import { Trash2, RotateCcw, Send, Mic, Type } from "lucide-react";
+import { Trash2, RotateCcw, Send, Mic, Type, Loader2 } from "lucide-react";
 import { Waveform } from "./Waveform";
 import { PillTooltip } from "./PillTooltip";
 import { MicSelectorPopover } from "./MicSelectorPopover";
@@ -37,6 +37,20 @@ export function VoicePillContent({
   const [micPopoverOpen, setMicPopoverOpen] = useState(false);
   const [micDevices, setMicDevices] = useState<MicDevice[]>([]);
   const micButtonRef = useRef<HTMLButtonElement>(null);
+  /** Silent guard against double-submit — no visual disabled state. */
+  const sendingRef = useRef(false);
+
+  const handleSend = () => {
+    if (sendingRef.current || isFinishing) return;
+    sendingRef.current = true;
+    onSend();
+  };
+
+  /** Reset the guard if the send fails and recording resumes (isFinishing
+   *  flips back to false), so the user can retry. */
+  useEffect(() => {
+    if (!isFinishing) sendingRef.current = false;
+  }, [isFinishing]);
 
   /** Enumerate mics when popover opens (labels need permission, which we've already requested). */
   useEffect(() => {
@@ -123,12 +137,15 @@ export function VoicePillContent({
 
       <button
         type="button"
-        className="echly-pill-send-btn"
-        onClick={onSend}
-        aria-label="Send recording"
-        disabled={isFinishing}
+        className={`echly-pill-send-btn${isFinishing ? " is-loading" : ""}`}
+        onClick={handleSend}
+        aria-label={isFinishing ? "Sending recording…" : "Send recording"}
       >
-        <Send size={18} strokeWidth={2} fill="currentColor" stroke="none" />
+        {isFinishing ? (
+          <Loader2 size={18} className="echly-mic-permission-spinner" />
+        ) : (
+          <Send size={18} strokeWidth={2} fill="currentColor" stroke="none" />
+        )}
       </button>
 
       {micPopoverOpen && (

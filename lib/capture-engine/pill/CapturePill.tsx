@@ -59,8 +59,6 @@ export interface CapturePillProps {
   onSelectMic?: (deviceId: string) => void;
   /** Currently selected microphone deviceId (for checkmark in picker). */
   selectedMicId?: string;
-  /** Open the browser's site settings page (chrome://settings/content/siteDetails?site=...). */
-  onOpenSiteSettings?: () => void;
   /** Portal target (shadow root or capture root). */
   portalTarget: HTMLElement | null;
 }
@@ -82,7 +80,6 @@ export function CapturePill(props: CapturePillProps) {
     onModeChange,
     onSelectMic,
     selectedMicId,
-    onOpenSiteSettings,
     portalTarget,
   } = props;
 
@@ -226,6 +223,7 @@ export function CapturePill(props: CapturePillProps) {
   /** Map (voiceError, micPermissionBlocked) → PillErrorType for richer UI. */
   const errorType: PillErrorType | null = useMemo(() => {
     if (!voiceError) return null;
+    if (voiceError === "site_blocked") return "mic_permission_site_blocked";
     if (voiceError === "mic_permission") {
       return micPermissionBlocked ? "mic_permission_blocked" : "mic_permission_initial";
     }
@@ -233,6 +231,13 @@ export function CapturePill(props: CapturePillProps) {
     if (voiceError === "transcription_failed") return "transcription_failed";
     return null;
   }, [voiceError, micPermissionBlocked]);
+
+  /** Bare hostname for the site-blocked copy; "This site" fallback. */
+  const hostnameForDisplay = useMemo(() => {
+    if (typeof window === "undefined") return "This site";
+    const host = window.location.hostname;
+    return host ? host.replace(/^www\./, "") : "This site";
+  }, []);
 
   const hintState: PillHintState = voiceError
     ? "error"
@@ -242,6 +247,7 @@ export function CapturePill(props: CapturePillProps) {
 
   const errorHintMessage = useMemo(() => {
     if (!voiceError) return undefined;
+    if (errorType === "mic_permission_site_blocked") return "This site blocks microphone access.";
     if (errorType === "mic_permission_blocked") return "Microphone blocked — change it in browser settings.";
     if (errorType === "mic_permission_initial") return "Allow microphone access to record.";
     if (voiceError === "no_audio") return "We didn't detect any sound.";
@@ -262,10 +268,11 @@ export function CapturePill(props: CapturePillProps) {
         style={pillStyle}
         data-echly-ui="true"
       >
-        {/* Suppress the hint pill when the inline blocked-permission error
-            renders its own hint-below — otherwise we'd show two
-            "Microphone blocked" messages stacked. */}
-        {errorType !== "mic_permission_blocked" && (
+        {/* Suppress the hint pill when the inline error panel renders its own
+            hint/instructions card — otherwise we'd stack two messages. Both
+            the blocked-permission and site-blocked panels are self-contained. */}
+        {errorType !== "mic_permission_blocked" &&
+          errorType !== "mic_permission_site_blocked" && (
           <PillHintText state={hintState} mode={mode} errorMessage={errorHintMessage} />
         )}
         <div
@@ -284,7 +291,8 @@ export function CapturePill(props: CapturePillProps) {
               type={errorType}
               onRetry={handleRetry}
               onCancel={onCancel}
-              onOpenSettings={onOpenSiteSettings}
+              onSwitchToWrite={handleSwitchToText}
+              hostnameForDisplay={hostnameForDisplay}
             />
           )}
           {!showError && mode === "voice" && (

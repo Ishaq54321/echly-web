@@ -53,8 +53,8 @@
 
   /* ─── SURFACES ───────────────────────────── */
   --surface:            #FFFFFF;
-  --surface-page:       #F5F5F5;
-  --surface-card:       #FFFFFF;
+  --surface-page:       #FAF9F7;
+  --surface-card:       #FAFAFA;
   --surface-subtle:     #F5F5F5;
   --surface-hover:      #FAFAF7;
   --surface-active:     #F0ECFB;
@@ -436,8 +436,8 @@
 
   /* ─── SURFACES ───────────────────────────── */
   --surface:            #FFFFFF;
-  --surface-page:       #F5F5F5;
-  --surface-card:       #FFFFFF;
+  --surface-page:       #FAF9F7;
+  --surface-card:       #FAFAFA;
   --surface-subtle:     #F5F5F5;
   --surface-hover:      #FAFAF7;
   --surface-active:     #F0ECFB;
@@ -1007,6 +1007,7 @@ body {
 .content-card   {
   background: var(--surface-card);
   border-radius: var(--content-card-radius);
+  border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-panel);
   flex: 1;
   min-height: 0;
@@ -1019,6 +1020,7 @@ body {
 .content-card:has(.session-page-shell) {
   background: transparent;
   border-radius: 0;
+  border: none;
   box-shadow: none;
   overflow: visible;
 }

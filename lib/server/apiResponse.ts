@@ -7,10 +7,17 @@ import { accessContextToResponseBody } from "@/lib/access/resolveAccess";
 export type ApiErrorCode =
   | "UNAUTHORIZED"
   | "FORBIDDEN"
+  | "GONE" // HTTP 410 for deleted/permanently-unavailable resources
   | "NOT_FOUND"
   | "GROUP_NOT_FOUND"
   | "INVALID_INPUT"
-  | "INTERNAL_ERROR";
+  | "INTERNAL_ERROR"
+  // Admin set_plan hybrid (Phase C3) — distinct codes so callers/tests can
+  // tell the rejection reasons apart.
+  | "ENTERPRISE_REQUIRES_MANUAL_OVERRIDE"
+  | "CANNOT_DOWNGRADE_PAID_TO_STARTER"
+  | "NEVER_PAID_REQUIRES_MANUAL_OVERRIDE"
+  | "PROVIDER_UPDATE_FAILED";
 
 export type ApiResponse<T = unknown> = {
   success: boolean;

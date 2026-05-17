@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { authFetch, getFirebaseBearerToken } from "@/lib/authFetch";
+import {
+  authFetch,
+  getFirebaseBearerToken,
+  clearAuthTokenCache,
+} from "@/lib/authFetch";
 import { useToast } from "@/components/dashboard/context/ToastContext";
 import { ObIcon } from "./icons";
 import { StepShell, StepFooter } from "./StepShell";
@@ -50,6 +54,10 @@ export function ReadyStep({
         const auth = getAuth();
         if (auth.currentUser) {
           await auth.currentUser.getIdToken(true);
+          // Phase 28.X — rebuild the authFetch token cache from the
+          // freshly-refreshed token so the deferred logo upload and the
+          // first dashboard requests carry the new workspaceId claim.
+          clearAuthTokenCache();
         }
       } catch {}
 

@@ -9,6 +9,7 @@ import {
 import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 import { assertWorkspaceActive } from "@/lib/server/assertWorkspaceActive";
+import { workspaceGuardErrorResponse } from "@/lib/server/workspaceGuardErrorResponse";
 import {
   getWorkspaceInvitationRepo,
   getWorkspaceMemberRepo,
@@ -195,25 +196,25 @@ export async function POST(
     // Only update active workspaceId if they have none yet
     await addWorkspaceMembershipRepo(user.uid, invitation.workspaceId);
 
-    // Re-read workspace after atomic member increment to get accurate count for Stripe
+    // Re-read workspace after atomic member increment to get accurate count for the payment provider
     const updatedWorkspace = await getWorkspace(invitation.workspaceId);
     const actualMemberCount = updatedWorkspace?.usage?.members ?? 1;
 
     if (
       updatedWorkspace?.billing?.plan === "business" &&
-      updatedWorkspace.billing.stripeSubscriptionId
+      updatedWorkspace.billing.subscriptionId
     ) {
       try {
         const newSeatCount = Math.max(actualMemberCount, 1);
         await getPaymentProvider().updateSubscriptionSeats(
-          updatedWorkspace.billing.stripeSubscriptionId,
+          updatedWorkspace.billing.subscriptionId,
           newSeatCount
         );
         await adminDb.doc(`workspaces/${invitation.workspaceId}`).update({
           "billing.seats": newSeatCount,
         });
-      } catch (stripeErr) {
-        console.error("[invite accept] failed to sync Stripe seats:", stripeErr);
+      } catch (providerErr) {
+        console.error("[invite accept] failed to sync subscription seats:", providerErr);
       }
     }
 
@@ -239,6 +240,9 @@ export async function POST(
       switchedToWorkspaceId: invitation.workspaceId,
     });
   } catch (err) {
+    const guardResponse = workspaceGuardErrorResponse(err);
+    if (guardResponse) return guardResponse;
+
     console.error("POST /api/workspace/invitations/accept/[token]:", err);
     return apiError({ code: "INTERNAL_ERROR", message: "Failed to accept invitation", status: 500 });
   }

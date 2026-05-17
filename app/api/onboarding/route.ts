@@ -194,6 +194,14 @@ export async function POST(req: NextRequest) {
       const batch = adminDb.batch();
       batch.create(workspaceRef, {
         ...payload,
+        usage: {
+          ...payload.usage,
+          // Owner member is added in this same atomic batch via the
+          // batch.set(memberRef, ...) below, so the counter starts at 1.
+          // Other member-add paths use addWorkspaceMemberRepo (which
+          // increments) instead of defaultWorkspaceDoc's baseline of 0.
+          members: 1,
+        },
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });

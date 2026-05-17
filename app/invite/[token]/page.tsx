@@ -12,6 +12,7 @@ import {
   signOut,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { clearAuthTokenCache } from "@/lib/authFetch";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import { Toast } from "@/components/ui/Toast";
 import {
@@ -481,6 +482,10 @@ export default function InviteAcceptPage() {
     // Force token refresh
     if (auth.currentUser) {
       await auth.currentUser.getIdToken(true);
+      // Phase 28.X — joining a workspace updates custom claims but this page
+      // does not hard-navigate, so drop the authFetch token cache to avoid
+      // sending the stale pre-join token on subsequent in-app requests.
+      clearAuthTokenCache();
     }
 
     refreshMemberships();

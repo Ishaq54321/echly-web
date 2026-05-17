@@ -132,6 +132,15 @@ export async function POST(req: NextRequest): Promise<Response> {
         init: { headers: corsHeaders(req) },
       });
     }
+    if (err instanceof Error && err.message === "WORKSPACE_DELETED") {
+      return apiError({
+        code: "GONE",
+        message: "Workspace deleted",
+        status: 410,
+        data: { tickets: [] },
+        init: { headers: corsHeaders(req) },
+      });
+    }
     throw err;
   }
 

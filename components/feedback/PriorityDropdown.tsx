@@ -2,9 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Flag, Ban } from "lucide-react";
-import { authFetch } from "@/lib/authFetch";
 import type { Priority } from "@/lib/domain/feedback";
-import { useToast } from "@/components/dashboard/context/ToastContext";
 
 interface PriorityConfig {
   value: Priority;
@@ -45,27 +43,30 @@ const PRIORITIES: PriorityConfig[] = [
 interface PriorityDropdownProps {
   feedbackId: string;
   currentPriority: Priority | null;
-  onPriorityChanged: (priority: Priority | null) => void;
-  onSaveStateChange?: (state: 'saving' | 'saved' | 'error' | 'hidden') => void;
+  /**
+   * Owns the server PATCH + optimistic state. May be async; when it is, the
+   * dropdown awaits it. Read-only call sites pass a no-op.
+   */
+  onPriorityChanged: (priority: Priority | null) => void | Promise<void>;
   disabled?: boolean;
   readOnly?: boolean;
   iconOnly?: boolean;
+  /** Page-level in-flight lock — survives this dropdown's remount. */
+  busy?: boolean;
 }
 
 export function PriorityDropdown({
-  feedbackId,
+  feedbackId: _feedbackId,
   currentPriority,
   onPriorityChanged,
-  onSaveStateChange,
   disabled = false,
   readOnly = false,
   iconOnly = false,
+  busy = false,
 }: PriorityDropdownProps) {
   const [open, setOpen] = useState(false);
   const [animate, setAnimate] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { showToast } = useToast();
 
   const activePriority = PRIORITIES.find((p) => p.value === currentPriority) ?? null;
 
@@ -98,33 +99,18 @@ export function PriorityDropdown({
     return () => document.removeEventListener("keydown", handler);
   }, [open]);
 
+  // The page handler (onPriorityChanged) now owns the server PATCH,
+  // generation guard, in-flight lock, rollback and error toast. The
+  // dropdown just closes and delegates — no second PATCH from here.
+  //
+  // Phase 28.X — `busy` is kept as a logical double-submit guard (silently
+  // ignore a selection while a PATCH is in flight) but is no longer a
+  // visual disabled/dimmed state: the optimistic value already shows, so
+  // the control should look settled.
   const handleSelect = async (priority: Priority | null) => {
-    const prev = currentPriority;
     setOpen(false);
-    onPriorityChanged(priority);
-    setIsSaving(true);
-    try {
-      const res = await authFetch(`/api/tickets/${feedbackId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ priority }),
-      });
-      if (!res?.ok) {
-        onPriorityChanged(prev);
-        onSaveStateChange?.('error');
-      } else {
-        const body = await res.json() as { data?: { ticket?: { priority?: Priority | null } } };
-        const serverPriority = body.data?.ticket?.priority ?? null;
-        if (serverPriority !== priority) {
-          onPriorityChanged(serverPriority);
-        }
-      }
-    } catch {
-      onPriorityChanged(prev);
-      onSaveStateChange?.('error');
-    } finally {
-      setIsSaving(false);
-    }
+    if (busy) return;
+    await onPriorityChanged(priority);
   };
 
   // READ-ONLY MODE
@@ -160,15 +146,18 @@ export function PriorityDropdown({
     return null;
   }
 
-  const baseCls = `inline-flex h-[34px] items-center gap-2 px-3.5 rounded-[7px] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[13px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all ${disabled || isSaving ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`;
+  // `busy` is intentionally NOT part of the visual state (Phase 28.X) — only
+  // the explicit `disabled` prop dims/locks the control. The in-flight lock
+  // is enforced logically in handleSelect instead.
+  const baseCls = `inline-flex h-[34px] items-center gap-2 px-3.5 rounded-[7px] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[13px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`;
 
   return (
     <div ref={containerRef} style={{ position: "relative", display: "inline-block" }}>
       <button
         type="button"
         className={baseCls}
-        disabled={disabled || isSaving}
-        onClick={() => !disabled && !isSaving && setOpen((o) => !o)}
+        disabled={disabled}
+        onClick={() => !disabled && setOpen((o) => !o)}
       >
         {activePriority ? (
           <>

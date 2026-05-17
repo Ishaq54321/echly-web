@@ -1,81 +1,112 @@
-export function subscriptionConfirmationEmailHtml(params: {
+import { emailShell, emailButton, emailInfoRow, emailColors, plainTextShell } from "../components";
+
+interface SubscriptionConfirmationProps {
   workspaceName: string;
   seatCount: number;
   billingCycle: "monthly" | "annual";
   nextBillingDate: Date;
   settingsUrl: string;
-}): string {
-  const { workspaceName, seatCount, billingCycle, nextBillingDate, settingsUrl } = params;
-  const pricePerSeat = billingCycle === "annual" ? 31.20 : 39;
-  const total = (pricePerSeat * seatCount).toFixed(2);
-  const cycle = "month";
-  const billingNote = billingCycle === "annual" ? " (billed annually at $374.40/seat/year)" : "";
-  const nextDate = nextBillingDate.toLocaleDateString("en-US", {
+  /** Monthly price per seat — from catalog, no hardcoded fallback. */
+  pricePerSeat: number;
+  /** Annual price per seat (monthly equivalent) — from catalog, no hardcoded fallback. */
+  annualPricePerSeat: number;
+}
+
+function formatDate(d: Date): string {
+  return d.toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
   });
+}
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Welcome to Annote Business!</title>
-</head>
-<body style="margin:0;padding:0;background:#F8F8F8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#F8F8F8;padding:40px 0;">
-  <tr><td align="center">
-    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border-radius:16px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.08);">
-      <tr>
-        <td style="padding:28px 36px 24px;border-bottom:1px solid #FAFAF7;">
-          <span style="font-size:22px;font-weight:700;color:#5A49BF;letter-spacing:-0.3px;">Annote</span>
-        </td>
-      </tr>
-      <tr>
-        <td style="padding:36px 36px 28px;">
-          <h1 style="margin:0 0 16px;font-size:24px;font-weight:700;color:#15101F;letter-spacing:-0.3px;">Welcome to Annote Business!</h1>
-          <p style="margin:0 0 16px;font-size:15px;color:#54495F;line-height:1.6;">
-            Your workspace <strong>${workspaceName}</strong> has been upgraded to the Business plan. You now have access to unlimited feedback tickets, unlimited sessions, and all premium features.
-          </p>
-          <div style="margin:0 0 24px;padding:20px;background:#F0ECFB;border-radius:12px;border:1px solid #DCD5F0;">
-            <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:0.5px;">Plan Details</p>
-            <table width="100%" cellpadding="0" cellspacing="0">
-              <tr>
-                <td style="font-size:14px;color:#666;padding:4px 0;">Plan</td>
-                <td style="font-size:14px;color:#15101F;font-weight:600;text-align:right;">Business</td>
-              </tr>
-              <tr>
-                <td style="font-size:14px;color:#666;padding:4px 0;">Seats</td>
-                <td style="font-size:14px;color:#15101F;font-weight:600;text-align:right;">${seatCount} seat${seatCount !== 1 ? "s" : ""}</td>
-              </tr>
-              <tr>
-                <td style="font-size:14px;color:#666;padding:4px 0;">Billing</td>
-                <td style="font-size:14px;color:#15101F;font-weight:600;text-align:right;">$${pricePerSeat}/seat/${cycle}${billingNote}</td>
-              </tr>
-              <tr>
-                <td style="font-size:14px;color:#666;padding:4px 0;">Total</td>
-                <td style="font-size:14px;color:#15101F;font-weight:600;text-align:right;">$${total}/${cycle}</td>
-              </tr>
-              <tr>
-                <td style="font-size:14px;color:#666;padding:4px 0;">Next billing date</td>
-                <td style="font-size:14px;color:#15101F;font-weight:600;text-align:right;">${nextDate}</td>
-              </tr>
-            </table>
-          </div>
-          <a href="${settingsUrl}" style="display:inline-block;background:#5A49BF;color:#FFFFFF;font-size:15px;font-weight:600;text-decoration:none;padding:13px 26px;border-radius:10px;">
-            Go to Settings
-          </a>
-        </td>
-      </tr>
-      <tr>
-        <td style="padding:20px 36px 28px;border-top:1px solid #FAFAF7;">
-          <p style="margin:0;font-size:13px;color:#B5AEBE;">© Annote — Agency feedback made simple</p>
-        </td>
-      </tr>
-    </table>
-  </td></tr>
-</table>
-</body>
-</html>`;
+export function subscriptionConfirmationEmailHtml(props: SubscriptionConfirmationProps): string {
+  const { workspaceName, seatCount, billingCycle, nextBillingDate, settingsUrl, pricePerSeat, annualPricePerSeat } = props;
+
+  const isAnnual = billingCycle === "annual";
+  const seatLabel = seatCount === 1 ? "seat" : "seats";
+
+  const monthlyTotal = seatCount * pricePerSeat;
+  const annualTotal = seatCount * annualPricePerSeat * 12;
+
+  const billingLine = isAnnual
+    ? `${seatCount} ${seatLabel} × $${annualPricePerSeat.toFixed(2)}/seat per month, billed annually`
+    : `${seatCount} ${seatLabel} × $${pricePerSeat}/seat per month`;
+
+  const totalLine = isAnnual
+    ? `$${annualTotal.toFixed(2)}/year`
+    : `$${monthlyTotal.toFixed(2)}/month`;
+
+  const body = `
+    <h1 style="margin:0 0 16px;font-size:24px;font-weight:600;color:${emailColors.textHeading};letter-spacing:-0.02em;">
+      You're on Business
+    </h1>
+
+    <p style="margin:0 0 24px;">
+      Your workspace <strong style="color:${emailColors.textHeading};">${workspaceName}</strong> is now on Business. You've unlocked unlimited team members, 1,500 AI improvements a month, and unlimited feedback tickets.
+    </p>
+
+    <div style="background-color:${emailColors.surfaceSubtle};border:1px solid ${emailColors.border};border-radius:8px;padding:20px 24px;margin:0 0 24px;">
+      <p style="margin:0 0 12px;font-size:13px;font-weight:500;color:${emailColors.textMuted};text-transform:uppercase;letter-spacing:0.05em;">
+        What you're paying
+      </p>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+        ${emailInfoRow("Billing", billingLine)}
+        ${emailInfoRow("Total", totalLine)}
+        ${emailInfoRow("Next charge", formatDate(nextBillingDate))}
+      </table>
+    </div>
+
+    <p style="margin:0 0 24px;font-size:13px;color:${emailColors.textMuted};">
+      Paddle will send a receipt for each charge separately.
+    </p>
+
+    ${emailButton("Open billing settings", settingsUrl)}
+
+    <p style="margin:24px 0 0;">
+      If anything looks off, just reply to this email.
+    </p>
+
+    <p style="margin:24px 0 0;color:${emailColors.textMuted};">
+      — Ishaq, Annote
+    </p>
+  `;
+
+  return emailShell(body, {
+    preheader: `Your workspace ${workspaceName} is now on Business.`,
+  });
+}
+
+export function subscriptionConfirmationEmailText(props: SubscriptionConfirmationProps): string {
+  const { workspaceName, seatCount, billingCycle, nextBillingDate, settingsUrl, pricePerSeat, annualPricePerSeat } = props;
+
+  const isAnnual = billingCycle === "annual";
+  const seatLabel = seatCount === 1 ? "seat" : "seats";
+  const monthlyTotal = seatCount * pricePerSeat;
+  const annualTotal = seatCount * annualPricePerSeat * 12;
+
+  const billingLine = isAnnual
+    ? `${seatCount} ${seatLabel} × $${annualPricePerSeat.toFixed(2)}/seat per month, billed annually`
+    : `${seatCount} ${seatLabel} × $${pricePerSeat}/seat per month`;
+
+  const totalLine = isAnnual
+    ? `$${annualTotal.toFixed(2)}/year`
+    : `$${monthlyTotal.toFixed(2)}/month`;
+
+  return plainTextShell(`You're on Business
+
+Your workspace ${workspaceName} is now on Business. You've unlocked unlimited team members, 1,500 AI improvements a month, and unlimited feedback tickets.
+
+What you're paying
+${billingLine}
+Total: ${totalLine}
+Next charge: ${formatDate(nextBillingDate)}
+
+Paddle will send a receipt for each charge separately.
+
+Open billing settings: ${settingsUrl}
+
+If anything looks off, just reply to this email.
+
+— Ishaq, Annote`);
 }

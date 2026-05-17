@@ -9,6 +9,7 @@ import {
 } from "@/lib/repositories/usersRepository.server";
 import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 import { assertWorkspaceActive } from "@/lib/server/assertWorkspaceActive";
+import { workspaceGuardErrorResponse } from "@/lib/server/workspaceGuardErrorResponse";
 import {
   getWorkspaceMemberRepo,
   createWorkspaceInvitationRepo,
@@ -342,6 +343,9 @@ export async function POST(req: NextRequest) {
 
     return apiSuccess({ results: finalResults });
   } catch (err) {
+    const guardResponse = workspaceGuardErrorResponse(err);
+    if (guardResponse) return guardResponse;
+
     console.error("POST /api/workspace/members/invite-batch:", err);
     return apiError({
       code: "INTERNAL_ERROR",

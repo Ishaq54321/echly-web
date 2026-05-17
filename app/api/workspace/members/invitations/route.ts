@@ -4,6 +4,7 @@ import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 import { assertWorkspaceActive } from "@/lib/server/assertWorkspaceActive";
+import { workspaceGuardErrorResponse } from "@/lib/server/workspaceGuardErrorResponse";
 import {
   getWorkspaceMemberRepo,
   getWorkspacePendingInvitationsRepo,
@@ -33,6 +34,9 @@ export async function GET(req: NextRequest) {
 
     return apiSuccess({ invitations });
   } catch (err) {
+    const guardResponse = workspaceGuardErrorResponse(err);
+    if (guardResponse) return guardResponse;
+
     console.error("GET /api/workspace/members/invitations:", err);
     return apiError({ code: "INTERNAL_ERROR", message: "Failed to load invitations", status: 500 });
   }

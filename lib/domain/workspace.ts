@@ -69,10 +69,29 @@ export interface Workspace {
     seats: number;
     /** Monthly price per seat (0 for starter, set for business). */
     pricePerSeat?: number;
-    stripeCustomerId?: string | null;
-    stripeSubscriptionId?: string | null;
+    customerId?: string | null;
+    subscriptionId?: string | null;
+    /**
+     * Set when the subscription is scheduled to cancel at period end (the
+     * sub is still active until this date). Cleared (null / absent) when no
+     * cancellation is pending or after the downgrade lands. Populated from
+     * provider `subscription.updated` events.
+     */
+    cancelAt?: Timestamp | null;
     /** Set by admin; when true, workspace cannot use the app. */
     suspended?: boolean;
+    /** Admin-granted comp. When true, provider webhooks must not downgrade/suspend this workspace. */
+    manualOverride?: boolean;
+    /**
+     * Card on file, populated from provider subscription events. `null` when
+     * unknown (comp'd workspaces, or the provider didn't send card metadata).
+     */
+    paymentMethod?: {
+      brand: string; // "visa", "mastercard", "amex", etc.
+      last4: string; // "4242"
+      expiryMonth?: number; // optional — provider may omit on subscription events
+      expiryYear?: number;
+    } | null;
   };
 
   /** Only explicit overrides. Plan-derived limits come from plan catalog; missing = use catalog. */
@@ -161,8 +180,10 @@ export function defaultWorkspaceDoc(params: {
       billingCycle: "monthly",
       seats: 1,
       pricePerSeat: 0,
-      stripeCustomerId: null,
-      stripeSubscriptionId: null,
+      customerId: null,
+      subscriptionId: null,
+      manualOverride: false,
+      paymentMethod: null,
     },
     entitlements: {
       // Do not set overrides — plan catalog is source of truth

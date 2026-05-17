@@ -7,16 +7,16 @@ import type { PlanId } from "@/lib/billing/plans";
 import { addWorkspaceMemberRepo } from "@/lib/repositories/workspaceMembersRepository.server";
 import { addWorkspaceMembershipRepo } from "@/lib/repositories/userMembershipsRepository.server";
 
-function requireUserId(userId: string, context: string): string {
-  const trimmed = userId.trim();
+function requireWorkspaceId(workspaceId: string, context: string): string {
+  const trimmed = workspaceId.trim();
   if (!trimmed) {
-    throw new Error(`Missing userId - invalid state (${context})`);
+    throw new Error(`Missing workspaceId - invalid state (${context})`);
   }
   return trimmed;
 }
 
-export function invalidateWorkspaceDocCache(userId?: string): void {
-  void userId;
+export function invalidateWorkspaceDocCache(workspaceId?: string): void {
+  void workspaceId;
 }
 
 function docToWorkspace(workspaceId: string, data: FirebaseFirestore.DocumentData): Workspace {
@@ -33,15 +33,15 @@ export async function getWorkspace(workspaceId: string): Promise<Workspace | nul
 }
 
 export async function createWorkspaceRepo(params: {
-  userId: string;
+  workspaceId: string;
   ownerId: string;
   name: string;
   logoUrl?: string | null;
   ownerEmail?: string | null;
   ownerName?: string | null;
 }): Promise<void> {
-  const resolvedUserId = requireUserId(params.userId, "createWorkspaceRepo");
-  const ref = adminDb.doc(`workspaces/${resolvedUserId}`);
+  const resolvedWorkspaceId = requireWorkspaceId(params.workspaceId, "createWorkspaceRepo");
+  const ref = adminDb.doc(`workspaces/${resolvedWorkspaceId}`);
   const payload: WorkspaceDoc = defaultWorkspaceDoc({
     ownerId: params.ownerId,
     name: params.name.trim() || "My Workspace",
@@ -69,18 +69,18 @@ export async function createWorkspaceRepo(params: {
       throw err;
     }
   }
-  invalidateWorkspaceDocCache(resolvedUserId);
+  invalidateWorkspaceDocCache(resolvedWorkspaceId);
 
   // Idempotent member add: skip the inner usage.members increment if the
   // owner member doc already exists (we lost the race or are retrying).
-  const memberRef = adminDb.doc(`workspaces/${resolvedUserId}/members/${params.ownerId}`);
+  const memberRef = adminDb.doc(`workspaces/${resolvedWorkspaceId}/members/${params.ownerId}`);
   const memberSnap = await memberRef.get();
   if (!memberSnap.exists) {
     const ownerSnap = await adminDb.doc(`users/${params.ownerId}`).get();
     const ownerAvatarUrl = ownerSnap.exists
       ? ((ownerSnap.data()?.avatarUrl ?? ownerSnap.data()?.photoURL) as string | null | undefined) ?? null
       : null;
-    await addWorkspaceMemberRepo(resolvedUserId, {
+    await addWorkspaceMemberRepo(resolvedWorkspaceId, {
       uid: params.ownerId,
       email: params.ownerEmail ?? "",
       displayName: params.ownerName ?? null,
@@ -92,47 +92,47 @@ export async function createWorkspaceRepo(params: {
   }
 
   // arrayUnion is idempotent — safe to call regardless of race outcome.
-  await addWorkspaceMembershipRepo(params.ownerId, resolvedUserId);
+  await addWorkspaceMembershipRepo(params.ownerId, resolvedWorkspaceId);
 }
 
-export async function updateWorkspaceName(userId: string, name: string): Promise<void> {
-  const resolvedUserId = requireUserId(userId, "updateWorkspaceName");
-  await adminDb.doc(`workspaces/${resolvedUserId}`).update({
+export async function updateWorkspaceName(workspaceId: string, name: string): Promise<void> {
+  const resolvedWorkspaceId = requireWorkspaceId(workspaceId, "updateWorkspaceName");
+  await adminDb.doc(`workspaces/${resolvedWorkspaceId}`).update({
     name,
     updatedAt: FieldValue.serverTimestamp(),
   });
-  invalidateWorkspaceDocCache(resolvedUserId);
+  invalidateWorkspaceDocCache(resolvedWorkspaceId);
 }
 
 export async function updateWorkspaceNotifications(
-  userId: string,
+  workspaceId: string,
   notifications: WorkspaceDoc["notifications"]
 ): Promise<void> {
-  const resolvedUserId = requireUserId(
-    userId,
+  const resolvedWorkspaceId = requireWorkspaceId(
+    workspaceId,
     "updateWorkspaceNotifications"
   );
-  await adminDb.doc(`workspaces/${resolvedUserId}`).update({
+  await adminDb.doc(`workspaces/${resolvedWorkspaceId}`).update({
     notifications,
     updatedAt: FieldValue.serverTimestamp(),
   });
-  invalidateWorkspaceDocCache(resolvedUserId);
+  invalidateWorkspaceDocCache(resolvedWorkspaceId);
 }
 
 export async function updateWorkspaceAppearance(
-  userId: string,
+  workspaceId: string,
   appearance: WorkspaceDoc["appearance"]
 ): Promise<void> {
-  const resolvedUserId = requireUserId(userId, "updateWorkspaceAppearance");
-  await adminDb.doc(`workspaces/${resolvedUserId}`).update({
+  const resolvedWorkspaceId = requireWorkspaceId(workspaceId, "updateWorkspaceAppearance");
+  await adminDb.doc(`workspaces/${resolvedWorkspaceId}`).update({
     appearance,
     updatedAt: FieldValue.serverTimestamp(),
   });
-  invalidateWorkspaceDocCache(resolvedUserId);
+  invalidateWorkspaceDocCache(resolvedWorkspaceId);
 }
 
 export async function updateWorkspaceSettings(
-  userId: string,
+  workspaceId: string,
   updates: Partial<
     Pick<
       WorkspaceDoc,
@@ -149,25 +149,25 @@ export async function updateWorkspaceSettings(
     >
   >
 ): Promise<void> {
-  const resolvedUserId = requireUserId(userId, "updateWorkspaceSettings");
+  const resolvedWorkspaceId = requireWorkspaceId(workspaceId, "updateWorkspaceSettings");
   const payload: Record<string, unknown> = {
     ...updates,
     updatedAt: FieldValue.serverTimestamp(),
   };
-  await adminDb.doc(`workspaces/${resolvedUserId}`).update(payload);
-  invalidateWorkspaceDocCache(resolvedUserId);
+  await adminDb.doc(`workspaces/${resolvedWorkspaceId}`).update(payload);
+  invalidateWorkspaceDocCache(resolvedWorkspaceId);
 }
 
 export async function updateWorkspacePlanRepo(
-  userId: string,
+  workspaceId: string,
   newPlan: PlanId
 ): Promise<void> {
-  const resolvedUserId = requireUserId(userId, "updateWorkspacePlanRepo");
-  await adminDb.doc(`workspaces/${resolvedUserId}`).update({
+  const resolvedWorkspaceId = requireWorkspaceId(workspaceId, "updateWorkspacePlanRepo");
+  await adminDb.doc(`workspaces/${resolvedWorkspaceId}`).update({
     "billing.plan": newPlan,
     updatedAt: FieldValue.serverTimestamp(),
   } as Record<string, unknown>);
-  invalidateWorkspaceDocCache(resolvedUserId);
+  invalidateWorkspaceDocCache(resolvedWorkspaceId);
 }
 
 /**

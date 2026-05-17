@@ -7,6 +7,8 @@ export type PlanId = "starter" | "business" | "enterprise";
 export interface PlanConfig {
   maxFeedbackPerMonth: number | null;
   maxMembers: number | null;
+  /** AI improvements allowed per calendar month. null = unlimited. */
+  aiImprovementsPerMonth: number | null;
   insightsAccess: boolean;
   customBranding: boolean;
   prioritySupport: boolean;
@@ -45,6 +47,7 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     annualPricePerSeat: 0,
     maxFeedbackPerMonth: 50,
     maxMembers: 5,
+    aiImprovementsPerMonth: 300,
     insightsAccess: false,
     customBranding: false,
     prioritySupport: false,
@@ -61,10 +64,11 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     description: "For growing teams that need more power",
     monthlyPrice: null,
     annualPrice: null,
-    pricePerSeat: 39,
-    annualPricePerSeat: 31.2,
+    pricePerSeat: 19,
+    annualPricePerSeat: 15.2,
     maxFeedbackPerMonth: null,
     maxMembers: null,
+    aiImprovementsPerMonth: 1500,
     insightsAccess: true,
     customBranding: true,
     prioritySupport: false,
@@ -85,6 +89,7 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     annualPricePerSeat: null,
     maxFeedbackPerMonth: null,
     maxMembers: null,
+    aiImprovementsPerMonth: null,
     insightsAccess: true,
     customBranding: true,
     prioritySupport: true,

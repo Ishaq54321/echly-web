@@ -9,7 +9,6 @@ import {
   ChevronUp,
   Camera,
   Check,
-  Minus,
   UserPlus,
   UserMinus,
   X,
@@ -23,6 +22,7 @@ import {
   EyeOff,
   Gem,
   Upload,
+  ArrowRight,
 } from "lucide-react";
 import { ImageCropModal } from "@/components/ui/ImageCropModal";
 import { InviteMemberModal } from "@/components/workspace/InviteMemberModal";
@@ -39,14 +39,22 @@ import {
   useWorkspace,
   type WorkspaceMembership,
 } from "@/lib/client/workspaceContext";
-import { BillingUsageProvider } from "@/lib/billing/BillingUsageProvider";
+import { BillingUsageProvider, useBillingUsageContext } from "@/lib/billing/BillingUsageProvider";
 import {
   listenToWorkspace,
   updateWorkspaceName,
 } from "@/lib/repositories/workspacesRepository";
 import { MinimalLoader } from "@/components/ui/MinimalLoader";
 import { authFetch } from "@/lib/authFetch";
-import { useBillingStore } from "@/lib/store/billingStore";
+import { useWorkspaceRealtimeStore } from "@/lib/realtime/workspaceStore";
+import { usePaddle } from "@/lib/hooks/usePaddle";
+import { openUpgradeCheckout } from "@/lib/billing/openUpgradeCheckout";
+import { PlansAndPricingView } from "@/components/billing/PlansAndPricingView";
+import { BillingManagementView } from "@/components/billing/BillingManagementView";
+import { ReadOnlyBillingState } from "@/components/billing/ReadOnlyBillingState";
+import { BillingLoadingSkeleton } from "@/components/billing/BillingLoadingSkeleton";
+import { UpgradeSuccessModal } from "@/components/billing/UpgradeSuccessModal";
+import { CheckoutEventNames } from "@paddle/paddle-js";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { PLANS, type PlanId } from "@/lib/billing/plans";
 
@@ -2968,175 +2976,91 @@ function IntegrationsTab({ onNavigateToBilling }: { onNavigateToBilling: () => v
   );
 }
 
-/* ——— Billing tab: SaaS pricing, backed by /api/plans/catalog ——— */
+/* ════════════════════════════════════════════════════════════════════
+   PHASE E · SURFACE 1 — Settings → Billing (two-view)
+   Owner sees View A (Plans & Pricing) on Starter or View B (Billing
+   management) on Business/comp'd; non-owners get a read-only card. The
+   D2 suspended inline card stays at the top of either owner view.
+   Token-based, lucide-react, skeleton loading.
+   ════════════════════════════════════════════════════════════════════ */
+
 const BILLING_CONTAINER = "w-full";
-const BRAND_BLUE = "var(--brand)";
-
-type CatalogPlan = {
-  id: "starter" | "business" | "enterprise";
-  name: string;
-  pricePerSeat: number | null;
-  annualPricePerSeat: number | null;
-  maxFeedbackPerMonth: number | null;
-  maxMembers: number | null;
-  insightsEnabled: boolean;
-  customBranding: boolean;
-  prioritySupport: boolean;
-  displayLimits: { sessions: string; members: string; feedbackTickets: string };
-};
-
-type DisplayPlan = {
-  id: CatalogPlan["id"];
-  title: string;
-  pricePerSeat: number | null;
-  features: string[];
-  cta: string;
-  highlight: boolean;
-  badge: string | null;
-};
-
-const PLAN_DISPLAY_META: Record<CatalogPlan["id"], Omit<DisplayPlan, "id" | "pricePerSeat">> = {
-  starter: {
-    title: "Starter",
-    features: [
-      "50 feedback tickets / month",
-      "AI action steps",
-      "Basic collaboration",
-    ],
-    cta: "Current Plan",
-    highlight: false,
-    badge: null,
-  },
-  business: {
-    title: "Business",
-    features: [
-      "Unlimited feedback tickets",
-      "Unlimited sessions",
-      "Unlimited members",
-      "Custom branding",
-      "Advanced AI insights",
-      "Full integrations",
-    ],
-    cta: "Upgrade to Business",
-    highlight: true,
-    badge: "Most Popular",
-  },
-  enterprise: {
-    title: "Enterprise",
-    features: [
-      "Everything in Business",
-      "Priority support",
-      "SSO",
-      "Audit logs",
-      "Custom integrations",
-    ],
-    cta: "Contact Sales",
-    highlight: false,
-    badge: null,
-  },
-};
-
-const COMPARISON_SECTIONS: {
-  section: string;
-  rows: {
-    feature: string;
-    starter: boolean | string;
-    business: boolean | string;
-    enterprise: boolean | string;
-  }[];
-}[] = [
-  {
-    section: "FEEDBACK CAPTURE",
-    rows: [
-      { feature: "Feedback tickets / month", starter: "50 / month", business: "Unlimited", enterprise: "Unlimited" },
-      { feature: "Feedback sessions", starter: "Unlimited", business: "Unlimited", enterprise: "Unlimited" },
-      { feature: "Feedback widget", starter: true, business: true, enterprise: true },
-    ],
-  },
-  {
-    section: "AI ASSISTANCE",
-    rows: [
-      { feature: "AI summaries", starter: true, business: true, enterprise: true },
-      { feature: "AI action steps", starter: true, business: true, enterprise: true },
-      { feature: "Advanced AI insights", starter: false, business: true, enterprise: true },
-    ],
-  },
-  {
-    section: "TEAM & WORKSPACE",
-    rows: [
-      { feature: "Members", starter: "Limited (5)", business: "Unlimited", enterprise: "Unlimited" },
-      { feature: "Custom branding", starter: false, business: true, enterprise: true },
-      { feature: "Full integrations", starter: false, business: true, enterprise: true },
-    ],
-  },
-  {
-    section: "SUPPORT & SECURITY",
-    rows: [
-      { feature: "Priority support", starter: false, business: false, enterprise: true },
-      { feature: "SSO", starter: false, business: false, enterprise: true },
-      { feature: "Audit logs", starter: false, business: false, enterprise: true },
-    ],
-  },
-];
-
-const FAQ_ITEMS: { q: string; a: string }[] = [
-  { q: "Can I cancel anytime?", a: "Yes. You can upgrade or cancel your plan at any time." },
-  { q: "What counts as a feedback ticket?", a: "A feedback ticket is an individual piece of feedback submitted through the widget. Each submission counts as one ticket." },
-  { q: "When do my tickets reset?", a: "Ticket counts reset on the 1st of every calendar month." },
-  { q: "Do you offer agency discounts?", a: "Yes. Contact sales for agency pricing." },
-];
-
-function CheckMarkIcon() {
-  return (
-    <span
-      className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full"
-      style={{ backgroundColor: BRAND_BLUE }}
-      aria-hidden
-    >
-      <Check className="h-3 w-3 text-white" strokeWidth={2.5} />
-    </span>
-  );
-}
 
 function BillingTab() {
-  const router = useRouter();
-  const [billingPeriod, setBillingPeriod] = useState<"annual" | "monthly">("monthly");
-  const [teamSize, setTeamSize] = useState("1");
-  const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
-  const { plans, loading } = usePlanCatalog();
+  // Surface 4: post-checkout celebration. Opened on checkout.completed and
+  // mounted here because BillingTab stays mounted through the Paddle overlay
+  // regardless of which surface (this view or UpgradeModal) opened checkout.
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const { plans, loading: catalogLoading, error: catalogError } =
+    usePlanCatalog();
   const { isWorkspaceOwner } = useWorkspace();
-  const { plan: currentPlan, seats: currentSeats } = useBillingStore();
+  // BillingUsageProvider wraps this tab; reading from context avoids a refetch.
+  const { refetch: refetchUsage } = useBillingUsageContext();
+  // The Firestore workspace doc is the source of truth for plan, seats,
+  // cycle, suspension, comp, and the card on file. Always loaded on this page.
+  const { workspace: realtimeWorkspace } = useWorkspaceRealtimeStore();
+  const billing = realtimeWorkspace?.billing;
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    if (searchParams.get("upgraded") === "true") {
-      setBillingError(null);
-    }
+    if (searchParams.get("upgraded") === "true") setBillingError(null);
   }, [searchParams]);
 
-  async function handleCheckout(cycle: "monthly" | "annual") {
-    if (!isWorkspaceOwner) return;
+  const { paddle } = usePaddle({
+    onEvent: (event) => {
+      if (event.name === CheckoutEventNames.CHECKOUT_COMPLETED) {
+        setBillingError(null);
+        setCheckoutLoading(false);
+        // Celebrate immediately — don't wait for Firestore. The modal itself
+        // handles the webhook-timing handoff.
+        setShowSuccessModal(true);
+        // The live workspace doc flips via webhook → view switches to B.
+        void refetchUsage();
+      } else if (
+        event.name === CheckoutEventNames.CHECKOUT_ERROR ||
+        event.name === CheckoutEventNames.CHECKOUT_PAYMENT_ERROR ||
+        event.name === CheckoutEventNames.CHECKOUT_FAILED
+      ) {
+        setBillingError("Checkout failed. Please try again.");
+        setCheckoutLoading(false);
+      } else if (event.name === CheckoutEventNames.CHECKOUT_CLOSED) {
+        setCheckoutLoading(false);
+      }
+    },
+  });
+
+  async function handleCheckout(
+    cycle: "monthly" | "annual",
+    seatCount?: number
+  ) {
+    if (!isWorkspaceOwner) {
+      setBillingError(
+        "Only the workspace owner can upgrade. Contact your owner to upgrade."
+      );
+      return;
+    }
+    if (!paddle) {
+      setBillingError(
+        "Checkout is still loading. Please try again in a moment."
+      );
+      return;
+    }
     setBillingError(null);
     setCheckoutLoading(true);
     try {
-      const res = await authFetch("/api/billing/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ billingCycle: cycle }),
-      });
-      if (!res) { setBillingError("Request failed. Try again."); return; }
-      const json = await res.json() as { success: boolean; data?: { checkoutUrl: string }; error?: { message: string } };
-      if (!res.ok || !json.success || !json.data?.checkoutUrl) {
-        setBillingError(json.error?.message ?? "Failed to start checkout. Try again.");
-        return;
-      }
-      window.location.href = json.data.checkoutUrl;
-    } catch {
-      setBillingError("Failed to start checkout. Try again.");
-    } finally {
+      // seatCount is advisory — the server clamps it to the member floor.
+      await openUpgradeCheckout({ paddle, billingCycle: cycle, seatCount });
+      // Cleared by checkout.completed / closed / error events.
+    } catch (err) {
+      console.error("[upgrade] failed to open checkout:", err);
+      setBillingError(
+        err instanceof Error
+          ? err.message
+          : "Failed to start checkout. Try again."
+      );
       setCheckoutLoading(false);
     }
   }
@@ -3147,402 +3071,227 @@ function BillingTab() {
     setPortalLoading(true);
     try {
       const res = await authFetch("/api/billing/portal", { method: "POST" });
-      if (!res) { setBillingError("Request failed. Try again."); return; }
-      const json = await res.json() as { success: boolean; data?: { portalUrl: string }; error?: { message: string } };
+      if (!res) {
+        setBillingError("Request failed. Try again.");
+        return;
+      }
+      const json = (await res.json()) as {
+        success: boolean;
+        data?: { portalUrl: string };
+        error?: { message: string };
+      };
       if (!res.ok || !json.success || !json.data?.portalUrl) {
-        setBillingError(json.error?.message ?? "Failed to open billing portal. Try again.");
+        setBillingError(
+          json.error?.message ??
+            "Couldn't open the billing portal. Try again."
+        );
         return;
       }
       window.location.href = json.data.portalUrl;
     } catch {
-      setBillingError("Failed to open billing portal. Try again.");
+      setBillingError("Couldn't open the billing portal. Try again.");
     } finally {
       setPortalLoading(false);
     }
   }
 
-  const teamSizeNumber = useMemo(() => {
-    const n = Number.parseInt(teamSize, 10);
-    if (!Number.isFinite(n) || n <= 0) return 1;
-    return n;
-  }, [teamSize]);
+  // ── Catalog lookups (shared by both views) ──────────────────────────
+  const starterCatalog = useMemo(
+    () => plans?.find((p) => p.id === "starter") ?? null,
+    [plans]
+  );
+  const businessCatalog = useMemo(
+    () => plans?.find((p) => p.id === "business") ?? null,
+    [plans]
+  );
+  const enterpriseCatalog = useMemo(
+    () => plans?.find((p) => p.id === "enterprise") ?? null,
+    [plans]
+  );
 
-  const displayPlans = useMemo(() => {
-    if (!plans || plans.length === 0) return [];
-    const result: (DisplayPlan & {
-      priceAmount: string;
-      priceSuffix: string;
-      priceSubLabel: string | null;
-    })[] = [];
-    for (const plan of plans) {
-      const meta = PLAN_DISPLAY_META[plan.id as CatalogPlan["id"]];
-      if (!meta) continue;
-      const isAnnual = billingPeriod === "annual";
-      const perSeat = isAnnual ? (plan.annualPricePerSeat ?? plan.pricePerSeat) : plan.pricePerSeat;
-
-      if (plan.id === "enterprise" || perSeat === null) {
-        result.push({
-          id: plan.id as CatalogPlan["id"],
-          title: plan.name || meta.title,
-          pricePerSeat: null,
-          features: meta.features,
-          cta: meta.cta,
-          highlight: meta.highlight,
-          badge: meta.badge,
-          priceAmount: "Custom",
-          priceSuffix: "",
-          priceSubLabel: "Contact us for pricing",
-        });
-        continue;
-      }
-
-      if (perSeat === 0) {
-        result.push({
-          id: plan.id as CatalogPlan["id"],
-          title: plan.name || meta.title,
-          pricePerSeat: 0,
-          features: meta.features,
-          cta: meta.cta,
-          highlight: meta.highlight,
-          badge: meta.badge,
-          priceAmount: "Free",
-          priceSuffix: "",
-          priceSubLabel: null,
-        });
-        continue;
-      }
-
-      const total = perSeat * teamSizeNumber;
-      const suffix = isAnnual ? "/ seat / year" : "/ seat / month";
-      const subLabel = isAnnual ? `$${(perSeat * 12).toFixed(0)}/seat/yr billed annually` : null;
-
-      result.push({
-        id: plan.id as CatalogPlan["id"],
-        title: plan.name || meta.title,
-        pricePerSeat: perSeat,
-        features: meta.features,
-        cta: meta.cta,
-        highlight: meta.highlight,
-        badge: meta.badge,
-        priceAmount: `$${perSeat % 1 === 0 ? perSeat.toFixed(0) : perSeat.toFixed(2)}`,
-        priceSuffix: suffix,
-        priceSubLabel: subLabel,
-      });
+  // Effective per-seat price for View B's current-plan card.
+  const billingCycle = billing?.billingCycle === "annual" ? "annual" : "monthly";
+  const perSeatPrice = useMemo(() => {
+    if (!businessCatalog) return null;
+    if (billingCycle === "annual") {
+      return (
+        businessCatalog.annualPricePerSeat ?? businessCatalog.pricePerSeat
+      );
     }
-    return result;
-  }, [plans, teamSizeNumber, billingPeriod]);
+    return businessCatalog.pricePerSeat;
+  }, [businessCatalog, billingCycle]);
 
-  if (loading) {
-    return (
-      <div
-        className={`flex min-h-[640px] flex-col items-center justify-center ${BILLING_CONTAINER} pb-20`}
-        aria-busy="true"
-        aria-live="polite"
-      >
-        <MinimalLoader label="Loading billing…" />
-      </div>
-    );
-  }
+  // ── Loading / error gates ───────────────────────────────────────────
+  const workspaceReady = realtimeWorkspace != null;
+  const isInitialLoading = catalogLoading || !workspaceReady;
+  const hasError =
+    Boolean(catalogError) || (!catalogLoading && (!plans || plans.length === 0));
 
-  if (!plans || plans.length === 0) {
+  if (hasError) {
     return (
       <div className={`flex flex-col ${BILLING_CONTAINER} pb-20`}>
-        <p className="text-center text-[var(--text-secondary)]">Unable to load plans. Please try again later.</p>
+        <div
+          className="mx-auto mt-12 flex max-w-md flex-col items-center rounded-[var(--radius-lg)] border p-8 text-center"
+          style={{ background: "var(--surface)", borderColor: "var(--border)" }}
+        >
+          <AlertCircle
+            size={28}
+            aria-hidden
+            style={{ color: "var(--color-danger)" }}
+          />
+          <h3
+            className="mt-3 text-lg font-semibold"
+            style={{ color: "var(--text-heading)" }}
+          >
+            Couldn&apos;t load billing info
+          </h3>
+          <p
+            className="mt-1 text-sm"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Something went wrong on our end. Try again in a moment.
+          </p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="mt-5 inline-flex h-[38px] items-center rounded-[var(--radius-btn)] px-5 text-sm font-semibold text-white"
+            style={{ background: "var(--brand)" }}
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
 
-  const isOnPaidPlan = currentPlan === "business" || currentPlan === "enterprise";
+  if (isInitialLoading || !realtimeWorkspace) {
+    return (
+      <div className={`flex flex-col ${BILLING_CONTAINER} pb-20`}>
+        <div className="mx-auto w-full">
+          <BillingLoadingSkeleton />
+        </div>
+      </div>
+    );
+  }
+
+  const isSuspended = billing?.suspended === true;
+  const plan = billing?.plan ?? "starter";
 
   return (
     <div className={`flex flex-col ${BILLING_CONTAINER} pb-20`}>
-
-      {/* Current plan status card — shown for Business/Enterprise */}
-      {isOnPaidPlan && (
-        <div className="billing-container mb-8">
-          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-card)] p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <span className="text-lg font-semibold text-[var(--text-heading)]">
-                  {currentPlan === "enterprise" ? "Enterprise Plan" : "Business Plan"}
-                </span>
-                {currentPlan === "business" && (
-                  <span className="inline-flex items-center rounded-full bg-[var(--color-success-bg)] px-2.5 py-0.5 text-xs font-semibold text-[var(--color-success)]">
-                    Active
-                  </span>
-                )}
-              </div>
-              {isWorkspaceOwner && currentPlan === "business" && (
-                <button
-                  type="button"
-                  onClick={() => void handleManageBilling()}
-                  disabled={portalLoading}
-                  className="inline-flex h-[34px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[13px] font-medium hover:bg-[var(--surface-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
-                >
-                  {portalLoading ? "Opening…" : "Manage Billing"}
-                </button>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 text-sm">
-              <div>
-                <p className="text-[var(--text-secondary)] text-xs mb-0.5">Active seats</p>
-                <p className="font-semibold text-[var(--text-heading)]">{currentSeats}</p>
-              </div>
-              <div>
-                <p className="text-[var(--text-secondary)] text-xs mb-0.5">Feedback tickets</p>
-                <p className="font-semibold text-[var(--text-heading)]">Unlimited</p>
-              </div>
-              <div>
-                <p className="text-[var(--text-secondary)] text-xs mb-0.5">Members</p>
-                <p className="font-semibold text-[var(--text-heading)]">Unlimited</p>
-              </div>
-            </div>
-            {!isWorkspaceOwner && currentPlan === "business" && (
-              <p className="mt-4 text-sm text-[var(--text-secondary)]">
-                Contact your workspace owner to manage billing.
-              </p>
-            )}
-            {currentPlan === "enterprise" && (
-              <p className="mt-4 text-sm text-[var(--text-secondary)]">
-                Contact support for billing inquiries.
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Error / success banners */}
-      {billingError && (
-        <div className="billing-container mb-4">
-          <div className="rounded-lg border border-[var(--color-danger-border)] bg-[var(--color-danger-bg)] px-4 py-3 text-sm text-[var(--color-danger)]">
+      <div className="mx-auto w-full">
+        {/* ── Transient action errors ─────────────────────────────────── */}
+        {billingError && (
+          <div
+            className="mb-4 rounded-[var(--radius-btn)] px-4 py-3 text-sm"
+            style={{
+              background: "var(--color-danger-bg)",
+              border: "1px solid var(--color-danger-border)",
+              color: "var(--color-danger)",
+            }}
+          >
             {billingError}
           </div>
-        </div>
-      )}
-      {searchParams.get("upgraded") === "true" && (
-        <div className="billing-container mb-4">
-          <div className="rounded-lg border border-[var(--color-success-border)] bg-[var(--color-success-bg)] px-4 py-3 text-sm text-[var(--color-success-solid)] font-medium">
-            You&apos;re now on the Business plan! Welcome aboard.
+        )}
+        {searchParams.get("upgraded") === "true" && (
+          <div
+            className="mb-4 rounded-[var(--radius-btn)] px-4 py-3 text-sm font-medium"
+            style={{
+              background: "var(--color-success-bg)",
+              border: "1px solid var(--color-success-border)",
+              color: "var(--color-success)",
+            }}
+          >
+            You&apos;re on the Business plan now. Welcome aboard.
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Hero */}
-      <header className="billing-container text-center" style={{ marginBottom: 32 }}>
-        <h2
-          className="text-[44px] font-extrabold leading-[1.1] tracking-[-0.02em] text-[var(--text-heading)]"
-          style={{ marginBottom: 24 }}
-        >
-          Choose the plan that fits your feedback workflow
-        </h2>
-      </header>
-
-      {/* Billing control bar */}
-      <div className="billing-container flex flex-wrap items-center justify-center gap-8" style={{ marginBottom: 32 }}>
-        <div className="flex items-center gap-2">
-          <label htmlFor="team-size" className="text-[15px] font-medium text-[var(--text-body)]">
-            Seats:
-          </label>
-          <input
-            id="team-size"
-            type="text"
-            value={teamSize}
-            onChange={(e) => setTeamSize(e.target.value)}
-            className="w-[60px] px-2.5 py-1.5 text-center rounded-[var(--radius-sm)] border border-[rgba(0,0,0,0.08)] text-[15px] text-[var(--text-heading)] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20"
-          />
-        </div>
-        <div className="flex items-center gap-4">
-          <span className="text-[15px] font-medium text-[var(--text-body)]">Billing:</span>
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="billing"
-                checked={billingPeriod === "monthly"}
-                onChange={() => setBillingPeriod("monthly")}
-                className="w-4 h-4 text-[var(--brand)] focus:ring-[var(--brand)]"
-              />
-              <span className="text-[15px] font-medium text-[var(--text-heading)]">Monthly</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="billing"
-                checked={billingPeriod === "annual"}
-                onChange={() => setBillingPeriod("annual")}
-                className="w-4 h-4 text-[var(--brand)] focus:ring-[var(--brand)]"
-              />
-              <span className="text-[15px] font-medium text-[var(--text-heading)]">
-                Annually <span className="text-xs text-[var(--brand)] font-semibold">Save 20%</span>
-              </span>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      {/* Pricing cards */}
-      <div className="billing-container">
-        <section className="billing-pricing-grid mb-[72px] items-stretch">
-          {displayPlans.map((plan) => (
-            <div
-              key={plan.id}
-              className={`billing-card ${plan.highlight ? "billing-card--business" : ""}`}
-            >
-              <div className="relative">
-                {plan.badge && (
-                  <span className="absolute -top-1 -right-0 rounded-full bg-[var(--brand-subtle)] px-[10px] py-1 text-xs font-semibold text-[var(--text-heading)]">
-                    {plan.badge}
-                  </span>
-                )}
-                <h3 className="plan-title text-[var(--text-heading)]">{plan.title}</h3>
-              </div>
-              <div className="mt-4">
-                <p className="price text-[var(--text-heading)]">
-                  {plan.priceAmount}
-                  {plan.priceSuffix && <span className="price-suffix">{plan.priceSuffix}</span>}
-                </p>
-                {plan.priceSubLabel && (
-                  <p className="mt-1 text-[14px] font-medium text-[var(--text-secondary)]">{plan.priceSubLabel}</p>
-                )}
-              </div>
-              <ul className="plan-features flex-1">
-                {plan.features.map((f) => (
-                  <li key={f} className="plan-feature">
-                    <span className="feature-icon mt-[2px]" aria-hidden>
-                      <CheckMarkIcon />
-                    </span>
-                    <span className="plan-feature-text text-[var(--text-body)]">{f}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-6">
-                <Button
-                  variant={plan.highlight ? "primary" : "secondary"}
-                  className={
-                    plan.highlight
-                      ? "w-full rounded-[var(--radius-btn)] px-4 py-2.5 text-sm font-semibold bg-[var(--brand)] text-white hover:brightness-110 border border-transparent"
-                      : "secondary-cta w-full text-sm"
-                  }
-                  disabled={
-                    (plan.id === "business" && checkoutLoading) ||
-                    (plan.id === "business" && isOnPaidPlan)
-                  }
-                  onClick={() => {
-                    if (plan.id === "enterprise") {
-                      router.push(`/settings?tab=billing&plan=enterprise`);
-                      return;
-                    }
-                    if (plan.id === "starter") return;
-                    if (plan.id === "business") {
-                      if (isOnPaidPlan) return;
-                      if (!isWorkspaceOwner) {
-                        setBillingError("Only the workspace owner can upgrade. Contact your owner to upgrade.");
-                        return;
-                      }
-                      void handleCheckout(billingPeriod);
-                      return;
-                    }
-                    router.push(`/settings?tab=billing&plan=${plan.id}&cycle=${billingPeriod}`);
-                  }}
-                >
-                  {plan.id === "business" && checkoutLoading
-                    ? "Redirecting…"
-                    : plan.id === "business" && isOnPaidPlan
-                    ? "Current plan"
-                    : plan.cta}
-                </Button>
-              </div>
-            </div>
-          ))}
-        </section>
-
-        {/* Feature comparison table */}
-        <section className="mb-[72px] overflow-x-auto">
-          <div className="rounded-[var(--radius-lg)] border overflow-hidden min-w-[560px]" style={{ borderColor: "rgba(0,0,0,0.08)" }}>
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b bg-[var(--surface-subtle)]/80" style={{ borderColor: "rgba(0,0,0,0.05)" }}>
-                  <th className="py-3 px-4 text-[15px] font-semibold text-[var(--text-heading)]">Feature</th>
-                  <th className="py-3 px-4 text-[15px] font-semibold text-[var(--text-heading)]">Starter (Free)</th>
-                  <th className="py-3 px-4 text-[15px] font-semibold text-[var(--text-heading)]">Business ($39/seat/mo)</th>
-                  <th className="py-3 px-4 text-[15px] font-semibold text-[var(--text-heading)]">Enterprise (Custom)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {COMPARISON_SECTIONS.map(({ section, rows }) => (
-                  <Fragment key={section}>
-                    <tr className="bg-[var(--surface-subtle)]">
-                      <td colSpan={4} className="py-2.5 px-4 text-[14px] font-semibold tracking-[0.04em] text-[var(--text-body)]">
-                        {section}
-                      </td>
-                    </tr>
-                    {rows.map((row, rowIdx) => (
-                      <tr
-                        key={row.feature}
-                        className={rowIdx % 2 === 1 ? "bg-[var(--surface-subtle)]" : ""}
-                        style={{ borderBottom: "1px solid rgba(0,0,0,0.05)" }}
-                      >
-                        <td className="py-3 px-4 text-[15px] text-[var(--text-body)]">{row.feature}</td>
-                        {(["starter", "business", "enterprise"] as const).map((col) => {
-                          const v = row[col];
-                          return (
-                            <td
-                              key={col}
-                              className="py-3 px-4 text-[15px] text-[var(--text-secondary)] align-middle"
-                            >
-                              {v === true ? (
-                                <span className="inline-flex items-center"><CheckMarkIcon /></span>
-                              ) : v === false ? (
-                                <Minus className="w-5 h-5 text-[var(--text-placeholder)] inline" strokeWidth={2} aria-hidden />
-                              ) : (
-                                <span>{v}</span>
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        {/* FAQ accordion */}
-        <section>
-          <h3 className="text-[44px] font-extrabold text-[var(--text-heading)] text-center mt-20 mb-12">
-            Frequently Asked Questions
-          </h3>
+        {/* Non-owner: read-only, any state. */}
+        {!isWorkspaceOwner ? (
+          <ReadOnlyBillingState workspace={realtimeWorkspace} />
+        ) : (
           <div>
-            {FAQ_ITEMS.map(({ q, a }, index) => {
-              const isOpen = faqOpenIndex === index;
-              return (
-                <div key={q} className="bg-[var(--brand-subtle)] rounded-[var(--radius-lg)] p-5 mb-4">
-                  <button
-                    type="button"
-                    onClick={() => setFaqOpenIndex(isOpen ? null : index)}
-                    className="w-full flex items-center justify-between gap-4 text-left text-[18px] font-semibold text-[var(--text-heading)]"
-                    aria-expanded={isOpen}
-                  >
-                    <span>{q}</span>
-                    <ChevronDown
-                      className={`w-5 h-5 shrink-0 text-[var(--text-body)] transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-                      aria-hidden
-                    />
-                  </button>
-                  <div
-                    className="overflow-hidden transition-all duration-200 ease"
-                    style={{ maxHeight: isOpen ? 300 : 0, opacity: isOpen ? 1 : 0, marginTop: isOpen ? 12 : 0 }}
-                  >
-                    <p className="text-[16px] text-[var(--text-body)]" style={{ lineHeight: 1.6 }}>{a}</p>
-                  </div>
+            {/* D2 suspended inline card — top of either owner view. */}
+            {isSuspended && (
+              <div
+                className="mb-6 flex items-start gap-4 rounded-xl p-6"
+                style={{
+                  background: "var(--color-danger-bg)",
+                  border: "1px solid var(--color-danger-border)",
+                }}
+              >
+                <div
+                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full"
+                  style={{ background: "var(--color-danger)" }}
+                >
+                  <AlertCircle
+                    className="h-5 w-5"
+                    style={{ color: "white" }}
+                    aria-hidden
+                  />
                 </div>
-              );
-            })}
+
+                <div className="min-w-0 flex-1">
+                  <h3
+                    className="mb-1 text-base font-semibold"
+                    style={{ color: "var(--text-heading)" }}
+                  >
+                    Your subscription is suspended
+                  </h3>
+                  <p
+                    className="mb-4 text-sm"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    {isWorkspaceOwner
+                      ? "We couldn't process your latest payment. Update your payment method below to restore access."
+                      : "This workspace's billing needs attention. Ask your workspace owner to update the payment method."}
+                  </p>
+
+                  {isWorkspaceOwner && (
+                    <button
+                      type="button"
+                      onClick={() => void handleManageBilling()}
+                      disabled={portalLoading}
+                      className="inline-flex items-center gap-2 text-sm font-medium transition-opacity hover:opacity-80 disabled:opacity-60"
+                      style={{ color: "var(--color-danger)" }}
+                    >
+                      {portalLoading ? "Opening…" : "Update payment method"}
+                      <ArrowRight className="h-4 w-4" aria-hidden />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {plan === "starter" ? (
+              <PlansAndPricingView
+                starter={starterCatalog}
+                business={businessCatalog}
+                enterprise={enterpriseCatalog}
+                memberFloor={realtimeWorkspace.usage?.members ?? 1}
+                checkoutLoading={checkoutLoading}
+                onUpgrade={(cycle, seatCount) =>
+                  void handleCheckout(cycle, seatCount)
+                }
+              />
+            ) : (
+              <BillingManagementView
+                workspace={realtimeWorkspace}
+                perSeatPrice={perSeatPrice}
+                portalLoading={portalLoading}
+                onManageBilling={() => void handleManageBilling()}
+              />
+            )}
           </div>
-        </section>
+        )}
       </div>
+
+      {/* Surface 4: post-checkout success. Underlying view auto-transitions
+          to Management once Firestore flips; this just dismisses cleanly. */}
+      <UpgradeSuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+      />
     </div>
   );
 }

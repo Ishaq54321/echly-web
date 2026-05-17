@@ -4,6 +4,7 @@ import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 import { assertWorkspaceActive } from "@/lib/server/assertWorkspaceActive";
+import { workspaceGuardErrorResponse } from "@/lib/server/workspaceGuardErrorResponse";
 import { getWorkspaceMemberRepo } from "@/lib/repositories/workspaceMembersRepository.server";
 import { adminDb, adminBucket } from "@/lib/server/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
@@ -80,6 +81,9 @@ export async function GET(req: NextRequest) {
 
     return apiSuccess({ brandLogoUrl: signedUrl });
   } catch (err) {
+    const guardResponse = workspaceGuardErrorResponse(err);
+    if (guardResponse) return guardResponse;
+
     console.error("GET /api/workspace/brand-logo:", err);
     return apiError({ code: "INTERNAL_ERROR", message: "Failed to refresh brand logo URL", status: 500 });
   }
@@ -183,6 +187,9 @@ export async function POST(req: NextRequest) {
 
     return apiSuccess({ brandLogoUrl: signedUrl });
   } catch (err) {
+    const guardResponse = workspaceGuardErrorResponse(err);
+    if (guardResponse) return guardResponse;
+
     console.error("POST /api/workspace/brand-logo:", err);
     return apiError({ code: "INTERNAL_ERROR", message: "Failed to upload brand logo", status: 500 });
   }
@@ -229,6 +236,9 @@ export async function DELETE(req: NextRequest) {
 
     return apiSuccess({ success: true });
   } catch (err) {
+    const guardResponse = workspaceGuardErrorResponse(err);
+    if (guardResponse) return guardResponse;
+
     console.error("DELETE /api/workspace/brand-logo:", err);
     return apiError({ code: "INTERNAL_ERROR", message: "Failed to remove brand logo", status: 500 });
   }

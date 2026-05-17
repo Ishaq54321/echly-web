@@ -78,14 +78,18 @@ export function ReopenedBadge({ size = 32, className }: BadgeProps) {
     >
       <circle cx="16" cy="16" r="16" fill="#BA7517" opacity="0.12" />
       <circle cx="16" cy="16" r="11" fill="#BA7517" />
-      <path
-        d="M19.5 12 A5 5 0 1 0 21 16.5 M19.5 12 V14.5 H17"
+      {/* Lucide "rotate-cw" geometry, scaled 0.62 and centered on (16,16) */}
+      <g
+        transform="translate(8.56 8.56) scale(0.62)"
         stroke="#FFFFFF"
-        strokeWidth="2"
+        strokeWidth="3.2"
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
-      />
+      >
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L21 8" />
+        <path d="M21 3v5h-5" />
+      </g>
     </svg>
   );
 }
@@ -136,10 +140,14 @@ export function CommentedBadge({ size = 32, className }: BadgeProps) {
     >
       <circle cx="16" cy="16" r="16" fill="#378ADD" opacity="0.12" />
       <circle cx="16" cy="16" r="11" fill="#378ADD" />
-      <path
-        d="M11 14.5 C11 12.7 12.3 11.5 14 11.5 H18 C19.7 11.5 21 12.7 21 14.5 V17 C21 18.7 19.7 20 18 20 H14.5 L12 21.5 V20 C11.4 19.6 11 18.8 11 17.8 Z"
-        fill="#FFFFFF"
-      />
+      {/* Heroicons solid "chat-bubble" geometry, scaled 0.62 and centered on (16,16) */}
+      <g transform="translate(9.8 9.8) scale(0.62)" fill="#FFFFFF">
+        <path
+          fillRule="evenodd"
+          clipRule="evenodd"
+          d="M3.43 2.524A41.29 41.29 0 0 1 10 2c2.236 0 4.43.18 6.57.524 1.437.231 2.43 1.49 2.43 2.902v5.148c0 1.413-.993 2.67-2.43 2.902a41.202 41.202 0 0 1-5.183.501.78.78 0 0 0-.528.224l-3.579 3.58A.75.75 0 0 1 6 17.25v-3.443a41.033 41.033 0 0 1-2.57-.33C1.993 13.244 1 11.986 1 10.573V5.426c0-1.413.993-2.67 2.43-2.902Z"
+        />
+      </g>
     </svg>
   );
 }
@@ -177,7 +185,7 @@ export function MentionBadge({ size = 32, className }: BadgeProps) {
 // ═══════════════════════════════════════════════════════
 // BADGE 7: Session created (session.created)
 // Color: coral #D85A30
-// Glyph: desktop window with traffic-light dots
+// Glyph: Heroicons solid "document" (page with text lines)
 // ═══════════════════════════════════════════════════════
 export function SessionCreatedBadge({ size = 32, className }: BadgeProps) {
   return (
@@ -191,10 +199,14 @@ export function SessionCreatedBadge({ size = 32, className }: BadgeProps) {
     >
       <circle cx="16" cy="16" r="16" fill="#D85A30" opacity="0.13" />
       <circle cx="16" cy="16" r="11" fill="#D85A30" />
-      <rect x="11" y="12" width="10" height="8" rx="1.5" fill="#FFFFFF" />
-      <rect x="11" y="12" width="10" height="2.5" rx="1.5" fill="#FFFFFF" opacity="0.4" />
-      <circle cx="13.5" cy="13.2" r="0.6" fill="#D85A30" />
-      <circle cx="15.5" cy="13.2" r="0.6" fill="#D85A30" />
+      {/* Heroicons solid "document" geometry, scaled 0.62 and centered on (16,16) */}
+      <g transform="translate(9.8 9.8) scale(0.62)" fill="#FFFFFF">
+        <path
+          fillRule="evenodd"
+          clipRule="evenodd"
+          d="M4.5 2A1.5 1.5 0 0 0 3 3.5v13A1.5 1.5 0 0 0 4.5 18h11a1.5 1.5 0 0 0 1.5-1.5V7.621a1.5 1.5 0 0 0-.44-1.06l-4.12-4.122A1.5 1.5 0 0 0 11.378 2H4.5Zm2.25 8.5a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5Zm0 3a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5Z"
+        />
+      </g>
     </svg>
   );
 }

@@ -502,11 +502,7 @@ function ShareModalForSession({ session, onClose, authUid }: ShareModalForSessio
       updatingGeneralAccess={share.updatingGeneralAccess}
       items={share.items}
       initialLoading={share.initialLoading}
-      inviting={share.inviting}
-      updatingId={share.updatingId}
-      removingId={share.removingId}
-      inviteError={share.inviteError}
-      listError={share.listError}
+      shareErrors={share.shareErrors}
       onInvite={() => {
         void share.invite().catch(() => {});
       }}

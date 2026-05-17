@@ -243,28 +243,6 @@ export function SessionOverlay({
     };
   }, [voiceError]);
 
-  /** Open browser's site-settings page so the user can flip mic from "blocked". */
-  const handleOpenSiteSettings = useCallback(() => {
-    if (typeof window === "undefined") return;
-    const origin = window.location.origin;
-    const url = `chrome://settings/content/siteDetails?site=${encodeURIComponent(origin)}`;
-    let opened: Window | null = null;
-    try {
-      opened = window.open(url, "_blank");
-    } catch {
-      opened = null;
-    }
-    if (opened) return;
-    try {
-      void navigator.clipboard.writeText(url);
-      alert(
-        "Couldn't open settings directly. The URL is copied to your clipboard — paste it into your browser's address bar."
-      );
-    } catch {
-      alert(`Please open this URL in a new tab to manage microphone access:\n\n${url}`);
-    }
-  }, []);
-
   useEffect(() => {
     if (!sessionMode || !captureRoot) return;
     const getActive = () =>
@@ -414,7 +392,6 @@ export function SessionOverlay({
           onModeChange={handlePillModeChange}
           onSelectMic={onSelectMicrophone}
           selectedMicId={voiceMicDeviceId}
-          onOpenSiteSettings={handleOpenSiteSettings}
           portalTarget={captureRoot}
         />
       )}

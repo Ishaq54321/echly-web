@@ -91,7 +91,10 @@ export type VoiceCaptureError =
   | null
   | "no_audio"
   | "transcription_failed"
-  | "mic_permission";
+  | "mic_permission"
+  /** Site sent a Permissions-Policy header disallowing mic — no user action
+   *  can override it; the only path forward is Write mode. */
+  | "site_blocked";
 
 /** Explicit capture flow state machine. */
 export type CaptureState =

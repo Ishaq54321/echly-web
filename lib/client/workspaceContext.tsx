@@ -27,6 +27,7 @@ import type { Workspace } from "@/lib/domain/workspace";
 import { PLANS, type PlanId } from "@/lib/billing/plans";
 import { composeFullName } from "@/lib/utils/nameSplit";
 import { setActiveWorkspaceForNotifications } from "@/lib/store/notificationStore";
+import { fetchMembers as prefetchWorkspaceMembers } from "@/lib/client/workspaceMembersStore";
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([
@@ -272,6 +273,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       if (currentUser) {
         try {
           await withTimeout(currentUser.getIdToken(true), 5000, "getIdToken");
+          // Phase 28.X — this forced refresh picks up updated custom claims
+          // (e.g. workspaceId). Drop the authFetch token cache so the next
+          // request sends the new token, not the stale cached one.
+          clearAuthTokenCache();
         } catch (err) {
           console.warn("[WorkspaceContext] Token refresh failed/timed out:", err);
         }
@@ -522,6 +527,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       .catch(() => setMemberCount(0));
   }, [activeWorkspaceId, claimsReady]);
 
+  // Phase 28.X — warm the member-list cache on every page load so the Assign
+  // dropdown opens instantly (it remounts per feedback-item navigation and
+  // can no longer cache locally). Fire-and-forget; the store dedups and
+  // applies its own 5-min TTL.
+  useEffect(() => {
+    if (!activeWorkspaceId || !claimsReady) return;
+    void prefetchWorkspaceMembers(activeWorkspaceId);
+  }, [activeWorkspaceId, claimsReady]);
+
   // Subscribe to the workspace document for live name/logo/owner data
   useEffect(() => {
     setWorkspaceDocLoading(true);
@@ -599,6 +613,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       // 4. Force Firebase token refresh to pick up new workspaceId claim
       if (auth.currentUser) {
         await auth.currentUser.getIdToken(true);
+        // Phase 28.X — invalidate the authFetch token cache so subsequent
+        // requests carry the new workspaceId claim, not the stale token.
+        clearAuthTokenCache();
       }
 
       // 4b. Signal the extension (if installed) — broadcast via window.postMessage

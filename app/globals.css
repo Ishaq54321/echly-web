@@ -4623,12 +4623,8 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
 .share-modal-share-stack {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
   margin-top: 0;
-}
-
-.share-modal-share-stack .share-modal-list-error {
-  margin: 0;
 }
 
 .share-modal-section-heading {
@@ -4664,8 +4660,9 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
 .share-modal-shared-with {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-height: 0;
+  /* No flex: 1 — size to content so an empty/sparse list doesn't claim a
+     greedy block of trailing whitespace. */
+  min-height: 0; /* keep for scroll-container safety */
 }
 
 .share-modal-shared-with .share-modal-section-heading--people {
@@ -4707,19 +4704,6 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
 .share-modal-invite-actions .share-dropdown--role-pill .role-pill {
   min-height: 44px;
   box-sizing: border-box;
-}
-
-.share-modal-success {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: #059669;
-}
-
-.share-modal-list-error {
-  margin: 0;
-  font-size: 13px;
-  color: #b45309;
 }
 
 .share-modal-list-loading {
@@ -5166,8 +5150,8 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 28px 20px;
-  min-height: 140px;
+  padding: 12px 16px;
+  min-height: 64px;
   font-size: 14px;
   font-weight: 500;
   line-height: 1.45;
@@ -5184,7 +5168,9 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
 }
 
 .share-modal-team--members {
-  min-height: 200px;
+  min-height: 64px; /* ~one row height — prevents layout jump on load */
+  max-height: 280px;
+  overflow-y: auto;
 }
 
 .share-modal-permissions .share-dropdown-trigger {
@@ -7001,6 +6987,449 @@ h6 [data-ai-touched="true"] {
   height: 13px;
 }
 .echly-v2 .begin-btn:active { transform: translateY(1px); }
+
+/* ── Mic permission panel (mode-selection, full-width) ──── */
+.echly-v2 .echly-mic-permission-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px var(--sp-lg) 20px;
+  background: var(--surface);
+  /* Take the residual height after the fixed header strips, then cap and
+     hide overflow so the instructions card (below) owns the scroll. */
+  flex: 1;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+/* Only when the permission panel is on screen, let .pill-mode participate
+   in the surface's flex height. :has() keeps this from affecting the
+   Voice/Write card view, which shares .pill-mode. .pill-mode is itself a
+   flex child of .echly-v2 (flex:1; min-height:0 inside the bounded
+   .echly-sidebar-surface), so 100% here resolves to a definite height. */
+.echly-v2 .pill-mode:has(.echly-mic-permission-panel) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 100%;
+}
+.echly-v2 .echly-mic-permission-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  margin-bottom: 16px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.echly-v2 .echly-mic-permission-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--brand);
+  flex-shrink: 0;
+}
+.echly-v2 .echly-mic-permission-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.echly-v2 .echly-mic-permission-icon-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--brand-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brand);
+  margin-bottom: 14px;
+  flex-shrink: 0;
+  position: relative;
+}
+.echly-v2 .echly-mic-permission-icon-circle--blocked {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.echly-v2 .echly-mic-permission-icon-circle--success {
+  background: color-mix(in srgb, var(--good) 12%, transparent);
+  color: var(--good);
+}
+/* Diagonal "blocked" slash drawn over the mic glyph. */
+.echly-v2 .echly-mic-permission-slash {
+  position: absolute;
+  top: 50%;
+  left: 11px;
+  right: 11px;
+  height: 2px;
+  background: var(--brand);
+  transform: rotate(-30deg);
+  border-radius: 1px;
+  pointer-events: none;
+}
+.echly-v2 .echly-mic-permission-spinner {
+  animation: echly-spin 0.9s linear infinite;
+}
+.echly-v2 .echly-mic-permission-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink);
+  margin: 0 0 6px;
+  text-align: center;
+}
+.echly-v2 .echly-mic-permission-sub {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  text-align: center;
+  margin: 0 0 16px;
+  max-width: 280px;
+}
+
+/* Inline instructions card */
+.echly-v2 .echly-mic-permission-instructions {
+  align-self: stretch;
+  background: var(--surface-subtle);
+  border-radius: var(--r-md);
+  padding: 14px;
+  border: 0.5px solid rgba(0, 0, 0, 0.05);
+  margin-bottom: 14px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+/* Subtle brand-tinted scrollbar — same thin pattern as .echly-sidebar-body,
+   recolored for the light instructions surface (a white thumb would be
+   invisible here). Only appears when steps exceed the capped height. */
+.echly-v2 .echly-mic-permission-instructions::-webkit-scrollbar {
+  width: 6px;
+}
+.echly-v2 .echly-mic-permission-instructions::-webkit-scrollbar-track {
+  background: transparent;
+}
+.echly-v2 .echly-mic-permission-instructions::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 9999px;
+}
+.echly-v2 .echly-mic-permission-instructions::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Site-blocked hint card (light-bulb tip → Write mode). Mirrors the
+   instructions card surface; single soft callout, no scroll. */
+.echly-v2 .echly-mic-permission-hint {
+  align-self: stretch;
+  background: var(--surface-subtle);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  border: 0.5px solid rgba(0, 0, 0, 0.05);
+  margin-bottom: 16px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 12px;
+  color: var(--ink);
+  line-height: 1.5;
+  text-align: left;
+}
+.echly-v2 .echly-mic-permission-hint svg {
+  color: var(--brand);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.echly-v2 .echly-mic-permission-hint strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.echly-v2 .echly-mic-permission-step {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.echly-v2 .echly-mic-permission-step:last-child {
+  margin-bottom: 0;
+}
+.echly-v2 .echly-mic-permission-step-num {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--brand-soft);
+  color: var(--brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 10px;
+  margin-top: 1px;
+}
+.echly-v2 .echly-mic-permission-step-text {
+  flex: 1;
+  font-size: 12px;
+  color: var(--ink);
+  line-height: 1.6;
+  text-align: left;
+}
+.echly-v2 .echly-mic-permission-step-text strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+.echly-v2 .echly-mic-permission-icon-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  background: var(--surface);
+  border: 0.5px solid rgba(0, 0, 0, 0.14);
+  border-radius: 5px;
+  vertical-align: middle;
+}
+.echly-v2 .echly-mic-permission-primary {
+  background: var(--brand);
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-family: inherit;
+  transition: background 120ms ease;
+}
+.echly-v2 .echly-mic-permission-primary:hover { background: var(--brand-ink); }
+.echly-v2 .echly-mic-permission-secondary {
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  padding: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  width: 100%;
+  font-family: inherit;
+  transition: color 120ms ease;
+}
+.echly-v2 .echly-mic-permission-secondary:hover { color: var(--ink); }
+
+/* ── Mic permission panel — compact pill variant ──────────
+   The pill root is NOT nested under .echly-v2, so this variant defines
+   every sub-element itself (using --pill-* tokens with literal fallbacks).
+   Same vertical card layout as the full panel, slightly tightened. */
+.echly-pill-root .echly-mic-permission-panel--pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: 16px 16px 14px;
+  background: var(--pill-surface, #fff);
+  border-radius: 14px;
+  width: 320px;
+  max-width: 360px;
+  /* No sidebar parent here, so cap with absolute values: 70vh guards short
+     viewports, 420px keeps it from sprawling on tall screens. */
+  max-height: min(420px, 70vh);
+  min-height: 0;
+  overflow: hidden;
+}
+.echly-pill-root .echly-mic-permission-panel--pill .echly-mic-permission-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.echly-pill-root .echly-mic-permission-panel--pill .echly-mic-permission-icon-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--pill-brand-soft, #F0ECFB);
+  color: var(--pill-brand, #5A49BF);
+  margin-bottom: 12px;
+  flex-shrink: 0;
+  position: relative;
+}
+.echly-pill-root .echly-mic-permission-panel--pill .echly-mic-permission-icon-circle--success {
+  background: rgba(24, 121, 78, 0.12);
+  color: #18794E;
+}
+.echly-pill-root .echly-mic-permission-panel--pill .echly-mic-permission-slash {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  right: 10px;
+  height: 2px;
+  background: var(--pill-brand, #5A49BF);
+  transform: rotate(-30deg);
+  border-radius: 1px;
+  pointer-events: none;
+}
+.echly-pill-root .echly-mic-permission-panel--pill .echly-mic-permission-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--pill-ink, #15101F);
+  margin: 0 0 5px;
+  text-align: center;
+}
+.echly-pill-root .echly-mic-permission-panel--pill .echly-mic-permission-sub {
+  font-size: 12px;
+  color: var(--pill-soft, #8A8096);
+  line-height: 1.5;
+  margin: 0 0 14px;
+  text-align: center;
+  max-width: 260px;
+}
+.echly-pill-root .echly-mic-permission-panel--pill .echly-mic-permission-instructions {
+  align-self: stretch;
+  background: var(--pill-surface-subtle, #F8F8F8);
+  border-radius: 10px;
+  padding: 12px;
+  border: 0.5px solid rgba(0, 0, 0, 0.05);
+  margin-bottom: 12px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.echly-pill-root
+  .echly-mic-permission-panel--pill
+  .echly-mic-permission-instructions::-webkit-scrollbar {
+  width: 6px;
+}
+.echly-pill-root
+  .echly-mic-permission-panel--pill
+  .echly-mic-permission-instructions::-webkit-scrollbar-track {
+  background: transparent;
+}
+.echly-pill-root
+  .echly-mic-permission-panel--pill
+  .echly-mic-permission-instructions::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 9999px;
+}
+.echly-pill-root
+  .echly-mic-permission-panel--pill
+  .echly-mic-permission-instructions::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Site-blocked hint card — compact pill variant. */
+.echly-pill-root .echly-mic-permission-panel--pill .echly-mic-permission-hint {
+  align-self: stretch;
+  background: var(--pill-surface-subtle, #F8F8F8);
+  border-radius: 10px;
+  padding: 11px 12px;
+  border: 0.5px solid rgba(0, 0, 0, 0.05);
+  margin-bottom: 12px;
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  font-size: 12px;
+  color: var(--pill-ink, #15101F);
+  line-height: 1.5;
+  text-align: left;
+}
+.echly-pill-root .echly-mic-permission-panel--pill .echly-mic-permission-hint svg {
+  color: var(--pill-brand, #5A49BF);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.echly-pill-root .echly-mic-permission-panel--pill .echly-mic-permission-hint strong {
+  font-weight: 600;
+  color: var(--pill-ink, #15101F);
+}
+.echly-pill-root .echly-mic-permission-panel--pill .echly-mic-permission-step {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+.echly-pill-root .echly-mic-permission-panel--pill .echly-mic-permission-step:last-child {
+  margin-bottom: 0;
+}
+.echly-pill-root .echly-mic-permission-panel--pill .echly-mic-permission-step-num {
+  flex-shrink: 0;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--pill-brand-soft, #F0ECFB);
+  color: var(--pill-brand, #5A49BF);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 10px;
+  margin-top: 1px;
+}
+.echly-pill-root .echly-mic-permission-panel--pill .echly-mic-permission-step-text {
+  flex: 1;
+  font-size: 12px;
+  color: var(--pill-ink, #15101F);
+  line-height: 1.55;
+  text-align: left;
+}
+.echly-pill-root .echly-mic-permission-panel--pill .echly-mic-permission-step-text strong {
+  font-weight: 600;
+  color: var(--pill-ink, #15101F);
+}
+.echly-pill-root .echly-mic-permission-panel--pill .echly-mic-permission-icon-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  background: var(--pill-surface, #fff);
+  border: 0.5px solid rgba(0, 0, 0, 0.14);
+  border-radius: 5px;
+  vertical-align: middle;
+}
+.echly-pill-root .echly-mic-permission-panel--pill .echly-mic-permission-primary {
+  background: var(--pill-brand, #5A49BF);
+  color: #fff;
+  border: none;
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-family: inherit;
+  transition: background 120ms ease;
+}
+.echly-pill-root .echly-mic-permission-panel--pill .echly-mic-permission-primary:hover {
+  background: var(--pill-brand-ink, #3D2F73);
+}
+.echly-pill-root .echly-mic-permission-panel--pill .echly-mic-permission-secondary {
+  background: transparent;
+  border: none;
+  color: var(--pill-soft, #8A8096);
+  padding: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  width: 100%;
+  font-family: inherit;
+  transition: color 120ms ease;
+}
+.echly-pill-root .echly-mic-permission-panel--pill .echly-mic-permission-secondary:hover {
+  color: var(--pill-ink, #15101F);
+}
+.echly-pill-root .echly-mic-permission-spinner {
+  animation: echly-spin 0.9s linear infinite;
+}
 
 /* ── V2 Animations ─────────────────────────────────────── */
 @keyframes v2-pulse {
@@ -10560,6 +10989,18 @@ h6 [data-ai-touched="true"] {
   cursor: not-allowed;
   background: var(--pill-soft);
   box-shadow: none;
+}
+/* Send-in-flight: keep the brand circle, show a spinner — reads as
+   "working", never as "broken/disabled". */
+.echly-pill-send-btn.is-loading {
+  background: var(--pill-brand);
+  color: #fff;
+  cursor: progress;
+  pointer-events: none;
+  box-shadow: 0 2px 6px rgba(90, 73, 191, 0.25);
+}
+.echly-pill-send-btn.is-loading .echly-mic-permission-spinner {
+  animation: echly-spin 0.9s linear infinite;
 }
 
 /* ── Text-mode input ── */

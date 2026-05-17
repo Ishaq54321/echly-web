@@ -22,6 +22,7 @@ import { routeParamId } from "@/lib/server/routeParams";
 import {
   buildRequestContext,
   tryBuildRequestContext,
+  type RequestContext,
 } from "@/lib/server/requestContext";
 import type { Feedback } from "@/lib/domain/feedback";
 import type { Session } from "@/lib/domain/session";
@@ -48,6 +49,12 @@ async function resolveTicketWorkspaceId(
     workspaceId: context.sessionWorkspaceId ?? "",
     feedback: context.feedback,
     session: context.session,
+    // Phase 28.X — thread the just-resolved access forward so the handler's
+    // buildRequestContext reuses it instead of re-running getAccessContext.
+    access: context.access,
+    accessRequest: context.accessRequest,
+    sessionWorkspaceId: context.sessionWorkspaceId,
+    userId: context.userId,
   };
 }
 
@@ -155,6 +162,20 @@ export const PATCH = withAuthorization(
         ? {
             feedback: pre.feedback as Feedback | null,
             session: pre.session as Session | null,
+          }
+        : {}),
+      // Phase 28.X — when resolveTicketWorkspaceId already resolved access
+      // for this same feedbackId, reuse it (skips a full getAccessContext
+      // fan-out). `access` is present (incl. null) only when threaded.
+      ...(pre && "access" in pre
+        ? {
+            preloadedAccess: {
+              access: pre.access as RequestContext["access"],
+              accessRequest:
+                pre.accessRequest as RequestContext["accessRequest"],
+              sessionWorkspaceId: pre.sessionWorkspaceId,
+              userId: pre.userId ?? null,
+            },
           }
         : {}),
     });
@@ -515,6 +536,17 @@ export const DELETE = withAuthorization(
           ? {
               feedback: pre.feedback as Feedback | null,
               session: pre.session as Session | null,
+            }
+          : {}),
+        ...(pre && "access" in pre
+          ? {
+              preloadedAccess: {
+                access: pre.access as RequestContext["access"],
+                accessRequest:
+                  pre.accessRequest as RequestContext["accessRequest"],
+                sessionWorkspaceId: pre.sessionWorkspaceId,
+                userId: pre.userId ?? null,
+              },
             }
           : {}),
       });

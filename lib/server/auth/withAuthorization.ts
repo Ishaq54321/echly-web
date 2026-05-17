@@ -16,6 +16,18 @@ export type PreloadedTicketContext = {
   feedback?: unknown;
   session?: unknown;
   comment?: unknown;
+  /**
+   * Phase 28.X — Access context already resolved while resolving the
+   * workspace (via `buildRequestContext` in `resolveTicketWorkspaceId`).
+   * When present, the handler's `buildRequestContext` reuses it instead of
+   * re-running `getAccessContext` — eliminating one full 4-doc Firestore
+   * fan-out per PATCH/DELETE request. Keyed implicitly by feedbackId since
+   * `resolveWorkspace` and the handler operate on the same route param.
+   */
+  access?: unknown;
+  accessRequest?: unknown;
+  sessionWorkspaceId?: string;
+  userId?: string | null;
 };
 
 export type HandlerContext = {
@@ -33,6 +45,11 @@ export type ResolvedWorkspace =
       feedback?: unknown;
       session?: unknown;
       comment?: unknown;
+      /** See {@link PreloadedTicketContext.access} — resolved access threaded forward. */
+      access?: unknown;
+      accessRequest?: unknown;
+      sessionWorkspaceId?: string;
+      userId?: string | null;
     };
 
 export type HandlerUser = AuthorizedRequestUser;
@@ -109,6 +126,10 @@ export function withAuthorization(
           feedback: resolvedWorkspace.feedback,
           session: resolvedWorkspace.session,
           comment: resolvedWorkspace.comment,
+          access: resolvedWorkspace.access,
+          accessRequest: resolvedWorkspace.accessRequest,
+          sessionWorkspaceId: resolvedWorkspace.sessionWorkspaceId,
+          userId: resolvedWorkspace.userId,
         };
       }
 

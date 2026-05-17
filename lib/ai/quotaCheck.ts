@@ -1,31 +1,32 @@
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
+import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
+import type { PlanId } from "@/lib/billing/plans";
 
-// Production limits
-// Free users (workspace plan === "starter"): 300 AI improvements per month
-// Paid users (business, enterprise): 1500 AI improvements per month
-const FREE_LIMIT = 300;
-const PAID_LIMIT = 1500;
+// Safe floor applied when plan resolution fails or the catalog lookup
+// returns nothing. Matches the Starter limit — never default to unlimited.
+const FALLBACK_LIMIT = 300;
 
 export interface UserPlan {
-  isFree: boolean;
+  plan: PlanId;
 }
 
+// `limit: null` means the plan grants unlimited AI improvements.
 export interface QuotaCheckResult {
   allowed: boolean;
   used: number;
-  limit: number;
+  limit: number | null;
   resetDate: string;
   quotaType: "monthly";
   isFree: boolean;
 }
 
 export type QuotaCheckOutcome =
-  | { allowed: true; isFree: boolean; limit: number }
+  | { allowed: true; isFree: boolean; limit: number | null }
   | {
       allowed: false;
       used: number;
-      limit: number;
+      limit: number | null;
       resetDate: string;
       quotaType: "monthly";
       isFree: boolean;
@@ -91,19 +92,18 @@ async function resolveUserPlanUncached(uid: string): Promise<UserPlan> {
     const workspaceId = userSnap.exists ? userSnap.data()?.workspaceId : null;
 
     if (!workspaceId) {
-      return { isFree: true };
+      return { plan: "starter" };
     }
 
     const workspaceSnap = await adminDb.doc(`workspaces/${workspaceId}`).get();
     const plan = workspaceSnap.exists
-      ? workspaceSnap.data()?.billing?.plan
+      ? (workspaceSnap.data()?.billing?.plan as PlanId | undefined)
       : null;
 
-    const isFree = !plan || plan === "starter";
-    return { isFree };
+    return { plan: plan ?? "starter" };
   } catch (err) {
-    console.error("Failed to resolve user plan, defaulting to free:", err);
-    return { isFree: true };
+    console.error("Failed to resolve user plan, defaulting to starter:", err);
+    return { plan: "starter" };
   }
 }
 
@@ -130,8 +130,23 @@ export function invalidateUserPlanCache(uid: string): void {
 // async increments from concurrent requests haven't landed yet.
 // Accepted: quota is a soft cap, not a payment gate.
 export async function checkAiQuota(uid: string): Promise<QuotaCheckOutcome> {
-  const { isFree } = await resolveUserPlan(uid);
-  const limit = isFree ? FREE_LIMIT : PAID_LIMIT;
+  const { plan } = await resolveUserPlan(uid);
+  const isFree = plan === "starter";
+
+  const catalog = await getPlanCatalog();
+  const entry = catalog[plan];
+  // Safe floor on lookup failure — never default to unlimited. A null
+  // entry value (Enterprise) is intentional unlimited and preserved.
+  const limit =
+    entry && entry.aiImprovementsPerMonth !== undefined
+      ? entry.aiImprovementsPerMonth
+      : FALLBACK_LIMIT;
+
+  // null limit = unlimited → no bucket read needed.
+  if (limit === null) {
+    return { allowed: true, isFree, limit: null };
+  }
+
   const monthKey = getCurrentMonthKey();
   const quotaRef = adminDb.doc(`users/${uid}/aiQuotas/${monthKey}`);
 

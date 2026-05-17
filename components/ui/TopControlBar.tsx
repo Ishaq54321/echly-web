@@ -137,7 +137,7 @@ export function TopControlBar({
 
   if (publicViewer) {
     return (
-      <div className="page-header sticky top-0 z-50 flex h-16 w-full shrink-0 items-center justify-end gap-4 bg-[var(--surface-subtle)] px-6">
+      <div className="page-header sticky top-0 z-50 flex h-16 w-full shrink-0 items-center justify-end gap-4 bg-[var(--surface-page)] px-6">
         <div className="right flex shrink-0 items-center gap-2.5">
           <Link
             href={`/login?returnUrl=${encodeURIComponent(`/session/${sessionId}`)}`}
@@ -153,7 +153,7 @@ export function TopControlBar({
   return (
     <>
       <header
-        className="shrink-0 bg-[var(--surface-subtle)] grid items-center px-5"
+        className="shrink-0 bg-[var(--surface-page)] grid items-center px-5"
         style={{ height: '72px', gridTemplateColumns: '1fr auto 1fr', gap: '24px' }}
       >
         {/* Left: Panel Toggle + Logo */}
@@ -229,20 +229,20 @@ export function TopControlBar({
               <button
                 type="button"
                 onClick={handleShareOpen}
-                className="flex items-center gap-1.5 h-[38px] px-4 text-white text-[14px] font-semibold tracking-[-0.005em] border-0 bg-transparent cursor-pointer"
+                className="flex items-center gap-1.5 h-[34px] px-3.5 text-white text-[13px] font-semibold tracking-[-0.005em] border-0 bg-transparent cursor-pointer"
               >
-                <UserPlus size={16} strokeWidth={2} />
+                <UserPlus size={14} strokeWidth={2} />
                 Share
               </button>
-              <div className="w-[1.5px] self-stretch bg-white/30" />
+              <div className="w-[1.5px] self-stretch bg-[var(--white)]/50" />
               <Tooltip content="Copy link">
                 <button
                   type="button"
                   onClick={copyCurrentLink}
-                  className="flex items-center justify-center h-[38px] w-[40px] text-white border-0 bg-transparent cursor-pointer hover:bg-white/10 transition-colors"
+                  className="flex items-center justify-center h-[34px] w-[36px] text-white border-0 bg-transparent cursor-pointer hover:bg-white/10 transition-colors"
                   disabled={linkCopyBusy}
                 >
-                  {linkCopied ? <Check size={16} strokeWidth={2} /> : <LinkIcon size={16} strokeWidth={2} />}
+                  {linkCopied ? <Check size={14} strokeWidth={2} /> : <LinkIcon size={14} strokeWidth={2} />}
                 </button>
               </Tooltip>
             </div>
@@ -281,11 +281,7 @@ export function TopControlBar({
               updatingGeneralAccess={share.updatingGeneralAccess}
               items={share.items}
               initialLoading={share.initialLoading}
-              inviting={share.inviting}
-              updatingId={share.updatingId}
-              removingId={share.removingId}
-              inviteError={share.inviteError}
-              listError={share.listError}
+              shareErrors={share.shareErrors}
               onInvite={() => {
                 void share.invite().catch(() => {});
               }}

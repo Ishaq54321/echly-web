@@ -10,7 +10,6 @@ import { TicketItem } from "./TicketItem";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { CanvasEmptyState } from "@/components/empty/CanvasEmptyState";
 import {
-  NoTicketsIllu,
   TicketSearchEmptyIllu,
   NoOpenTicketsIllu,
   NoResolvedTicketsIllu,
@@ -451,16 +450,8 @@ function TicketListInner({
           </div>
         )}
 
-        {!isSearchMode && !countsLoading && total === 0 && (
-          <div className="px-3 py-8 mt-2">
-            <CanvasEmptyState
-              density="compact"
-              illustration={<NoTicketsIllu />}
-              title="No tickets yet"
-              description="Capture your first screenshot or recording to create a ticket."
-            />
-          </div>
-        )}
+        {/* Empty-state for an empty session now lives in the center panel
+            (SessionPageClient renderExecutionContent), not the left list. */}
 
         {/* Open */}
         <section className="mb-4">

@@ -169,6 +169,14 @@ export async function POST(req: NextRequest): Promise<Response> {
         init: { headers },
       });
     }
+    if (err instanceof Error && err.message === "WORKSPACE_DELETED") {
+      return apiError({
+        code: "GONE",
+        message: "Workspace deleted",
+        status: 410,
+        init: { headers },
+      });
+    }
     throw err;
   }
 

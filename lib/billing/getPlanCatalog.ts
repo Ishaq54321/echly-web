@@ -8,6 +8,7 @@ export interface PlanCatalogEntry {
   annualPricePerSeat: number | null;
   maxFeedbackPerMonth: number | null;
   maxMembers: number | null;
+  aiImprovementsPerMonth: number | null;
   insightsAccess: boolean;
   integrations: boolean;
   customBranding: boolean;
@@ -34,6 +35,7 @@ function buildDefaultCatalog(): PlanCatalog {
       annualPricePerSeat: def.annualPricePerSeat,
       maxFeedbackPerMonth: def.maxFeedbackPerMonth,
       maxMembers: def.maxMembers,
+      aiImprovementsPerMonth: def.aiImprovementsPerMonth,
       insightsAccess: def.insightsAccess,
       integrations: def.integrations,
       customBranding: def.customBranding,
@@ -59,6 +61,7 @@ async function fetchPlans(): Promise<PlanCatalog> {
         annualPricePerSeat?: number | null;
         maxFeedbackPerMonth?: number | null;
         maxMembers?: number | null;
+        aiImprovementsPerMonth?: number | null;
         insightsAccess?: boolean;
         insightsEnabled?: boolean; // legacy field name — checked for backwards compatibility
         integrations?: boolean;
@@ -80,6 +83,10 @@ async function fetchPlans(): Promise<PlanCatalog> {
             ? data.maxFeedbackPerMonth
             : current.maxFeedbackPerMonth,
         maxMembers: data.maxMembers !== undefined ? data.maxMembers : current.maxMembers,
+        aiImprovementsPerMonth:
+          data.aiImprovementsPerMonth !== undefined
+            ? data.aiImprovementsPerMonth
+            : current.aiImprovementsPerMonth,
         insightsAccess:
           data.insightsAccess !== undefined
             ? data.insightsAccess

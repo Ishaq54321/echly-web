@@ -1,52 +1,78 @@
-export function subscriptionCancelledEmailHtml(params: {
+import { emailShell, emailButton, emailColors, plainTextShell } from "../components";
+
+interface SubscriptionCancelledProps {
   workspaceName: string;
   upgradeUrl: string;
-}): string {
-  const { workspaceName, upgradeUrl } = params;
+  starterLimits: {
+    maxMembers: number | null;
+    maxFeedbackPerMonth: number | null;
+    aiImprovementsPerMonth: number | null;
+  };
+}
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Your Annote Business subscription has ended</title>
-</head>
-<body style="margin:0;padding:0;background:#F8F8F8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#F8F8F8;padding:40px 0;">
-  <tr><td align="center">
-    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border-radius:16px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.08);">
-      <tr>
-        <td style="padding:28px 36px 24px;border-bottom:1px solid #FAFAF7;">
-          <span style="font-size:22px;font-weight:700;color:#5A49BF;letter-spacing:-0.3px;">Annote</span>
-        </td>
-      </tr>
-      <tr>
-        <td style="padding:36px 36px 28px;">
-          <h1 style="margin:0 0 16px;font-size:24px;font-weight:700;color:#15101F;letter-spacing:-0.3px;">Your Business subscription has ended</h1>
-          <p style="margin:0 0 16px;font-size:15px;color:#54495F;line-height:1.6;">
-            Your workspace <strong>${workspaceName}</strong> has been moved to the Starter (free) plan.
-          </p>
-          <div style="margin:0 0 20px;padding:16px;background:#FFEDD5;border-radius:10px;border-left:3px solid #F77E2C;">
-            <p style="margin:0;font-size:14px;color:#9B573E;line-height:1.5;">
-              Your feedback tickets are now limited to 50 per month and you can have up to 5 members. Unlimited feedback, sessions, and advanced features require a Business plan.
-            </p>
-          </div>
-          <p style="margin:0 0 24px;font-size:15px;color:#54495F;line-height:1.6;">
-            You can re-upgrade at any time to restore unlimited access.
-          </p>
-          <a href="${upgradeUrl}" style="display:inline-block;background:#5A49BF;color:#FFFFFF;font-size:15px;font-weight:600;text-decoration:none;padding:13px 26px;border-radius:10px;">
-            Re-upgrade to Business
-          </a>
-        </td>
-      </tr>
-      <tr>
-        <td style="padding:20px 36px 28px;border-top:1px solid #FAFAF7;">
-          <p style="margin:0;font-size:13px;color:#B5AEBE;">© Annote — Agency feedback made simple</p>
-        </td>
-      </tr>
-    </table>
-  </td></tr>
-</table>
-</body>
-</html>`;
+function formatLimit(n: number | null, suffix: string): string {
+  if (n === null) return `Unlimited ${suffix}`;
+  return `Up to ${n.toLocaleString()} ${suffix}`;
+}
+
+export function subscriptionCancelledEmailHtml(props: SubscriptionCancelledProps): string {
+  const { workspaceName, upgradeUrl, starterLimits } = props;
+
+  const body = `
+    <h1 style="margin:0 0 16px;font-size:24px;font-weight:600;color:${emailColors.textHeading};letter-spacing:-0.02em;">
+      Your subscription is canceled
+    </h1>
+
+    <p style="margin:0 0 24px;">
+      Your workspace <strong style="color:${emailColors.textHeading};">${workspaceName}</strong> is now on the Starter plan. Your existing team and data are still there — we just dialed back the limits.
+    </p>
+
+    <div style="background-color:${emailColors.surfaceSubtle};border:1px solid ${emailColors.border};border-radius:8px;padding:20px 24px;margin:0 0 24px;">
+      <p style="margin:0 0 12px;font-size:13px;font-weight:500;color:${emailColors.textMuted};text-transform:uppercase;letter-spacing:0.05em;">
+        What changes
+      </p>
+      <p style="margin:0 0 8px;color:${emailColors.textBody};">${formatLimit(starterLimits.maxMembers, "team members")}</p>
+      <p style="margin:0 0 8px;color:${emailColors.textBody};">${formatLimit(starterLimits.maxFeedbackPerMonth, "feedback tickets a month")}</p>
+      <p style="margin:0;color:${emailColors.textBody};">${formatLimit(starterLimits.aiImprovementsPerMonth, "AI improvements a month")}</p>
+    </div>
+
+    <p style="margin:0 0 24px;">
+      If you'd like to come back, you can re-upgrade anytime.
+    </p>
+
+    ${emailButton("Re-upgrade to Business", upgradeUrl)}
+
+    <p style="margin:24px 0 0;">
+      Thanks for trying Annote. If there's something we could've done better, I'd love to hear it — just reply.
+    </p>
+
+    <p style="margin:24px 0 0;color:${emailColors.textMuted};">
+      — Ishaq, Annote
+    </p>
+  `;
+
+  return emailShell(body, {
+    preheader: `Your workspace ${workspaceName} is now on the Starter plan.`,
+  });
+}
+
+export function subscriptionCancelledEmailText(props: SubscriptionCancelledProps): string {
+  const { workspaceName, upgradeUrl, starterLimits } = props;
+
+  return plainTextShell(`Your subscription is canceled
+
+Your workspace ${workspaceName} is now on the Starter plan. Your existing team and data are still there — we just dialed back the limits.
+
+What changes
+${formatLimit(starterLimits.maxMembers, "team members")}
+${formatLimit(starterLimits.maxFeedbackPerMonth, "feedback tickets a month")}
+${formatLimit(starterLimits.aiImprovementsPerMonth, "AI improvements a month")}
+
+If you'd like to come back, you can re-upgrade anytime.
+
+Re-upgrade to Business: ${upgradeUrl}
+
+Thanks for trying Annote. If there's something we could've done better, I'd love to hear it — just reply.
+
+— Ishaq, Annote`);
 }

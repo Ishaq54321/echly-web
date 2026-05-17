@@ -89,6 +89,21 @@ export async function buildRequestContext(params: {
   /** Pre-fetched user profile from withAuthorization; when present, skips the users/{uid} Firestore read. */
   preloadedUserProfile?: { email: string | null; workspaceId: string } | null;
   /**
+   * Phase 28.X — Access context already resolved by an earlier
+   * `buildRequestContext` call in the same request (threaded via
+   * `withAuthorization`'s `ctx.preloaded`). When present, this is a hard
+   * short-circuit: `getAccessContext` is NOT called again and these exact
+   * values are reused. Eliminates the redundant 4-doc Firestore fan-out
+   * the dedup cache routinely missed under real latency. Requires the
+   * caller to also pass `feedback`/`session` (it does — same preload).
+   */
+  preloadedAccess?: {
+    access: AccessContext | null;
+    accessRequest: AccessContextRequestAwareness | null;
+    sessionWorkspaceId?: string;
+    userId?: string | null;
+  };
+  /**
    * When true, anonymous requests without a share token are allowed; `identityType` is `NONE`
    * and access is resolved with `user: null` (e.g. GET session overview).
    */
@@ -186,7 +201,18 @@ export async function buildRequestContext(params: {
   let access: AccessContext | null = null;
   let accessRequest: AccessContextRequestAwareness | null = null;
   let sessionOut: Session | null = session;
-  if (sidForAccess) {
+  if (params.preloadedAccess !== undefined) {
+    // Phase 28.X hard short-circuit — reuse the access context resolved by
+    // the earlier buildRequestContext call (resolveTicketWorkspaceId). No
+    // getAccessContext fan-out. Not a cache: if preloaded access exists, it
+    // is authoritative for this request.
+    console.log(
+      "[PERF] buildRequestContext: using preloaded access — skipped getAccessContext"
+    );
+    access = params.preloadedAccess.access;
+    accessRequest = params.preloadedAccess.accessRequest;
+    sessionOut = session;
+  } else if (sidForAccess) {
     const accessContextInput: SystemContext = {
       userId,
       workspaceId,

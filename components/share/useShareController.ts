@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { authFetch } from "@/lib/authFetch";
 import {
   retainAccessRequestsListener,
@@ -48,7 +49,7 @@ function getErrorMessage(input: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-function itemKey(item: Pick<ShareItem, "type" | "id">): string {
+export function itemKey(item: Pick<ShareItem, "type" | "id">): string {
   return `${item.type}:${item.id}`;
 }
 
@@ -68,11 +69,15 @@ export function useShareController(
     initialGeneralAccess ?? "restricted"
   );
   const [updatingGeneralAccess, setUpdatingGeneralAccess] = useState(false);
-  const [inviting, setInviting] = useState(false);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [removingId, setRemovingId] = useState<string | null>(null);
-  const [listError, setListError] = useState("");
-  const [inviteError, setInviteError] = useState("");
+
+  // Focused error states — each surfaces next to the control that caused it.
+  // Replaces the single shared `listError`.
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [generalAccessError, setGeneralAccessError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
+  const [requestErrors, setRequestErrors] = useState<Record<string, string>>({});
+
   const accessRequestsState = useAccessRequestsStore(sessionId);
   const accessRequests = useMemo<ShareAccessRequestItem[]>(
     () =>
@@ -92,20 +97,114 @@ export function useShareController(
   const [linkCopied, setLinkCopied] = useState(false);
   const linkCopiedTimerRef = useRef<number | null>(null);
 
+  // Silent double-submit / staleness guards (no UI dependence). Mirrors the
+  // AssignDropdown `if (busy) return;` pattern and the generalAccess
+  // generation ref below — invite/role/remove mutations apply optimistically
+  // and never block the UI; these refs only prevent duplicate sends and
+  // discard out-of-order responses.
+  const invitingRef = useRef(false);
+  const updateGenerationRefs = useRef<Map<string, number>>(new Map());
+  const removeGenerationRefs = useRef<Map<string, number>>(new Map());
+
   const generalAccessDebounceRef = useRef<number | null>(null);
   const generalAccessLatestGenRef = useRef(0);
   const generalAccessPendingValueRef = useRef<ShareGeneralAccess | null>(null);
   const generalAccessPreviousValueRef = useRef<ShareGeneralAccess | null>(null);
 
+  // Per-row / per-request error timers, so a fresh action on the same key
+  // cancels a still-pending auto-clear instead of clearing the new error.
+  const rowErrorTimers = useRef<Map<string, number>>(new Map());
+  const requestErrorTimers = useRef<Map<string, number>>(new Map());
+
+  const setRowErrorWithTimeout = useCallback((key: string, message: string) => {
+    const existing = rowErrorTimers.current.get(key);
+    if (existing != null) window.clearTimeout(existing);
+    setRowErrors((prev) => ({ ...prev, [key]: message }));
+    const timer = window.setTimeout(() => {
+      rowErrorTimers.current.delete(key);
+      setRowErrors((prev) => {
+        if (!(key in prev)) return prev;
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }, 4000);
+    rowErrorTimers.current.set(key, timer);
+  }, []);
+
+  const clearRowError = useCallback((key: string) => {
+    const existing = rowErrorTimers.current.get(key);
+    if (existing != null) {
+      window.clearTimeout(existing);
+      rowErrorTimers.current.delete(key);
+    }
+    setRowErrors((prev) => {
+      if (!(key in prev)) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }, []);
+
+  const setRequestErrorWithTimeout = useCallback((key: string, message: string) => {
+    const existing = requestErrorTimers.current.get(key);
+    if (existing != null) window.clearTimeout(existing);
+    setRequestErrors((prev) => ({ ...prev, [key]: message }));
+    const timer = window.setTimeout(() => {
+      requestErrorTimers.current.delete(key);
+      setRequestErrors((prev) => {
+        if (!(key in prev)) return prev;
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }, 4000);
+    requestErrorTimers.current.set(key, timer);
+  }, []);
+
+  const clearRequestError = useCallback((key: string) => {
+    const existing = requestErrorTimers.current.get(key);
+    if (existing != null) {
+      window.clearTimeout(existing);
+      requestErrorTimers.current.delete(key);
+    }
+    setRequestErrors((prev) => {
+      if (!(key in prev)) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }, []);
+
+  // Modal-closed fallback: if the failure lands while the modal is closed,
+  // the inline surface would be invisible — fall back to a single Sonner
+  // toast so the user isn't silently misled. This is the ONLY remaining
+  // toast.error path in this controller. `open` is read via a ref so this
+  // callback stays identity-stable — the mutation callbacks below capture it
+  // once, but it always observes the *current* modal-open state (a request
+  // started while open can still land after the modal closed → Test 10).
+  const openRef = useRef(open);
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
+  const reportError = useCallback((inlineSetter: () => void) => {
+    if (openRef.current) {
+      inlineSetter();
+    } else {
+      toast.error("Action failed — please try again", { duration: 5000 });
+    }
+  }, []);
+
   const load = useCallback(async () => {
     const sid = sessionId.trim();
     if (!sid) return;
     setInitialLoading(true);
-    setListError("");
+    setLoadError(null);
 
     const res = await authFetch(`/api/sessions/${encodeURIComponent(sid)}/members`);
 
     if (!res) {
+      setLoadError("Could not load access list");
       setInitialLoading(false);
       return;
     }
@@ -113,7 +212,7 @@ export function useShareController(
       items?: ShareItem[];
     }>;
     if (!res.ok || !json.success) {
-      setListError(getErrorMessage(json));
+      setLoadError(getErrorMessage(json) || "Could not load access list");
       setInitialLoading(false);
       return;
     }
@@ -125,17 +224,21 @@ export function useShareController(
   const invite = useCallback(async () => {
     const sid = sessionId.trim();
     if (!sid) return;
-    setInviting(true);
-    setInviteError("");
-    setListError("");
+    if (invitingRef.current) return; // silent double-submit guard
+    invitingRef.current = true;
+    setInviteError(null);
 
+    const email = inviteEmail.trim();
     const optimisticItem: ShareItem = {
       id: `optimistic-${Date.now()}`,
       type: "invite",
-      email: inviteEmail.trim(),
+      email,
       access: inviteAccess,
       status: "pending",
     };
+    // Clear the input immediately and apply the optimistic row — the action
+    // feels instant, no different from Assign/Priority.
+    setInviteEmail("");
     setItems((prev) => [optimisticItem, ...prev]);
 
     try {
@@ -143,13 +246,14 @@ export function useShareController(
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: inviteEmail.trim(),
+          email,
           access: inviteAccess,
         }),
       });
 
       if (!res) {
         setItems((prev) => prev.filter((i) => i.id !== optimisticItem.id));
+        reportError(() => setInviteError("Failed to invite — please try again"));
         return;
       }
 
@@ -159,18 +263,17 @@ export function useShareController(
       }>;
       if (!res.ok || !json.success) {
         setItems((prev) => prev.filter((i) => i.id !== optimisticItem.id));
-        setInviteError(getErrorMessage(json));
+        reportError(() =>
+          setInviteError(getErrorMessage(json) || "Failed to invite — please try again")
+        );
         return;
       }
 
       if (json.data?.type === "already_member") {
         setItems((prev) => prev.filter((i) => i.id !== optimisticItem.id));
-        setInviteError("User already has access");
-        setInviteEmail("");
+        reportError(() => setInviteError("User already has access"));
         return;
       }
-
-      setInviteEmail("");
 
       // Reconcile in place: swap the optimistic row for the canonical item
       // the server returned. No follow-up GET /members — the response IS the
@@ -192,14 +295,15 @@ export function useShareController(
         setItems((prev) => prev.filter((i) => i.id !== optimisticItem.id));
       }
     } finally {
-      setInviting(false);
+      invitingRef.current = false;
     }
-  }, [inviteAccess, inviteEmail, sessionId]);
+  }, [inviteAccess, inviteEmail, sessionId, reportError]);
 
   const updateGeneralAccess = useCallback(
     (value: ShareGeneralAccess) => {
       const sid = sessionId.trim();
       if (!sid) return;
+      setGeneralAccessError(null);
 
       // Capture the pre-toggle value on the first click of a debounce window,
       // so rapid back-and-forth toggles still know what to roll back to on failure.
@@ -237,11 +341,12 @@ export function useShareController(
           body: JSON.stringify({ generalAccess: valueToSend }),
         });
 
-        // Newer request superseded this one — ignore the response.
+        // Superseded by a later toggle — intentional silent rollback.
         if (myGen !== generalAccessLatestGenRef.current) return;
 
         if (!res) {
           if (previous !== null) setGeneralAccess(previous);
+          setGeneralAccessError("Failed to update general access — please try again");
           setUpdatingGeneralAccess(false);
           generalAccessPendingValueRef.current = null;
           generalAccessPreviousValueRef.current = null;
@@ -249,11 +354,14 @@ export function useShareController(
         }
 
         const json = (await res.json().catch(() => ({}))) as ApiEnvelope<Record<string, never>>;
+        // Superseded by a later toggle — intentional silent rollback.
         if (myGen !== generalAccessLatestGenRef.current) return;
 
         if (!res.ok || !json.success) {
           if (previous !== null) setGeneralAccess(previous);
-          setListError("Only the session owner can change general access");
+          setGeneralAccessError(
+            getErrorMessage(json) || "Only the session owner can change general access"
+          );
           console.error("[useShareController] updateGeneralAccess failed", { status: res.status, json });
         }
         setUpdatingGeneralAccess(false);
@@ -279,9 +387,13 @@ export function useShareController(
   }, [sessionId]);
 
   useEffect(() => {
+    const rowTimers = rowErrorTimers.current;
+    const reqTimers = requestErrorTimers.current;
     return () => {
       if (linkCopiedTimerRef.current != null) window.clearTimeout(linkCopiedTimerRef.current);
       if (generalAccessDebounceRef.current != null) window.clearTimeout(generalAccessDebounceRef.current);
+      rowTimers.forEach((t) => window.clearTimeout(t));
+      reqTimers.forEach((t) => window.clearTimeout(t));
     };
   }, []);
 
@@ -299,8 +411,9 @@ export function useShareController(
       const key = itemKey(item);
 
       // Optimistic: flip the access label immediately. Snapshot the prior
-      // list so a failed PATCH can roll the row back. `updatingId` keeps the
-      // small inline spinner on the row so the user knows it's still settling.
+      // list so a failed PATCH can roll the row back. The per-key generation
+      // ref discards out-of-order responses (rapid re-edits) without any UI
+      // dependence — the mutation is silent, just like Assign/Priority.
       let previousItems: ShareItem[] = [];
       setItems((prev) => {
         previousItems = prev;
@@ -310,8 +423,9 @@ export function useShareController(
             : row
         );
       });
-      setUpdatingId(key);
-      setListError("");
+      const gen = (updateGenerationRefs.current.get(key) ?? 0) + 1;
+      updateGenerationRefs.current.set(key, gen);
+      clearRowError(key);
 
       const res = await authFetch(`/api/sessions/${encodeURIComponent(sid)}/members`, {
         method: "PATCH",
@@ -322,24 +436,31 @@ export function useShareController(
           access,
         }),
       });
+
+      // A newer edit to this same row superseded us — discard this response.
+      if (updateGenerationRefs.current.get(key) !== gen) return;
+
       if (!res) {
         setItems(previousItems);
-        setUpdatingId(null);
+        reportError(() =>
+          setRowErrorWithTimeout(key, "Failed to update access — please try again")
+        );
         return;
       }
       const json = (await res.json().catch(() => ({}))) as ApiEnvelope<{
         type?: "member_updated" | "invite_updated";
       }>;
+      if (updateGenerationRefs.current.get(key) !== gen) return;
       if (!res.ok || !json.success) {
         setItems(previousItems);
-        setListError(getErrorMessage(json) || "Failed to update access");
-        setUpdatingId(null);
+        reportError(() =>
+          setRowErrorWithTimeout(key, getErrorMessage(json) || "Failed to update access")
+        );
         return;
       }
       // Success: optimistic value already applied — nothing more to do.
-      setUpdatingId(null);
     },
-    [sessionId]
+    [sessionId, reportError, setRowErrorWithTimeout, clearRowError]
   );
 
   const patchAccessRequest = useCallback(
@@ -348,7 +469,7 @@ export function useShareController(
       const rid = requestId.trim();
       if (!sid || !rid) return;
       setPatchingAccessRequestId(rid);
-      setListError("");
+      clearRequestError(rid);
 
       // Optimistic: add new member for approve. Request removal is handled by
       // the realtime accessRequests listener once the server PATCH commits.
@@ -378,6 +499,9 @@ export function useShareController(
         if (optimisticMemberId) {
           setItems(prev => prev.filter(i => i.id !== optimisticMemberId));
         }
+        reportError(() =>
+          setRequestErrorWithTimeout(rid, "Could not process request. Try again.")
+        );
         setPatchingAccessRequestId(null);
         return;
       }
@@ -389,7 +513,9 @@ export function useShareController(
         if (optimisticMemberId) {
           setItems(prev => prev.filter(i => i.id !== optimisticMemberId));
         }
-        setListError("Could not process request. Try again.");
+        reportError(() =>
+          setRequestErrorWithTimeout(rid, "Could not process request. Try again.")
+        );
         setPatchingAccessRequestId(null);
         return;
       }
@@ -416,7 +542,7 @@ export function useShareController(
 
       setPatchingAccessRequestId(null);
     },
-    [sessionId, accessRequests]
+    [sessionId, accessRequests, reportError, setRequestErrorWithTimeout, clearRequestError]
   );
 
   const removeAccess = useCallback(
@@ -426,8 +552,9 @@ export function useShareController(
       const key = itemKey(item);
 
       // Optimistic: drop the row immediately. Snapshot the prior list so a
-      // failed DELETE can re-insert it. `removingId` drives the inline
-      // spinner for the brief window the request is in flight.
+      // failed DELETE can re-insert it. The per-key generation ref discards
+      // out-of-order responses without any UI dependence — the removal is
+      // silent, just like Assign/Priority.
       let previousItems: ShareItem[] = [];
       setItems((prev) => {
         previousItems = prev;
@@ -435,8 +562,9 @@ export function useShareController(
           (row) => !(row.type === item.type && row.id === item.id)
         );
       });
-      setRemovingId(key);
-      setListError("");
+      const gen = (removeGenerationRefs.current.get(key) ?? 0) + 1;
+      removeGenerationRefs.current.set(key, gen);
+      clearRowError(key);
 
       const res = await authFetch(`/api/sessions/${encodeURIComponent(sid)}/members`, {
         method: "DELETE",
@@ -446,24 +574,31 @@ export function useShareController(
           id: item.id,
         }),
       });
+
+      // A newer mutation to this same row superseded us — discard.
+      if (removeGenerationRefs.current.get(key) !== gen) return;
+
       if (!res) {
         setItems(previousItems);
-        setRemovingId(null);
+        reportError(() =>
+          setRowErrorWithTimeout(key, "Failed to remove — please try again")
+        );
         return;
       }
       const json = (await res.json().catch(() => ({}))) as ApiEnvelope<{
         type?: "member_removed" | "invite_removed";
       }>;
+      if (removeGenerationRefs.current.get(key) !== gen) return;
       if (!res.ok || !json.success) {
         setItems(previousItems);
-        setListError(getErrorMessage(json) || "Failed to remove access");
-        setRemovingId(null);
+        reportError(() =>
+          setRowErrorWithTimeout(key, getErrorMessage(json) || "Failed to remove access")
+        );
         return;
       }
       // Success: row already gone — nothing more to do.
-      setRemovingId(null);
     },
-    [sessionId]
+    [sessionId, reportError, setRowErrorWithTimeout, clearRowError]
   );
 
   useEffect(() => {
@@ -485,6 +620,13 @@ export function useShareController(
       .finally(() => setLoadingWorkspaceMembers(false));
   }, [open]);
 
+  // Wrap setInviteEmail so any keystroke clears a stale invite error
+  // (plan Step 3: "Errors clear on relevant input change").
+  const handleSetInviteEmail = useCallback((value: string) => {
+    setInviteEmail(value);
+    setInviteError(null);
+  }, []);
+
   return {
     open,
     setOpen,
@@ -495,17 +637,20 @@ export function useShareController(
     onApproveAccessRequest: (requestId: string, access?: "view" | "resolve") =>
       patchAccessRequest(requestId, "approve", access),
     inviteEmail,
-    setInviteEmail,
+    setInviteEmail: handleSetInviteEmail,
     inviteAccess,
     setInviteAccess,
     generalAccess,
     updatingGeneralAccess,
     initialLoading,
-    inviting,
-    updatingId,
-    removingId,
-    listError,
-    inviteError,
+    // Focused error surfaces — bundled so the two call sites pass one prop.
+    shareErrors: {
+      inviteError,
+      generalAccessError,
+      loadError,
+      rowErrors,
+      requestErrors,
+    },
     load,
     updateGeneralAccess,
     invite,
@@ -518,3 +663,11 @@ export function useShareController(
     loadingWorkspaceMembers,
   };
 }
+
+export type ShareErrors = {
+  inviteError: string | null;
+  generalAccessError: string | null;
+  loadError: string | null;
+  rowErrors: Record<string, string>;
+  requestErrors: Record<string, string>;
+};

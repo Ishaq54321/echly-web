@@ -11,14 +11,32 @@ function echlyPerfEnabled(): boolean {
   );
 }
 
+// Phase 28.X — in-memory ID token cache. Firebase ID tokens last 60 min; the
+// SDK may do a network refresh to Google's token endpoint near expiry or under
+// certain conditions, adding ~0.5–2s to the critical path of every mutation.
+// Caching for 55 min keeps the common path free of that round-trip while
+// staying safely inside the token's validity window. Cleared on 401/403 (the
+// retry path force-refreshes) and on sign-out via clearAuthTokenCache().
+let cachedToken: string | null = null;
+let cachedTokenExpiry = 0; // epoch ms; token is reused while now < this
+const TOKEN_CACHE_DURATION_MS = 55 * 60 * 1000; // 55 min (tokens last 60)
+
 async function getIdTokenFresh(
   user: { getIdToken(): Promise<string> }
 ): Promise<string> {
-  return user.getIdToken();
+  const now = Date.now();
+  if (cachedToken && now < cachedTokenExpiry) {
+    return cachedToken;
+  }
+  const token = await user.getIdToken();
+  cachedToken = token;
+  cachedTokenExpiry = now + TOKEN_CACHE_DURATION_MS;
+  return token;
 }
 
 export function clearAuthTokenCache(): void {
-  // No-op: token cache removed.
+  cachedToken = null;
+  cachedTokenExpiry = 0;
 }
 
 /** Bearer token for non-fetch callers (e.g. XHR upload). Uses the same refresh behavior as authFetch. */
@@ -134,13 +152,23 @@ export async function authFetch(
     if ((res.status === 401 || res.status === 403) && !retried && user) {
       retried = true;
       try {
+        // The cached token was rejected — drop it so no later call reuses
+        // it, then force-refresh and re-prime the cache with the new token.
+        clearAuthTokenCache();
         const freshToken = await user.getIdToken(true);
+        cachedToken = freshToken;
+        cachedTokenExpiry = Date.now() + TOKEN_CACHE_DURATION_MS;
         const retryHeaders = new Headers(restInit.headers || {});
         retryHeaders.set("Authorization", `Bearer ${freshToken}`);
         res = await fetch(resolveInput(input), { ...restInit, headers: retryHeaders, cache: "no-store", signal: signal ?? restInit.signal });
       } catch {}
     }
     if (timeoutId) clearTimeout(timeoutId);
+    // 403 responses with "Workspace suspended" message are no longer redirected from here.
+    // WorkspaceSuspendedGuard (mounted at the app layout root) renders a top banner when
+    // the workspace status indicates suspension. Background fetches that 403 with this
+    // reason simply fail silently — callers handle the failure as a normal failed response.
+    // (The previous redirect here caused remount loops via background fetches.)
     if (res.status === 403 && typeof window !== "undefined") {
       res
         .clone()
@@ -152,13 +180,6 @@ export async function authFetch(
               data?: { reason?: string } | null;
             }
           ) => {
-            if (
-              data?.error?.code === "FORBIDDEN" &&
-              data?.error?.message === "Workspace suspended"
-            ) {
-              window.location.href = "/workspace-suspended";
-              return;
-            }
             if (
               data?.error?.code === "FORBIDDEN" &&
               (data?.data?.reason === "WORKSPACE_ACCESS_REVOKED" ||

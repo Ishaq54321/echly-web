@@ -14,6 +14,14 @@ const PLAN_LABELS: Record<string, string> = {
   enterprise: "Enterprise",
 };
 
+function paddleDashboardUrl(path: string): string {
+  const base =
+    process.env.NEXT_PUBLIC_PADDLE_ENVIRONMENT === "production"
+      ? "https://vendors.paddle.com"
+      : "https://sandbox-vendors.paddle.com";
+  return `${base}${path}`;
+}
+
 export default function AdminCustomersPage() {
   const searchParams = useSearchParams();
   const planFilter = searchParams.get("plan") ?? null;
@@ -24,12 +32,18 @@ export default function AdminCustomersPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [overrideFeedbackLimit, setOverrideFeedbackLimit] = useState<string>("");
   const [newPlan, setNewPlan] = useState<string>("");
+  const [compPlan, setCompPlan] = useState<string>("business");
+  const [compSeats, setCompSeats] = useState<string>("1");
   const [confirm, setConfirm] = useState<{
     title: string;
     message: string;
     onConfirm: () => void;
     confirmLabel?: string;
   } | null>(null);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [cancelEffective, setCancelEffective] = useState<
+    "immediately" | "next_billing_period"
+  >("next_billing_period");
 
   useEffect(() => {
     if (!selected) return;
@@ -131,7 +145,37 @@ export default function AdminCustomersPage() {
     );
   };
 
+  const handleGrantComp = (row: WorkspaceRow) => {
+    const seats = parseInt(compSeats, 10);
+    if (Number.isNaN(seats) || seats < 1) {
+      showToast("Seats must be a positive integer");
+      return;
+    }
+    openConfirm(
+      "Grant comp plan?",
+      `This sets ${PLAN_LABELS[compPlan] ?? compPlan} (${seats} seat${seats === 1 ? "" : "s"}) as a manual override. Provider billing webhooks will no longer downgrade or suspend this workspace, and any existing subscription link is cleared.`,
+      () => {
+        runAction(row.id, "set_manual_override", { plan: compPlan, seats }, "Comp plan granted");
+        closeConfirm();
+      },
+      "Grant comp"
+    );
+  };
+
+  const handleRemoveComp = (row: WorkspaceRow) => {
+    openConfirm(
+      "Remove manual override?",
+      "Billing webhooks will resume mutating this workspace. It stays on its current plan until a real billing event occurs.",
+      () => {
+        runAction(row.id, "remove_manual_override", {}, "Manual override removed");
+        closeConfirm();
+      },
+      "Remove override"
+    );
+  };
+
   const suspended = selected?.billing?.suspended === true;
+  const isManualOverride = selected?.billing?.manualOverride === true;
 
   if (loading) {
     return (
@@ -183,9 +227,14 @@ export default function AdminCustomersPage() {
                   <span className="rounded-full bg-[var(--surface-hover)] px-2 py-0.5 text-xs font-medium text-[var(--text-body)]">
                     {row.plan}
                   </span>
+                  {row.billing?.manualOverride === true && (
+                    <span className="ml-1.5 inline-flex items-center rounded-full bg-[var(--brand-subtle)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--brand)]">
+                      Manual override
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-2.5">
-                  {row.billing?.stripeSubscriptionId ? (
+                  {row.billing?.subscriptionId ? (
                     <span className="inline-flex items-center rounded-full bg-[var(--color-success-bg)] px-2 py-0.5 text-xs font-medium text-[var(--color-success)]">
                       Active
                     </span>
@@ -240,7 +289,7 @@ export default function AdminCustomersPage() {
                     <dt className="text-[var(--text-secondary)]">Plan</dt>
                     <dd className="flex items-center gap-2">
                       <span className="text-[var(--text-heading)]">{PLAN_LABELS[selected.plan] ?? selected.plan}</span>
-                      {selected.plan === "business" && selected.billing?.stripeSubscriptionId && (
+                      {selected.plan === "business" && selected.billing?.subscriptionId && (
                         <span className="inline-flex items-center rounded-full bg-[var(--color-success-bg)] px-2 py-0.5 text-xs font-medium text-[var(--color-success)]">
                           Active
                         </span>
@@ -281,32 +330,32 @@ export default function AdminCustomersPage() {
                     <dt className="text-[var(--text-secondary)]">Workspace ID</dt>
                     <dd className="font-mono text-[var(--text-secondary)] text-xs break-all">{selected.id}</dd>
                   </div>
-                  {selected.billing?.stripeCustomerId && (
+                  {selected.billing?.customerId && (
                     <div>
-                      <dt className="text-[var(--text-secondary)]">Stripe customer</dt>
+                      <dt className="text-[var(--text-secondary)]">Customer</dt>
                       <dd className="font-mono text-xs break-all">
                         <a
-                          href={`https://dashboard.stripe.com/customers/${selected.billing.stripeCustomerId}`}
+                          href={paddleDashboardUrl(`/customers/${selected.billing.customerId}`)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-[var(--brand)] hover:underline"
                         >
-                          {selected.billing.stripeCustomerId}
+                          {selected.billing.customerId}
                         </a>
                       </dd>
                     </div>
                   )}
-                  {selected.billing?.stripeSubscriptionId && (
+                  {selected.billing?.subscriptionId && (
                     <div>
-                      <dt className="text-[var(--text-secondary)]">Stripe subscription</dt>
+                      <dt className="text-[var(--text-secondary)]">Subscription</dt>
                       <dd className="font-mono text-xs break-all">
                         <a
-                          href={`https://dashboard.stripe.com/subscriptions/${selected.billing.stripeSubscriptionId}`}
+                          href={paddleDashboardUrl(`/subscriptions/${selected.billing.subscriptionId}`)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-[var(--brand)] hover:underline"
                         >
-                          {selected.billing.stripeSubscriptionId}
+                          {selected.billing.subscriptionId}
                         </a>
                       </dd>
                     </div>
@@ -422,6 +471,67 @@ export default function AdminCustomersPage() {
                 </div>
               </section>
 
+              {/* Comp / Manual Override */}
+              <section>
+                <h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide mb-3">
+                  Comp Plan
+                </h3>
+                {isManualOverride ? (
+                  <>
+                    <p className="text-xs text-[var(--text-secondary)] mb-3">
+                      <span className="inline-flex items-center rounded-full bg-[var(--brand-subtle)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--brand)] mr-1.5">
+                        Manual override
+                      </span>
+                      Billing webhooks will not downgrade or suspend this workspace.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveComp(selected)}
+                      disabled={actionLoading}
+                      className="inline-flex h-[38px] items-center justify-center gap-2 w-full px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[14px] font-medium hover:bg-[var(--surface-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+                    >
+                      {actionLoading ? "Updating…" : "Remove manual override"}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs text-[var(--text-secondary)] mb-2">
+                      Grant a free plan that survives billing webhooks. Clears any existing subscription link.
+                    </p>
+                    <div className="flex gap-2 mb-2">
+                      <select
+                        value={compPlan}
+                        onChange={(e) => setCompPlan(e.target.value)}
+                        disabled={actionLoading}
+                        className="flex-1 rounded-lg border border-[var(--border)] px-3 py-2 text-sm disabled:opacity-50"
+                      >
+                        {PLAN_OPTIONS.map((p) => (
+                          <option key={p} value={p}>{PLAN_LABELS[p] ?? p}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={compSeats}
+                        onChange={(e) => setCompSeats(e.target.value)}
+                        disabled={actionLoading}
+                        aria-label="Seats"
+                        className="w-20 rounded-lg border border-[var(--border)] px-3 py-2 text-sm disabled:opacity-50"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleGrantComp(selected)}
+                      disabled={actionLoading}
+                      className="inline-flex h-[38px] items-center justify-center gap-2 w-full px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+                    >
+                      {actionLoading ? "Granting…" : "Grant comp plan"}
+                    </button>
+                  </>
+                )}
+              </section>
+
               {/* Danger Zone */}
               <section>
                 <h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide mb-3">
@@ -447,6 +557,23 @@ export default function AdminCustomersPage() {
                       {actionLoading ? "Suspending…" : "Suspend workspace"}
                     </button>
                   )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCancelEffective("next_billing_period");
+                      setCancelModalOpen(true);
+                    }}
+                    disabled={
+                      actionLoading ||
+                      selected.plan === "starter" ||
+                      selected.billing?.manualOverride === true ||
+                      !selected.billing?.subscriptionId
+                    }
+                    className="inline-flex h-[38px] items-center justify-center gap-2 w-full px-4 rounded-[var(--radius-btn)] border border-[var(--color-danger-border)] bg-[var(--color-danger-bg)] text-[var(--color-danger)] text-[14px] font-medium hover:opacity-90 transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+                  >
+                    Cancel subscription
+                  </button>
                 </div>
               </section>
             </div>
@@ -475,6 +602,94 @@ export default function AdminCustomersPage() {
                 className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer"
               >
                 {confirm.confirmLabel ?? "Confirm"}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={cancelModalOpen}
+        onClose={() => setCancelModalOpen(false)}
+        role="alertdialog"
+        ariaLabelledBy="cancel-sub-title"
+      >
+        {selected && (
+          <div className="p-6">
+            <h3
+              id="cancel-sub-title"
+              className="text-lg font-semibold text-[var(--text-heading)]"
+            >
+              Cancel subscription
+            </h3>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">
+              Cancel subscription for <strong>{selected.name}</strong>? The
+              workspace will be downgraded to Starter.
+            </p>
+
+            <div className="mt-4 space-y-2">
+              <label className="flex cursor-pointer items-start gap-2">
+                <input
+                  type="radio"
+                  name="cancel-effective"
+                  value="next_billing_period"
+                  checked={cancelEffective === "next_billing_period"}
+                  onChange={() => setCancelEffective("next_billing_period")}
+                  className="mt-1"
+                />
+                <span>
+                  <strong className="text-[14px] text-[var(--text-heading)]">
+                    End of billing period
+                  </strong>
+                  <span className="block text-sm text-[var(--text-secondary)]">
+                    Customer keeps access until their next billing date
+                  </span>
+                </span>
+              </label>
+
+              <label className="flex cursor-pointer items-start gap-2">
+                <input
+                  type="radio"
+                  name="cancel-effective"
+                  value="immediately"
+                  checked={cancelEffective === "immediately"}
+                  onChange={() => setCancelEffective("immediately")}
+                  className="mt-1"
+                />
+                <span>
+                  <strong className="text-[14px] text-[var(--text-heading)]">
+                    Immediately
+                  </strong>
+                  <span className="block text-sm text-[var(--text-secondary)]">
+                    Customer loses access right away
+                  </span>
+                </span>
+              </label>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setCancelModalOpen(false)}
+                className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[14px] font-medium hover:bg-[var(--surface-hover)] transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={async () => {
+                  setCancelModalOpen(false);
+                  await runAction(
+                    selected.id,
+                    "cancel_subscription",
+                    { effective: cancelEffective },
+                    "Subscription canceled"
+                  );
+                }}
+                className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--color-danger-solid)] text-white text-[14px] font-medium hover:opacity-90 transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+              >
+                Confirm cancellation
               </button>
             </div>
           </div>

@@ -4,6 +4,7 @@ import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 import { assertWorkspaceActive } from "@/lib/server/assertWorkspaceActive";
+import { workspaceGuardErrorResponse } from "@/lib/server/workspaceGuardErrorResponse";
 import { getWorkspaceMembersRepo } from "@/lib/repositories/workspaceMembersRepository.server";
 import type { WorkspaceMember } from "@/lib/domain/workspaceMember";
 import { adminDb } from "@/lib/server/firebaseAdmin";
@@ -21,10 +22,13 @@ export async function GET(req: NextRequest) {
 
   try {
     const workspaceId = await getUserWorkspaceIdRepo(user.uid);
-    const workspace = await getWorkspace(workspaceId);
+    // getWorkspace and getWorkspaceMembersRepo are independent once we have
+    // workspaceId — overlap them (4 serial Firestore round-trips → 3).
+    const [workspace, members] = await Promise.all([
+      getWorkspace(workspaceId),
+      getWorkspaceMembersRepo(workspaceId),
+    ]);
     assertWorkspaceActive(workspace);
-
-    const members = await getWorkspaceMembersRepo(workspaceId);
 
     const sorted: WorkspaceMember[] = [
       ...members.filter((m) => m.role === "OWNER"),
@@ -91,6 +95,9 @@ export async function GET(req: NextRequest) {
 
     return apiSuccess({ members: serialized });
   } catch (err) {
+    const guardResponse = workspaceGuardErrorResponse(err);
+    if (guardResponse) return guardResponse;
+
     console.error("GET /api/workspace/members:", err);
     return apiError({ code: "INTERNAL_ERROR", message: "Failed to load members", status: 500 });
   }

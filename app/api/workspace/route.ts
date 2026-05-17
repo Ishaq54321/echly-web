@@ -4,6 +4,7 @@ import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 import { assertWorkspaceActive } from "@/lib/server/assertWorkspaceActive";
+import { workspaceGuardErrorResponse } from "@/lib/server/workspaceGuardErrorResponse";
 import {
   getWorkspaceMemberRepo,
   softDeleteWorkspaceRepo,
@@ -32,7 +33,7 @@ export async function DELETE(req: NextRequest) {
   try {
     const workspaceId = await getUserWorkspaceIdRepo(user.uid);
     const workspace = await getWorkspace(workspaceId);
-    assertWorkspaceActive(workspace);
+    assertWorkspaceActive(workspace, { allowSuspended: true });
     if (!workspace) {
       return apiError({ code: "NOT_FOUND", message: "Workspace not found", status: 404 });
     }
@@ -46,11 +47,11 @@ export async function DELETE(req: NextRequest) {
       return apiError({ code: "INVALID_INPUT", message: "Workspace name confirmation does not match", status: 400 });
     }
 
-    if (workspace.billing?.stripeSubscriptionId) {
+    if (workspace.billing?.subscriptionId) {
       try {
-        await getPaymentProvider().cancelSubscription(workspace.billing.stripeSubscriptionId, false);
+        await getPaymentProvider().cancelSubscription(workspace.billing.subscriptionId, false);
       } catch (err) {
-        console.error("Failed to cancel Stripe subscription on workspace delete:", err);
+        console.error("Failed to cancel billing subscription on workspace delete:", err);
       }
     }
 
@@ -80,6 +81,9 @@ export async function DELETE(req: NextRequest) {
       purgeDate: purgeDate.toISOString(),
     });
   } catch (err) {
+    const guardResponse = workspaceGuardErrorResponse(err);
+    if (guardResponse) return guardResponse;
+
     console.error("DELETE /api/workspace:", err);
     return apiError({ code: "INTERNAL_ERROR", message: "Failed to delete workspace", status: 500 });
   }

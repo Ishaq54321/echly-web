@@ -1,32 +1,89 @@
 "use client";
 
-import Link from "next/link";
-import { Lock } from "lucide-react";
+import { useState } from "react";
+import { useWorkspace } from "@/lib/client/workspaceContext";
+import { authFetch } from "@/lib/authFetch";
+import { CreditCard, AlertCircle } from "lucide-react";
 
 export default function WorkspaceSuspendedPage() {
+  const { isWorkspaceOwner } = useWorkspace();
+  const [loading, setLoading] = useState(false);
+
+  const handleUpdatePayment = async () => {
+    setLoading(true);
+    try {
+      const res = await authFetch("/api/billing/portal", { method: "POST" });
+      const data = (await res?.json()) as { data?: { portalUrl?: string } } | null;
+      if (data?.data?.portalUrl) {
+        window.location.href = data.data.portalUrl;
+        return;
+      }
+      console.error("[suspended page] portal returned no URL");
+    } catch (err) {
+      console.error("[suspended page] portal failed:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="flex h-full flex-col items-center justify-center bg-[var(--surface-subtle)] px-4">
-      <div className="w-full max-w-md rounded-xl border border-[var(--border)] bg-white p-8 text-center shadow-sm">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--surface-hover)] text-[var(--text-secondary)]">
-          <Lock className="h-6 w-6" aria-hidden />
+    <div
+      className="flex min-h-screen items-center justify-center px-6"
+      style={{ background: "var(--surface-subtle)" }}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl p-10 text-center"
+        style={{
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+        }}
+      >
+        <div
+          className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full"
+          style={{ background: "var(--color-danger-bg)" }}
+        >
+          <AlertCircle className="h-8 w-8" style={{ color: "var(--color-danger)" }} aria-hidden />
         </div>
-        <h1 className="text-xl font-semibold text-[var(--text-heading)]">
-          Workspace Suspended
+
+        <h1 className="mb-3 text-2xl font-semibold" style={{ color: "var(--text-heading)" }}>
+          Workspace suspended
         </h1>
-        <p className="mt-3 text-sm text-[var(--text-secondary)]">
-          Your workspace has been temporarily suspended by the administrator.
+
+        <p
+          className="mb-8 text-base leading-relaxed"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          {isWorkspaceOwner
+            ? "We couldn't process your latest payment. Update your payment method to restore access to your workspace."
+            : "This workspace's billing needs attention. Ask your workspace owner to update the payment method to restore access."}
         </p>
-        <p className="mt-1 text-sm text-[var(--text-secondary)]">
-          If you believe this is an error, please contact support.
-        </p>
-        <div className="mt-6">
-          <Link
-            href="mailto:support@echly.com"
-            className="inline-flex items-center justify-center rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--text-body)] shadow-sm transition hover:bg-[var(--surface-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] focus:ring-offset-2"
+
+        {isWorkspaceOwner && (
+          <button
+            type="button"
+            onClick={handleUpdatePayment}
+            disabled={loading}
+            className="mb-4 flex h-12 w-full items-center justify-center gap-2 rounded-lg text-base font-medium text-white transition-opacity"
+            style={{ background: "var(--brand)", opacity: loading ? 0.7 : 1 }}
           >
-            Contact Support
-          </Link>
-        </div>
+            {loading ? (
+              "Loading…"
+            ) : (
+              <>
+                <CreditCard className="h-4 w-4" aria-hidden />
+                Update payment method
+              </>
+            )}
+          </button>
+        )}
+
+        <a
+          href="mailto:support@echly.com"
+          className="inline-flex items-center gap-1 text-sm transition-colors"
+          style={{ color: "var(--text-tertiary)" }}
+        >
+          Contact support
+        </a>
       </div>
     </div>
   );

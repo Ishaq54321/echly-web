@@ -16,6 +16,10 @@ import { buildCaptureContext } from "../internal/contextHelpers";
 import { playDoneClick, playShutterSound } from "../internal/audioHelpers";
 import { logSession } from "../internal/sessionHelpers";
 import {
+  isMicBlockedBySitePolicy,
+  isPolicyBlockError,
+} from "../micSitePolicy";
+import {
   detectVisualContainer,
   clampRect,
   cropImageToRegion,
@@ -628,10 +632,25 @@ export function useCaptureWidget({
       setState("voice_listening");
       setListeningAudioLevel(0);
     } catch (err) {
-      logger.error("error", "microphone_permission_denied", err);
+      // A site-level Permissions-Policy block is not a denial we can recover
+      // from — surface it as its own error so the pill shows the honest
+      // "switch to Write" panel instead of a doomed Try-again loop.
+      const siteBlocked =
+        isMicBlockedBySitePolicy() || isPolicyBlockError(err);
+      if (siteBlocked) {
+        console.warn(
+          "[Annote] Microphone blocked by site Permissions-Policy. " +
+            "This site has disabled microphone via HTTP header — no user action can override.",
+        );
+      }
+      logger.error("error", "microphone_permission_denied", {
+        name: (err as Error)?.name,
+        message: (err as Error)?.message,
+        siteBlocked,
+      });
       recordingActiveRef.current = false;
       if (sessionFeedbackPendingRef.current) {
-        setVoiceError("mic_permission");
+        setVoiceError(siteBlocked ? "site_blocked" : "mic_permission");
         setState("idle");
         return;
       }

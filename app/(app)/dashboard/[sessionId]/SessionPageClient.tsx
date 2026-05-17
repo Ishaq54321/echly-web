@@ -58,6 +58,8 @@ import {
   ExecutionView,
 } from "@/components/layout/operating-system";
 import { TicketActivityPanel } from "@/components/session/feedbackDetail/TicketActivityPanel";
+import { CanvasEmptyState } from "@/components/empty/CanvasEmptyState";
+import { NoTicketsIllu } from "@/components/empty/canvasIllustrations";
 import { TopControlBar } from "@/components/ui/TopControlBar";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useToast } from "@/components/dashboard/context/ToastContext";
@@ -652,10 +654,18 @@ export default function SessionPageClient({
     new Map<string, { isResolved: boolean; generation: number }>()
   );
   const pendingOptimisticAssigneeRef = useRef(
-    new Map<string, { assigneeId: string | null; assigneeName: string | null; assigneeAvatarUrl: string | null }>()
+    new Map<
+      string,
+      {
+        assigneeId: string | null;
+        assigneeName: string | null;
+        assigneeAvatarUrl: string | null;
+        generation: number;
+      }
+    >()
   );
   const pendingOptimisticPriorityRef = useRef(
-    new Map<string, { priority: "high" | "medium" | "low" | null }>()
+    new Map<string, { priority: "high" | "medium" | "low" | null; generation: number }>()
   );
   const pendingOptimisticTagsRef = useRef(
     new Map<string, { tags: string[] | null }>()
@@ -663,11 +673,17 @@ export default function SessionPageClient({
   /** Monotonic save generation per ticket; stale PATCH responses must not overwrite UI. */
   const descriptionSaveLatestGenRef = useRef(new Map<string, number>());
   const resolveSaveLatestGenRef = useRef(new Map<string, number>());
+  const assignSaveLatestGenRef = useRef(new Map<string, number>());
+  const prioritySaveLatestGenRef = useRef(new Map<string, number>());
 
   // Forward ref so the resolve reconciliation effect (declared above
   // removeResolving) can release the in-flight button lock when the
   // Firestore listener wins the race against the PATCH response.
   const removeResolvingRef = useRef<(id: string) => void>(() => {});
+  // Same pattern for assign/priority: the reconcile effects are declared
+  // above their remove* helpers, so route the release through a forward ref.
+  const removeAssigningRef = useRef<(id: string) => void>(() => {});
+  const removePriorityChangingRef = useRef<(id: string) => void>(() => {});
 
   // Ticket IDs currently being deleted (or just deleted, awaiting listener confirmation).
   // Suppresses listener re-emission of a deleted ticket until the server confirms removal.
@@ -698,6 +714,8 @@ export default function SessionPageClient({
     pendingOptimisticTagsRef.current.clear();
     descriptionSaveLatestGenRef.current.clear();
     resolveSaveLatestGenRef.current.clear();
+    assignSaveLatestGenRef.current.clear();
+    prioritySaveLatestGenRef.current.clear();
     pendingDeletedTicketIdsRef.current.clear();
     deleteRevertSnapshotsRef.current.clear();
     confirmedDeletedTicketIdsRef.current.clear();
@@ -836,8 +854,30 @@ export default function SessionPageClient({
     let didCleanup = false;
     for (const [id, entry] of pendingOptimisticAssigneeRef.current) {
       const listenerItem = base.find((f: Feedback) => f.id === id);
-      if (listenerItem && listenerItem.assigneeId === entry.assigneeId) {
+      if (!listenerItem) continue;
+
+      const latestGen = assignSaveLatestGenRef.current.get(id);
+      if (entry.generation !== latestGen) {
+        // Stale generation — superseded by a newer click; drop immediately.
         pendingOptimisticAssigneeRef.current.delete(id);
+        didCleanup = true;
+        continue;
+      }
+
+      // Latest generation owns the overlay — release once the listener has
+      // caught up on assigneeId, the source of truth for assignment identity.
+      // Name/avatar are display denormalizations; they're corrected via the
+      // PATCH success path's canonical-payload merge, so gating on them here
+      // (Phase 28.18) only delayed the lock release when the optimistic
+      // getMemberDisplayName name diverged from the server's resolveUserName.
+      const matchesId = (listenerItem.assigneeId ?? null) === entry.assigneeId;
+      if (matchesId) {
+        pendingOptimisticAssigneeRef.current.delete(id);
+        assignSaveLatestGenRef.current.delete(id);
+        // If the listener won the race against the PATCH response, the
+        // response will see latestGen=undefined and bail — release the
+        // in-flight lock here so the button doesn't stay disabled.
+        removeAssigningRef.current(id);
         didCleanup = true;
       }
     }
@@ -851,8 +891,19 @@ export default function SessionPageClient({
     let didCleanup = false;
     for (const [id, entry] of pendingOptimisticPriorityRef.current) {
       const listenerItem = base.find((f: Feedback) => f.id === id);
-      if (listenerItem && listenerItem.priority === entry.priority) {
+      if (!listenerItem) continue;
+
+      const latestGen = prioritySaveLatestGenRef.current.get(id);
+      if (entry.generation !== latestGen) {
         pendingOptimisticPriorityRef.current.delete(id);
+        didCleanup = true;
+        continue;
+      }
+
+      if ((listenerItem.priority ?? null) === entry.priority) {
+        pendingOptimisticPriorityRef.current.delete(id);
+        prioritySaveLatestGenRef.current.delete(id);
+        removePriorityChangingRef.current(id);
         didCleanup = true;
       }
     }
@@ -1154,7 +1205,6 @@ export default function SessionPageClient({
   const [resolveAffirmationKey, setResolveAffirmationKey] = useState(0);
   const [resolvingSet, setResolvingSet] = useState<Set<string>>(() => new Set());
   const [resolveToastState, setResolveToastState] = useState<ResolveToastState>("hidden");
-  const [actionToastState, setActionToastState] = useState<ResolveToastState>("hidden");
   /** Tracks which ticket was being resolved so we can navigate back on PATCH failure. */
   const resolvingTicketIdRef = useRef<string | null>(null);
 
@@ -1173,6 +1223,43 @@ export default function SessionPageClient({
     []
   );
   removeResolvingRef.current = removeResolving;
+
+  // Parent-level in-flight locks for Assign / Priority. Component-local
+  // state in the dropdown is lost on re-render (the dropdown is keyed on
+  // ticket id); keeping the lock here survives re-renders, matching
+  // resolvingSet's behavior.
+  const [assigningSet, setAssigningSet] = useState<Set<string>>(() => new Set());
+  const [priorityChangingSet, setPriorityChangingSet] = useState<Set<string>>(
+    () => new Set()
+  );
+  const addAssigning = useCallback(
+    (id: string) => setAssigningSet(prev => new Set([...prev, id])),
+    []
+  );
+  const removeAssigning = useCallback(
+    (id: string) =>
+      setAssigningSet(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      }),
+    []
+  );
+  removeAssigningRef.current = removeAssigning;
+  const addPriorityChanging = useCallback(
+    (id: string) => setPriorityChangingSet(prev => new Set([...prev, id])),
+    []
+  );
+  const removePriorityChanging = useCallback(
+    (id: string) =>
+      setPriorityChangingSet(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      }),
+    []
+  );
+  removePriorityChangingRef.current = removePriorityChanging;
   const feedbackScopedVisual = useMemo(() => {
     if (resolveOptimisticMap.size === 0)
       return feedbackScoped;
@@ -2768,40 +2855,231 @@ export default function SessionPageClient({
     );
   };
 
+  // Robust optimistic assign — mirrors saveResolved's pattern: a monotonic
+  // generation per ticket so stale PATCH responses can't clobber a fresher
+  // selection, a page-level in-flight lock (assigningSet) that survives
+  // re-renders, snapshot rollback + error toast on failure, and a
+  // server-payload merge on success (handles name/avatar corrections).
   const handleAssigned = useCallback(
-    (assigneeId: string | null, assigneeName: string | null, assigneeAvatarUrl: string | null) => {
+    async (
+      assigneeId: string | null,
+      assigneeName: string | null,
+      assigneeAvatarUrl: string | null
+    ) => {
       const ticketId = effectiveSelectedId;
       if (!ticketId) return;
-      setFeedback((prev) =>
-        prev.map((item) =>
+
+      const nextAssigneeId = assigneeId ?? null;
+      const nextAssigneeName = assigneeName ?? null;
+      const nextAssigneeAvatarUrl = assigneeAvatarUrl ?? null;
+
+      // Bump generation FIRST so an older in-flight call can detect it's stale.
+      const myGen = (assignSaveLatestGenRef.current.get(ticketId) ?? 0) + 1;
+      assignSaveLatestGenRef.current.set(ticketId, myGen);
+
+      // Snapshot from listener-source state, not the optimistic-merged list —
+      // rapid clicks must not capture a stale optimistic value as "previous".
+      const serverFeedback = feedbackStoreState?.feedback ?? [];
+      const prev = serverFeedback.find((i) => i.id === ticketId) ?? null;
+      const previousAssignee = {
+        assigneeId: prev?.assigneeId ?? null,
+        assigneeName: prev?.assigneeName ?? null,
+        assigneeAvatarUrl: prev?.assigneeAvatarUrl ?? null,
+      };
+
+      // Parent-level lock — survives the dropdown's re-render/remount.
+      addAssigning(ticketId);
+
+      // Optimistic mutation (same visible behavior as before).
+      setFeedback((list) =>
+        list.map((item) =>
           item.id === ticketId
-            ? { ...item, assigneeId, assigneeName, assigneeAvatarUrl }
+            ? {
+                ...item,
+                assigneeId: nextAssigneeId,
+                assigneeName: nextAssigneeName,
+                assigneeAvatarUrl: nextAssigneeAvatarUrl,
+              }
             : item
         )
       );
       pendingOptimisticAssigneeRef.current.set(ticketId, {
-        assigneeId: assigneeId ?? null,
-        assigneeName: assigneeName ?? null,
-        assigneeAvatarUrl: assigneeAvatarUrl ?? null,
+        assigneeId: nextAssigneeId,
+        assigneeName: nextAssigneeName,
+        assigneeAvatarUrl: nextAssigneeAvatarUrl,
+        generation: myGen,
       });
       bumpOverlayVersion();
+
+      const rollback = () => {
+        // Only the latest generation may roll back — an older failed PATCH
+        // must not stomp a newer selection that's still in flight.
+        if (assignSaveLatestGenRef.current.get(ticketId) !== myGen) return;
+        pendingOptimisticAssigneeRef.current.delete(ticketId);
+        setFeedback((list) =>
+          list.map((item) =>
+            item.id === ticketId
+              ? { ...item, ...previousAssignee }
+              : item
+          )
+        );
+        bumpOverlayVersion();
+        removeAssigning(ticketId);
+      };
+
+      try {
+        const res = await authFetch(`/api/tickets/${ticketId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            assigneeId: nextAssigneeId,
+            assigneeName: nextAssigneeName,
+            assigneeAvatarUrl: nextAssigneeAvatarUrl,
+          }),
+        });
+        if (!res || !res.ok) {
+          rollback();
+          if (res && responseIsPermissionDenied(res)) {
+            notifyPermissionDenied(showToast);
+          } else {
+            showToast("Couldn't assign ticket. Try again.");
+          }
+          return;
+        }
+        let ticketPayload: TicketFromApi;
+        try {
+          ticketPayload = requireApiSuccessData<{ ticket: TicketFromApi }>(
+            await res.json()
+          ).ticket;
+        } catch {
+          rollback();
+          showToast("Couldn't assign ticket. Try again.");
+          return;
+        }
+        // Only the latest generation owns cleanup; an older PATCH response
+        // must not wipe optimistic state for a newer in-flight click.
+        if (assignSaveLatestGenRef.current.get(ticketId) !== myGen) return;
+        removeAssigning(ticketId);
+        // Merge the server payload back so any field corrections (e.g. a
+        // canonical resolved name/avatar) win. The pending overlay is left
+        // for the reconcile effect to clear once the listener catches up.
+        setFeedback((list) =>
+          list.map((item) => {
+            if (item.id !== ticketId) return item;
+            const { createdAt, updatedAt, ...safePayload } =
+              ticketPayload as Record<string, unknown>;
+            return { ...item, ...safePayload };
+          })
+        );
+      } catch (err) {
+        console.error("[ECHLY] handleAssigned failed", err);
+        rollback();
+        showToast("Couldn't assign ticket. Try again.");
+      }
     },
-    [effectiveSelectedId, setFeedback, bumpOverlayVersion]
+    [
+      effectiveSelectedId,
+      feedbackStoreState?.feedback,
+      setFeedback,
+      bumpOverlayVersion,
+      addAssigning,
+      removeAssigning,
+      showToast,
+    ]
   );
 
+  // Robust optimistic priority — same pattern as handleAssigned, single field.
   const handlePriorityChanged = useCallback(
-    (priority: "high" | "medium" | "low" | null) => {
+    async (priority: "high" | "medium" | "low" | null) => {
       const ticketId = effectiveSelectedId;
       if (!ticketId) return;
-      setFeedback((prev) =>
-        prev.map((item) =>
-          item.id === ticketId ? { ...item, priority } : item
+
+      const nextPriority = priority ?? null;
+
+      const myGen = (prioritySaveLatestGenRef.current.get(ticketId) ?? 0) + 1;
+      prioritySaveLatestGenRef.current.set(ticketId, myGen);
+
+      const serverFeedback = feedbackStoreState?.feedback ?? [];
+      const prev = serverFeedback.find((i) => i.id === ticketId) ?? null;
+      const previousPriority = prev?.priority ?? null;
+
+      addPriorityChanging(ticketId);
+
+      setFeedback((list) =>
+        list.map((item) =>
+          item.id === ticketId ? { ...item, priority: nextPriority } : item
         )
       );
-      pendingOptimisticPriorityRef.current.set(ticketId, { priority: priority ?? null });
+      pendingOptimisticPriorityRef.current.set(ticketId, {
+        priority: nextPriority,
+        generation: myGen,
+      });
       bumpOverlayVersion();
+
+      const rollback = () => {
+        if (prioritySaveLatestGenRef.current.get(ticketId) !== myGen) return;
+        pendingOptimisticPriorityRef.current.delete(ticketId);
+        setFeedback((list) =>
+          list.map((item) =>
+            item.id === ticketId
+              ? { ...item, priority: previousPriority }
+              : item
+          )
+        );
+        bumpOverlayVersion();
+        removePriorityChanging(ticketId);
+      };
+
+      try {
+        const res = await authFetch(`/api/tickets/${ticketId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ priority: nextPriority }),
+        });
+        if (!res || !res.ok) {
+          rollback();
+          if (res && responseIsPermissionDenied(res)) {
+            notifyPermissionDenied(showToast);
+          } else {
+            showToast("Couldn't update priority. Try again.");
+          }
+          return;
+        }
+        let ticketPayload: TicketFromApi;
+        try {
+          ticketPayload = requireApiSuccessData<{ ticket: TicketFromApi }>(
+            await res.json()
+          ).ticket;
+        } catch {
+          rollback();
+          showToast("Couldn't update priority. Try again.");
+          return;
+        }
+        if (prioritySaveLatestGenRef.current.get(ticketId) !== myGen) return;
+        removePriorityChanging(ticketId);
+        setFeedback((list) =>
+          list.map((item) => {
+            if (item.id !== ticketId) return item;
+            const { createdAt, updatedAt, ...safePayload } =
+              ticketPayload as Record<string, unknown>;
+            return { ...item, ...safePayload };
+          })
+        );
+      } catch (err) {
+        console.error("[ECHLY] handlePriorityChanged failed", err);
+        rollback();
+        showToast("Couldn't update priority. Try again.");
+      }
     },
-    [effectiveSelectedId, setFeedback, bumpOverlayVersion]
+    [
+      effectiveSelectedId,
+      feedbackStoreState?.feedback,
+      setFeedback,
+      bumpOverlayVersion,
+      addPriorityChanging,
+      removePriorityChanging,
+      showToast,
+    ]
   );
 
   const handleSessionTitleBlur = useCallback(async () => {
@@ -3294,13 +3572,12 @@ export default function SessionPageClient({
         );
       }
       return (
-        <div className="mt-16">
-          <div className="text-[16px] font-medium text-[var(--text-primary-strong)]">
-            No feedback yet
-          </div>
-          <div className="mt-2 text-[14px] text-[var(--text-tertiary)]">
-            Capture feedback to start organizing insights.
-          </div>
+        <div className="flex-1 min-h-0 flex items-center justify-center">
+          <CanvasEmptyState
+            illustration={<NoTicketsIllu />}
+            title="No tickets yet"
+            description="No tickets in this session yet. Use the ⋯ menu above to add one."
+          />
         </div>
       );
     }
@@ -3404,7 +3681,8 @@ export default function SessionPageClient({
         screenshotUrlError={selectedScreenshotUrlError}
         onAssigned={isWorkspaceMember ? handleAssigned : undefined}
         onPriorityChanged={isWorkspaceMember ? handlePriorityChanged : undefined}
-        onSaveStateChange={setActionToastState}
+        assigneeBusy={assigningSet.has(effectiveSelectedId ?? "")}
+        priorityBusy={priorityChangingSet.has(effectiveSelectedId ?? "")}
         canAssignTicket={sessionAccess?.canResolve === true}
         isWorkspaceMember={isWorkspaceMember}
         animatingPinId={animatingPinId}
@@ -3426,12 +3704,7 @@ export default function SessionPageClient({
         state={resolveToastState}
         onDismiss={() => setResolveToastState("hidden")}
       />
-      <ResolveToast
-        state={resolveToastState !== "hidden" ? "hidden" : actionToastState}
-        onDismiss={() => setActionToastState("hidden")}
-        errorText="Failed to save"
-      />
-      <div className="session-page-shell flex flex-col h-full min-h-0 overflow-hidden relative bg-[var(--surface-subtle)]">
+      <div className="session-page-shell flex flex-col h-full min-h-0 overflow-hidden relative bg-[var(--surface-page)]">
         {!isPublicRoute && (
           <TopControlBar
             sessionId={sessionId}
@@ -3463,7 +3736,7 @@ export default function SessionPageClient({
           />
         )}
         <div
-          className="grid flex-1 min-h-0 overflow-hidden bg-[var(--surface-subtle)]"
+          className="grid flex-1 min-h-0 overflow-hidden bg-[var(--surface-page)]"
           style={{
             gridTemplateColumns: (isActivityPanelOpen || activeThreadId != null) ? '346px 1fr 360px' : '346px 1fr',
             gap: '14px',

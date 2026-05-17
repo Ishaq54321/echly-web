@@ -6,6 +6,7 @@ import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 import { assertWorkspaceActive } from "@/lib/server/assertWorkspaceActive";
+import { workspaceGuardErrorResponse } from "@/lib/server/workspaceGuardErrorResponse";
 import {
   getWorkspaceMemberRepo,
   getWorkspaceInvitationRepo,
@@ -93,6 +94,9 @@ export async function POST(
 
     return apiSuccess({ invitation: activeInvitation });
   } catch (err) {
+    const guardResponse = workspaceGuardErrorResponse(err);
+    if (guardResponse) return guardResponse;
+
     console.error("POST /api/workspace/members/invitations/[token]/resend:", err);
     return apiError({ code: "INTERNAL_ERROR", message: "Failed to resend invitation", status: 500 });
   }

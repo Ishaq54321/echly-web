@@ -4,6 +4,7 @@ import { apiError, apiSuccess } from "@/lib/server/apiResponse";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { getWorkspace } from "@/lib/repositories/workspacesRepository.server";
 import { assertWorkspaceActive } from "@/lib/server/assertWorkspaceActive";
+import { workspaceGuardErrorResponse } from "@/lib/server/workspaceGuardErrorResponse";
 import {
   getWorkspaceMembersRepo,
   getWorkspacePendingInvitationsRepo,
@@ -88,6 +89,9 @@ export async function GET(req: NextRequest) {
       totalPending: pendingRows.length,
     });
   } catch (err) {
+    const guardResponse = workspaceGuardErrorResponse(err);
+    if (guardResponse) return guardResponse;
+
     console.error("GET /api/workspace/members/all:", err);
     return apiError({ code: "INTERNAL_ERROR", message: "Failed to load members", status: 500 });
   }

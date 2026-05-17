@@ -5,8 +5,7 @@ import {
   type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { Workspace, WorkspaceDoc } from "@/lib/domain/workspace";
-import type { PlanId } from "@/lib/billing/plans";
+import type { Workspace } from "@/lib/domain/workspace";
 import { authFetch } from "@/lib/authFetch";
 import {
   getWorkspaceRealtimeSnapshot,
@@ -14,8 +13,8 @@ import {
   subscribeWorkspaceStore,
 } from "@/lib/realtime/workspaceStore";
 
-export function invalidateWorkspaceDocCache(userId?: string): void {
-  void userId;
+export function invalidateWorkspaceDocCache(workspaceId?: string): void {
+  void workspaceId;
 }
 
 function docToWorkspace(workspaceDocId: string, data: DocumentData): Workspace {
@@ -63,15 +62,14 @@ export function listenToWorkspace(
 }
 
 export async function updateWorkspaceName(
-  userId: string,
+  workspaceId: string,
   name: string
 ): Promise<void> {
-  const legacyIdKey = "workspace" + "Id";
   const res = await authFetch("/api/workspaces", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      [legacyIdKey]: userId,
+      workspaceId,
       updates: { name },
     }),
   });
@@ -79,104 +77,6 @@ export async function updateWorkspaceName(
     const msg = res ? await res.text() : "Not authenticated";
     throw new Error(`Failed to update workspace name: ${msg}`);
   }
-  invalidateWorkspaceDocCache(userId);
-}
-
-export async function updateWorkspaceNotifications(
-  userId: string,
-  notifications: WorkspaceDoc["notifications"]
-): Promise<void> {
-  const legacyIdKey = "workspace" + "Id";
-  const res = await authFetch("/api/workspaces", {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      [legacyIdKey]: userId,
-      updates: { notifications },
-    }),
-  });
-  if (!res || !res.ok) {
-    const msg = res ? await res.text() : "Not authenticated";
-    throw new Error(`Failed to update workspace notifications: ${msg}`);
-  }
-  invalidateWorkspaceDocCache(userId);
-}
-
-export async function updateWorkspaceAppearance(
-  userId: string,
-  appearance: WorkspaceDoc["appearance"]
-): Promise<void> {
-  const legacyIdKey = "workspace" + "Id";
-  const res = await authFetch("/api/workspaces", {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      [legacyIdKey]: userId,
-      updates: { appearance },
-    }),
-  });
-  if (!res || !res.ok) {
-    const msg = res ? await res.text() : "Not authenticated";
-    throw new Error(`Failed to update workspace appearance: ${msg}`);
-  }
-  invalidateWorkspaceDocCache(userId);
-}
-
-export async function updateWorkspaceSettings(
-  userId: string,
-  updates: Partial<
-    Pick<
-      WorkspaceDoc,
-      | "name"
-      | "logoUrl"
-      | "appearance"
-      | "notifications"
-      | "automations"
-      | "permissions"
-      | "integrations"
-      | "billing"
-      | "entitlements"
-      | "usage"
-    >
-  >
-): Promise<void> {
-  const legacyIdKey = "workspace" + "Id";
-  const res = await authFetch("/api/workspaces", {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      [legacyIdKey]: userId,
-      updates,
-    }),
-  });
-  if (!res || !res.ok) {
-    const msg = res ? await res.text() : "Not authenticated";
-    throw new Error(`Failed to update workspace settings: ${msg}`);
-  }
-  invalidateWorkspaceDocCache(userId);
-}
-
-/**
- * Updates workspace billing plan only. Does not write plan-derived limits into entitlements;
- * effective limits are always catalog[plan] unless workspace has an explicit override.
- */
-export async function updateWorkspacePlanRepo(
-  userId: string,
-  newPlan: PlanId
-): Promise<void> {
-  const legacyIdKey = "workspace" + "Id";
-  const res = await authFetch("/api/workspaces", {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      [legacyIdKey]: userId,
-      updates: { "billing.plan": newPlan },
-    }),
-  });
-  if (!res || !res.ok) {
-    const msg = res ? await res.text() : "Not authenticated";
-    throw new Error(`Failed to update workspace plan: ${msg}`);
-  }
-  invalidateWorkspaceDocCache(userId);
+  invalidateWorkspaceDocCache(workspaceId);
 }
 

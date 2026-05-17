@@ -1,55 +1,4 @@
-export function workspaceDeletedConfirmationHtml({
-  workspaceName,
-  purgeDate,
-}: {
-  workspaceName: string;
-  purgeDate: string;
-}): string {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Your workspace has been scheduled for deletion</title>
-</head>
-<body style="margin:0;padding:0;background:#F8F8F8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F8F8F8;padding:40px 0;">
-    <tr>
-      <td align="center">
-        <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;max-width:560px;width:100%;">
-          <tr>
-            <td style="background:#5A49BF;padding:28px 40px;">
-              <span style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.02em;">Annote</span>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:40px 40px 32px;">
-              <h1 style="margin:0 0 8px;font-size:24px;font-weight:700;color:#15101F;line-height:1.3;">
-                Your workspace <em>${escapeHtml(workspaceName)}</em> has been scheduled for deletion
-              </h1>
-              <p style="margin:0 0 16px;font-size:15px;color:#54495F;">
-                Your workspace will be permanently deleted on <strong>${escapeHtml(purgeDate)}</strong>.
-              </p>
-              <p style="margin:0 0 24px;font-size:15px;color:#54495F;">
-                All sessions, feedback, and members will be permanently removed.
-                To cancel, reply to this email or contact support within 30 days.
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:20px 40px 32px;border-top:1px solid #FAFAF7;">
-              <p style="margin:0;font-size:13px;color:#8A8096;">
-                If you did not request this deletion, please contact support immediately.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-}
+import { emailShell, emailColors, plainTextShell } from "../components";
 
 function escapeHtml(str: string): string {
   return str
@@ -57,4 +6,46 @@ function escapeHtml(str: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+interface WorkspaceDeletedConfirmationProps {
+  workspaceName: string;
+  purgeDate: string;
+}
+
+export function workspaceDeletedConfirmationHtml({
+  workspaceName,
+  purgeDate,
+}: WorkspaceDeletedConfirmationProps): string {
+  const body = `
+    <h1 style="margin:0 0 8px;font-size:24px;font-weight:600;color:${emailColors.textHeading};letter-spacing:-0.02em;line-height:1.3;">
+      Your workspace <em>${escapeHtml(workspaceName)}</em> is scheduled for deletion
+    </h1>
+    <p style="margin:0 0 16px;">
+      Your workspace will be permanently deleted on <strong style="color:${emailColors.textHeading};">${escapeHtml(purgeDate)}</strong>.
+    </p>
+    <p style="margin:0 0 8px;">
+      All sessions, feedback, and members will be permanently removed. To cancel, reply to this email or contact support within 30 days.
+    </p>
+    <p style="margin:0;font-size:13px;color:${emailColors.textMuted};">
+      If you did not request this deletion, please contact support immediately.
+    </p>
+  `;
+
+  return emailShell(body, {
+    preheader: `${workspaceName} will be permanently deleted on ${purgeDate}.`,
+  });
+}
+
+export function workspaceDeletedConfirmationText({
+  workspaceName,
+  purgeDate,
+}: WorkspaceDeletedConfirmationProps): string {
+  return plainTextShell(`Your workspace ${workspaceName} is scheduled for deletion
+
+Your workspace will be permanently deleted on ${purgeDate}.
+
+All sessions, feedback, and members will be permanently removed. To cancel, reply to this email or contact support within 30 days.
+
+If you did not request this deletion, please contact support immediately.`);
 }

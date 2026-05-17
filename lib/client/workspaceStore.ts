@@ -29,6 +29,11 @@ const SESSIONS_CACHE_PREFIX = "echly_sessions";
  *  Kept short so the realtime tickle's force-refetch always reaches the network. */
 const WORKSPACE_SESSIONS_TTL_MS = 5_000;
 
+/** Debounce rapid visibilitychange refetches (e.g. fast Alt+Tab cycling) so a
+ *  single user return to the dashboard triggers at most one force-refetch. */
+let lastVisibilityRefetch = 0;
+const VISIBILITY_REFETCH_DEBOUNCE_MS = 2_000;
+
 function sessionsCacheKey(uid: string, workspaceId: string): string {
   return `${SESSIONS_CACHE_PREFIX}:${uid}:${workspaceId}`;
 }
@@ -406,6 +411,43 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
       void fetchSessions({ force: true });
     });
     return () => release();
+  }, [isIdentityReady, userId, workspaceId, fetchSessions]);
+
+  // Refetch sessions when the page is restored from bfcache or
+  // becomes visible again. Without this, the dashboard shows stale
+  // data after browser-Back navigation because the module-level
+  // store survives the navigation but nothing triggers a refresh.
+  useEffect(() => {
+    if (!isIdentityReady || !userId || !workspaceId) return;
+    if (typeof window === "undefined") return;
+
+    function handlePageShow(event: PageTransitionEvent) {
+      // event.persisted === true means the page was restored from
+      // the bfcache. The React tree is frozen and useEffect cleanup
+      // never ran — we MUST manually refetch.
+      if (event.persisted) {
+        void fetchSessions({ force: true });
+      }
+    }
+
+    function handleVisibilityChange() {
+      // When the user returns to the tab after being away (or after
+      // navigating back), refetch to catch any missed tickle events.
+      // The debounce prevents thrashing if visibility flips rapidly.
+      if (document.visibilityState !== "visible") return;
+      const now = Date.now();
+      if (now - lastVisibilityRefetch < VISIBILITY_REFETCH_DEBOUNCE_MS) return;
+      lastVisibilityRefetch = now;
+      void fetchSessions({ force: true });
+    }
+
+    window.addEventListener("pageshow", handlePageShow);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("pageshow", handlePageShow);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [isIdentityReady, userId, workspaceId, fetchSessions]);
 
   const loadMoreSessions = useCallback(async () => {
