@@ -178,17 +178,35 @@ async function ensureUserAndRespond(
               (v): v is string => typeof v === "string" && v.trim() !== ""
             )
           : [];
-        if (!memberships.includes(storedWorkspaceId)) memberships.push(storedWorkspaceId);
-        await setWorkspaceClaims(user.uid, storedWorkspaceId, memberships);
+        // Defense-in-depth: only push storedWorkspaceId into the claims array
+        // if a member doc actually backs it. Without this, a stale
+        // users/{uid}.workspaceId (e.g. from some future bug that doesn't
+        // clear it on removal) would re-grant workspace access on every page
+        // load. If the pointer is stale, clear it instead of trusting it.
+        let activeWorkspaceId: string | null = storedWorkspaceId;
+        if (!memberships.includes(storedWorkspaceId)) {
+          const memberSnap = await adminDb
+            .doc(`workspaces/${storedWorkspaceId}/members/${user.uid}`)
+            .get();
+          if (memberSnap.exists) {
+            memberships.push(storedWorkspaceId);
+          } else {
+            await adminDb
+              .doc(`users/${user.uid}`)
+              .update({ workspaceId: null });
+            activeWorkspaceId = null;
+          }
+        }
+        await setWorkspaceClaims(user.uid, activeWorkspaceId, memberships);
         const headers = await buildHeadersWithOnboardedCookie(
           req,
           user.uid,
           data.onboardingCompleted,
-          true
+          activeWorkspaceId !== null
         );
         return apiSuccess(
           {
-            workspaceId: storedWorkspaceId,
+            workspaceId: activeWorkspaceId,
             avatarUrl: (data.avatarUrl as string | undefined) ?? null,
             firstName,
             lastName,

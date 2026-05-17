@@ -16,6 +16,7 @@ type Props = {
   workspaceName: string;
   workspaceSlug?: string;
   workspaceLogoFile?: File | null;
+  pendingInvites?: string[];
   onBack: () => void;
 };
 
@@ -24,6 +25,7 @@ export function ReadyStep({
   workspaceName,
   workspaceSlug,
   workspaceLogoFile,
+  pendingInvites,
   onBack,
 }: Props) {
   const router = useRouter();
@@ -77,6 +79,29 @@ export function ReadyStep({
           }
         } catch (logoErr) {
           console.warn("[onboarding] logo upload failed:", logoErr);
+        }
+      }
+
+      // Dispatch invites queued on the invite step. The workspace now exists
+      // and the token carries the new workspaceId claim, so invite-batch can
+      // resolve the workspace. Best-effort: a failure here does NOT roll back
+      // the workspace or block completion — the user can re-invite from
+      // Settings → Workspace.
+      if (pendingInvites && pendingInvites.length > 0) {
+        try {
+          const inviteRes = await authFetch("/api/workspace/members/invite-batch", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ emails: pendingInvites }),
+          });
+          if (!inviteRes || !inviteRes.ok) {
+            const detail = inviteRes ? await inviteRes.text() : "no response";
+            console.error("[onboarding] failed to send queued invites:", detail);
+            showToast("Workspace ready — some invites didn't send. Retry from Settings.");
+          }
+        } catch (inviteErr) {
+          console.error("[onboarding] invite batch threw:", inviteErr);
+          showToast("Workspace ready — some invites didn't send. Retry from Settings.");
         }
       }
 

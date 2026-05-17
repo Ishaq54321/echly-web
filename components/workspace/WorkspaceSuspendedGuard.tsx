@@ -6,7 +6,6 @@ import { authFetch } from "@/lib/authFetch";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { StatusOverlay } from "@/components/ui/StatusOverlay";
 import { AlertCircle } from "lucide-react";
 
 interface WorkspaceSuspendedGuardProps {
@@ -14,15 +13,28 @@ interface WorkspaceSuspendedGuardProps {
 }
 
 /**
- * Fetches workspace status when signed in. If suspended, renders a non-dismissible
- * banner above the app (the owner can self-recover via the billing portal) instead
- * of hard-redirecting. Status-fetch failures fail closed via StatusOverlay.
+ * Renders a non-dismissible suspended banner above the app (the owner can
+ * self-recover via the billing portal) instead of hard-redirecting.
+ *
+ * The suspended state is read from the realtime workspace context — the SAME
+ * Firestore-synced doc BillingTab uses — not a one-shot status fetch. This
+ * keeps the banner in lock-step with the rest of the billing UI and makes it
+ * react to state changes within ~1s without a page reload.
+ *
+ * Defense-in-depth: the banner only shows when the workspace is actually on a
+ * paid plan. A canceled/starter workspace with a lingering `suspended: true`
+ * must NOT show the banner (mirrors BillingTab's isMeaningfullySuspended).
  */
 export function WorkspaceSuspendedGuard({ children }: WorkspaceSuspendedGuardProps) {
   const router = useRouter();
-  const { authUid, isIdentityReady, workspaceId, isWorkspaceOwner } = useWorkspace();
-  const [suspended, setSuspended] = useState<boolean | null>(null);
-  const [statusError, setStatusError] = useState<string | null>(null);
+  const {
+    authUid,
+    isIdentityReady,
+    workspaceId,
+    isWorkspaceOwner,
+    isWorkspaceSuspended,
+    plan,
+  } = useWorkspace();
   const [portalLoading, setPortalLoading] = useState(false);
 
   // Redirect to /no-workspace if user is authenticated but has no workspace at all
@@ -45,37 +57,11 @@ export function WorkspaceSuspendedGuard({ children }: WorkspaceSuspendedGuardPro
     return () => { cancelled = true; };
   }, [authUid, isIdentityReady, workspaceId, router]);
 
-  useEffect(() => {
-    let cancelled = false;
-    if (!isIdentityReady) {
-      setSuspended(false);
-      setStatusError(null);
-      return;
-    }
-    setSuspended(null);
-    setStatusError(null);
-    authFetch("/api/workspace/status")
-      .then((res) => {
-        if (!res) {
-          throw new Error("Could not fetch workspace status");
-        }
-        if (!res.ok) {
-          throw new Error(`Workspace status failed (${res.status})`);
-        }
-        return res.json() as Promise<{ data?: { suspended?: boolean } }>;
-      })
-      .then((body) => {
-        if (!cancelled) setSuspended(body.data?.suspended === true);
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setStatusError(err instanceof Error ? err.message : "Failed to load workspace status");
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isIdentityReady]);
+  // Defense in depth: only show suspended UI when the workspace is actually on
+  // a paid plan. A canceled/starter workspace with a lingering suspended: true
+  // (e.g. mid-cascade, before the cancel write lands) must NOT show the banner.
+  const isMeaningfullySuspended =
+    isWorkspaceSuspended && (plan === "business" || plan === "enterprise");
 
   const handleUpdatePayment = async () => {
     setPortalLoading(true);
@@ -96,7 +82,7 @@ export function WorkspaceSuspendedGuard({ children }: WorkspaceSuspendedGuardPro
 
   return (
     <>
-      {suspended === true && (
+      {isMeaningfullySuspended && (
         <div
           role="alert"
           className="sticky top-0 z-50 w-full"
@@ -139,9 +125,6 @@ export function WorkspaceSuspendedGuard({ children }: WorkspaceSuspendedGuardPro
         </div>
       )}
       {children}
-      {authUid && statusError ? (
-        <StatusOverlay title="Could not load workspace status" message={statusError} />
-      ) : null}
     </>
   );
 }

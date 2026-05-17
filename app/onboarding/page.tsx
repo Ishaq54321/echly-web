@@ -50,6 +50,10 @@ export default function OnboardingPage() {
   const [workspaceLogoPreviewUrl, setWorkspaceLogoPreviewUrl] = useState<string | null>(
     ctxWorkspaceLogoUrl ?? null
   );
+  // Invites are deferred like the logo: the workspace doesn't exist until
+  // POST /api/onboarding succeeds, so we collect emails here and dispatch
+  // them from ReadyStep after the workspace is created.
+  const [pendingInvites, setPendingInvites] = useState<string[]>([]);
 
   useEffect(() => { if (ctxFirstName) setFirstName(ctxFirstName); }, [ctxFirstName]);
   useEffect(() => { if (ctxLastName) setLastName(ctxLastName); }, [ctxLastName]);
@@ -179,6 +183,8 @@ export default function OnboardingPage() {
           ownerName={[firstName, lastName].filter(Boolean).join(" ")}
           ownerEmail={authEmail ?? ""}
           workspaceName={workspaceName}
+          pendingInvites={pendingInvites}
+          onPendingInvitesChange={setPendingInvites}
           onContinue={advance}
           onBack={goBack}
         />
@@ -192,6 +198,7 @@ export default function OnboardingPage() {
           workspaceName={workspaceName}
           workspaceSlug={workspaceSlug}
           workspaceLogoFile={workspaceLogoFile}
+          pendingInvites={pendingInvites}
           onBack={goBack}
         />
       );

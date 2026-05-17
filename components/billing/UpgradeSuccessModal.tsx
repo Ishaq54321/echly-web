@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, Sparkles, X } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 import { MODAL_LAYER_Z_INDEX } from "@/lib/ui/zIndex";
 import { useWorkspaceRealtimeStore } from "@/lib/realtime/workspaceStore";
@@ -14,37 +14,36 @@ export interface UpgradeSuccessModalProps {
   planName?: string;
 }
 
-const EASE_OUT_200 = "200ms ease-out";
+// Once Firestore confirms, show the success state briefly before dismissing
+// so the transition reads as "done" rather than a flash.
+const SUCCESS_HOLD_MS = 800;
 
-// Max wait once the user clicks through but Firestore hasn't flipped yet.
-const FINALIZE_TIMEOUT_MS = 10000;
-
-const UNLOCKS = [
-  "Unlimited team members",
-  "1,500 AI improvements per month",
-  "Unlimited feedback tickets",
-  "Priority support",
-];
+// Safety cap: webhook normally lands in 1-3s, but never trap the user. After
+// this we dismiss regardless — the view router self-corrects when/if the
+// webhook eventually lands (or the user can refresh).
+const FALLBACK_TIMEOUT_MS = 15000;
 
 /**
- * Post-checkout celebration. Fires immediately on Paddle's
- * `checkout.completed` (opened from BillingTab — see settings/page.tsx),
- * independent of the Firestore webhook landing.
+ * Post-checkout bridge state. Opens immediately on Paddle's
+ * `checkout.completed` (from BillingTab — see settings/page.tsx), then acts
+ * as a redirecting/loading screen until Firestore catches up.
  *
- * Flicker fix: rendered through {@link ModalPortal} into document.body so
- * it's decoupled from BillingTab's view-router re-render. When the webhook
- * flips `billing.plan` (starter → business), BillingTab swaps
- * PlansAndPricingView → BillingManagementView; before this change the modal
- * lived inside that subtree at z-index 1000 and got unmounted / painted
- * under the sidebar. Now it portals to body at the canonical modal layer,
- * so its lifecycle is driven ONLY by `isOpen` + user dismissal — never by
- * `billing.plan`.
+ * This is NOT a dismissible celebration. There's no Continue button, close
+ * button, Escape handler, or backdrop-click — it's a bridge that covers the
+ * Firestore-catchup window so the user never glimpses the stale Plans view
+ * mid-transition. Lifecycle is driven purely by `isOpen` + the live workspace
+ * doc; it dismisses itself once state is consistent.
  *
- * Timing reality: the success state shows right away and does NOT
- * auto-dismiss — it stays until the user clicks "Get started" or X. When
- * the user clicks through we check the live workspace doc: if the webhook
- * already flipped the plan, dismiss; otherwise show a brief "Finalizing"
- * spinner that auto-dismisses the moment Firestore catches up (10s cap).
+ * Flow the user sees:
+ *   spinner ("Setting up your Business plan")
+ *     → webhook flips billing.plan starter → business in Firestore
+ *     → success ("Welcome to Business") for ~800ms
+ *     → auto-dismiss; BillingManagementView is already rendered behind it
+ *
+ * Rendered through {@link ModalPortal} into document.body so it's decoupled
+ * from BillingTab's view-router re-render: when the webhook flips the plan,
+ * BillingTab swaps PlansAndPricingView → BillingManagementView, and the
+ * portal keeps this mounted at the canonical modal layer regardless.
  */
 export function UpgradeSuccessModal({
   isOpen,
@@ -52,49 +51,28 @@ export function UpgradeSuccessModal({
   planName = "Business",
 }: UpgradeSuccessModalProps) {
   const { workspace } = useWorkspaceRealtimeStore();
-  const [isFinalizing, setIsFinalizing] = useState(false);
 
   const plan = workspace?.billing?.plan;
+  // Bridge holds until the webhook flips the plan. The webhook writes plan and
+  // subscriptionId in one atomic Firestore update, so an extra subscriptionId
+  // check adds no real protection — it only widens the spinner window.
   const isPlanConfirmed = plan === "business" || plan === "enterprise";
 
-  // Reset finalizing state whenever the modal is (re)opened, so a later
-  // checkout doesn't inherit a stale spinner. Deferred out of the effect's
-  // synchronous body via rAF so the setState doesn't run during commit
-  // (react-hooks/set-state-in-effect) — matches the codebase convention.
+  // Auto-dismiss once Firestore confirms — hold the success state briefly so
+  // the handoff reads as intentional, not a flicker. Gated on isOpen so an
+  // unrelated workspace update (already-business workspace, another tab's
+  // write) can't fire this when the modal isn't even up.
   useEffect(() => {
-    if (!isOpen) return;
-    const t = requestAnimationFrame(() => setIsFinalizing(false));
-    return () => cancelAnimationFrame(t);
-  }, [isOpen]);
-
-  const handleContinue = () => {
-    if (isPlanConfirmed) {
-      onClose();
-    } else {
-      setIsFinalizing(true);
-    }
-  };
-
-  // While finalizing: dismiss as soon as Firestore confirms, or after the
-  // 10s cap regardless (the view router self-corrects when the webhook lands).
-  useEffect(() => {
-    if (!isFinalizing) return;
-    if (isPlanConfirmed) {
-      onClose();
-      return;
-    }
-    const timeout = setTimeout(onClose, FINALIZE_TIMEOUT_MS);
+    if (!isOpen || !isPlanConfirmed) return;
+    const timeout = setTimeout(onClose, SUCCESS_HOLD_MS);
     return () => clearTimeout(timeout);
-  }, [isFinalizing, isPlanConfirmed, onClose]);
+  }, [isOpen, isPlanConfirmed, onClose]);
 
-  // Escape-key dismissal (backdrop + X handled inline) — matches UpgradeModal.
+  // Safety fallback: never trap the user if the webhook is slow or fails.
   useEffect(() => {
     if (!isOpen) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    const fallback = setTimeout(onClose, FALLBACK_TIMEOUT_MS);
+    return () => clearTimeout(fallback);
   }, [isOpen, onClose]);
 
   return (
@@ -105,12 +83,11 @@ export function UpgradeSuccessModal({
             className="fixed inset-0 flex items-center justify-center p-4"
             style={{ zIndex: MODAL_LAYER_Z_INDEX }}
           >
-            {/* Backdrop */}
+            {/* Backdrop — fully blocks underlying UI; NOT click-to-dismiss. */}
             <motion.div
               className="absolute inset-0"
               style={{ background: "var(--surface-overlay)" }}
               aria-hidden
-              onClick={onClose}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -131,98 +108,10 @@ export function UpgradeSuccessModal({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-              onClick={(e) => e.stopPropagation()}
             >
-              {/* Close button */}
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Close"
-                className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-md"
-                style={{
-                  color: "var(--text-tertiary)",
-                  transition: `color ${EASE_OUT_200}`,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = "var(--text-secondary)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = "var(--text-tertiary)";
-                }}
-              >
-                <X size={18} aria-hidden />
-              </button>
-
-              {!isFinalizing ? (
+              {!isPlanConfirmed ? (
                 <>
-                  {/* Success icon */}
-                  <div
-                    className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full"
-                    style={{ background: "var(--color-success-bg)" }}
-                  >
-                    <CheckCircle2
-                      size={40}
-                      aria-hidden
-                      style={{ color: "var(--color-success)" }}
-                    />
-                  </div>
-
-                  {/* Heading */}
-                  <h2
-                    id="upgrade-success-title"
-                    className="mb-2 text-2xl font-semibold"
-                    style={{ color: "var(--text-heading)" }}
-                  >
-                    Welcome to {planName}!
-                  </h2>
-
-                  <p
-                    className="mb-8 text-base"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    Your upgrade is complete. Here&apos;s what you unlocked:
-                  </p>
-
-                  {/* Unlocks list */}
-                  <ul className="mb-8 space-y-3 text-left" role="list">
-                    {UNLOCKS.map((item) => (
-                      <li
-                        key={item}
-                        className="flex items-center gap-3 text-sm"
-                        style={{ color: "var(--text-heading)" }}
-                      >
-                        <Sparkles
-                          size={16}
-                          aria-hidden
-                          style={{ color: "var(--brand)", flexShrink: 0 }}
-                        />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  {/* CTA */}
-                  <button
-                    type="button"
-                    onClick={handleContinue}
-                    className="h-12 w-full rounded-[var(--radius-btn)] text-base font-medium text-white"
-                    style={{
-                      background: "var(--brand)",
-                      transition: `opacity ${EASE_OUT_200}`,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.opacity = "0.95";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.opacity = "1";
-                    }}
-                  >
-                    Get started
-                  </button>
-                </>
-              ) : (
-                <>
-                  {/* Finalizing state */}
+                  {/* Bridge / loading state — Firestore hasn't caught up yet. */}
                   <div
                     className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full"
                     style={{ background: "var(--surface-subtle)" }}
@@ -241,14 +130,43 @@ export function UpgradeSuccessModal({
                     className="mb-2 text-xl font-semibold"
                     style={{ color: "var(--text-heading)" }}
                   >
-                    Finalizing your upgrade
+                    Setting up your {planName} plan
                   </h2>
 
                   <p
                     className="text-sm"
                     style={{ color: "var(--text-secondary)" }}
                   >
-                    Just a moment while we set everything up.
+                    This will only take a moment.
+                  </p>
+                </>
+              ) : (
+                <>
+                  {/* Success state — shown briefly before auto-dismiss. */}
+                  <div
+                    className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full"
+                    style={{ background: "var(--color-success-bg)" }}
+                  >
+                    <CheckCircle2
+                      size={40}
+                      aria-hidden
+                      style={{ color: "var(--color-success)" }}
+                    />
+                  </div>
+
+                  <h2
+                    id="upgrade-success-title"
+                    className="mb-2 text-2xl font-semibold"
+                    style={{ color: "var(--text-heading)" }}
+                  >
+                    Welcome to {planName}
+                  </h2>
+
+                  <p
+                    className="text-base"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    You&apos;re all set.
                   </p>
                 </>
               )}

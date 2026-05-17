@@ -187,6 +187,8 @@ async function handleSubscriptionStarted(
     // A fresh subscription is never mid-cancellation — clear any stale flag
     // (e.g. cancel-then-resubscribe).
     "billing.cancelAt": null,
+    // Next renewal date for the Current Plan card.
+    "billing.nextBilledAt": subData.currentPeriodEnd,
     updatedAt: FieldValue.serverTimestamp(),
   };
   // Only write the card when the provider returned one — never clobber an
@@ -268,6 +270,10 @@ async function handleSubscriptionUpdated(
   const updates: Record<string, unknown> = {
     "billing.seats": subData.seatCount,
     "billing.billingCycle": subData.billingCycle,
+    // Keep the renewal date converged with Paddle. The card hides this line
+    // while a cancel is pending (`cancelAt` set), so it's safe to track the
+    // real period end here; self-heals if the cancel is reverted.
+    "billing.nextBilledAt": subData.currentPeriodEnd,
     updatedAt: FieldValue.serverTimestamp(),
   };
 
@@ -353,6 +359,13 @@ async function handleSubscriptionCanceled(
     "billing.billingCycle": "monthly",
     // The scheduled cancel has now landed — drop the grace-period flag.
     "billing.cancelAt": null,
+    // No subscription left — clear the renewal date so the card doesn't show
+    // a stale "Renews on" line.
+    "billing.nextBilledAt": null,
+    // A canceled subscription cannot be "suspended" — these are mutually
+    // exclusive states. Clearing it here prevents the durable divergent
+    // state (starter + suspended) that produced the dashboard flip-flop.
+    "billing.suspended": false,
     updatedAt: FieldValue.serverTimestamp(),
   });
 

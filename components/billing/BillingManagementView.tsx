@@ -21,6 +21,19 @@ function formatLongDate(
   }).format(d);
 }
 
+/** "Jun 17, 2026" — short month, fits inline under the plan name. */
+function formatShortDate(
+  value: Parameters<typeof toDate>[0]
+): string {
+  const d = toDate(value);
+  if (!d) return "";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(d);
+}
+
 const EASE_OUT_200 = "200ms ease-out";
 
 interface TransactionSummary {
@@ -122,20 +135,44 @@ export function BillingManagementView({
     }
   };
 
-  const planLabel =
-    billing?.plan === "enterprise" ? "Enterprise" : "Business";
+  const isEnterprise = billing?.plan === "enterprise";
+  const planLabel = isEnterprise ? "Enterprise" : "Business";
+  const seatLabel = seats === 1 ? "seat" : "seats";
+
+  // `perSeatPrice` is the cycle-effective per-seat *monthly* rate (annual is
+  // billed at the discounted monthly-equivalent). Total is what they actually
+  // pay each cycle: monthly → seats × rate; annual → seats × rate × 12.
+  const totalAmount =
+    perSeatPrice != null
+      ? cycle === "annual"
+        ? seats * perSeatPrice * 12
+        : seats * perSeatPrice
+      : null;
 
   const priceLine = isComped
     ? "Complimentary"
-    : perSeatPrice != null
-    ? `${fmt(perSeatPrice)} /seat /${cycle === "annual" ? "yr" : "mo"}`
+    : isEnterprise
+    ? "Custom"
+    : totalAmount != null
+    ? `${fmt(totalAmount)} /${cycle === "annual" ? "yr" : "mo"}`
     : "—";
 
   const subLine = isComped
     ? "Granted by Annote — no payment required"
-    : `${cycle === "annual" ? "Annual" : "Monthly"} billing • ${seats} seat${
-        seats === 1 ? "" : "s"
-      }`;
+    : isEnterprise
+    ? `${seats} ${seatLabel} • Custom plan`
+    : perSeatPrice != null
+    ? `${seats} ${seatLabel} × ${fmt(perSeatPrice)} • ${
+        cycle === "annual" ? "Billed annually" : "Monthly billing"
+      }`
+    : `${cycle === "annual" ? "Annual" : "Monthly"} billing • ${seats} ${seatLabel}`;
+
+  // Renewal date — quiet third line. Hidden for comp'd (no cycle), Enterprise
+  // (custom contract), cancel-pending (banner already states the end date),
+  // and when the date is absent/invalid (returns "").
+  const renewalDate = formatShortDate(billing?.nextBilledAt);
+  const showRenewalDate =
+    renewalDate !== "" && !isComped && !isEnterprise && !isCanceling;
 
   return (
     <div className="space-y-6">
@@ -201,6 +238,14 @@ export function BillingManagementView({
         <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
           {subLine}
         </p>
+        {showRenewalDate && (
+          <p
+            className="mt-1 text-sm"
+            style={{ color: "var(--text-tertiary)" }}
+          >
+            Renews on {renewalDate}
+          </p>
+        )}
       </div>
 
       {/* ── Section 2: Payment method (hidden for comp'd) ────────────── */}

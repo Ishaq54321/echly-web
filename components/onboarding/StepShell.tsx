@@ -1,13 +1,20 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Image from "next/image";
 
 export function StepHeader({ step, total = 5 }: { step: number; total?: number }) {
   return (
     <header className="ob-head">
       <span className="ob-brand">
-        <span className="ob-brand-mark">A</span>
-        <span>Annote</span>
+        <Image
+          src="/annote-logo-full.svg"
+          alt="Annote"
+          width={118}
+          height={28}
+          priority
+          className="ob-brand-logo"
+        />
       </span>
       <div className="ob-stepwrap">
         <div className="ob-progress">

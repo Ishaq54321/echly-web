@@ -76,18 +76,10 @@
   letter-spacing: -0.022em;
   font-size: 16px;
 }
-.ob-brand-mark {
-  width: 28px;
+.ob-brand-logo {
   height: 28px;
-  border-radius: 8px;
-  background: var(--ob-brand);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: -0.04em;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.22) inset, 0 1px 2px rgba(15, 91, 181, 0.25);
+  width: auto;
+  display: block;
 }
 .ob-stepwrap {
   display: inline-flex;
@@ -246,12 +238,13 @@
   color: #fff;
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.18) inset,
-    0 1px 2px rgba(15, 91, 181, 0.30),
-    0 4px 14px -6px rgba(15, 91, 181, 0.45);
+    0 1px 2px rgba(61, 47, 115, 0.30),
+    0 4px 14px -6px rgba(61, 47, 115, 0.45);
 }
 .ob-btn-primary:hover:not(:disabled) { background: var(--ob-brand-ink); }
+.ob-btn-primary:active:not(:disabled) { background: var(--ob-brand-ink); }
 .ob-btn-primary:disabled {
-  background: #C9DDF6;
+  background: #D7D2EB;
   box-shadow: none;
   cursor: not-allowed;
 }
@@ -693,17 +686,11 @@
   flex-wrap: wrap;
   gap: 6px;
   padding: 8px 8px 8px 10px;
-  border: 1px solid var(--ob-hair-strong);
-  border-radius: 9px;
-  background: #FAFAF7;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   min-height: 86px;
   align-content: flex-start;
-  transition: border-color 0.14s, background 0.14s, box-shadow 0.14s;
-}
-.ob-email-chips:focus-within {
-  border-color: var(--ob-brand);
-  background: #fff;
-  box-shadow: 0 0 0 4px rgba(90, 73, 191, 0.10);
 }
 .ob-email-chip {
   display: inline-flex;

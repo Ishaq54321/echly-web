@@ -30,6 +30,8 @@ type Props = {
   ownerName: string;
   ownerEmail: string;
   workspaceName: string;
+  pendingInvites: string[];
+  onPendingInvitesChange: (emails: string[]) => void;
   onContinue: () => void;
   onBack: () => void;
 };
@@ -49,14 +51,23 @@ export function InviteStep({
   ownerName,
   ownerEmail,
   workspaceName,
+  pendingInvites,
+  onPendingInvitesChange,
   onContinue,
   onBack,
 }: Props) {
   const { showToast } = useToast();
-  const [emails, setEmails] = useState<string[]>([]);
+  // Emails are owned by the onboarding page so they survive this step and can
+  // be sent after the workspace is created (see ReadyStep). We mirror the
+  // lifted list here as `emails` to keep the rest of the component unchanged.
+  const emails = pendingInvites;
+  const setEmails = (updater: string[] | ((prev: string[]) => string[])) => {
+    onPendingInvitesChange(
+      typeof updater === "function" ? updater(pendingInvites) : updater
+    );
+  };
   const [status, setStatus] = useState<Record<string, InviteStatus>>({});
   const [draft, setDraft] = useState("");
-  const [sending, setSending] = useState(false);
   const [gmailLoading, setGmailLoading] = useState(false);
   const [gmailContacts, setGmailContacts] = useState<GoogleContact[] | null>(null);
   const [contactSelection, setContactSelection] = useState<Set<string>>(new Set());
@@ -227,111 +238,13 @@ export function InviteStep({
     }
   };
 
-  const sendInvites = async () => {
-    if (!emails.length) {
-      onContinue();
-      return;
-    }
-    setSending(true);
-    const pendingEmails = emails.filter((e) => status[e] !== "sent");
-    setStatus((prev) => {
-      const next = { ...prev };
-      pendingEmails.forEach((e) => { next[e] = "sending"; });
-      return next;
-    });
-
-    try {
-      const res = await authFetch("/api/workspace/members/invite-batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emails: pendingEmails }),
-      });
-      if (!res || !res.ok) {
-        let msg = "Couldn't send invites";
-        if (res) {
-          try {
-            const body = await res.json();
-            if (body?.error?.message) msg = body.error.message;
-          } catch {}
-        }
-        setStatus((prev) => {
-          const next = { ...prev };
-          pendingEmails.forEach((e) => { next[e] = "error"; });
-          return next;
-        });
-        showToast(msg);
-        setSending(false);
-        return;
-      }
-
-      type ApiInviteStatus =
-        | "invited"
-        | "already_member"
-        | "already_invited"
-        | "invalid"
-        | "error"
-        | "limit_reached";
-      const body = (await res.json()) as {
-        success?: boolean;
-        data?: {
-          results?: Array<{ email: string; status: ApiInviteStatus; message?: string }>;
-        };
-      };
-      const results = body?.data?.results ?? [];
-
-      setStatus((prev) => {
-        const next = { ...prev };
-        results.forEach((r) => {
-          if (r.status === "invited") next[r.email] = "sent";
-          else next[r.email] = r.status;
-        });
-        return next;
-      });
-
-      const sent = results.filter((r) => r.status === "invited").length;
-      const failed = results.filter(
-        (r) => r.status === "error" || r.status === "limit_reached"
-      ).length;
-      const skipped = results.filter(
-        (r) =>
-          r.status === "already_member" ||
-          r.status === "already_invited" ||
-          r.status === "invalid"
-      ).length;
-
-      if (sent > 0) {
-        showToast(`${sent} invite${sent === 1 ? "" : "s"} sent`);
-      }
-      if (skipped > 0 && sent === 0 && failed === 0) {
-        showToast(`${skipped} email${skipped === 1 ? "" : "s"} skipped`);
-      }
-      if (failed > 0) {
-        showToast(`${failed} invite${failed === 1 ? "" : "s"} failed`);
-      }
-
-      // Advance only when nothing is in a hard-error state. Skipped emails
-      // (already_member / already_invited / invalid) don't block the flow.
-      if (failed === 0) {
-        onContinue();
-      }
-    } catch {
-      setStatus((prev) => {
-        const next = { ...prev };
-        pendingEmails.forEach((e) => { next[e] = "error"; });
-        return next;
-      });
-      showToast("Couldn't send invites");
-    } finally {
-      setSending(false);
-    }
-  };
-
+  // Invites are not sent here. They're queued in page state and dispatched
+  // after POST /api/onboarding creates the workspace (see ReadyStep). The
+  // "Continue" button just advances and lifts the collected emails up.
   const inviteLabel =
     emails.length === 0
       ? "Continue"
-      : sending
-      ? "Sending…"
-      : `Send ${emails.length} ${emails.length === 1 ? "invite" : "invites"}`;
+      : `Continue with ${emails.length} ${emails.length === 1 ? "invite" : "invites"}`;
 
   return (
     <StepShell
@@ -614,8 +527,12 @@ export function InviteStep({
             type="button"
             className="ob-btn ob-btn-ghost"
             style={{ padding: "0 12px" }}
-            onClick={onContinue}
-            disabled={sending}
+            onClick={() => {
+              // Explicit opt-out: discard any queued emails so ReadyStep
+              // doesn't dispatch them after workspace creation.
+              if (emails.length) onPendingInvitesChange([]);
+              onContinue();
+            }}
           >
             I&apos;ll do this later
           </button>
@@ -624,8 +541,7 @@ export function InviteStep({
           <button
             type="button"
             className="ob-btn ob-btn-primary"
-            onClick={sendInvites}
-            disabled={sending}
+            onClick={onContinue}
           >
             {inviteLabel}
             <ObIcon.Arrow size={13} />

@@ -37,8 +37,8 @@ import type { Workspace } from "@/lib/domain/workspace";
 import {
   assertIdentityResolved,
   useWorkspace,
-  type WorkspaceMembership,
 } from "@/lib/client/workspaceContext";
+import type { WorkspaceMembership } from "@/lib/client/workspaceContext";
 import { BillingUsageProvider, useBillingUsageContext } from "@/lib/billing/BillingUsageProvider";
 import {
   listenToWorkspace,
@@ -87,7 +87,6 @@ function SectionHeader({
 
 const TABS = [
   { id: "profile", label: "My account" },
-  { id: "workspaces", label: "Workspaces" },
   { id: "workspace", label: "Workspace" },
   { id: "security", label: "Security" },
   { id: "billing", label: "Billing" },
@@ -103,16 +102,15 @@ function SettingsPageInner() {
     workspaceLoading,
     isIdentityResolved,
     isIdentityReady,
-    allWorkspaces,
-    activeWorkspaceId,
-    switchWorkspace,
   } = useWorkspace();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>("profile");
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
 
   useEffect(() => {
-    const tab = searchParams.get("tab");
+    const tabParam = searchParams.get("tab");
+    // Legacy: the standalone "Workspaces" tab was merged into "Workspace".
+    const tab = tabParam === "workspaces" ? "workspace" : tabParam;
     if (tab && TABS.some((t) => t.id === tab)) {
       setActiveTab(tab as TabId);
     }
@@ -175,7 +173,7 @@ function SettingsPageInner() {
           className="flex items-center gap-10 border-b border-[var(--border-default)] mb-8"
           aria-label="Settings sections"
         >
-          {TABS.filter((t) => t.id !== "workspaces" || allWorkspaces.length > 1).map(({ id, label }) => {
+          {TABS.map(({ id, label }) => {
             const isActive = activeTab === id;
             return (
               <button
@@ -203,13 +201,6 @@ function SettingsPageInner() {
         {/* Tab content */}
         <BillingUsageProvider>
           {activeTab === "profile" && <MyAccountTab />}
-          {activeTab === "workspaces" && (
-            <WorkspacesTab
-              allWorkspaces={allWorkspaces}
-              activeWorkspaceId={activeWorkspaceId ?? workspaceId}
-              switchWorkspace={switchWorkspace}
-            />
-          )}
           {activeTab === "workspace" && (
             <WorkspaceTab
               workspace={workspace}
@@ -219,9 +210,51 @@ function SettingsPageInner() {
           )}
           {activeTab === "security" && <SecurityTab />}
           {activeTab === "billing" && <BillingTab />}
+          {/* Post-checkout success bridge. Mounted at the settings shell —
+              OUTSIDE the activeTab gate and above BillingTab's loading/error
+              early returns — so a checkout completed from any surface keeps
+              the modal mounted continuously through the Firestore-sync window.
+              Lives inside BillingUsageProvider so it can refresh usage. */}
+          <UpgradeCheckoutBridge />
         </BillingUsageProvider>
       </div>
     </div>
+  );
+}
+
+/**
+ * Post-checkout bridge owner. Holds the success-modal state, the Paddle
+ * `checkout.completed` subscription, and the post-upgrade usage refetch.
+ *
+ * Hoisted out of BillingTab: BillingTab has loading/error early returns that
+ * unmount its whole subtree on a Firestore snapshot re-entry, which used to
+ * tear down the modal mid-bridge (skeleton flash → modal reappears). Mounted
+ * here it is unconditional and stable, so the modal survives ANY BillingTab
+ * re-render, remount, loading, or error transition. usePaddle fans every
+ * event out to all listeners, so BillingTab's own subscription (for its
+ * checkout button spinner / error banner) keeps working independently.
+ */
+function UpgradeCheckoutBridge() {
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const { refetch: refetchUsage } = useBillingUsageContext();
+
+  usePaddle({
+    onEvent: (event) => {
+      if (event.name === CheckoutEventNames.CHECKOUT_COMPLETED) {
+        // Celebrate immediately — don't wait for Firestore. The modal itself
+        // handles the webhook-timing handoff and self-dismisses once the
+        // live workspace doc flips.
+        setShowSuccessModal(true);
+        void refetchUsage();
+      }
+    },
+  });
+
+  return (
+    <UpgradeSuccessModal
+      isOpen={showSuccessModal}
+      onClose={() => setShowSuccessModal(false)}
+    />
   );
 }
 
@@ -243,77 +276,163 @@ export default function SettingsPage() {
   );
 }
 
-function WorkspacesTab({
-  allWorkspaces,
-  activeWorkspaceId,
-  switchWorkspace,
-}: {
-  allWorkspaces: WorkspaceMembership[];
-  activeWorkspaceId: string | null;
-  switchWorkspace: (wid: string) => Promise<void>;
-}) {
+/**
+ * Workspaces switcher. Formerly a dedicated "Workspaces" settings tab;
+ * now rendered as the last section of the Workspace tab. Lists ALL workspaces
+ * the user belongs to — the current one (marked, non-interactive) pinned to
+ * the top, the rest clickable to switch. Self-gates to null for single-
+ * workspace users. Pulls its own data from useWorkspace() so it stays a
+ * drop-in section component.
+ */
+function YourWorkspacesSection() {
+  const { allWorkspaces, activeWorkspaceId, workspaceId, switchWorkspace } = useWorkspace();
+  const currentId = activeWorkspaceId ?? workspaceId;
   const [switchingTo, setSwitchingTo] = useState<string | null>(null);
 
+  // A single-workspace user already knows where they are — showing one row
+  // marked "Current" is pure noise. Keep the multi-workspace gate.
+  if (allWorkspaces.length <= 1) return null;
+
+  // Current workspace first, then the rest in their existing order.
+  const sorted = [...allWorkspaces].sort((a, b) => {
+    if (a.workspaceId === currentId) return -1;
+    if (b.workspaceId === currentId) return 1;
+    return 0;
+  });
+
   return (
-    <div style={{ maxWidth: 900, width: "100%", padding: "32px 0" }}>
-      <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid var(--border)" }}>
-        <h1 className="text-lg font-semibold text-[var(--text-heading)] mb-1">Your workspaces</h1>
+    <div style={{ maxWidth: 900, width: "100%" }}>
+      <div style={{ marginBottom: 20 }}>
+        <h2 className="text-lg font-semibold text-[var(--text-heading)] mb-1">Your workspaces</h2>
         <p style={{ fontSize: 14, color: "var(--text-secondary)", margin: 0 }}>
-          Switch between workspaces you belong to.
+          Workspaces you&apos;re a member of
         </p>
       </div>
       <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
-        {allWorkspaces.map((ws, idx) => {
-          const isCurrent = ws.workspaceId === activeWorkspaceId;
-          const initial = ws.name.trim().charAt(0).toUpperCase() || "W";
-          return (
-            <button
-              key={ws.workspaceId}
-              type="button"
-              disabled={isCurrent || switchingTo !== null}
-              onClick={async () => {
-                setSwitchingTo(ws.workspaceId);
-                try { await switchWorkspace(ws.workspaceId); }
-                finally { setSwitchingTo(null); }
-              }}
-              style={{
-                display: "flex", alignItems: "center", gap: 14,
-                padding: "16px 24px", width: "100%",
-                background: "transparent", border: "none", textAlign: "left",
-                borderTop: idx === 0 ? "none" : "1px solid var(--surface-hover)",
-                cursor: isCurrent ? "default" : "pointer",
-                fontFamily: "inherit",
-              }}
-            >
-              {ws.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={ws.logoUrl} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-              ) : (
-                <span style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--brand)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 600, flexShrink: 0 }}>
-                  {initial}
-                </span>
-              )}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-heading)" }}>
-                  {ws.name}
-                  {isCurrent && (
-                    <span style={{ marginLeft: 10, fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 999, background: "var(--brand-subtle)", color: "var(--brand)" }}>
-                      Current
-                    </span>
-                  )}
-                </div>
-                <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>
-                  {ws.isOwner ? "Owner" : "Member"}
-                </div>
-              </div>
-              {switchingTo === ws.workspaceId && (
-                <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>Switching…</span>
-              )}
-            </button>
-          );
-        })}
+        {sorted.map((ws, idx) => (
+          <WorkspaceRow
+            key={ws.workspaceId}
+            ws={ws}
+            isCurrent={ws.workspaceId === currentId}
+            isFirst={idx === 0}
+            switching={switchingTo === ws.workspaceId}
+            disabled={switchingTo !== null}
+            onSwitch={async () => {
+              setSwitchingTo(ws.workspaceId);
+              try { await switchWorkspace(ws.workspaceId); }
+              finally { setSwitchingTo(null); }
+            }}
+          />
+        ))}
       </div>
     </div>
+  );
+}
+
+function WorkspaceRow({
+  ws,
+  isCurrent,
+  isFirst,
+  switching,
+  disabled,
+  onSwitch,
+}: {
+  ws: WorkspaceMembership;
+  isCurrent: boolean;
+  isFirst: boolean;
+  switching: boolean;
+  disabled: boolean;
+  onSwitch: () => void | Promise<void>;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const initial = ws.name.trim().charAt(0).toUpperCase() || "W";
+  const roleLabel = ws.isOwner ? "Owner" : "Member";
+  const borderTop = isFirst ? "none" : "1px solid var(--surface-hover)";
+
+  const content = (
+    <>
+      {ws.logoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={ws.logoUrl} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+      ) : (
+        <span style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--brand)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 600, flexShrink: 0 }}>
+          {initial}
+        </span>
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+          <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text-heading)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {ws.name}
+          </span>
+          {isCurrent && (
+            <span
+              style={{
+                flexShrink: 0,
+                fontSize: 11, fontWeight: 600,
+                padding: "2px 8px", borderRadius: 999,
+                background: "var(--brand-bg, rgba(90, 73, 191, 0.1))",
+                color: "var(--brand)",
+              }}
+            >
+              Current
+            </span>
+          )}
+        </div>
+        <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>
+          {roleLabel}
+        </div>
+      </div>
+      {isCurrent ? null : switching ? (
+        <span style={{ fontSize: 13, color: "var(--text-secondary)", flexShrink: 0 }}>Switching…</span>
+      ) : (
+        <ArrowRight
+          size={18}
+          style={{
+            color: "var(--text-tertiary)", flexShrink: 0,
+            transition: "transform 150ms ease",
+            transform: hovered ? "translateX(4px)" : "translateX(0)",
+          }}
+        />
+      )}
+    </>
+  );
+
+  const baseStyle: React.CSSProperties = {
+    display: "flex", alignItems: "center", gap: 14,
+    padding: "16px 24px", width: "100%",
+    border: "none", textAlign: "left",
+    borderTop,
+    fontFamily: "inherit",
+  };
+
+  // Current workspace: a label, not an action.
+  if (isCurrent) {
+    return (
+      <div aria-current="true" style={{ ...baseStyle, background: "transparent" }}>
+        {content}
+      </div>
+    );
+  }
+
+  // Other workspaces: keyboard-accessible button with a hover affordance.
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => { void onSwitch(); }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)}
+      onBlur={() => setHovered(false)}
+      style={{
+        ...baseStyle,
+        background: hovered ? "var(--surface-subtle, var(--surface-hover))" : "transparent",
+        cursor: disabled ? "default" : "pointer",
+        transition: "background-color 150ms ease",
+      }}
+    >
+      {content}
+    </button>
   );
 }
 
@@ -1038,6 +1157,12 @@ function WorkspaceTab({
       </div>
 
       </div>{/* end card */}
+
+      {/* Your workspaces — formerly the standalone "Workspaces" tab.
+          Self-gates to null for single-workspace users. */}
+      <div style={{ marginTop: 48 }}>
+        <YourWorkspacesSection />
+      </div>
 
       {logoCropSrc && (
         <ImageCropModal
@@ -2990,15 +3115,9 @@ function BillingTab() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
-  // Surface 4: post-checkout celebration. Opened on checkout.completed and
-  // mounted here because BillingTab stays mounted through the Paddle overlay
-  // regardless of which surface (this view or UpgradeModal) opened checkout.
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const { plans, loading: catalogLoading, error: catalogError } =
     usePlanCatalog();
   const { isWorkspaceOwner } = useWorkspace();
-  // BillingUsageProvider wraps this tab; reading from context avoids a refetch.
-  const { refetch: refetchUsage } = useBillingUsageContext();
   // The Firestore workspace doc is the source of truth for plan, seats,
   // cycle, suspension, comp, and the card on file. Always loaded on this page.
   const { workspace: realtimeWorkspace } = useWorkspaceRealtimeStore();
@@ -3009,16 +3128,15 @@ function BillingTab() {
     if (searchParams.get("upgraded") === "true") setBillingError(null);
   }, [searchParams]);
 
+  // Owns ONLY this tab's checkout button spinner + error banner. The success
+  // modal + post-upgrade usage refetch live in <UpgradeCheckoutBridge /> at
+  // the settings shell so they survive this tab's loading/error remounts.
+  // usePaddle fans every event out to all listeners, so both run.
   const { paddle } = usePaddle({
     onEvent: (event) => {
       if (event.name === CheckoutEventNames.CHECKOUT_COMPLETED) {
         setBillingError(null);
         setCheckoutLoading(false);
-        // Celebrate immediately — don't wait for Firestore. The modal itself
-        // handles the webhook-timing handoff.
-        setShowSuccessModal(true);
-        // The live workspace doc flips via webhook → view switches to B.
-        void refetchUsage();
       } else if (
         event.name === CheckoutEventNames.CHECKOUT_ERROR ||
         event.name === CheckoutEventNames.CHECKOUT_PAYMENT_ERROR ||
@@ -3122,8 +3240,6 @@ function BillingTab() {
   }, [businessCatalog, billingCycle]);
 
   // ── Loading / error gates ───────────────────────────────────────────
-  const workspaceReady = realtimeWorkspace != null;
-  const isInitialLoading = catalogLoading || !workspaceReady;
   const hasError =
     Boolean(catalogError) || (!catalogLoading && (!plans || plans.length === 0));
 
@@ -3164,7 +3280,17 @@ function BillingTab() {
     );
   }
 
-  if (isInitialLoading || !realtimeWorkspace) {
+  // Skeleton ONLY on a genuine first load — when we have no data at all yet.
+  // Scoped to BillingTab (the workspace store is untouched):
+  //   • realtimeWorkspace: module-level store persists across this tab's
+  //     unmount/remount, so `!realtimeWorkspace` is true only on the very
+  //     first workspace fetch — re-subscription keeps the cached workspace.
+  //   • !plans: the plan catalog is module-cached and hydrated synchronously
+  //     on remount, so `!plans` is true only on the first-ever catalog fetch.
+  // We deliberately do NOT gate on `catalogLoading` here: it briefly flips
+  // true on every remount even with a warm cache, which is exactly the
+  // re-entry skeleton flicker we're killing. If we have data, render the UI.
+  if (!realtimeWorkspace || !plans) {
     return (
       <div className={`flex flex-col ${BILLING_CONTAINER} pb-20`}>
         <div className="mx-auto w-full">
@@ -3176,6 +3302,12 @@ function BillingTab() {
 
   const isSuspended = billing?.suspended === true;
   const plan = billing?.plan ?? "starter";
+  // Defense in depth: only show suspended UI when the workspace is actually on
+  // a paid plan. A canceled/starter workspace with a lingering suspended: true
+  // (e.g. mid-cascade, before the subscription_canceled write lands) should
+  // NOT stack a suspended card on top of the Plans view.
+  const isMeaningfullySuspended =
+    isSuspended && (plan === "business" || plan === "enterprise");
 
   return (
     <div className={`flex flex-col ${BILLING_CONTAINER} pb-20`}>
@@ -3212,7 +3344,7 @@ function BillingTab() {
         ) : (
           <div>
             {/* D2 suspended inline card — top of either owner view. */}
-            {isSuspended && (
+            {isMeaningfullySuspended && (
               <div
                 className="mb-6 flex items-start gap-4 rounded-xl p-6"
                 style={{
@@ -3285,13 +3417,6 @@ function BillingTab() {
           </div>
         )}
       </div>
-
-      {/* Surface 4: post-checkout success. Underlying view auto-transitions
-          to Management once Firestore flips; this just dismisses cleanly. */}
-      <UpgradeSuccessModal
-        isOpen={showSuccessModal}
-        onClose={() => setShowSuccessModal(false)}
-      />
     </div>
   );
 }

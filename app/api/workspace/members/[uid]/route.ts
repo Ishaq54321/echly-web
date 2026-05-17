@@ -12,6 +12,7 @@ import {
 } from "@/lib/repositories/workspaceMembersRepository.server";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { getPaymentProvider } from "@/lib/billing/payments";
+import { setWorkspaceClaims } from "@/lib/server/setWorkspaceClaim";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +81,48 @@ export async function DELETE(
       } catch (providerErr) {
         console.error("[member remove] failed to sync subscription seats:", providerErr);
       }
+    }
+
+    // Repoint the removed user's active-workspace pointer and clear their auth
+    // claims. removeWorkspaceMemberRepo already arrayRemove'd workspaceId from
+    // users/{targetUid}.workspaceMemberships, but it leaves
+    // users/{targetUid}.workspaceId and the Firebase custom claims pointing at
+    // the workspace they were just removed from — which lets the self-heal
+    // sites re-grant access permanently. Read fresh so the arrayRemove is
+    // reflected.
+    try {
+      const targetUserSnap = await adminDb.doc(`users/${targetUid}`).get();
+      const targetUserData = targetUserSnap.data() ?? {};
+      const remainingMemberships: string[] = Array.isArray(
+        targetUserData.workspaceMemberships
+      )
+        ? (targetUserData.workspaceMemberships as unknown[]).filter(
+            (v): v is string =>
+              typeof v === "string" && v.trim() !== "" && v !== workspaceId
+          )
+        : [];
+
+      // Deterministic pick: first remaining workspace, or null if none.
+      const newActiveWorkspaceId: string | null =
+        remainingMemberships[0] ?? null;
+
+      await adminDb.doc(`users/${targetUid}`).update({
+        workspaceId: newActiveWorkspaceId,
+      });
+
+      await setWorkspaceClaims(
+        targetUid,
+        newActiveWorkspaceId,
+        remainingMemberships
+      );
+    } catch (claimErr) {
+      // Removal already succeeded (membership doc is deleted). Don't 500 — the
+      // stale claim expires naturally and server-side resolution already
+      // rejects the removed workspace.
+      console.error(
+        `[member remove] failed to repoint/clear claims for ${targetUid}:`,
+        claimErr
+      );
     }
 
     return apiSuccess({ success: true });

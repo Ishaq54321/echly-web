@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import {
   AuthFoot,
@@ -112,8 +113,14 @@ function CheckEmailContent() {
         <div className="auth-left">
           <header className="auth-head">
             <span className="brand">
-              <span className="brand-mark">A</span>
-              <span>Annote</span>
+              <Image
+                src="/annote-logo-full.svg"
+                alt="Annote"
+                width={118}
+                height={28}
+                priority
+                className="brand-logo"
+              />
             </span>
             <div className="auth-meta">
               <span>Wrong email?</span>

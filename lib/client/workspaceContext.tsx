@@ -85,6 +85,13 @@ export type WorkspaceContextValue = {
   brandLogoUrl: string | null;
   /** Workspace plan id of viewer's workspace. */
   plan: string;
+  /**
+   * True when the workspace billing is suspended (dunning / failed payment).
+   * Derived from the same realtime workspace doc as BillingTab so the
+   * suspended banner stays in lock-step with the rest of the billing UI
+   * (no separate status fetch / dual source of truth).
+   */
+  isWorkspaceSuspended: boolean;
   /** True when viewer's plan + entitlement allows custom branding. Used in settings UI only. */
   customBrandingEntitled: boolean;
   /** Workspace owner UID from the workspace document. */
@@ -700,6 +707,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       workspaceLogoUrl: workspaceDoc?.logoUrl ?? null,
       brandLogoUrl: workspaceDoc?.brandLogoUrl ?? null,
       plan: workspaceDoc?.billing?.plan ?? "starter",
+      isWorkspaceSuspended: workspaceDoc?.billing?.suspended === true,
       customBrandingEntitled:
         workspaceDoc?.entitlements?.customBranding
           ?? PLANS[(workspaceDoc?.billing?.plan ?? "starter") as PlanId]?.customBranding

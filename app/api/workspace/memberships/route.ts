@@ -33,15 +33,26 @@ export async function GET(req: NextRequest) {
       : [];
     const wasInArray = new Set(membershipIds);
 
-    // Also include their own workspaceId if not already present
+    // Also include their own workspaceId if not already present — but only if
+    // a member doc actually backs it. Defense-in-depth: a stale
+    // users/{uid}.workspaceId (e.g. left behind by some future bug on member
+    // removal) must not self-heal back into workspaceMemberships and re-grant
+    // access. We only spend the extra read when the pointer isn't already in
+    // the array.
     const ownWid = typeof userData.workspaceId === "string" ? userData.workspaceId.trim() : "";
     if (ownWid && !wasInArray.has(ownWid)) {
-      membershipIds.push(ownWid);
-      // Self-heal: persist the missing entry so future reads don't need this fallback.
-      // Idempotent (arrayUnion). Fire-and-forget — does not block the response.
-      addWorkspaceMembershipRepo(user.uid, ownWid).catch((err) => {
-        console.warn("[memberships] self-heal failed", { uid: user.uid, wid: ownWid, err });
-      });
+      const memberSnap = await adminDb
+        .doc(`workspaces/${ownWid}/members/${user.uid}`)
+        .get();
+      if (memberSnap.exists) {
+        membershipIds.push(ownWid);
+        // Self-heal: persist the missing entry so future reads don't need this
+        // fallback. Idempotent (arrayUnion). Fire-and-forget — does not block
+        // the response.
+        addWorkspaceMembershipRepo(user.uid, ownWid).catch((err) => {
+          console.warn("[memberships] self-heal failed", { uid: user.uid, wid: ownWid, err });
+        });
+      }
     }
 
     if (membershipIds.length === 0) {

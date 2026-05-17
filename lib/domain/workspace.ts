@@ -78,6 +78,13 @@ export interface Workspace {
      * provider `subscription.updated` events.
      */
     cancelAt?: Timestamp | null;
+    /**
+     * Next renewal/charge date for an active subscription (provider
+     * `currentPeriodEnd`). Written on `subscription.started` / `.updated`,
+     * nulled on cancel. Absent until the first webhook fires — comp'd and
+     * Enterprise workspaces have no standard cycle, so it stays absent.
+     */
+    nextBilledAt?: Timestamp | null;
     /** Set by admin; when true, workspace cannot use the app. */
     suspended?: boolean;
     /** Admin-granted comp. When true, provider webhooks must not downgrade/suspend this workspace. */

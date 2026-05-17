@@ -36,8 +36,14 @@ let cachedPlanCatalogPromise: Promise<PlanCatalogItem[] | null> | null = null;
  * Fetches plan catalog from API (single source of truth). No Firestore listener.
  */
 export function usePlanCatalog(): UsePlanCatalogResult {
-  const [plans, setPlans] = useState<PlanCatalogItem[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Hydrate synchronously from the module cache so a remount (e.g. tab
+  // re-entry) has plans on its FIRST render instead of a null→data frame.
+  // Consumers that gate a skeleton on `!plans` then don't flash on re-entry.
+  // Uncached first load is unchanged: cache is null → starts loading.
+  const [plans, setPlans] = useState<PlanCatalogItem[] | null>(
+    () => cachedPlanCatalog
+  );
+  const [loading, setLoading] = useState(() => cachedPlanCatalog == null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
