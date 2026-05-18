@@ -65,15 +65,18 @@
 
 /* ── Pill shared chrome ─────────────────────────────────── */
 .echly-v2 .pill {
-  background: var(--surface);
+  /* Warm translucent glass. Previously var(--surface) (#FFFFFF) which
+     masked the ::before blur entirely — now the blur reads through. */
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: var(--r-xl);
-  border: 1px solid rgba(28,25,23,0.06);
-  box-shadow:
-    0 1px 0 rgba(255,255,255,0.9) inset,
-    0 1px 2.5px rgba(28,25,23,0.04),
-    0 10px 20px -10px rgba(28,25,23,0.10),
-    0 30px 60px -20px rgba(28,25,23,0.18);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-stack);
   position: relative;
+  /* New stacking context so the ::before highlight sits between the
+     translucent surface and the content, not behind the pill. */
+  isolation: isolate;
   font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
   color: var(--body);
   font-size: 14px;
@@ -81,12 +84,22 @@
   text-rendering: optimizeLegibility;
 }
 .echly-v2 .pill::before {
+  /* Blur now lives on the parent (above) — avoid double-blurring this
+     nested layer. Repurpose ::before as a subtle top-edge highlight that
+     hugs the rounded top corners and stays inset from the border so it
+     never reads as a hard straight line across the top of the surface. */
   content: '';
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  backdrop-filter: blur(25px);
-  -webkit-backdrop-filter: blur(25px);
+  top: 0;
+  left: 1px;
+  right: 1px;
+  height: 50%;
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  background: linear-gradient(
+    to bottom,
+    var(--glass-edge-highlight),
+    transparent
+  );
   z-index: -1;
   pointer-events: none;
 }

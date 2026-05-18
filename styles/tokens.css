@@ -385,6 +385,25 @@
   --nav-hover-icon:  var(--text-heading);
   --nav-hover-label: var(--text-heading);
   --topbar-icon:     var(--text-tertiary);
+
+  /* ─── GLASS — EXTENSION SURFACES ONLY ────────
+     Warm-tinted translucent surface + heavy blur + saturate boost.
+     Recipe mirrors .echly-pill-hint--dark (the reference glass chip).
+     These are the LIGHT-theme values; dark overrides live in
+     app/globals.css under #echly-root[data-theme="dark"] (the real
+     theming hook in this codebase — there is no [data-theme] at :root).
+     NOTE: deliberately NOT named --glass-highlight; that token already
+     exists in globals.css with a different meaning. */
+  --glass-surface:          rgba(252, 251, 249, 0.86);
+  --glass-surface-elevated: rgba(254, 253, 251, 0.92);
+  --glass-border:           rgba(28, 25, 23, 0.08);
+  --glass-border-strong:    rgba(28, 25, 23, 0.12);
+  --glass-edge-highlight:   rgba(255, 255, 255, 0.4);
+  --glass-shadow-stack:
+    0 5px 15px rgba(28, 25, 23, 0.05),
+    0 1px 4px rgba(28, 25, 23, 0.035);
+  --glass-blur:        blur(28px) saturate(140%);
+  --glass-blur-strong: blur(40px) saturate(150%);
 }
 
 /* Duplicate of the :root block above, scoped to :host so shadow DOM
@@ -768,6 +787,20 @@
   --nav-hover-icon:  var(--text-heading);
   --nav-hover-label: var(--text-heading);
   --topbar-icon:     var(--text-tertiary);
+
+  /* ─── GLASS — EXTENSION SURFACES ONLY ────────
+     Light-theme values. Kept identical to the :root block above.
+     Dark overrides: app/globals.css #echly-root[data-theme="dark"]. */
+  --glass-surface:          rgba(252, 251, 249, 0.86);
+  --glass-surface-elevated: rgba(254, 253, 251, 0.92);
+  --glass-border:           rgba(28, 25, 23, 0.08);
+  --glass-border-strong:    rgba(28, 25, 23, 0.12);
+  --glass-edge-highlight:   rgba(255, 255, 255, 0.4);
+  --glass-shadow-stack:
+    0 5px 15px rgba(28, 25, 23, 0.05),
+    0 1px 4px rgba(28, 25, 23, 0.035);
+  --glass-blur:        blur(28px) saturate(140%);
+  --glass-blur-strong: blur(40px) saturate(150%);
 }
 
 /* ─── GLOBAL BASE ────────────────────────── */

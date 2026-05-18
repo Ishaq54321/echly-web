@@ -1951,8 +1951,8 @@ textarea:focus-visible {
   --transition-fast: 120ms cubic-bezier(0.22, 0.61, 0.36, 1);
   --echly-font: "Plus Jakarta Sans", "SF Pro Display", Inter, system-ui,
     -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;
-  --echly-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-  --echly-shadow-hover: 0 14px 40px rgba(0, 0, 0, 0.45);
+  --echly-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+  --echly-shadow-hover: 0 10px 28px rgba(0, 0, 0, 0.28);
 }
 
 #echly-root[data-theme="dark"] {
@@ -2004,6 +2004,17 @@ textarea:focus-visible {
     rgba(20, 20, 20, 0.92) 100%
   );
   --echly-waveform-fill: rgba(96, 165, 250, 0.75);
+
+  /* GLASS — dark-theme overrides (extension surfaces only).
+     Light values come from :host/:root in styles/tokens.css. */
+  --glass-surface:          rgba(21, 16, 31, 0.86);
+  --glass-surface-elevated: rgba(28, 22, 38, 0.92);
+  --glass-border:           rgba(255, 255, 255, 0.08);
+  --glass-border-strong:    rgba(255, 255, 255, 0.14);
+  --glass-edge-highlight:   rgba(255, 255, 255, 0.06);
+  --glass-shadow-stack:
+    0 5px 15px rgba(0, 0, 0, 0.14),
+    0 1px 4px rgba(0, 0, 0, 0.09);
 }
 
 #echly-root[data-theme="light"] {
@@ -2055,6 +2066,17 @@ textarea:focus-visible {
     rgba(255, 255, 255, 0.9) 100%
   );
   --echly-waveform-fill: rgba(26, 86, 219, 0.85);
+
+  /* GLASS — explicit light values. Restated here so an explicit
+     light theme overrides the dark-default fallback below. */
+  --glass-surface:          rgba(252, 251, 249, 0.86);
+  --glass-surface-elevated: rgba(254, 253, 251, 0.92);
+  --glass-border:           rgba(28, 25, 23, 0.08);
+  --glass-border-strong:    rgba(28, 25, 23, 0.12);
+  --glass-edge-highlight:   rgba(255, 255, 255, 0.4);
+  --glass-shadow-stack:
+    0 5px 15px rgba(28, 25, 23, 0.05),
+    0 1px 4px rgba(28, 25, 23, 0.035);
 }
 
 /* Fallback when widget is used without data-theme (e.g. app embed): default dark */
@@ -2108,6 +2130,17 @@ textarea:focus-visible {
   );
   --echly-waveform-fill: rgba(96, 165, 250, 0.75);
   color-scheme: dark;
+
+  /* GLASS — dark-default fallback (no data-theme set). Mirrors the
+     #echly-root[data-theme="dark"] glass values. */
+  --glass-surface:          rgba(21, 16, 31, 0.86);
+  --glass-surface-elevated: rgba(28, 22, 38, 0.92);
+  --glass-border:           rgba(255, 255, 255, 0.08);
+  --glass-border-strong:    rgba(255, 255, 255, 0.14);
+  --glass-edge-highlight:   rgba(255, 255, 255, 0.06);
+  --glass-shadow-stack:
+    0 5px 15px rgba(0, 0, 0, 0.14),
+    0 1px 4px rgba(0, 0, 0, 0.09);
 }
 
 #echly-root {
@@ -2183,30 +2216,33 @@ textarea:focus-visible {
   max-height: 100%;
   border-radius: 28px;
   padding: 24px 20px;
-  background: var(--bg-primary);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.08),
-    0 2px 8px rgba(0, 0, 0, 0.06);
+  /* Largest extension surface — warm translucent glass with the STRONG
+     blur (was var(--bg-primary) with no backdrop-filter; the translucent
+     base existed but blur was never applied). */
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-blur-strong);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-stack);
   overflow: visible;
   font-family: var(--echly-font);
   transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
-/* Dark mode: stronger shadow + subtle border for elevated tray card */
+/* Dark mode: glass border + shadow already swing dark via the
+   #echly-root[data-theme] token overrides, so this block only needs to
+   keep parity with the base recipe (kept explicit for clarity). */
 #echly-root[data-theme="dark"] .echly-sidebar-surface,
 #echly-root:not([data-theme]) .echly-sidebar-surface {
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow:
-    0 10px 28px rgba(0, 0, 0, 0.45),
-    0 2px 8px rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-stack);
 }
 .echly-sidebar-surface:hover {
   box-shadow: var(--echly-shadow-hover);
 }
 #echly-root[data-theme="light"] .echly-sidebar-surface:hover {
   box-shadow:
-    0 10px 28px rgba(0, 0, 0, 0.1),
-    0 4px 12px rgba(0, 0, 0, 0.08);
+    0 8px 22px rgba(0, 0, 0, 0.08),
+    0 3px 8px rgba(0, 0, 0, 0.05);
 }
 .echly-sidebar-surface::before {
   content: "";
@@ -2878,8 +2914,13 @@ input.session-title-input.session-title-input--light-surface:focus-visible {
   margin-right: 14px;
   width: 240px;
   border-radius: 14px;
-  background: var(--panel-bg);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  /* Elevated glass — more opaque for dropdown legibility. Was the
+     opaque theme-aware var(--panel-bg) with no blur/border. */
+  background: var(--glass-surface-elevated);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-stack);
   padding: 12px 8px;
   z-index: 30;
   top: 0;
@@ -3369,10 +3410,12 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
   gap: 12px;
   padding: 12px 20px;
   border-radius: 14px;
-  background: var(--bg-primary);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--border-subtle);
+  /* Small surface — standard glass blur (not the strong variant).
+     Was var(--bg-primary) + plain blur(20px); now on the glass recipe. */
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   color: var(--text-primary);
   font-size: 14px;
   font-weight: 500;
@@ -3380,7 +3423,7 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
   line-height: 1.4;
   cursor: pointer;
   transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
-  box-shadow: var(--shadow-depth);
+  box-shadow: var(--glass-shadow-stack);
 }
 .echly-floating-trigger:not(.echly-launcher):hover {
   transform: translateY(-1px);
@@ -6499,15 +6542,18 @@ h6 [data-ai-touched="true"] {
 
 /* ── Pill shared chrome ─────────────────────────────────── */
 .echly-v2 .pill {
-  background: var(--surface);
+  /* Warm translucent glass. Previously var(--surface) (#FFFFFF) which
+     masked the ::before blur entirely — now the blur reads through. */
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: var(--r-xl);
-  border: 1px solid rgba(28,25,23,0.06);
-  box-shadow:
-    0 1px 0 rgba(255,255,255,0.9) inset,
-    0 1px 2.5px rgba(28,25,23,0.03),
-    0 10px 20px -10px rgba(28,25,23,0.06),
-    0 30px 60px -20px rgba(28,25,23,0.10);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-stack);
   position: relative;
+  /* New stacking context so the ::before highlight sits between the
+     translucent surface and the content, not behind the pill. */
+  isolation: isolate;
   font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
   color: var(--body);
   font-size: 14px;
@@ -6515,12 +6561,22 @@ h6 [data-ai-touched="true"] {
   text-rendering: optimizeLegibility;
 }
 .echly-v2 .pill::before {
+  /* Blur now lives on the parent (above) — avoid double-blurring this
+     nested layer. Repurpose ::before as a subtle top-edge highlight that
+     hugs the rounded top corners and stays inset from the border so it
+     never reads as a hard straight line across the top of the surface. */
   content: '';
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  backdrop-filter: blur(25px);
-  -webkit-backdrop-filter: blur(25px);
+  top: 0;
+  left: 1px;
+  right: 1px;
+  height: 50%;
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  background: linear-gradient(
+    to bottom,
+    var(--glass-edge-highlight),
+    transparent
+  );
   z-index: -1;
   pointer-events: none;
 }
@@ -7232,7 +7288,13 @@ h6 [data-ai-touched="true"] {
   align-items: center;
   gap: 0;
   padding: 16px 16px 14px;
-  background: var(--pill-surface, #fff);
+  /* Text-dense permission panel — elevated (more opaque) glass for
+     legibility, plus blur + hairline + premium depth. */
+  background: var(--glass-surface-elevated);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-stack);
   border-radius: 14px;
   width: 320px;
   max-width: 360px;
@@ -10782,14 +10844,18 @@ h6 [data-ai-touched="true"] {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  background: var(--pill-surface);
+  /* Warm translucent glass (was opaque var(--pill-surface) = #FFFFFF). */
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: 999px;
   padding: 8px 8px 8px 12px;
   gap: 12px;
   /* Design-system floating-element shadow. --shadow-depth-recording bundles
    * both the soft drop shadow and a 1px ring, so it replaces all three
    * hand-rolled layers (incl. the old --pill-hair ring) in one token and
-   * adapts per theme (dark/light/default). */
+   * adapts per theme (dark/light/default). Kept (not swapped for the glass
+   * shadow) because the recording ring is intentional depth-of-recording. */
   box-shadow: var(--shadow-depth-recording);
   height: 52px;
   width: 360px;
@@ -11270,13 +11336,13 @@ h6 [data-ai-touched="true"] {
   isolation: isolate;
   padding: 6px;
   border-radius: 14px;
-  background: #FFFFFF;
-  border: 1px solid rgba(28, 25, 23, 0.06);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.9) inset,
-    0 2px 4px rgba(28, 25, 23, 0.04),
-    0 8px 24px -4px rgba(28, 25, 23, 0.12),
-    0 20px 48px -8px rgba(28, 25, 23, 0.18);
+  /* Elevated glass — more opaque variant for dropdown legibility.
+     Was opaque #FFFFFF with a hand-rolled shadow stack. */
+  background: var(--glass-surface-elevated);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-stack);
   display: flex;
   flex-direction: column;
   gap: 2px;

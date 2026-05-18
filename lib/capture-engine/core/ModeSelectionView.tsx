@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
   X,
   Mic,
@@ -14,7 +14,6 @@ import {
   Edit3,
 } from "lucide-react";
 import { useMicPermission } from "./hooks/useMicPermission";
-import { useAudioLevels } from "./hooks/useAudioLevels";
 import { detectBrowser } from "./detectBrowser";
 import { ChromeSlidersIcon, EdgeLockIcon } from "./BrowserAddressBarIcon";
 
@@ -113,36 +112,6 @@ export default function ModeSelectionView({
   // inside a user gesture (the Begin click). The hook's Permissions API
   // listener already learns the initial state for UI display without firing
   // getUserMedia.
-
-  /** Preview stream for the audio-reactive bars — only once mic is granted. */
-  const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
-  useEffect(() => {
-    if (micPermissionState !== "granted") return;
-    let cancelled = false;
-    let activeStream: MediaStream | null = null;
-
-    navigator.mediaDevices
-      .getUserMedia({ audio: true })
-      .then((s) => {
-        if (cancelled) {
-          s.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        activeStream = s;
-        setPreviewStream(s);
-      })
-      .catch((err) => {
-        console.warn("[ECHLY:MIC] preview stream failed", err);
-      });
-
-    return () => {
-      cancelled = true;
-      activeStream?.getTracks().forEach((t) => t.stop());
-      setPreviewStream(null);
-    };
-  }, [micPermissionState]);
-
-  const { bars } = useAudioLevels(previewStream);
 
   const isGranting = micPermissionState === "granting";
   const isDeniedRetryable = micPermissionState === "denied";
@@ -448,7 +417,7 @@ export default function ModeSelectionView({
               {" "}Annote AI
             </span>
             <div className="mode-prompt-title">How do you want to give feedback?</div>
-            <div className="mode-prompt-sub">Describe what needs to change — AI structures it into tickets.</div>
+            <div className="mode-prompt-sub">AI structures whichever you choose into tickets.</div>
           </div>
 
           {/* Mode cards */}
@@ -473,21 +442,11 @@ export default function ModeSelectionView({
               <div>
                 <div className="mode-card-title">Voice</div>
                 <div className="mode-card-sub">
-                  Speak the change. AI cleans and structures it.
+                  Faster.
+                  <br />
+                  Speak naturally
                 </div>
               </div>
-              <span className="voice-wave" aria-hidden="true">
-                {bars.map((level, i) => (
-                  <span
-                    key={i}
-                    style={{
-                      transform: `scaleY(${Math.max(0.15, Math.min(1.6, level * 2.4))})`,
-                      transformOrigin: "bottom",
-                      transition: "transform 70ms ease-out",
-                    }}
-                  />
-                ))}
-              </span>
             </button>
 
             <button
@@ -509,7 +468,11 @@ export default function ModeSelectionView({
               </span>
               <div>
                 <div className="mode-card-title">Write</div>
-                <div className="mode-card-sub">Type in your words. AI structures it into tickets.</div>
+                <div className="mode-card-sub">
+                  Quieter.
+                  <br />
+                  Type your thoughts.
+                </div>
               </div>
             </button>
           </div>
