@@ -78,7 +78,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // STEP 5 — auth gate
-  const sessionCookie = request.cookies.get("echly_session")?.value;
+  const sessionCookie = request.cookies.get("annote_session")?.value;
   const session = sessionCookie ? await verifySessionToken(sessionCookie) : null;
   if (!session) {
     const loginUrl = new URL("/login", request.url);

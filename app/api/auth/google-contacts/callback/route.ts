@@ -15,7 +15,7 @@ function htmlResponse(payload: {
 }): NextResponse {
   // Strip cookie + render an HTML page that posts the result back to the
   // opener window. This is the popup pattern — the parent listens for the
-  // "echly:google-contacts" message.
+  // "annote:google-contacts" message.
   const json = JSON.stringify(payload).replace(/</g, "\\u003c");
   const body = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Authorizing…</title></head>
@@ -26,7 +26,7 @@ function htmlResponse(payload: {
   var payload = ${json};
   try {
     if (window.opener && !window.opener.closed) {
-      window.opener.postMessage({ source: "echly:google-contacts", payload: payload }, window.location.origin);
+      window.opener.postMessage({ source: "annote:google-contacts", payload: payload }, window.location.origin);
     }
   } catch (e) {}
   setTimeout(function () { window.close(); }, 250);

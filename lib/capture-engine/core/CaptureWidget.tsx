@@ -103,7 +103,7 @@ export default function CaptureWidget({
   const [microphones, setMicrophones] = useState<Array<{ deviceId: string; label: string }>>([]);
   const [selectedMicrophone, setSelectedMicrophone] = useState<string>(() => {
     if (typeof localStorage === "undefined") return "";
-    try { return localStorage.getItem("echly:selectedMic") ?? ""; } catch { return ""; }
+    try { return localStorage.getItem("annote:selectedMic") ?? ""; } catch { return ""; }
   });
   const [micDropdownOpen, setMicDropdownOpen] = useState(false);
   /** V2: when true, show mode selection screen instead of home screen. */
@@ -202,14 +202,14 @@ export default function CaptureWidget({
               "";
             if (preferred) {
               setSelectedMicrophone(preferred);
-              try { localStorage.setItem("echly:selectedMic", preferred); } catch {}
+              try { localStorage.setItem("annote:selectedMic", preferred); } catch {}
             }
           }
         }
       : undefined,
     onVoiceMicrophoneSelect: (deviceId) => {
       setSelectedMicrophone(deviceId);
-      try { localStorage.setItem("echly:selectedMic", deviceId); } catch {}
+      try { localStorage.setItem("annote:selectedMic", deviceId); } catch {}
     },
     captureRootParent,
     environment,
@@ -777,7 +777,7 @@ export default function CaptureWidget({
                 selectedDeviceId={selectedMicrophone}
                 onSelect={(id) => {
                   setSelectedMicrophone(id);
-                  try { localStorage.setItem("echly:selectedMic", id); } catch {}
+                  try { localStorage.setItem("annote:selectedMic", id); } catch {}
                 }}
                 onClose={() => setMicDropdownOpen(false)}
               />

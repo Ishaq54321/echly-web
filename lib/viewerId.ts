@@ -1,4 +1,4 @@
-const STORAGE_KEY = "echly_viewer_id";
+const STORAGE_KEY = "annote_viewer_id";
 
 /**
  * Returns a stable viewer id for Loom-style view counting.

@@ -27,8 +27,8 @@ export async function OPTIONS(req: NextRequest) {
 
 /**
  * POST /api/extension/session
- * Exchange the echly_session cookie for a short-lived extension token.
- * No request body. Session is read from the echly_session cookie.
+ * Exchange the annote_session cookie for a short-lived extension token.
+ * No request body. Session is read from the annote_session cookie.
  */
 export async function POST(request: NextRequest) {
   const user = await getSessionUser(request);

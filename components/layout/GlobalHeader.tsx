@@ -25,7 +25,7 @@ export function GlobalHeader() {
       {isDashboardHome ? (
         <button
           type="button"
-          onClick={() => window.dispatchEvent(new CustomEvent("echly:open-search-overlay"))}
+          onClick={() => window.dispatchEvent(new CustomEvent("annote:open-search-overlay"))}
           className="flex items-center gap-2.5 h-[34px] max-w-[320px] w-full px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-[var(--surface-subtle)] text-[13px] text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)] transition-colors cursor-pointer mx-auto"
         >
           <Search size={16} strokeWidth={2} className="text-[var(--text-secondary)] shrink-0" />

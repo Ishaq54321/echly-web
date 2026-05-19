@@ -9,7 +9,7 @@ import type { Session, SharedSessionMembership } from "@/lib/domain/session";
 import { SESSION_FEEDBACK_PATH } from "@/utils/getSessionLink";
 import { authFetch } from "@/lib/authFetch";
 
-export const OPEN_SEARCH_EVENT = "echly:open-search-overlay";
+export const OPEN_SEARCH_EVENT = "annote:open-search-overlay";
 
 function sessionUpdatedMs(updatedAt: Session["updatedAt"]): number {
   if (updatedAt == null) return 0;

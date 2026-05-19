@@ -600,7 +600,7 @@ export function useCaptureWidget({
         // Selected mic may have been unplugged between enumeration and use; fall back to system default.
         if (effectiveMicId) {
           console.warn("[ECHLY:MIC] selected mic failed, falling back to default", err);
-          try { localStorage.removeItem("echly:selectedMic"); } catch { /* noop */ }
+          try { localStorage.removeItem("annote:selectedMic"); } catch { /* noop */ }
           stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         } else {
           throw err;

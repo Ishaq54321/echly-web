@@ -41,7 +41,7 @@ const TEXT_COPY: Record<"typing", HintEntry> = {
   },
 };
 
-const SESSION_KEY_PREFIX = "echly:hint-shown:";
+const SESSION_KEY_PREFIX = "annote:hint-shown:";
 const AUTO_DISMISS_MS = 4000;
 const FADE_OUT_BEFORE_MS = 300;
 

@@ -1,6 +1,6 @@
 import { SignJWT, jwtVerify } from "jose";
 
-const COOKIE_NAME = "echly_session";
+const COOKIE_NAME = "annote_session";
 const MAX_AGE_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
 export interface SessionUser {
@@ -70,7 +70,7 @@ function parseCookieHeader(cookieHeader: string | null): string | null {
 }
 
 /**
- * Read echly_session cookie from the request, verify the JWT, and return user data.
+ * Read annote_session cookie from the request, verify the JWT, and return user data.
  * Returns null if the cookie is missing or the token is invalid.
  */
 export async function getSessionUser(request: Request): Promise<SessionUser | null> {

@@ -80,7 +80,7 @@ export function InviteStep({
       const data = event.data as
         | { source?: string; payload?: { ok?: boolean; contacts?: GoogleContact[]; error?: string } }
         | undefined;
-      if (!data || data.source !== "echly:google-contacts") return;
+      if (!data || data.source !== "annote:google-contacts") return;
       setGmailLoading(false);
       const payload = data.payload;
       if (!payload?.ok) {

@@ -23,7 +23,7 @@ import {
 import { SESSION_FEEDBACK_PATH } from "@/utils/getSessionLink";
 import { retainSessionsListTickle } from "@/lib/realtime/sessionsListTickle";
 
-const SESSIONS_CACHE_PREFIX = "echly_sessions";
+const SESSIONS_CACHE_PREFIX = "annote_sessions";
 
 /** Skip GET /api/sessions (first page) when a fresh snapshot exists for this uid.
  *  Kept short so the realtime tickle's force-refetch always reaches the network. */

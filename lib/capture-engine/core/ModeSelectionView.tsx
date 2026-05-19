@@ -17,7 +17,7 @@ import { useMicPermission } from "./hooks/useMicPermission";
 import { detectBrowser } from "./detectBrowser";
 import { ChromeSlidersIcon, EdgeLockIcon } from "./BrowserAddressBarIcon";
 
-const STORED_MIC_KEY = "echly:selectedMic";
+const STORED_MIC_KEY = "annote:selectedMic";
 
 function readStoredMicId(): string | null {
   try {

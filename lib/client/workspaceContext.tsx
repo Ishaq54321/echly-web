@@ -650,7 +650,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const keysToRemove: string[] = [];
       for (let i = 0; i < sessionStorage.length; i++) {
         const key = sessionStorage.key(i);
-        if (key?.startsWith(`echly_sessions:${authUid}`)) {
+        if (key?.startsWith(`annote_sessions:${authUid}`)) {
           keysToRemove.push(key);
         }
       }

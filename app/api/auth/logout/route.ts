@@ -4,7 +4,7 @@ import { ONBOARDED_COOKIE_NAME } from "@/lib/server/onboardingCookie";
 export async function POST() {
   const response = apiSuccess({ loggedOut: true });
 
-  response.cookies.set("echly_session", "", {
+  response.cookies.set("annote_session", "", {
     httpOnly: true,
     path: "/",
     maxAge: 0,
