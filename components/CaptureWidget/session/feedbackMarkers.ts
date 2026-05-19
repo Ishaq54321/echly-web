@@ -114,7 +114,7 @@ export function createMarker(
 
   const marker = document.createElement("div");
   marker.className = "echly-marker";
-  marker.setAttribute("data-echly-ui", "true");
+  marker.setAttribute("data-annote-ui", "true");
   marker.setAttribute("aria-label", `Feedback ${index}`);
   marker.textContent = String(index);
   marker.style.cssText = [
@@ -140,7 +140,7 @@ export function createMarker(
 
   const tooltip = document.createElement("span");
   tooltip.className = "echly-marker-tooltip";
-  tooltip.setAttribute("data-echly-ui", "true");
+  tooltip.setAttribute("data-annote-ui", "true");
   tooltip.style.cssText = [
     "position:absolute",
     "bottom:calc(100% + 8px)",

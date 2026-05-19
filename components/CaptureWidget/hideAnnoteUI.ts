@@ -36,7 +36,7 @@ const UI_SELECTORS = [
   ".echly-marker-tooltip",
 ];
 
-export function hideEchlyUI(): Element[] {
+export function hideAnnoteUI(): Element[] {
   const host = document.getElementById(SHADOW_HOST_ID);
   if (!host || !host.shadowRoot) return [];
 
@@ -62,7 +62,7 @@ export function hideEchlyUI(): Element[] {
   return hidden;
 }
 
-export function restoreEchlyUI(hidden: Element[]): void {
+export function restoreAnnoteUI(hidden: Element[]): void {
   hidden.forEach((el) => {
     const prev = (el as HTMLElement).dataset.prevVisibility;
     (el as HTMLElement).style.visibility = prev ?? "";

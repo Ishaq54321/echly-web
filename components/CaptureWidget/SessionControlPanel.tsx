@@ -25,7 +25,7 @@ export function SessionControlPanel({
   const isPaused = sessionPaused && !isSaving;
 
   return (
-    <div data-echly-ui="true" className="echly-sc-root">
+    <div data-annote-ui="true" className="echly-sc-root">
       <div className="sc-bar">
 
         {/* Status: spinner | amber pause icon | green live dot + label */}

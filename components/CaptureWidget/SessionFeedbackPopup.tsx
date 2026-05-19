@@ -38,7 +38,7 @@ export function SessionFeedbackPopup({
 
   return (
     <div
-      data-echly-ui="true"
+      data-annote-ui="true"
       style={{
         position: "fixed",
         top: "50%",

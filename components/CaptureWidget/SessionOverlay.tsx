@@ -55,7 +55,7 @@ export type SessionOverlayProps = {
 /**
  * Renders session UI into capture root and attaches highlighter + click capture.
  * When sessionMode and !sessionPaused, hover and click are active; when sessionFeedbackPending
- * is set, click capture is effectively disabled (popup is on top and has data-echly-ui).
+ * is set, click capture is effectively disabled (popup is on top and has data-annote-ui).
  */
 export function SessionOverlay({
   captureRoot,
@@ -137,7 +137,7 @@ export function SessionOverlay({
     const handleMove = (e: MouseEvent) => {
       setCursorPos({ x: e.clientX, y: e.clientY });
       const target = e.target as Element | null;
-      const overEchly = !!target?.closest?.("[data-echly-ui]");
+      const overEchly = !!target?.closest?.("[data-annote-ui]");
       setHoveringEchlyUi(overEchly);
     };
     document.addEventListener("mousemove", handleMove, { passive: true });
@@ -284,12 +284,12 @@ export function SessionOverlay({
     document.body.style.cursor = COMMENT_CURSOR;
 
     const styleEl = document.createElement("style");
-    styleEl.setAttribute("data-echly-cursor-override", "true");
+    styleEl.setAttribute("data-annote-cursor-override", "true");
     styleEl.textContent = `
       html, body, body * {
         cursor: ${COMMENT_CURSOR} !important;
       }
-      [data-echly-ui], [data-echly-ui] * {
+      [data-annote-ui], [data-annote-ui] * {
         cursor: auto !important;
       }
     `;

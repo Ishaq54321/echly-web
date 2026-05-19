@@ -66,7 +66,7 @@ class EchlyWidgetErrorBoundary extends React.Component<
   }
   render() {
     if (this.state.hasError && this.state.error) {
-      return <div data-echly-crashed>CRASHED</div>;
+      return <div data-annote-crashed>CRASHED</div>;
     }
     return this.props.children;
   }
@@ -1580,7 +1580,7 @@ function ContentApp({ widgetRoot }: ContentAppProps) {
   );
   } catch (e) {
     logger.error("error", "extension_crash", e);
-    return <div data-echly-crashed>CRASHED</div>;
+    return <div data-annote-crashed>CRASHED</div>;
   }
 }
 
@@ -1629,7 +1629,7 @@ function mountReactApp(host: HTMLDivElement): void {
 
   const container = document.createElement("div");
   container.id = ROOT_ID;
-  container.setAttribute("data-echly-ui", "true");
+  container.setAttribute("data-annote-ui", "true");
   container.style.all = "initial";
   container.style.boxSizing = "border-box";
   container.style.pointerEvents = "auto";
@@ -1715,7 +1715,7 @@ function injectWidgetUI(): void {
   if (!host) {
     host = document.createElement("div");
     host.id = SHADOW_HOST_ID;
-    host.setAttribute("data-echly-ui", "true");
+    host.setAttribute("data-annote-ui", "true");
     /* Host is content-sized and pinned to a corner. Drag/snap moves the host itself via
        updateHostPosition(corner); the inner widget stays at the host's origin. Critically,
        the host must NOT be a full-viewport overlay or it intercepts every page click and

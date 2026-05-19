@@ -23,8 +23,8 @@ import {
   detectVisualContainer,
   clampRect,
   cropImageToRegion,
-  hideEchlyUI,
-  restoreEchlyUI,
+  hideAnnoteUI,
+  restoreAnnoteUI,
   createMarker,
   removeAllMarkers,
   updateMarker,
@@ -1141,7 +1141,7 @@ export function useCaptureWidget({
       return null;
     }
     logger.debug("extension", "screenshot_capture_started");
-    const hidden = hideEchlyUI();
+    const hidden = hideAnnoteUI();
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() =>
         requestAnimationFrame(() =>
@@ -1156,7 +1156,7 @@ export function useCaptureWidget({
       logger.warn("extension", "screenshot_capture_failed", err);
       return null;
     } finally {
-      restoreEchlyUI(hidden);
+      restoreAnnoteUI(hidden);
     }
   }, [environment]);
 

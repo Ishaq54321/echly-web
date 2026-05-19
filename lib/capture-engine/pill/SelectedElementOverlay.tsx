@@ -64,7 +64,7 @@ export function SelectedElementOverlay({ targetElement }: SelectedElementOverlay
     <div
       ref={overlayRef}
       className="echly-selected-overlay"
-      data-echly-ui="true"
+      data-annote-ui="true"
       aria-hidden="true"
       style={{
         position: "fixed",

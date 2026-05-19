@@ -49,7 +49,7 @@ export function Modal({
         role={role}
         aria-modal="true"
         aria-labelledby={ariaLabelledBy}
-        data-echly-ui="true"
+        data-annote-ui="true"
         style={{ zIndex: MODAL_LAYER_Z_INDEX }}
       >
         <div

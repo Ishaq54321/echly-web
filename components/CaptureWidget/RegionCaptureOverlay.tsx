@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { buildCaptureContext, isEchlyElement } from "@/lib/captureContext";
+import { buildCaptureContext, isAnnoteElement } from "@/lib/captureContext";
 import { ECHLY_DEBUG } from "@/lib/utils/logger";
 import { playShutterSound } from "@/lib/playShutterSound";
 import type { CaptureContext } from "@/lib/capture-engine/core/types";
@@ -223,7 +223,7 @@ export function RegionCaptureOverlay({
         typeof document !== "undefined"
           ? document.elementFromPoint(centerX, centerY)
           : null;
-      while (element && isEchlyElement(element)) {
+      while (element && isAnnoteElement(element)) {
         element = element.parentElement;
       }
       if (!element) element = document.body;
@@ -358,7 +358,7 @@ export function RegionCaptureOverlay({
       role="presentation"
       aria-hidden
       className="echly-region-overlay"
-      data-echly-ui="true"
+      data-annote-ui="true"
       style={{
         position: "fixed",
         inset: 0,

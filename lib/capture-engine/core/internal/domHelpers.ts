@@ -2,7 +2,7 @@
  * Core-internal DOM helpers. Wraps external @/components/CaptureWidget imports
  * so core only imports from internal/*. Prepares for future decoupling.
  */
-export { hideEchlyUI, restoreEchlyUI } from "@/components/CaptureWidget/hideEchlyUI";
+export { hideAnnoteUI, restoreAnnoteUI } from "@/components/CaptureWidget/hideAnnoteUI";
 export {
   detectVisualContainer,
   clampRect,

@@ -84,7 +84,7 @@ function isLikelyDefault(property: string, value: string): boolean {
  * True if the node belongs to Echly extension UI (overlay, toolbar, shadow root).
  * Used so DOM capture never includes extension UI in subtreeText.
  */
-export function isEchlyElement(node: Node | Element | null): boolean {
+export function isAnnoteElement(node: Node | Element | null): boolean {
   if (!node) return false;
   const el = node instanceof Element ? node : (node as Node).parentElement;
   if (!el) return false;
@@ -92,10 +92,10 @@ export function isEchlyElement(node: Node | Element | null): boolean {
   if (target.id && String(target.id).toLowerCase().startsWith("echly")) return true;
   const cn = target.className;
   if (cn && typeof cn === "string" && cn.includes("echly")) return true;
-  if (target instanceof Element && target.getAttribute?.("data-echly-ui") != null) return true;
-  if (target instanceof Element && target.closest?.("[data-echly-ui]")) return true;
+  if (target instanceof Element && target.getAttribute?.("data-annote-ui") != null) return true;
+  if (target instanceof Element && target.closest?.("[data-annote-ui]")) return true;
   const root = target.getRootNode?.();
-  if (root && root instanceof ShadowRoot && isEchlyElement(root.host)) return true;
+  if (root && root instanceof ShadowRoot && isAnnoteElement(root.host)) return true;
   return false;
 }
 
@@ -1204,7 +1204,7 @@ function findDistinctInlineDescendants(
   const directChildren = Array.from(el.children) as Element[];
 
   for (const child of directChildren) {
-    if (isEchlyElement(child)) continue;
+    if (isAnnoteElement(child)) continue;
     if (!isMeaningfulChild(child)) continue;
 
     // Check if this child is visually distinct from the element
@@ -1241,7 +1241,7 @@ function unwrapMeaningfulChildren(el: Element, depth: number = 0): Element[] {
   const directChildren = Array.from(el.children) as Element[];
 
   for (const child of directChildren) {
-    if (isEchlyElement(child)) continue;
+    if (isAnnoteElement(child)) continue;
     if (!isMeaningfulChild(child)) continue;
 
     if (isPureWrapper(child)) {
@@ -1346,15 +1346,15 @@ export function extractMeaningfulChildren(el: Element | null): string {
  * Ignores script/style, trims whitespace, limit ~2000 characters.
  */
 export function extractSubtreeText(el: Element | null): string | null {
-  if (!el || isEchlyElement(el)) return null;
+  if (!el || isAnnoteElement(el)) return null;
   const parts: string[] = [];
   const walker = el.ownerDocument.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       const parent = node.parentElement;
       if (!parent) return NodeFilter.FILTER_REJECT;
-      if (isEchlyElement(parent)) return NodeFilter.FILTER_REJECT;
+      if (isAnnoteElement(parent)) return NodeFilter.FILTER_REJECT;
       const root = parent.getRootNode?.();
-      if (root && root instanceof ShadowRoot && isEchlyElement(root.host))
+      if (root && root instanceof ShadowRoot && isAnnoteElement(root.host))
         return NodeFilter.FILTER_REJECT;
       const tag = parent.tagName.toLowerCase();
       if (SKIP_TAGS.has(tag)) return NodeFilter.FILTER_REJECT;
@@ -1403,7 +1403,7 @@ export function buildCaptureContext(
   selectedElement: Element | null
 ): CaptureContext {
   let element: Element | null = selectedElement;
-  while (element && isEchlyElement(element)) {
+  while (element && isAnnoteElement(element)) {
     element = element.parentElement;
   }
 
@@ -1425,7 +1425,7 @@ export function buildCaptureContext(
   const inputValue: string = element ? extractInputValue(element) : "";
   const iframeContext: string = detectIframeContext(win);
 
-  if (element && !isEchlyElement(element) && element !== win.document?.body) {
+  if (element && !isAnnoteElement(element) && element !== win.document?.body) {
     if (!subtreeText?.trim()) {
       const raw = (element as HTMLElement).innerText ?? (element as HTMLElement).textContent ?? "";
       const trimmed = raw.replace(/\s+/g, " ").trim().slice(0, MAX_SUBTREE_CHARS) || null;

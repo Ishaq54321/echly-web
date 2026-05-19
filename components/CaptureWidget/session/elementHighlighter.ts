@@ -72,7 +72,7 @@ export function attachElementHighlighter(
   }
   overlay = document.createElement("div");
   overlay.setAttribute("aria-hidden", "true");
-  overlay.setAttribute("data-echly-ui", "true");
+  overlay.setAttribute("data-annote-ui", "true");
   overlay.style.cssText = [
     "position:fixed",
     "pointer-events:none",

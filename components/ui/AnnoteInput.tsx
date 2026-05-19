@@ -2,10 +2,10 @@
 
 import React from "react";
 
-export type EchlyInputProps = {
+export type AnnoteInputProps = {
   className?: string;
 } & React.InputHTMLAttributes<HTMLInputElement>;
 
-export function EchlyInput({ className = "", ...props }: EchlyInputProps) {
+export function AnnoteInput({ className = "", ...props }: AnnoteInputProps) {
   return <input className={`echly-input ${className}`.trim()} {...props} />;
 }

@@ -2,7 +2,7 @@
  * Session Feedback Mode: helpers and safety checks.
  * Do not break existing region capture flow.
  */
-import { isEchlyElement } from "@/lib/captureContext";
+import { isAnnoteElement } from "@/lib/captureContext";
 import { ECHLY_DEBUG } from "@/lib/utils/logger";
 
 const SESSION_LOG = "[SESSION]";
@@ -16,7 +16,7 @@ export function logSession(message: string): void {
 /** Elements we must never treat as capture targets (Echly UI + form controls). */
 export function isSessionCaptureTarget(element: Element | null): boolean {
   if (!element || element === document.body) return false;
-  if (isEchlyElement(element)) return false;
+  if (isAnnoteElement(element)) return false;
   const host = document.getElementById("echly-shadow-host");
   if (host && host.contains(element)) return false;
   const tag = element.tagName?.toLowerCase();

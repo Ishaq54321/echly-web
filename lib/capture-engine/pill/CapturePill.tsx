@@ -266,7 +266,7 @@ export function CapturePill(props: CapturePillProps) {
         ref={rootRef}
         className="echly-pill-root"
         style={pillStyle}
-        data-echly-ui="true"
+        data-annote-ui="true"
       >
         {/* Suppress the hint pill when the inline error panel renders its own
             hint/instructions card — otherwise we'd stack two messages. Both
