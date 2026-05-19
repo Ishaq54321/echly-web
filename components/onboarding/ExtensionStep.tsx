@@ -30,7 +30,7 @@ export function ExtensionStep({ onContinue, onBack }: Props) {
                 <span style={{ color: "var(--ob-soft)", display: "inline-flex" }}>
                   <ObIcon.Lock size={9} />
                 </span>
-                app.echly.app/dashboard
+                app.annote.ai/dashboard
               </div>
               <div className="ob-bb-extbtn">E</div>
             </div>

@@ -7,7 +7,7 @@ import type { PlanCatalogItem } from "@/lib/hooks/usePlanCatalog";
 const EASE_OUT_200 = "200ms ease-out";
 
 const SALES_MAILTO =
-  "mailto:sales@annote.app?subject=Annote%20Enterprise%20inquiry";
+  "mailto:ishaq@annote.ai?subject=Annote%20Enterprise%20inquiry";
 
 /**
  * View A — shown to Starter owners. A Loom-inspired 3-column comparison

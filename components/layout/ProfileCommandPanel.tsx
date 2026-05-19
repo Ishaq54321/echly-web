@@ -581,7 +581,7 @@ export function ProfileCommandPanel({
               icon={HelpCircle}
               label="Help & Support"
               onClick={() => {
-                window.open("mailto:support@echly.com", "_self");
+                window.open("mailto:ishaq@annote.ai", "_self");
                 onClose();
               }}
             />

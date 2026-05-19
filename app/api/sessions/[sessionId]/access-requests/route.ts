@@ -19,7 +19,7 @@ import { fireAndForget } from "@/lib/server/fireAndForget";
 import { dispatchNotifications } from "@/lib/server/notificationFanOut.server";
 import { composeFullName } from "@/lib/utils/nameSplit";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://annote.ai";
 
 export const dynamic = "force-dynamic";
 

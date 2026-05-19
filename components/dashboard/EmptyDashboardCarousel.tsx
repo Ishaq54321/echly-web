@@ -439,7 +439,7 @@ function ShareIllustration() {
             />
           </svg>
         </span>
-        <span className={styles.c2LkText}>echly.app/s/q7n2</span>
+        <span className={styles.c2LkText}>annote.ai/s/q7n2</span>
         <span className={styles.c2LkCopy}>
           <svg width="9" height="9" viewBox="0 0 12 12" fill="none">
             <rect

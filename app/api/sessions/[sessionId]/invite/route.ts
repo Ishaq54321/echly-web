@@ -19,7 +19,7 @@ import { sendSessionInviteEmail } from "@/lib/email/workspaceEmails";
 import { resolveUserName } from "@/lib/utils/nameSplit";
 import { fireAndForget } from "@/lib/server/fireAndForget";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://annote.ai";
 
 export const dynamic = "force-dynamic";
 

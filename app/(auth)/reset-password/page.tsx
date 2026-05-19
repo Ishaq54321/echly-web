@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { confirmPasswordReset, verifyPasswordResetCode } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { mapAuthError } from "@/lib/auth/errorMessages";
@@ -29,6 +29,7 @@ function strengthScore(pw: string): number {
 }
 
 function ResetPasswordContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const oobCode = searchParams.get("oobCode") ?? "";
   const mode = searchParams.get("mode") ?? "";
@@ -65,6 +66,15 @@ function ResetPasswordContent() {
       cancelled = true;
     };
   }, [oobCode, mode]);
+
+  useEffect(() => {
+    if (phase === "success") {
+      const timer = setTimeout(() => {
+        router.push("/login?reset=success");
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [phase, router]);
 
   const score = strengthScore(pw);
   const labels = ["", "Weak", "Fair", "Strong", "Excellent"];
@@ -147,10 +157,16 @@ function ResetPasswordContent() {
                     </div>
                   </div>
                 </div>
-                <Link href="/login" className="btn btn-primary btn-block" style={{ marginTop: 4 }}>
+                <Link href="/login?reset=success" className="btn btn-primary btn-block" style={{ marginTop: 4 }}>
                   Log in
                   <ArrowIcon size={13} />
                 </Link>
+                <p
+                  className="auth-sub"
+                  style={{ marginTop: 10, textAlign: "center", fontSize: 13 }}
+                >
+                  Redirecting to log in in 3 seconds…
+                </p>
               </>
             ) : phase === "invalid" ? (
               <>

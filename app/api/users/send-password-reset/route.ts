@@ -39,15 +39,24 @@ export async function POST(req: NextRequest) {
     return apiError({ code: "INVALID_INPUT", message: "Email is required", status: 400 });
   }
 
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://annote.ai";
+
   try {
-    const resetLink = await getAuth().generatePasswordResetLink(email);
+    const firebaseLink = await getAuth().generatePasswordResetLink(email);
+
+    const oobCode = new URL(firebaseLink).searchParams.get("oobCode");
+    if (!oobCode) throw new Error("Missing oobCode in generated reset link");
+
+    const resetUrl = `${baseUrl}/reset-password?oobCode=${encodeURIComponent(
+      oobCode
+    )}&mode=resetPassword`;
 
     const userSnap = await adminDb.doc(`users/${user.uid}`).get();
     const userName = (userSnap.data()?.displayName as string | undefined) ?? email;
 
     await sendPasswordResetEmail({
       to: email,
-      resetUrl: resetLink,
+      resetUrl,
       userName,
     });
 

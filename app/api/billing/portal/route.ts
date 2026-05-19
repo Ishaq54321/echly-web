@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const origin = req.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
+    const origin = req.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://annote.ai";
 
     const provider = getPaymentProvider();
     const result = await provider.createPortalSession({

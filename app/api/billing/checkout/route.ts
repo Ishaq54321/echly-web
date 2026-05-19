@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       ? Math.max(requested, floor)
       : floor;
 
-    const origin = req.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
+    const origin = req.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://annote.ai";
     const ownerEmail = user.email ?? "";
 
     const provider = getPaymentProvider();

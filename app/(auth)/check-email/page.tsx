@@ -203,7 +203,7 @@ function CheckEmailContent() {
 
             <div className="auth-switch">
               <span>Still no email?</span>
-              <a href="mailto:support@echly.com">Contact support</a>
+              <a href="mailto:ishaq@annote.ai">Contact support</a>
             </div>
           </div>
 
@@ -244,7 +244,7 @@ function CheckEmailStage({
             <MailIcon size={16} />
           </span>
           <div className="label">
-            <b>Annote &lt;no-reply@echly.app&gt;</b>
+            <b>Annote &lt;no-reply@annote.ai&gt;</b>
             <div className="sub">{stageSub}</div>
           </div>
         </div>

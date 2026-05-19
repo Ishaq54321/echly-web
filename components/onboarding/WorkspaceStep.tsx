@@ -194,7 +194,7 @@ export function WorkspaceStep({ initialName, initialLogoUrl, initialLogoFile, on
               </span>
               <div>
                 <div className="ob-ws-card-name">{name || "Your workspace"}</div>
-                <div className="ob-ws-card-meta">echly.app/{slug || "workspace"} · 1 member</div>
+                <div className="ob-ws-card-meta">annote.ai/{slug || "workspace"} · 1 member</div>
               </div>
               <div
                 style={{
@@ -242,7 +242,7 @@ export function WorkspaceStep({ initialName, initialLogoUrl, initialLogoFile, on
             <span>URL:</span>
             {slugEditing ? (
               <>
-                <span>echly.app/</span>
+                <span>annote.ai/</span>
                 <input
                   className="ob-input"
                   style={{ height: 28, padding: "0 8px", fontSize: 12, width: 200 }}
@@ -261,7 +261,7 @@ export function WorkspaceStep({ initialName, initialLogoUrl, initialLogoFile, on
                   onClick={() => setSlugEditing(true)}
                   title="Click to customize"
                 >
-                  echly.app/{slug || "workspace"}
+                  annote.ai/{slug || "workspace"}
                 </b>
                 {slugStatusIndicator()}
               </>

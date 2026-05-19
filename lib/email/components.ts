@@ -68,7 +68,7 @@ export function emailShell(bodyHtml: string, opts: ShellOptions = {}): string {
           <tr>
             <td style="padding:20px 32px;border-top:1px solid ${emailColors.border};">
               <p style="margin:0;font-size:12px;color:${emailColors.textFooter};line-height:1.5;">
-                Sent by Annote. <a href="https://annote.app" style="color:${emailColors.textFooter};text-decoration:underline;">annote.app</a>
+                Sent by Annote. <a href="https://annote.ai" style="color:${emailColors.textFooter};text-decoration:underline;">annote.ai</a>
               </p>
             </td>
           </tr>
@@ -114,5 +114,5 @@ export function plainTextShell(body: string): string {
   return `${body}
 
 ---
-Sent by Annote — annote.app`;
+Sent by Annote — annote.ai`;
 }

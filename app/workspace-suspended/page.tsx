@@ -78,7 +78,7 @@ export default function WorkspaceSuspendedPage() {
         )}
 
         <a
-          href="mailto:support@echly.com"
+          href="mailto:ishaq@annote.ai"
           className="inline-flex items-center gap-1 text-sm transition-colors"
           style={{ color: "var(--text-tertiary)" }}
         >

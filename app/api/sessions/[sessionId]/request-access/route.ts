@@ -21,7 +21,7 @@ import {
 import type { AccessRequest } from "@/lib/domain/accessRequest";
 import { composeFullName } from "@/lib/utils/nameSplit";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://annote.ai";
 
 export const dynamic = "force-dynamic";
 

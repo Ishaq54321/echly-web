@@ -9,7 +9,7 @@ import { sendEmailChangeConfirmation } from "@/lib/email/workspaceEmails";
 
 export const dynamic = "force-dynamic";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://annote.ai";
 const FIREBASE_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "";
 
 export async function POST(req: NextRequest) {

@@ -71,7 +71,7 @@ export default function NoWorkspacePage() {
         <p className="text-[var(--text-tertiary)] mt-8" style={{ fontSize: 13 }}>
           Need help?{" "}
           <a
-            href="mailto:support@echly.com"
+            href="mailto:ishaq@annote.ai"
             className="hover:underline"
             style={{ color: "var(--brand-text)" }}
           >

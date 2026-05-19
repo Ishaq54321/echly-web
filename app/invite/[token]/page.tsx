@@ -8,7 +8,6 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  sendPasswordResetEmail,
   signOut,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
@@ -684,9 +683,15 @@ export default function InviteAcceptPage() {
     const { preview } = state;
     if (!preview) return;
     try {
-      await sendPasswordResetEmail(auth, preview.email);
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: preview.email }),
+      });
+      if (!res.ok) throw new Error("Request failed");
+      showToast("Password reset email sent — check your inbox");
     } catch {
-      /* show success regardless */
+      showToast("Couldn't send reset email. Please try again.");
     }
     setState((s) => ({ ...s, phase: "forgot" }));
   }

@@ -24,7 +24,7 @@ import { emailVerificationHtml, emailVerificationText } from "./templates/emailV
 
 // WS-006 FIX: always use verified sender domain
 // regardless of APP_URL (localhost would break Resend)
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://annote.ai";
 
 export async function sendWorkspaceInviteEmail({
   to,

@@ -43,6 +43,7 @@ function LoginPageContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const resetSuccess = searchParams.get("reset") === "success";
   const reason = searchParams.get("reason");
   const reasonMessage =
     reason === "workspace_access_revoked"
@@ -123,6 +124,24 @@ function LoginPageContent() {
             <p className="auth-sub">
               Pick up your sessions, tickets, and reviews — exactly where the team left off.
             </p>
+
+            {resetSuccess && (
+              <p
+                role="status"
+                style={{
+                  marginTop: 8,
+                  marginBottom: 14,
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  color: "#15803d",
+                  background: "rgba(22,163,74,0.08)",
+                  border: "1px solid rgba(22,163,74,0.25)",
+                }}
+              >
+                Password reset successful! Sign in with your new password.
+              </p>
+            )}
 
             {reasonMessage && (
               <p

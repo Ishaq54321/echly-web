@@ -13,7 +13,7 @@ import type { WebhookEvent } from "@/lib/billing/payments/types";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://annote.ai";
 const BILLING_PORTAL_URL = `${APP_URL}/settings?tab=billing`;
 
 /**

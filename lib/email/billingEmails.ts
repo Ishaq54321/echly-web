@@ -14,7 +14,7 @@ import {
 } from "./templates/paymentFailed";
 import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://annote.ai";
 
 export async function sendSubscriptionConfirmationEmail(params: {
   to: string;

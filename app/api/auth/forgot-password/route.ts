@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://annote.ai";
 
   try {
     const firebaseLink = await getAuth().generatePasswordResetLink(email);

@@ -7,7 +7,7 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://echly.com";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://annote.ai";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);

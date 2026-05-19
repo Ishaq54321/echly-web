@@ -36,6 +36,7 @@ function transcribeCorsHeaders(request: NextRequest): Record<string, string> {
   // Allow localhost + app origin.
   else if (
     origin === "http://localhost:3000" ||
+    origin === "https://annote.ai" ||
     origin === "https://echly-web.vercel.app"
   ) {
     allowOrigin = origin;

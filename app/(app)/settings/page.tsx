@@ -1380,7 +1380,7 @@ function DeleteAccountModal({ onClose }: { onClose: () => void }) {
             <button
               type="button"
               disabled={!confirmed}
-              onClick={() => { onClose(); alert("Contact support@echly.com to delete your account."); }}
+              onClick={() => { onClose(); alert("Contact ishaq@annote.ai to delete your account."); }}
               style={{ height: 38, padding: "0 16px", borderRadius: 9, border: "none", background: confirmed ? "var(--color-danger)" : "var(--color-danger-border)", color: "white", fontSize: 14, fontWeight: 600, cursor: confirmed ? "pointer" : "not-allowed", transition: "background 200ms" }}
             >
               Delete account
