@@ -15,17 +15,42 @@ export const resend = RESEND_API_KEY
   ? new Resend(RESEND_API_KEY)
   : null;
 
-const DEV_LOG_FORCED = process.env.EMAIL_DEV_LOG === "true";
-
 function extractFirstUrl(html: string): string | null {
   const m = html.match(/href="(https?:\/\/[^"]+)"/);
   return m?.[1] ?? null;
 }
 
-// Dev/localhost fallback: log email to console.
-// Logs when no API key is configured OR when EMAIL_DEV_LOG=true is set.
-// With API key set and EMAIL_DEV_LOG unset, real emails are sent (even in dev).
+/**
+ * Email sender configuration.
+ *
+ * Behavior:
+ * - If RESEND_API_KEY is unset, emails are logged to the console (never sent).
+ * - If EMAIL_DEV_LOG=true (and NODE_ENV !== "production"), emails are logged
+ *   to the console even when the API key is set. Useful for inspecting outgoing
+ *   email content during development without sending real emails.
+ * - Otherwise, emails are sent via Resend (including from localhost).
+ *
+ * EMAIL_DEV_LOG is ignored in production (NODE_ENV === "production") as a
+ * safety guard against accidentally silencing production email.
+ */
 const REPLY_TO = "ishaq@annote.ai";
+
+/**
+ * From-address variants.
+ * - "system"  — transactional/system email (password reset, verification,
+ *   invites, access requests). Impersonal sender so it reads as automated.
+ * - "founder" — lifecycle/billing email written in the founder's voice
+ *   (subscription confirmation/cancellation, payment failed, workspace
+ *   deletion). Sender carries the founder name so replies feel personal.
+ */
+export type FromVariant = "system" | "founder";
+
+function getFromAddress(variant: FromVariant = "system"): string {
+  const email = "noreply@annote.ai";
+  return variant === "founder"
+    ? `Ishaq from Annote <${email}>`
+    : `Annote <${email}>`;
+}
 
 export async function sendEmailOrLog(params: {
   to: string;
@@ -35,8 +60,18 @@ export async function sendEmailOrLog(params: {
   text?: string;
   /** Reply-to override. Defaults to ishaq@annote.ai so replies reach a human. */
   replyTo?: string;
+  /**
+   * Which from-name to send under. Defaults to "system" (transactional).
+   * Lifecycle/billing emails pass "founder".
+   */
+  fromVariant?: FromVariant;
 }): Promise<void> {
-  if (!resend || DEV_LOG_FORCED || process.env.NODE_ENV === "development") {
+  // Determine if we should log instead of sending.
+  const isProduction = process.env.NODE_ENV === "production";
+  const logModeRequested = process.env.EMAIL_DEV_LOG === "true";
+  const shouldLogOnly = !resend || (logModeRequested && !isProduction);
+
+  if (shouldLogOnly) {
     const link = extractFirstUrl(params.html);
     console.log(
       `\n📧 [DEV EMAIL — not sent]\n` +
@@ -46,8 +81,11 @@ export async function sendEmailOrLog(params: {
     );
     return;
   }
+  // Unreachable when resend is null (that implies shouldLogOnly above),
+  // but this guard restores TypeScript's non-null narrowing for resend.
+  if (!resend) return;
   const { error } = await resend.emails.send({
-    from: "Ishaq from Annote <noreply@echly.com>",
+    from: getFromAddress(params.fromVariant),
     to: params.to,
     subject: params.subject,
     html: params.html,

@@ -1,17 +1,25 @@
-import { emailShell, emailButton, emailColors, plainTextShell } from "../components";
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
+import {
+  emailShellV2,
+  emailCardV2,
+  emailButtonV2,
+  emailButtonRowV2,
+  emailHeadingV2,
+  emailParagraphV2,
+  emailSignoffV2,
+  emailSpacerV2,
+  escapeEmailHtml,
+  plainTextShellV2,
+} from "../components";
 
 interface AccessRequestNotificationProps {
   requesterEmail: string;
   sessionName: string;
   sessionUrl: string;
+  /**
+   * Kept for signature stability — callers still pass it. The previous
+   * template appended this bare to the footer ("...this request. Acme");
+   * the new copy drops it (audit fix).
+   */
   workspaceName: string;
 }
 
@@ -19,23 +27,28 @@ export function accessRequestNotificationEmailHtml({
   requesterEmail,
   sessionName,
   sessionUrl,
-  workspaceName,
 }: AccessRequestNotificationProps): string {
-  const body = `
-    <h1 style="margin:0 0 8px;font-size:24px;font-weight:600;color:${emailColors.textHeading};letter-spacing:-0.02em;line-height:1.3;">
-      New access request
-    </h1>
-    <p style="margin:0 0 8px;">
-      <strong style="color:${emailColors.textHeading};">${escapeHtml(requesterEmail)}</strong> is requesting access to view the session <strong style="color:${emailColors.textHeading};">${escapeHtml(sessionName)}</strong>.
-    </p>
-    ${emailButton("Review request", escapeHtml(sessionUrl))}
-    <p style="margin:0;font-size:13px;color:${emailColors.textMuted};">
-      Open the session and use the Share menu to approve or reject this request. ${escapeHtml(workspaceName)}
-    </p>
-  `;
+  const safeRequester = escapeEmailHtml(requesterEmail);
+  const safeSession = escapeEmailHtml(sessionName);
 
-  return emailShell(body, {
-    preheader: `${requesterEmail} requested access to ${sessionName}.`,
+  return emailShellV2({
+    preheader: "Review and approve from your dashboard.",
+    content: emailCardV2({
+      content: `
+        ${emailHeadingV2(`${safeRequester} requested access`)}
+        ${emailParagraphV2(
+          `${safeRequester} requested access to your session &ldquo;${safeSession}.&rdquo;`
+        )}
+        ${emailSpacerV2({ height: 8 })}
+        ${emailButtonRowV2(emailButtonV2({ label: "Review request", href: sessionUrl }))}
+        ${emailSpacerV2({ height: 8 })}
+        ${emailParagraphV2(
+          "You can approve or decline from the session's share menu. If you don't recognize this person, declining is safe — they won't see anything.",
+          { spaceAfter: 0 }
+        )}
+        ${emailSignoffV2("— Annote")}
+      `,
+    }),
   });
 }
 
@@ -43,13 +56,14 @@ export function accessRequestNotificationEmailText({
   requesterEmail,
   sessionName,
   sessionUrl,
-  workspaceName,
 }: AccessRequestNotificationProps): string {
-  return plainTextShell(`New access request
-
-${requesterEmail} is requesting access to view the session ${sessionName}.
+  return plainTextShellV2({
+    body: `${requesterEmail} requested access to your session "${sessionName}".
 
 Review request: ${sessionUrl}
 
-Open the session and use the Share menu to approve or reject this request. ${workspaceName}`);
+You can approve or decline from the session's share menu. If you don't recognize this person, declining is safe — they won't see anything.
+
+— Annote`,
+  });
 }

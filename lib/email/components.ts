@@ -1,151 +1,16 @@
-// Shared email shell — single source of truth for email visual identity.
-// DO NOT use CSS variables in email HTML (email clients don't resolve them).
-// Hardcoded hex colors only, inline CSS only, 560px max-width, single-column.
+// Shared email visual system — single source of truth for email identity.
 //
-// ─────────────────────────────────────────────────────────────────────────
-// PHASE 1 NOTE (email visual infrastructure overhaul)
+// Constraints (email clients are not browsers):
+//   - NO CSS variables in email HTML (clients don't resolve them).
+//   - Hardcoded hex colors, inline CSS only.
+//   - Table-based, bulletproof, Outlook-compatible. 560px max-width,
+//     single-column. Light mode only.
 //
-// This file now has TWO generations of components:
-//
-//   LEGACY  — emailColors, emailShell, emailButton, emailInfoRow,
-//             plainTextShell. Unchanged signatures. All 12 templates in
-//             ./templates still use these. Do NOT change/rename them; that
-//             would break the build before Phase 2 migrates each template.
-//
-//   V2      — EMAIL_COLORS / EMAIL_FONTS / EMAIL_SIZES tokens plus
-//             emailShellV2, emailCardV2, emailButtonV2, emailInfoRowV2,
-//             emailDividerV2, emailSpacerV2, plainTextShellV2. New
-//             Anthropic/Stripe-style design system. Phase 2 will migrate
-//             templates onto these one-by-one, then the legacy block above
-//             is deleted and the V2 names can drop their suffix.
-// ─────────────────────────────────────────────────────────────────────────
-
-// =========================================================================
-// LEGACY — DO NOT MODIFY. Kept until Phase 2 migrates every template.
-// =========================================================================
-
-export const emailColors = {
-  brand: "#5A49BF",
-  brandHover: "#4F40A8", // outline button states (not really hovered in email)
-  brandLight: "#F0ECFB", // accent backgrounds
-  brandLightBorder: "#DCD5F0",
-  textHeading: "#0F0E13",
-  textBody: "#3D3946",
-  textMuted: "#7A7484",
-  textFooter: "#B5AEBE",
-  background: "#FFFFFF",
-  surface: "#FAFAFB",
-  surfaceSubtle: "#F5F4F7",
-  border: "#E5E3EA",
-  success: "#16A34A",
-  successBg: "#F0FDF4",
-  successBorder: "#BBF7D0",
-  danger: "#E5484D",
-  dangerBg: "#FEF2F2",
-  dangerBorder: "#FECACA",
-  warning: "#F77E2C",
-  warningBg: "#FFEDD5",
-  warningBorder: "#FED7AA",
-} as const;
-
-interface ShellOptions {
-  /** Hidden preview text shown in inbox preview before the body. */
-  preheader?: string;
-}
-
-export function emailShell(bodyHtml: string, opts: ShellOptions = {}): string {
-  const preheader = opts.preheader ?? "";
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="x-apple-disable-message-reformatting">
-  <title>Annote</title>
-</head>
-<body style="margin:0;padding:0;background-color:${emailColors.surface};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
-  ${preheader ? `<div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${preheader}</div>` : ""}
-
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${emailColors.surface};">
-    <tr>
-      <td align="center" style="padding:40px 20px;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;background-color:${emailColors.background};border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-
-          <!-- Header -->
-          <tr>
-            <td style="padding:24px 32px;border-bottom:1px solid ${emailColors.border};">
-              <span style="font-size:18px;font-weight:600;color:${emailColors.brand};letter-spacing:-0.01em;">Annote</span>
-            </td>
-          </tr>
-
-          <!-- Body -->
-          <tr>
-            <td style="padding:32px;color:${emailColors.textBody};font-size:15px;line-height:1.6;">
-              ${bodyHtml}
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="padding:20px 32px;border-top:1px solid ${emailColors.border};">
-              <p style="margin:0;font-size:12px;color:${emailColors.textFooter};line-height:1.5;">
-                Sent by Annote. <a href="https://annote.ai" style="color:${emailColors.textFooter};text-decoration:underline;">annote.ai</a>
-              </p>
-            </td>
-          </tr>
-
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-}
-
-// Button component — inline CSS, MSO-compatible.
-export function emailButton(
-  text: string,
-  href: string,
-  opts: { variant?: "primary" | "secondary" } = {}
-): string {
-  const variant = opts.variant ?? "primary";
-  const bg = variant === "primary" ? emailColors.brand : emailColors.background;
-  const fg = variant === "primary" ? "#FFFFFF" : emailColors.textHeading;
-  const border = variant === "primary" ? emailColors.brand : emailColors.border;
-
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;">
-    <tr>
-      <td style="border-radius:8px;background-color:${bg};border:1px solid ${border};">
-        <a href="${href}" target="_blank" style="display:inline-block;padding:12px 24px;font-size:14px;font-weight:500;color:${fg};text-decoration:none;border-radius:8px;">${text}</a>
-      </td>
-    </tr>
-  </table>`;
-}
-
-// Info row — for key/value pairs in plan details.
-export function emailInfoRow(label: string, value: string): string {
-  return `<tr>
-    <td style="padding:8px 0;font-size:14px;color:${emailColors.textMuted};">${label}</td>
-    <td style="padding:8px 0;font-size:14px;color:${emailColors.textHeading};text-align:right;font-weight:500;">${value}</td>
-  </tr>`;
-}
-
-// Plain-text shell — for the plain-text alternative.
-export function plainTextShell(body: string): string {
-  return `${body}
-
----
-Sent by Annote — annote.ai`;
-}
-
-// =========================================================================
-// V2 — Phase 1 visual infrastructure (Anthropic/Stripe-style receipt design)
-//
-// New design tokens + bulletproof, table-based, Outlook-compatible
-// components. Light mode only for this phase. Templates migrate onto these
-// in Phase 2.
-// =========================================================================
+// History: Phase 1 introduced this Anthropic/Stripe-style receipt system
+// alongside a legacy generation; Phase 2 migrated all 12 templates onto it
+// and deleted the legacy block. The "V2" suffix is retained on exported
+// names because templates import them by that name; renaming is a separate,
+// mechanical follow-up.
 
 export const EMAIL_COLORS = {
   pageBackground: "#F9F8F6",
@@ -360,6 +225,52 @@ interface SpacerV2Options {
 /** V2 pure vertical spacer row. */
 export function emailSpacerV2({ height }: SpacerV2Options): string {
   return `<tr><td style="height:${height}px;line-height:${height}px;font-size:0;">&nbsp;</td></tr>`;
+}
+
+/**
+ * V2 text helpers — shared row builders so every template renders the same
+ * heading / paragraph / sign-off treatment. These return `<tr>` rows meant to
+ * live inside an emailCardV2 content slot.
+ */
+
+/** V2 card heading row (h1-equivalent). */
+export function emailHeadingV2(text: string): string {
+  return `<tr><td style="font-size:20px;font-weight:600;color:${EMAIL_COLORS.textPrimary};line-height:1.3;padding:0 0 16px 0;">${text}</td></tr>`;
+}
+
+interface ParagraphV2Options {
+  /** Bottom padding below the paragraph. Default 16. Use 0 for the last line before a sign-off. */
+  spaceAfter?: number;
+}
+
+/** V2 body paragraph row. `html` may contain inline markup (links, <strong>). */
+export function emailParagraphV2(
+  html: string,
+  { spaceAfter = 16 }: ParagraphV2Options = {}
+): string {
+  return `<tr><td style="font-size:${EMAIL_SIZES.bodyFontSize}px;color:${EMAIL_COLORS.textPrimary};line-height:${EMAIL_SIZES.bodyLineHeight};padding:0 0 ${spaceAfter}px 0;">${html}</td></tr>`;
+}
+
+/**
+ * V2 sign-off row — the "— Name" or "— Name, Founder, Annote" closer.
+ * Rendered in secondary color, slightly separated from the body above.
+ */
+export function emailSignoffV2(text: string): string {
+  return `<tr><td style="font-size:${EMAIL_SIZES.bodyFontSize}px;color:${EMAIL_COLORS.textSecondary};line-height:${EMAIL_SIZES.bodyLineHeight};padding:8px 0 0 0;">${text}</td></tr>`;
+}
+
+/** Wraps a button block in a row with standard top spacing inside a card. */
+export function emailButtonRowV2(buttonHtml: string): string {
+  return `<tr><td style="padding:8px 0 8px 0;">${buttonHtml}</td></tr>`;
+}
+
+/** HTML-escape interpolated user data before it goes into an email body. */
+export function escapeEmailHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 interface PlainTextV2Options {

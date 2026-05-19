@@ -1,96 +1,202 @@
-// DEV-ONLY email preview route. Renders V2 email components with placeholder
-// data so the new visual infrastructure can be eyeballed in a browser without
-// sending real email. Hard-gated: returns 404 when NODE_ENV === "production".
+// DEV-ONLY email preview route. Renders the real (V2-migrated) email
+// templates with placeholder data so they can be eyeballed in a browser
+// without sending real email. Hard-gated: 404 when NODE_ENV === "production".
 //
 // Path is the literal /dev/... segment (NOT a route group) so the URL matches
-// the documented path. Visit e.g. http://localhost:3000/dev/email-preview/welcome
-// Templates: test (= welcome), welcome, payment-receipt, payment-failed.
+// the documented path. Visit e.g.
+//   http://localhost:3000/dev/email-preview/password-reset
+//
+// `?text=1` returns the plain-text alternative instead of HTML — used to
+// eyeball the text/plain part (VALIDATION Test 5).
 
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import {
-  emailShellV2,
-  emailCardV2,
-  emailButtonV2,
-  emailInfoRowV2,
-  emailDividerV2,
-  emailSpacerV2,
-  EMAIL_COLORS,
-  EMAIL_SIZES,
-} from "@/lib/email/components";
+
+import { passwordResetEmailHtml, passwordResetEmailText } from "@/lib/email/templates/passwordReset";
+import { emailVerificationHtml, emailVerificationText } from "@/lib/email/templates/emailVerification";
+import { emailChangeEmailHtml, emailChangeEmailText } from "@/lib/email/templates/emailChange";
+import { workspaceInviteEmailHtml, workspaceInviteEmailText } from "@/lib/email/templates/workspaceInvite";
+import { workspaceInviteReminderHtml, workspaceInviteReminderText } from "@/lib/email/templates/workspaceInviteReminder";
+import { sessionInviteEmailHtml, sessionInviteEmailText } from "@/lib/email/templates/sessionInvite";
+import { accessRequestNotificationEmailHtml, accessRequestNotificationEmailText } from "@/lib/email/templates/accessRequestNotification";
+import { accessRequestResultEmailHtml, accessRequestResultEmailText } from "@/lib/email/templates/accessRequestResult";
+import { subscriptionConfirmationEmailHtml, subscriptionConfirmationEmailText } from "@/lib/email/templates/subscriptionConfirmation";
+import { subscriptionCancelledEmailHtml, subscriptionCancelledEmailText } from "@/lib/email/templates/subscriptionCancelled";
+import { paymentFailedEmailHtml, paymentFailedEmailText } from "@/lib/email/templates/paymentFailed";
+import { workspaceDeletedConfirmationHtml, workspaceDeletedConfirmationText } from "@/lib/email/templates/workspaceDeletedConfirmation";
 
 export const dynamic = "force-dynamic";
 
-const H1 = (text: string) =>
-  `<tr><td style="font-size:20px;font-weight:600;color:${EMAIL_COLORS.textPrimary};line-height:1.3;padding:0 0 12px 0;">${text}</td></tr>`;
+const NEXT_BILLING = new Date("2026-06-19T00:00:00Z");
 
-const P = (html: string) =>
-  `<tr><td style="font-size:${EMAIL_SIZES.bodyFontSize}px;color:${EMAIL_COLORS.textPrimary};line-height:${EMAIL_SIZES.bodyLineHeight};padding:0 0 16px 0;">${html}</td></tr>`;
-
-function welcome(): string {
-  return emailShellV2({
-    preheader: "Welcome to Annote — capture feedback in a click.",
-    content: emailCardV2({
-      content: `
-        ${H1("Welcome to Annote")}
-        ${P("Hey Test, thanks for signing up. Annote lets you capture visual feedback on any site in a single click — no back-and-forth, no screenshots pasted into docs.")}
-        ${P("Install the extension and leave your first piece of feedback to see how it works.")}
-        ${emailSpacerV2({ height: 8 })}
-        <tr><td>${emailButtonV2({ label: "Get started", href: "https://annote.ai" })}</td></tr>
-      `,
-    }),
-  });
+interface Variant {
+  html: string;
+  text: string;
 }
 
-function paymentReceipt(): string {
-  return emailShellV2({
-    preheader: "Your Annote receipt — $120.00",
-    content:
-      emailCardV2({
-        content: `
-          ${H1("Payment receipt")}
-          ${P("Thanks for your payment. Here are the details for your records.")}
-          ${emailInfoRowV2({ label: "Receipt number", value: "ANN-2026-00481", mono: true })}
-          ${emailInfoRowV2({ label: "Invoice number", value: "INV-9F2A1C", mono: true })}
-          ${emailInfoRowV2({ label: "Payment method", value: "Visa ending 4242" })}
-          ${emailDividerV2()}
-          ${emailInfoRowV2({ label: "Amount paid", value: "$120.00", mono: true })}
-        `,
-      }) +
-      emailSpacerV2({ height: 16 }) +
-      emailCardV2({
-        content: `
-          ${P("Manage your subscription or download past invoices any time from billing settings.")}
-          <tr><td>${emailButtonV2({ label: "Open billing settings", href: "https://annote.ai", align: "full" })}</td></tr>
-        `,
-      }),
-  });
-}
-
-function paymentFailed(): string {
-  return emailShellV2({
-    preheader: "We couldn't charge your card",
-    content: emailCardV2({
-      content: `
-        ${H1("We couldn't charge your card")}
-        ${P("Your latest payment for <strong>Acme Workspace</strong> didn't go through. This usually means the card has expired or hit its limit.")}
-        ${P("Update your payment method to keep your workspace on Business.")}
-        ${emailSpacerV2({ height: 8 })}
-        <tr><td>${emailButtonV2({ label: "Update payment method", href: "https://annote.ai", align: "full" })}</td></tr>
-      `,
-    }),
-  });
-}
-
-const TEMPLATES: Record<string, () => string> = {
-  test: welcome,
-  welcome,
-  "payment-receipt": paymentReceipt,
-  "payment-failed": paymentFailed,
+const TEMPLATES: Record<string, () => Variant> = {
+  "password-reset": () => {
+    const p = { resetUrl: "https://annote.ai/reset/PLACEHOLDER", userName: "Sam Rivera" };
+    return { html: passwordResetEmailHtml(p), text: passwordResetEmailText(p) };
+  },
+  "email-verification": () => {
+    const p = { verifyUrl: "https://annote.ai/verify/PLACEHOLDER", userName: "Sam Rivera" };
+    return { html: emailVerificationHtml(p), text: emailVerificationText(p) };
+  },
+  "email-change": () => {
+    const p = {
+      newEmail: "new.address@example.com",
+      confirmUrl: "https://annote.ai/confirm-email/PLACEHOLDER",
+      userName: "Sam Rivera",
+    };
+    return { html: emailChangeEmailHtml(p), text: emailChangeEmailText(p) };
+  },
+  "workspace-invite": () => {
+    const p = {
+      invitedByName: "Jordan Lee",
+      workspaceName: "Acme Design",
+      role: "MEMBER",
+      acceptUrl: "https://annote.ai/invite/PLACEHOLDER",
+      expiresInDays: 30,
+    };
+    return { html: workspaceInviteEmailHtml(p), text: workspaceInviteEmailText(p) };
+  },
+  "workspace-invite-reminder": () => {
+    const p = {
+      workspaceName: "Acme Design",
+      acceptUrl: "https://annote.ai/invite/PLACEHOLDER",
+      expiresInDays: 3,
+    };
+    return { html: workspaceInviteReminderHtml(p), text: workspaceInviteReminderText(p) };
+  },
+  "session-invite": () => {
+    const p = {
+      invitedByName: "Jordan Lee",
+      invitedByEmail: "jordan@acme.com",
+      sessionName: "Homepage redesign feedback",
+      workspaceName: "Acme Design",
+      accessLevel: "view" as const,
+      sessionUrl: "https://annote.ai/s/PLACEHOLDER",
+      requiresAccount: false,
+    };
+    return { html: sessionInviteEmailHtml(p), text: sessionInviteEmailText(p) };
+  },
+  "session-invite-account": () => {
+    const p = {
+      invitedByName: "Jordan Lee",
+      sessionName: "Homepage redesign feedback",
+      workspaceName: "Acme Design",
+      accessLevel: "resolve" as const,
+      sessionUrl: "https://annote.ai/s/PLACEHOLDER",
+      requiresAccount: true,
+    };
+    return { html: sessionInviteEmailHtml(p), text: sessionInviteEmailText(p) };
+  },
+  "access-request-notification": () => {
+    const p = {
+      requesterEmail: "outsider@example.com",
+      sessionName: "Homepage redesign feedback",
+      sessionUrl: "https://annote.ai/s/PLACEHOLDER",
+      workspaceName: "Acme Design",
+    };
+    return {
+      html: accessRequestNotificationEmailHtml(p),
+      text: accessRequestNotificationEmailText(p),
+    };
+  },
+  "access-request-approved": () => {
+    const p = {
+      approved: true,
+      sessionName: "Homepage redesign feedback",
+      sessionUrl: "https://annote.ai/s/PLACEHOLDER",
+      workspaceName: "Acme Design",
+    };
+    return {
+      html: accessRequestResultEmailHtml(p),
+      text: accessRequestResultEmailText(p),
+    };
+  },
+  "access-request-rejected": () => {
+    const p = {
+      approved: false,
+      sessionName: "Homepage redesign feedback",
+      sessionUrl: "https://annote.ai/s/PLACEHOLDER",
+      workspaceName: "Acme Design",
+    };
+    return {
+      html: accessRequestResultEmailHtml(p),
+      text: accessRequestResultEmailText(p),
+    };
+  },
+  "subscription-confirmation": () => {
+    const p = {
+      workspaceName: "Acme Design",
+      seatCount: 5,
+      billingCycle: "monthly" as const,
+      nextBillingDate: NEXT_BILLING,
+      settingsUrl: "https://annote.ai/settings?tab=billing",
+      pricePerSeat: 19,
+      annualPricePerSeat: 15.2,
+      firstName: "Sam",
+    };
+    return {
+      html: subscriptionConfirmationEmailHtml(p),
+      text: subscriptionConfirmationEmailText(p),
+    };
+  },
+  "subscription-cancelled": () => {
+    const p = {
+      workspaceName: "Acme Design",
+      upgradeUrl: "https://annote.ai/settings?tab=billing",
+      starterLimits: { maxMembers: 3, maxFeedbackPerMonth: 50, aiImprovementsPerMonth: 20 },
+      firstName: "Sam",
+      periodEndDate: "June 19, 2026",
+    };
+    return {
+      html: subscriptionCancelledEmailHtml(p),
+      text: subscriptionCancelledEmailText(p),
+    };
+  },
+  "payment-failed": () => {
+    const p = {
+      workspaceName: "Acme Design",
+      portalUrl: "https://annote.ai/settings?tab=billing",
+      firstName: "Sam",
+      cardBrand: "Visa",
+      cardLast4: "4242",
+      retryDate: "May 22, 2026",
+    };
+    return { html: paymentFailedEmailHtml(p), text: paymentFailedEmailText(p) };
+  },
+  "workspace-deleted": () => {
+    // No restoreUrl — exercises the no-CTA fallback (current product reality).
+    const p = {
+      workspaceName: "Acme Design",
+      purgeDate: "June 18, 2026",
+      firstName: "Sam",
+    };
+    return {
+      html: workspaceDeletedConfirmationHtml(p),
+      text: workspaceDeletedConfirmationText(p),
+    };
+  },
+  "workspace-deleted-restore": () => {
+    // With restoreUrl — exercises the Phase-5 "Restore workspace" CTA variant.
+    const p = {
+      workspaceName: "Acme Design",
+      purgeDate: "June 18, 2026",
+      firstName: "Sam",
+      restoreUrl: "https://annote.ai/settings?tab=advanced",
+    };
+    return {
+      html: workspaceDeletedConfirmationHtml(p),
+      text: workspaceDeletedConfirmationText(p),
+    };
+  },
 };
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ template: string }> }
 ) {
   if (process.env.NODE_ENV === "production") {
@@ -101,14 +207,21 @@ export async function GET(
   const render = TEMPLATES[template];
 
   if (!render) {
-    const available = Object.keys(TEMPLATES).join(", ");
+    const available = Object.keys(TEMPLATES).sort().join(", ");
     return new NextResponse(
       `Unknown template "${template}". Available: ${available}`,
       { status: 404 }
     );
   }
 
-  return new NextResponse(render(), {
-    headers: { "Content-Type": "text/html; charset=utf-8" },
+  const variant = render();
+  const wantText = req.nextUrl.searchParams.get("text") === "1";
+
+  return new NextResponse(wantText ? variant.text : variant.html, {
+    headers: {
+      "Content-Type": wantText
+        ? "text/plain; charset=utf-8"
+        : "text/html; charset=utf-8",
+    },
   });
 }

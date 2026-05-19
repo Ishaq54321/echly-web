@@ -1,17 +1,25 @@
-import { emailShell, emailButton, emailColors, plainTextShell } from "../components";
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
+import {
+  emailShellV2,
+  emailCardV2,
+  emailButtonV2,
+  emailButtonRowV2,
+  emailHeadingV2,
+  emailParagraphV2,
+  emailSignoffV2,
+  emailSpacerV2,
+  escapeEmailHtml,
+  plainTextShellV2,
+} from "../components";
 
 interface AccessRequestResultProps {
   approved: boolean;
   sessionName: string;
   sessionUrl: string;
+  /**
+   * Kept for signature stability — callers still pass it. The previous
+   * template rendered this bare in the footer; the new copy drops it
+   * (audit fix).
+   */
   workspaceName: string;
 }
 
@@ -19,41 +27,42 @@ export function accessRequestResultEmailHtml({
   approved,
   sessionName,
   sessionUrl,
-  workspaceName,
 }: AccessRequestResultProps): string {
-  if (approved) {
-    const body = `
-      <h1 style="margin:0 0 8px;font-size:24px;font-weight:600;color:${emailColors.textHeading};letter-spacing:-0.02em;line-height:1.3;">
-        Access granted
-      </h1>
-      <p style="margin:0 0 8px;">
-        Your request to access <strong style="color:${emailColors.textHeading};">${escapeHtml(sessionName)}</strong> has been approved. You can now view and resolve feedback.
-      </p>
-      ${emailButton("Open session", escapeHtml(sessionUrl))}
-      <p style="margin:0;font-size:13px;color:${emailColors.textMuted};">
-        ${escapeHtml(workspaceName)}
-      </p>
-    `;
+  const safeSession = escapeEmailHtml(sessionName);
 
-    return emailShell(body, {
-      preheader: `You now have access to ${sessionName}.`,
+  if (approved) {
+    return emailShellV2({
+      preheader: "Open the session anytime.",
+      content: emailCardV2({
+        content: `
+          ${emailHeadingV2(`You now have access to ${safeSession}`)}
+          ${emailParagraphV2(
+            `Your access request for &ldquo;${safeSession}&rdquo; was approved.`
+          )}
+          ${emailSpacerV2({ height: 8 })}
+          ${emailButtonRowV2(emailButtonV2({ label: "Open the session", href: sessionUrl }))}
+          ${emailSpacerV2({ height: 8 })}
+          ${emailSignoffV2("— Annote")}
+        `,
+      }),
     });
   }
 
-  const body = `
-    <h1 style="margin:0 0 8px;font-size:24px;font-weight:600;color:${emailColors.textHeading};letter-spacing:-0.02em;line-height:1.3;">
-      Request not approved
-    </h1>
-    <p style="margin:0 0 8px;">
-      Your request to access <strong style="color:${emailColors.textHeading};">${escapeHtml(sessionName)}</strong> was not approved. Reach out to the session owner if you think this was a mistake.
-    </p>
-    <p style="margin:0;font-size:13px;color:${emailColors.textMuted};">
-      ${escapeHtml(workspaceName)}
-    </p>
-  `;
-
-  return emailShell(body, {
-    preheader: `Access request for ${sessionName}.`,
+  return emailShellV2({
+    preheader: "Request declined.",
+    content: emailCardV2({
+      content: `
+        ${emailHeadingV2(`Access request for ${safeSession}`)}
+        ${emailParagraphV2(
+          `Your access request for &ldquo;${safeSession}&rdquo; was declined.`
+        )}
+        ${emailParagraphV2(
+          "If you think this was a mistake, the best path is to reach out directly to whoever shared the session originally.",
+          { spaceAfter: 0 }
+        )}
+        ${emailSignoffV2("— Annote")}
+      `,
+    }),
   });
 }
 
@@ -61,21 +70,22 @@ export function accessRequestResultEmailText({
   approved,
   sessionName,
   sessionUrl,
-  workspaceName,
 }: AccessRequestResultProps): string {
   if (approved) {
-    return plainTextShell(`Access granted
+    return plainTextShellV2({
+      body: `Your access request for "${sessionName}" was approved.
 
-Your request to access ${sessionName} has been approved. You can now view and resolve feedback.
+Open the session: ${sessionUrl}
 
-Open session: ${sessionUrl}
-
-${workspaceName}`);
+— Annote`,
+    });
   }
 
-  return plainTextShell(`Request not approved
+  return plainTextShellV2({
+    body: `Your access request for "${sessionName}" was declined.
 
-Your request to access ${sessionName} was not approved. Reach out to the session owner if you think this was a mistake.
+If you think this was a mistake, the best path is to reach out directly to whoever shared the session originally.
 
-${workspaceName}`);
+— Annote`,
+  });
 }

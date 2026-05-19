@@ -1,78 +1,90 @@
-import { emailShell, emailButton, emailColors, plainTextShell } from "../components";
+import {
+  emailShellV2,
+  emailCardV2,
+  emailHeadingV2,
+  emailParagraphV2,
+  emailSignoffV2,
+  escapeEmailHtml,
+  plainTextShellV2,
+} from "../components";
 
 interface SubscriptionCancelledProps {
   workspaceName: string;
+  /** Kept for signature stability — callers still pass it; the new copy is intentionally button-free. */
   upgradeUrl: string;
+  /** Kept for signature stability — callers still pass it; new copy doesn't enumerate limits. */
   starterLimits: {
     maxMembers: number | null;
     maxFeedbackPerMonth: number | null;
     aiImprovementsPerMonth: number | null;
   };
+  /** Phase-5 optional: recipient first name for the greeting. Falls back to "there". */
+  firstName?: string;
+  /** Phase-5 optional: paid plan display name. Defaults to "Business". */
+  planName?: string;
+  /** Phase-5 optional: date paid features end. Falls back to a generic phrase when absent. */
+  periodEndDate?: string;
 }
 
-function formatLimit(n: number | null, suffix: string): string {
-  if (n === null) return `Unlimited ${suffix}`;
-  return `Up to ${n.toLocaleString()} ${suffix}`;
-}
+export function subscriptionCancelledEmailHtml(
+  props: SubscriptionCancelledProps
+): string {
+  const { workspaceName, firstName, planName = "Business", periodEndDate } = props;
 
-export function subscriptionCancelledEmailHtml(props: SubscriptionCancelledProps): string {
-  const { workspaceName, upgradeUrl, starterLimits } = props;
+  const greetingName = firstName ? escapeEmailHtml(firstName) : "there";
+  const safePlan = escapeEmailHtml(planName);
+  const throughClause = periodEndDate
+    ? `You'll keep ${safePlan} features through <strong>${escapeEmailHtml(periodEndDate)}</strong>, after which the workspace switches to the free plan.`
+    : `You'll keep ${safePlan} features until the end of your current billing period, after which the workspace switches to the free plan.`;
 
-  const body = `
-    <h1 style="margin:0 0 16px;font-size:24px;font-weight:600;color:${emailColors.textHeading};letter-spacing:-0.02em;">
-      Your subscription is canceled
-    </h1>
-
-    <p style="margin:0 0 24px;">
-      Your workspace <strong style="color:${emailColors.textHeading};">${workspaceName}</strong> is now on the Starter plan. Your existing team and data are still there — we just dialed back the limits.
-    </p>
-
-    <div style="background-color:${emailColors.surfaceSubtle};border:1px solid ${emailColors.border};border-radius:8px;padding:20px 24px;margin:0 0 24px;">
-      <p style="margin:0 0 12px;font-size:13px;font-weight:500;color:${emailColors.textMuted};text-transform:uppercase;letter-spacing:0.05em;">
-        What changes
-      </p>
-      <p style="margin:0 0 8px;color:${emailColors.textBody};">${formatLimit(starterLimits.maxMembers, "team members")}</p>
-      <p style="margin:0 0 8px;color:${emailColors.textBody};">${formatLimit(starterLimits.maxFeedbackPerMonth, "feedback tickets a month")}</p>
-      <p style="margin:0;color:${emailColors.textBody};">${formatLimit(starterLimits.aiImprovementsPerMonth, "AI improvements a month")}</p>
-    </div>
-
-    <p style="margin:0 0 24px;">
-      If you'd like to come back, you can re-upgrade anytime.
-    </p>
-
-    ${emailButton("Re-upgrade to Business", upgradeUrl)}
-
-    <p style="margin:24px 0 0;">
-      Thanks for trying Annote. If there's something we could've done better, I'd love to hear it — just reply.
-    </p>
-
-    <p style="margin:24px 0 0;color:${emailColors.textMuted};">
-      — Ishaq, Annote
-    </p>
-  `;
-
-  return emailShell(body, {
-    preheader: `Your workspace ${workspaceName} is now on the Starter plan.`,
+  return emailShellV2({
+    preheader: "Your data stays put. The door's open whenever.",
+    content: emailCardV2({
+      content: `
+        ${emailHeadingV2("Your Annote subscription is canceled")}
+        ${emailParagraphV2(`Hey ${greetingName},`)}
+        ${emailParagraphV2(
+          `Your Annote subscription is canceled. You won't be charged again. ${throughClause}`
+        )}
+        ${emailParagraphV2(
+          `What that means for your data: your sessions, captures, comments, and shared links all stay where they are. Nothing is deleted. You can keep using the free plan as long as you want, or export everything from the Billing page if you'd rather take it with you.`
+        )}
+        ${emailParagraphV2(
+          "Thanks for trying Annote. Genuinely — early users decide what a product becomes, and the time you spent here shaped it."
+        )}
+        ${emailParagraphV2(
+          "If something specific pushed you to cancel, I'd love to hear what. One sentence is enough."
+        )}
+        ${emailParagraphV2("The door's open whenever.", { spaceAfter: 0 })}
+        ${emailSignoffV2("— Ishaq, Founder, Annote")}
+      `,
+    }),
   });
 }
 
-export function subscriptionCancelledEmailText(props: SubscriptionCancelledProps): string {
-  const { workspaceName, upgradeUrl, starterLimits } = props;
+export function subscriptionCancelledEmailText(
+  props: SubscriptionCancelledProps
+): string {
+  const { firstName, planName = "Business", periodEndDate } = props;
 
-  return plainTextShell(`Your subscription is canceled
+  const greetingName = firstName ?? "there";
+  const throughClause = periodEndDate
+    ? `You'll keep ${planName} features through ${periodEndDate}, after which the workspace switches to the free plan.`
+    : `You'll keep ${planName} features until the end of your current billing period, after which the workspace switches to the free plan.`;
 
-Your workspace ${workspaceName} is now on the Starter plan. Your existing team and data are still there — we just dialed back the limits.
+  return plainTextShellV2({
+    body: `Hey ${greetingName},
 
-What changes
-${formatLimit(starterLimits.maxMembers, "team members")}
-${formatLimit(starterLimits.maxFeedbackPerMonth, "feedback tickets a month")}
-${formatLimit(starterLimits.aiImprovementsPerMonth, "AI improvements a month")}
+Your Annote subscription is canceled. You won't be charged again. ${throughClause}
 
-If you'd like to come back, you can re-upgrade anytime.
+What that means for your data: your sessions, captures, comments, and shared links all stay where they are. Nothing is deleted. You can keep using the free plan as long as you want, or export everything from the Billing page if you'd rather take it with you.
 
-Re-upgrade to Business: ${upgradeUrl}
+Thanks for trying Annote. Genuinely — early users decide what a product becomes, and the time you spent here shaped it.
 
-Thanks for trying Annote. If there's something we could've done better, I'd love to hear it — just reply.
+If something specific pushed you to cancel, I'd love to hear what. One sentence is enough.
 
-— Ishaq, Annote`);
+The door's open whenever.
+
+— Ishaq, Founder, Annote`,
+  });
 }

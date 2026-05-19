@@ -51,6 +51,7 @@ export async function sendSubscriptionConfirmationEmail(params: {
       subject: "You're on Annote Business — here's what's next",
       html: subscriptionConfirmationEmailHtml(props),
       text: subscriptionConfirmationEmailText(props),
+      fromVariant: "founder",
     });
   } catch (err) {
     console.error("[sendSubscriptionConfirmationEmail] failed", err);
@@ -87,6 +88,7 @@ export async function sendSubscriptionCancelledEmail(params: {
       subject: "Your Annote subscription is canceled",
       html: subscriptionCancelledEmailHtml(props),
       text: subscriptionCancelledEmailText(props),
+      fromVariant: "founder",
     });
   } catch (err) {
     console.error("[sendSubscriptionCancelledEmail] failed", err);
@@ -106,9 +108,10 @@ export async function sendPaymentFailedEmail(params: {
 
     await sendEmailOrLog({
       to: params.to,
-      subject: "Quick heads up — we couldn't charge your card",
+      subject: "We couldn't process your payment",
       html: paymentFailedEmailHtml(props),
       text: paymentFailedEmailText(props),
+      fromVariant: "founder",
     });
   } catch (err) {
     console.error("[sendPaymentFailedEmail] failed", err);

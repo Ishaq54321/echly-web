@@ -1,44 +1,49 @@
-import { emailShell, emailButton, emailColors, plainTextShell } from "../components";
+import {
+  emailShellV2,
+  emailCardV2,
+  emailButtonV2,
+  emailButtonRowV2,
+  emailHeadingV2,
+  emailParagraphV2,
+  emailSignoffV2,
+  emailSpacerV2,
+  plainTextShellV2,
+} from "../components";
 
 interface PasswordResetProps {
   resetUrl: string;
+  /** Kept for signature stability — callers still pass it; new copy drops the greeting. */
   userName: string;
 }
 
-export function passwordResetEmailHtml({
-  resetUrl,
-  userName,
-}: PasswordResetProps): string {
-  const body = `
-    <h1 style="margin:0 0 16px;font-size:24px;font-weight:600;color:${emailColors.textHeading};letter-spacing:-0.02em;">
-      Reset your password
-    </h1>
-    <p style="margin:0 0 12px;">
-      Hi ${userName}, you requested a password reset for your Annote account. Click below to choose a new password.
-    </p>
-    <p style="margin:0 0 8px;font-size:14px;color:${emailColors.textMuted};line-height:1.6;padding:14px 16px;background:${emailColors.warningBg};border-radius:8px;border-left:3px solid ${emailColors.warning};">
-      This link expires in 1 hour. If you didn't request a password reset, you can safely ignore this email.
-    </p>
-    ${emailButton("Reset password", resetUrl)}
-    <p style="margin:0;font-size:13px;color:${emailColors.textMuted};">
-      This link expires in 1 hour.
-    </p>
-  `;
-
-  return emailShell(body, {
-    preheader: "Reset your Annote password.",
+export function passwordResetEmailHtml({ resetUrl }: PasswordResetProps): string {
+  return emailShellV2({
+    preheader: "Link expires in 60 minutes.",
+    content: emailCardV2({
+      content: `
+        ${emailHeadingV2("Reset your Annote password")}
+        ${emailParagraphV2("We got a request to reset the password for your Annote account.")}
+        ${emailSpacerV2({ height: 8 })}
+        ${emailButtonRowV2(emailButtonV2({ label: "Reset password", href: resetUrl }))}
+        ${emailSpacerV2({ height: 8 })}
+        ${emailParagraphV2(
+          "The link expires in 60 minutes. If you didn't request this, you can ignore the email — your password won't change.",
+          { spaceAfter: 0 }
+        )}
+        ${emailSignoffV2("— Annote")}
+      `,
+    }),
   });
 }
 
-export function passwordResetEmailText({
-  resetUrl,
-  userName,
-}: PasswordResetProps): string {
-  return plainTextShell(`Reset your password
+export function passwordResetEmailText({ resetUrl }: PasswordResetProps): string {
+  return plainTextShellV2({
+    body: `We got a request to reset the password for your Annote account.
 
-Hi ${userName}, you requested a password reset for your Annote account. Open the link below to choose a new password.
+Reset password: ${resetUrl}
 
-This link expires in 1 hour. If you didn't request a password reset, you can safely ignore this email.
+The link expires in 60 minutes. If you didn't request this, you can ignore the email — your password won't change.
 
-Reset password: ${resetUrl}`);
+— Annote`,
+  });
 }

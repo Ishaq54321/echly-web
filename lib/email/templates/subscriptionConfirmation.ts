@@ -1,4 +1,17 @@
-import { emailShell, emailButton, emailInfoRow, emailColors, plainTextShell } from "../components";
+import {
+  emailShellV2,
+  emailCardV2,
+  emailButtonV2,
+  emailButtonRowV2,
+  emailHeadingV2,
+  emailParagraphV2,
+  emailInfoRowV2,
+  emailDividerV2,
+  emailSignoffV2,
+  emailSpacerV2,
+  escapeEmailHtml,
+  plainTextShellV2,
+} from "../components";
 
 interface SubscriptionConfirmationProps {
   workspaceName: string;
@@ -10,6 +23,10 @@ interface SubscriptionConfirmationProps {
   pricePerSeat: number;
   /** Annual price per seat (monthly equivalent) — from catalog, no hardcoded fallback. */
   annualPricePerSeat: number;
+  /** Phase-5 optional: recipient first name for the greeting. Falls back to "there". */
+  firstName?: string;
+  /** Phase-5 optional: plan display name. Defaults to "Business" (matches subject + prior copy). */
+  planName?: string;
 }
 
 function formatDate(d: Date): string {
@@ -20,93 +37,106 @@ function formatDate(d: Date): string {
   });
 }
 
-export function subscriptionConfirmationEmailHtml(props: SubscriptionConfirmationProps): string {
-  const { workspaceName, seatCount, billingCycle, nextBillingDate, settingsUrl, pricePerSeat, annualPricePerSeat } = props;
+/** Derives the human amount string from existing catalog props (no placeholders). */
+function computeAmount(props: SubscriptionConfirmationProps): string {
+  const { seatCount, billingCycle, pricePerSeat, annualPricePerSeat } = props;
+  if (billingCycle === "annual") {
+    return `$${(seatCount * annualPricePerSeat * 12).toFixed(2)}/year`;
+  }
+  return `$${(seatCount * pricePerSeat).toFixed(2)}/month`;
+}
 
-  const isAnnual = billingCycle === "annual";
-  const seatLabel = seatCount === 1 ? "seat" : "seats";
+export function subscriptionConfirmationEmailHtml(
+  props: SubscriptionConfirmationProps
+): string {
+  const {
+    workspaceName,
+    seatCount,
+    billingCycle,
+    nextBillingDate,
+    settingsUrl,
+    firstName,
+    planName = "Business",
+  } = props;
 
-  const monthlyTotal = seatCount * pricePerSeat;
-  const annualTotal = seatCount * annualPricePerSeat * 12;
+  const greetingName = firstName ? escapeEmailHtml(firstName) : "there";
+  const safeWorkspace = escapeEmailHtml(workspaceName);
+  const safePlan = escapeEmailHtml(planName);
+  const cycleLabel = billingCycle === "annual" ? "annual" : "monthly";
+  const amount = computeAmount(props);
+  const seatLabel = seatCount === 1 ? "1 seat" : `${seatCount} seats`;
 
-  const billingLine = isAnnual
-    ? `${seatCount} ${seatLabel} × $${annualPricePerSeat.toFixed(2)}/seat per month, billed annually`
-    : `${seatCount} ${seatLabel} × $${pricePerSeat}/seat per month`;
-
-  const totalLine = isAnnual
-    ? `$${annualTotal.toFixed(2)}/year`
-    : `$${monthlyTotal.toFixed(2)}/month`;
-
-  const body = `
-    <h1 style="margin:0 0 16px;font-size:24px;font-weight:600;color:${emailColors.textHeading};letter-spacing:-0.02em;">
-      You're on Business
-    </h1>
-
-    <p style="margin:0 0 24px;">
-      Your workspace <strong style="color:${emailColors.textHeading};">${workspaceName}</strong> is now on Business. You've unlocked unlimited team members, 1,500 AI improvements a month, and unlimited feedback tickets.
-    </p>
-
-    <div style="background-color:${emailColors.surfaceSubtle};border:1px solid ${emailColors.border};border-radius:8px;padding:20px 24px;margin:0 0 24px;">
-      <p style="margin:0 0 12px;font-size:13px;font-weight:500;color:${emailColors.textMuted};text-transform:uppercase;letter-spacing:0.05em;">
-        What you're paying
-      </p>
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-        ${emailInfoRow("Billing", billingLine)}
-        ${emailInfoRow("Total", totalLine)}
-        ${emailInfoRow("Next charge", formatDate(nextBillingDate))}
-      </table>
-    </div>
-
-    <p style="margin:0 0 24px;font-size:13px;color:${emailColors.textMuted};">
-      Paddle will send a receipt for each charge separately.
-    </p>
-
-    ${emailButton("Open billing settings", settingsUrl)}
-
-    <p style="margin:24px 0 0;">
-      If anything looks off, just reply to this email.
-    </p>
-
-    <p style="margin:24px 0 0;color:${emailColors.textMuted};">
-      — Ishaq, Annote
-    </p>
-  `;
-
-  return emailShell(body, {
-    preheader: `Your workspace ${workspaceName} is now on Business.`,
+  return emailShellV2({
+    preheader: `${planName}, ${cycleLabel}. Next charge ${formatDate(nextBillingDate)}.`,
+    content:
+      emailCardV2({
+        content: `
+          ${emailHeadingV2(`You're on Annote ${safePlan} — here's what's next`)}
+          ${emailParagraphV2(`Hey ${greetingName},`)}
+          ${emailParagraphV2(
+            `Thanks for upgrading <strong>${safeWorkspace}</strong> to Annote ${safePlan}. Here's what you're paying for:`
+          )}
+          ${emailInfoRowV2({ label: "Plan", value: `${safePlan} (${cycleLabel})` })}
+          ${emailInfoRowV2({ label: "Seats", value: seatLabel })}
+          ${emailInfoRowV2({ label: "Next charge", value: formatDate(nextBillingDate) })}
+          ${emailDividerV2()}
+          ${emailInfoRowV2({ label: "Amount", value: amount, mono: true })}
+        `,
+      }) +
+      emailSpacerV2({ height: 16 }) +
+      emailCardV2({
+        content: `
+          ${emailParagraphV2(
+            `You can manage your subscription, download invoices, and change plans anytime from <a href="${settingsUrl}" style="color:#5A49BF;text-decoration:underline;">Billing settings</a>.`
+          )}
+          ${emailButtonRowV2(
+            emailButtonV2({ label: "Open billing settings", href: settingsUrl, align: "full" })
+          )}
+          ${emailSpacerV2({ height: 8 })}
+          ${emailParagraphV2(
+            "If anything looks off or you have questions, just reply — comes straight to me.",
+            { spaceAfter: 0 }
+          )}
+          ${emailSignoffV2("— Ishaq, Founder, Annote")}
+        `,
+      }),
   });
 }
 
-export function subscriptionConfirmationEmailText(props: SubscriptionConfirmationProps): string {
-  const { workspaceName, seatCount, billingCycle, nextBillingDate, settingsUrl, pricePerSeat, annualPricePerSeat } = props;
+export function subscriptionConfirmationEmailText(
+  props: SubscriptionConfirmationProps
+): string {
+  const {
+    workspaceName,
+    seatCount,
+    billingCycle,
+    nextBillingDate,
+    settingsUrl,
+    firstName,
+    planName = "Business",
+  } = props;
 
-  const isAnnual = billingCycle === "annual";
-  const seatLabel = seatCount === 1 ? "seat" : "seats";
-  const monthlyTotal = seatCount * pricePerSeat;
-  const annualTotal = seatCount * annualPricePerSeat * 12;
+  const greetingName = firstName ?? "there";
+  const cycleLabel = billingCycle === "annual" ? "annual" : "monthly";
+  const seatLabel = seatCount === 1 ? "1 seat" : `${seatCount} seats`;
+  const amount = computeAmount(props);
 
-  const billingLine = isAnnual
-    ? `${seatCount} ${seatLabel} × $${annualPricePerSeat.toFixed(2)}/seat per month, billed annually`
-    : `${seatCount} ${seatLabel} × $${pricePerSeat}/seat per month`;
+  return plainTextShellV2({
+    body: `Hey ${greetingName},
 
-  const totalLine = isAnnual
-    ? `$${annualTotal.toFixed(2)}/year`
-    : `$${monthlyTotal.toFixed(2)}/month`;
+Thanks for upgrading ${workspaceName} to Annote ${planName}. Here's what you're paying for:
 
-  return plainTextShell(`You're on Business
-
-Your workspace ${workspaceName} is now on Business. You've unlocked unlimited team members, 1,500 AI improvements a month, and unlimited feedback tickets.
-
-What you're paying
-${billingLine}
-Total: ${totalLine}
+Plan: ${planName} (${cycleLabel})
+Seats: ${seatLabel}
 Next charge: ${formatDate(nextBillingDate)}
+Amount: ${amount}
 
-Paddle will send a receipt for each charge separately.
+You can manage your subscription, download invoices, and change plans anytime from Billing settings.
 
 Open billing settings: ${settingsUrl}
 
-If anything looks off, just reply to this email.
+If anything looks off or you have questions, just reply — comes straight to me.
 
-— Ishaq, Annote`);
+— Ishaq, Founder, Annote`,
+  });
 }

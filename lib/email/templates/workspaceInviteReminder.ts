@@ -1,12 +1,15 @@
-import { emailShell, emailButton, emailColors, plainTextShell } from "../components";
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
+import {
+  emailShellV2,
+  emailCardV2,
+  emailButtonV2,
+  emailButtonRowV2,
+  emailHeadingV2,
+  emailParagraphV2,
+  emailSignoffV2,
+  emailSpacerV2,
+  escapeEmailHtml,
+  plainTextShellV2,
+} from "../components";
 
 interface WorkspaceInviteReminderProps {
   workspaceName: string;
@@ -19,21 +22,26 @@ export function workspaceInviteReminderHtml({
   acceptUrl,
   expiresInDays,
 }: WorkspaceInviteReminderProps): string {
-  const body = `
-    <h1 style="margin:0 0 8px;font-size:24px;font-weight:600;color:${emailColors.textHeading};letter-spacing:-0.02em;line-height:1.3;">
-      Your invitation to ${escapeHtml(workspaceName)} expires in ${expiresInDays} days
-    </h1>
-    <p style="margin:0 0 8px;">
-      Accept your invitation before it expires to join the workspace.
-    </p>
-    ${emailButton("Accept invitation", acceptUrl)}
-    <p style="margin:0;font-size:13px;color:${emailColors.textMuted};">
-      If you didn't expect this invitation, you can safely ignore this email.
-    </p>
-  `;
+  const safeWorkspace = escapeEmailHtml(workspaceName);
 
-  return emailShell(body, {
-    preheader: `Your invitation to ${workspaceName} expires in ${expiresInDays} days.`,
+  return emailShellV2({
+    preheader: "Still time to join the workspace.",
+    content: emailCardV2({
+      content: `
+        ${emailHeadingV2(`Your invitation to ${safeWorkspace} expires in ${expiresInDays} days`)}
+        ${emailParagraphV2(
+          `Your invitation to join <strong>${safeWorkspace}</strong> on Annote expires in ${expiresInDays} days.`
+        )}
+        ${emailSpacerV2({ height: 8 })}
+        ${emailButtonRowV2(emailButtonV2({ label: `Join ${safeWorkspace}`, href: acceptUrl }))}
+        ${emailSpacerV2({ height: 8 })}
+        ${emailParagraphV2(
+          "If you've decided not to join, no action needed — the invite will expire automatically.",
+          { spaceAfter: 0 }
+        )}
+        ${emailSignoffV2("— Annote")}
+      `,
+    }),
   });
 }
 
@@ -42,11 +50,13 @@ export function workspaceInviteReminderText({
   acceptUrl,
   expiresInDays,
 }: WorkspaceInviteReminderProps): string {
-  return plainTextShell(`Your invitation to ${workspaceName} expires in ${expiresInDays} days
+  return plainTextShellV2({
+    body: `Your invitation to join ${workspaceName} on Annote expires in ${expiresInDays} days.
 
-Accept your invitation before it expires to join the workspace.
+Join ${workspaceName}: ${acceptUrl}
 
-Accept invitation: ${acceptUrl}
+If you've decided not to join, no action needed — the invite will expire automatically.
 
-If you didn't expect this invitation, you can safely ignore this email.`);
+— Annote`,
+  });
 }

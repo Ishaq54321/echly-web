@@ -1,54 +1,97 @@
-import { emailShell, emailButton, emailColors, plainTextShell } from "../components";
+import {
+  emailShellV2,
+  emailCardV2,
+  emailButtonV2,
+  emailButtonRowV2,
+  emailHeadingV2,
+  emailParagraphV2,
+  emailSignoffV2,
+  emailSpacerV2,
+  escapeEmailHtml,
+  plainTextShellV2,
+} from "../components";
 
 interface PaymentFailedProps {
   workspaceName: string;
   portalUrl: string;
+  /** Phase-5 optional: recipient first name for the greeting. Falls back to "there". */
+  firstName?: string;
+  /** Phase-5 optional: card brand (e.g. "Visa"). Copy degrades when absent. */
+  cardBrand?: string;
+  /** Phase-5 optional: last 4 of the card. Copy degrades when absent. */
+  cardLast4?: string;
+  /** Phase-5 optional: next retry date. Copy degrades when absent. */
+  retryDate?: string;
+  /** Phase-5 optional: plan display name. Defaults to "Business". */
+  planName?: string;
+}
+
+/**
+ * "We tried to charge Visa ending in 4242 for your Business plan" — degrades
+ * to a generic line. `escape` is applied to interpolated values so the same
+ * builder is safe for both HTML and plain-text callers (plain-text passes the
+ * identity function).
+ */
+function chargeLine(
+  props: PaymentFailedProps,
+  escape: (s: string) => string
+): string {
+  const plan = escape(props.planName ?? "Business");
+  if (props.cardBrand && props.cardLast4) {
+    return `We tried to charge ${escape(props.cardBrand)} ending in ${escape(props.cardLast4)} for your ${plan} plan and it didn't go through. Most of the time this is an expired card or a temporary hold from your bank — easy to fix.`;
+  }
+  return `We tried to charge your card for your ${plan} plan and it didn't go through. Most of the time this is an expired card or a temporary hold from your bank — easy to fix.`;
+}
+
+/** Retry sentence — names the date when known, otherwise stays generic. */
+function retryLine(retryDate?: string): string {
+  return retryDate
+    ? `We'll try again automatically over the next few days. If the next attempt fails on ${retryDate}, your workspace will drop to the free plan and new captures will pause. Everything you've already captured stays accessible either way.`
+    : `We'll try again automatically over the next few days. If the next attempt fails, your workspace will drop to the free plan and new captures will pause. Everything you've already captured stays accessible either way.`;
 }
 
 export function paymentFailedEmailHtml(props: PaymentFailedProps): string {
-  const { workspaceName, portalUrl } = props;
+  const { portalUrl, firstName } = props;
+  const greetingName = firstName ? escapeEmailHtml(firstName) : "there";
 
-  const body = `
-    <h1 style="margin:0 0 16px;font-size:24px;font-weight:600;color:${emailColors.textHeading};letter-spacing:-0.02em;">
-      We couldn't charge your card
-    </h1>
-
-    <p style="margin:0 0 16px;">
-      Your latest payment for <strong style="color:${emailColors.textHeading};">${workspaceName}</strong> didn't go through. This usually means the card has expired or hit its limit.
-    </p>
-
-    <p style="margin:0 0 24px;">
-      No rush — we'll try again over the next few days. To skip the wait, update your payment method now.
-    </p>
-
-    ${emailButton("Update payment method", portalUrl)}
-
-    <p style="margin:24px 0 0;font-size:13px;color:${emailColors.textMuted};">
-      If we can't process payment after a few attempts, your workspace will move to the Starter plan. Just reply to this email if you run into anything.
-    </p>
-
-    <p style="margin:24px 0 0;color:${emailColors.textMuted};">
-      — Ishaq, Annote
-    </p>
-  `;
-
-  return emailShell(body, {
-    preheader: `Update your payment method for ${workspaceName}.`,
+  return emailShellV2({
+    preheader: "Quick fix — usually just an expired card.",
+    content: emailCardV2({
+      content: `
+        ${emailHeadingV2("We couldn't process your payment")}
+        ${emailParagraphV2(`Hey ${greetingName},`)}
+        ${emailParagraphV2(chargeLine(props, escapeEmailHtml))}
+        ${emailSpacerV2({ height: 8 })}
+        ${emailButtonRowV2(
+          emailButtonV2({ label: "Update payment method", href: portalUrl, align: "full" })
+        )}
+        ${emailSpacerV2({ height: 8 })}
+        ${emailParagraphV2(retryLine(props.retryDate))}
+        ${emailParagraphV2(
+          "If something's not adding up, just reply — comes straight to me.",
+          { spaceAfter: 0 }
+        )}
+        ${emailSignoffV2("— Ishaq, Founder, Annote")}
+      `,
+    }),
   });
 }
 
 export function paymentFailedEmailText(props: PaymentFailedProps): string {
-  const { workspaceName, portalUrl } = props;
+  const { portalUrl, firstName } = props;
+  const greetingName = firstName ?? "there";
 
-  return plainTextShell(`We couldn't charge your card
+  return plainTextShellV2({
+    body: `Hey ${greetingName},
 
-Your latest payment for ${workspaceName} didn't go through. This usually means the card has expired or hit its limit.
-
-No rush — we'll try again over the next few days. To skip the wait, update your payment method now.
+${chargeLine(props, (s) => s)}
 
 Update payment method: ${portalUrl}
 
-If we can't process payment after a few attempts, your workspace will move to the Starter plan. Just reply to this email if you run into anything.
+${retryLine(props.retryDate)}
 
-— Ishaq, Annote`);
+If something's not adding up, just reply — comes straight to me.
+
+— Ishaq, Founder, Annote`,
+  });
 }

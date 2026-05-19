@@ -1,44 +1,49 @@
-import { emailShell, emailButton, emailColors, plainTextShell } from "../components";
+import {
+  emailShellV2,
+  emailCardV2,
+  emailButtonV2,
+  emailButtonRowV2,
+  emailHeadingV2,
+  emailParagraphV2,
+  emailSignoffV2,
+  emailSpacerV2,
+  plainTextShellV2,
+} from "../components";
 
 interface EmailVerificationProps {
   verifyUrl: string;
+  /** Kept for signature stability — callers still pass it; new copy drops the greeting. */
   userName: string;
 }
 
-export function emailVerificationHtml({
-  verifyUrl,
-  userName,
-}: EmailVerificationProps): string {
-  const body = `
-    <h1 style="margin:0 0 16px;font-size:24px;font-weight:600;color:${emailColors.textHeading};letter-spacing:-0.02em;">
-      Verify your email
-    </h1>
-    <p style="margin:0 0 12px;">
-      Hi ${userName}, please verify your email to finish setting up your Annote account. Click the button below to continue.
-    </p>
-    <p style="margin:0 0 8px;font-size:14px;color:${emailColors.textMuted};line-height:1.6;">
-      This link expires in 1 hour. If you didn't create an Annote account, you can safely ignore this email.
-    </p>
-    ${emailButton("Verify email", verifyUrl)}
-    <p style="margin:0;font-size:13px;color:${emailColors.textMuted};">
-      This link expires in 1 hour.
-    </p>
-  `;
-
-  return emailShell(body, {
-    preheader: "Verify your email to finish setting up Annote.",
+export function emailVerificationHtml({ verifyUrl }: EmailVerificationProps): string {
+  return emailShellV2({
+    preheader: "Link expires in 24 hours.",
+    content: emailCardV2({
+      content: `
+        ${emailHeadingV2("Verify your email")}
+        ${emailParagraphV2("Confirm the email address on your Annote account by clicking below.")}
+        ${emailSpacerV2({ height: 8 })}
+        ${emailButtonRowV2(emailButtonV2({ label: "Verify email", href: verifyUrl }))}
+        ${emailSpacerV2({ height: 8 })}
+        ${emailParagraphV2(
+          "This link expires in 24 hours. If you didn't sign up for Annote, you can ignore this email.",
+          { spaceAfter: 0 }
+        )}
+        ${emailSignoffV2("— Annote")}
+      `,
+    }),
   });
 }
 
-export function emailVerificationText({
-  verifyUrl,
-  userName,
-}: EmailVerificationProps): string {
-  return plainTextShell(`Verify your email
+export function emailVerificationText({ verifyUrl }: EmailVerificationProps): string {
+  return plainTextShellV2({
+    body: `Confirm the email address on your Annote account by clicking below.
 
-Hi ${userName}, please verify your email to finish setting up your Annote account. Open the link below to continue.
+Verify email: ${verifyUrl}
 
-This link expires in 1 hour. If you didn't create an Annote account, you can safely ignore this email.
+This link expires in 24 hours. If you didn't sign up for Annote, you can ignore this email.
 
-Verify email: ${verifyUrl}`);
+— Annote`,
+  });
 }

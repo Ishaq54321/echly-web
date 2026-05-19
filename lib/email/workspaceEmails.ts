@@ -241,5 +241,6 @@ export async function sendWorkspaceDeletionConfirmationEmail({
     subject: `Your workspace "${workspaceName}" has been scheduled for deletion`,
     html: workspaceDeletedConfirmationHtml(props),
     text: workspaceDeletedConfirmationText(props),
+    fromVariant: "founder",
   });
 }

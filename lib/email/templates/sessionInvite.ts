@@ -1,77 +1,100 @@
-import { emailShell, emailButton, emailColors, plainTextShell } from "../components";
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
+import {
+  emailShellV2,
+  emailCardV2,
+  emailButtonV2,
+  emailButtonRowV2,
+  emailHeadingV2,
+  emailParagraphV2,
+  emailSignoffV2,
+  emailSpacerV2,
+  escapeEmailHtml,
+  plainTextShellV2,
+} from "../components";
 
 interface SessionInviteProps {
   invitedByName: string;
   sessionName: string;
+  /** Kept for signature stability — callers still pass it; new copy doesn't surface the workspace. */
   workspaceName: string;
+  /** Kept for signature stability — callers still pass it; new copy doesn't surface access level. */
   accessLevel: "view" | "resolve";
   sessionUrl: string;
   requiresAccount?: boolean;
+  /**
+   * Phase-5 optional: the inviter's email, shown in parens after their name.
+   * Callers don't pass this yet; copy degrades to name-only when absent.
+   */
+  invitedByEmail?: string;
+}
+
+function accountLine(requiresAccount: boolean): string {
+  return requiresAccount
+    ? "You'll need a free Annote account to view it (takes ten seconds)."
+    : "You don't need an account to view it. The link opens straight to the session.";
 }
 
 export function sessionInviteEmailHtml({
   invitedByName,
   sessionName,
-  workspaceName,
-  accessLevel,
   sessionUrl,
   requiresAccount = false,
+  invitedByEmail,
 }: SessionInviteProps): string {
-  const accessLabel =
-    accessLevel === "resolve" ? "view and resolve feedback on" : "view feedback on";
+  const safeInviter = escapeEmailHtml(invitedByName);
+  const safeSession = escapeEmailHtml(sessionName);
+  const inviterWithEmail = invitedByEmail
+    ? `${safeInviter} (${escapeEmailHtml(invitedByEmail)})`
+    : safeInviter;
 
-  const body = `
-    <h1 style="margin:0 0 8px;font-size:24px;font-weight:600;color:${emailColors.textHeading};letter-spacing:-0.02em;line-height:1.3;">
-      ${escapeHtml(invitedByName)} invited you to a session
-    </h1>
-    <p style="margin:0 0 4px;font-size:18px;font-weight:600;color:${emailColors.textHeading};">
-      ${escapeHtml(sessionName)}
-    </p>
-    <p style="margin:0 0 8px;">
-      You can ${escapeHtml(accessLabel)} this session.
-    </p>
-    ${emailButton("Open session", escapeHtml(sessionUrl))}
-    ${
-      requiresAccount
-        ? `<p style="margin:0 0 8px;font-size:13px;color:${emailColors.textMuted};">You'll need to create a free account to access this session.</p>`
-        : ""
-    }
-    <p style="margin:0;font-size:13px;color:${emailColors.textMuted};">
-      This is a session in ${escapeHtml(workspaceName)}. If you didn't expect this invitation, you can safely ignore this email.
-    </p>
-  `;
-
-  return emailShell(body, {
-    preheader: `${invitedByName} invited you to view ${sessionName}.`,
+  return emailShellV2({
+    preheader: requiresAccount
+      ? "Click to open — free account required."
+      : "Click to open — no account needed.",
+    content: emailCardV2({
+      content: `
+        ${emailHeadingV2(`${safeInviter} shared an Annote session with you`)}
+        ${emailParagraphV2(
+          `${inviterWithEmail} shared a session with you on Annote: &ldquo;${safeSession}.&rdquo;`
+        )}
+        ${emailParagraphV2(
+          `Annote is a tool for capturing feedback on websites. ${safeInviter} recorded their thoughts directly on the pages in question, and the session below collects them as tickets — screenshots, voice notes, and context, all in one place.`
+        )}
+        ${emailParagraphV2(accountLine(requiresAccount))}
+        ${emailSpacerV2({ height: 8 })}
+        ${emailButtonRowV2(emailButtonV2({ label: "Open the session", href: sessionUrl }))}
+        ${emailSpacerV2({ height: 8 })}
+        ${emailParagraphV2(
+          `If anything looks off or you'd rather not receive these, you can let ${safeInviter} know directly — this came from them, not from a list.`,
+          { spaceAfter: 0 }
+        )}
+        ${emailSignoffV2("— Annote")}
+      `,
+    }),
   });
 }
 
 export function sessionInviteEmailText({
   invitedByName,
   sessionName,
-  workspaceName,
-  accessLevel,
   sessionUrl,
   requiresAccount = false,
+  invitedByEmail,
 }: SessionInviteProps): string {
-  const accessLabel =
-    accessLevel === "resolve" ? "view and resolve feedback on" : "view feedback on";
+  const inviterWithEmail = invitedByEmail
+    ? `${invitedByName} (${invitedByEmail})`
+    : invitedByName;
 
-  return plainTextShell(`${invitedByName} invited you to a session
+  return plainTextShellV2({
+    body: `${inviterWithEmail} shared a session with you on Annote: "${sessionName}."
 
-${sessionName}
+Annote is a tool for capturing feedback on websites. ${invitedByName} recorded their thoughts directly on the pages in question, and the session below collects them as tickets — screenshots, voice notes, and context, all in one place.
 
-You can ${accessLabel} this session.
+${accountLine(requiresAccount)}
 
-Open session: ${sessionUrl}
-${requiresAccount ? "\nYou'll need to create a free account to access this session.\n" : ""}
-This is a session in ${workspaceName}. If you didn't expect this invitation, you can safely ignore this email.`);
+Open the session: ${sessionUrl}
+
+If anything looks off or you'd rather not receive these, you can let ${invitedByName} know directly — this came from them, not from a list.
+
+— Annote`,
+  });
 }
