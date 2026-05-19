@@ -3,8 +3,6 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, Fragment } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Monitor,
-  Laptop,
   ChevronDown,
   ChevronUp,
   Camera,
@@ -2653,26 +2651,57 @@ function MembersTab({
 }
 
 /* ——— Security tab ——— */
-type SessionRow = {
-  id: string;
-  device: string;
-  browser: string;
-  location: string;
-  current: boolean;
-  icon: typeof Laptop;
-};
-
 function SecurityTab() {
   const router = useRouter();
-  const { isWorkspaceOwner, workspaceName } = useWorkspace();
-  const sessions = useMemo<SessionRow[]>(
-    () => [
-      { id: "1", device: "MacBook Pro", browser: "Chrome", location: "San Francisco, US", current: true, icon: Laptop },
-      { id: "2", device: "Windows PC", browser: "Chrome", location: "New York, US", current: false, icon: Monitor },
-    ],
-    []
-  );
+  const { isWorkspaceOwner, workspaceName, authEmail } = useWorkspace();
   const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  // Auth provider — gates the Password card (Google users have no password to reset)
+  const [authProvider, setAuthProvider] = useState<"google" | "password" | "unknown">("unknown");
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await authFetch("/api/users");
+        if (res?.ok) {
+          const json = await res.json() as { success: boolean; data?: { authProvider: "google" | "password" | "unknown" } };
+          if (json.success && json.data?.authProvider) {
+            setAuthProvider(json.data.authProvider);
+          }
+        }
+      } catch { /* non-fatal */ }
+    })();
+  }, []);
+
+  // Reset password state
+  const [resetPasswordModalOpen, setResetPasswordModalOpen] = useState(false);
+  const [resetPasswordSending, setResetPasswordSending] = useState(false);
+  const [resetPasswordError, setResetPasswordError] = useState<string | null>(null);
+  const [resetPasswordSuccess, setResetPasswordSuccess] = useState(false);
+
+  async function handleResetPasswordSubmit() {
+    if (!authEmail) { setResetPasswordError("No email on file. Try again later."); return; }
+    setResetPasswordError(null);
+    setResetPasswordSending(true);
+    try {
+      const res = await authFetch("/api/users/send-password-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: authEmail }),
+      });
+      if (!res?.ok) {
+        const json = await res?.json().catch(() => null) as { error?: { message: string } } | null;
+        setResetPasswordError(json?.error?.message ?? "Failed to send reset email. Try again.");
+        return;
+      }
+      setResetPasswordModalOpen(false);
+      setResetPasswordSuccess(true);
+      setTimeout(() => setResetPasswordSuccess(false), 5000);
+    } catch {
+      setResetPasswordError("Failed to send reset email. Try again.");
+    } finally {
+      setResetPasswordSending(false);
+    }
+  }
 
   // Transfer ownership state
   const [transferModalOpen, setTransferModalOpen] = useState(false);
@@ -2784,67 +2813,72 @@ function SecurityTab() {
           You are now a member of this workspace.
         </div>
       )}
-      <Card className={SETTINGS_CARD} as="article">
-        <SectionHeader
-          title="Password & Authentication"
-          description="Manage your password and two-factor authentication."
-        />
-        <div className={`mt-4 pt-4 border-t border-[var(--border-default)] ${ROW_GAP}`}>
-          <div className="flex flex-wrap items-center justify-between gap-4 py-1">
-            <div className="min-w-0">
-              <p className="text-[15px] font-medium text-[var(--text-heading)]">Change Password</p>
-              <p className={SETTING_DESC}>Update your account password.</p>
-            </div>
-            <Button variant="secondary" className={`${BTN_SECONDARY} shrink-0`}>
-              Change Password
-            </Button>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-4 pt-5 border-t border-[var(--border-default)]">
-            <div className="min-w-0">
-              <p className="text-[15px] font-medium text-[var(--text-heading)]">Enable Two-Factor Authentication</p>
-              <p className={SETTING_DESC}>Add an extra layer of security.</p>
-            </div>
-            <Button variant="secondary" className={`${BTN_SECONDARY} shrink-0`}>
-              Enable
-            </Button>
-          </div>
+      {resetPasswordSuccess && (
+        <div className="rounded-xl px-4 py-3 bg-[var(--color-success-bg)] border border-[var(--color-success)]/30 text-sm font-medium text-[var(--color-success)]">
+          Password reset email sent. Check your inbox.
         </div>
-      </Card>
-
-      <Card className={SETTINGS_CARD} as="article">
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-0">
+      )}
+      {authProvider === "password" ? (
+        <Card className={SETTINGS_CARD} as="article">
           <SectionHeader
-            title="Active Sessions"
-            description="Devices where you're currently signed in."
+            title="Password"
+            description="Manage your password."
           />
-          <Button variant="ghost" className="text-[14px] font-medium text-[var(--brand)] hover:underline shrink-0">
-            Log out of all other sessions
-          </Button>
-        </div>
-        <div className="mt-4 pt-4 border-t border-[var(--border-default)] space-y-2">
-          {sessions.map((s) => {
-            const Icon = s.icon;
-            return (
-              <div
-                key={s.id}
-                className="flex items-center gap-3 py-3 px-3 rounded-lg border border-transparent hover:bg-[var(--surface-hover)]/80 hover:border-[var(--border-default)] transition-all duration-200"
-              >
-                <Icon className="w-5 h-5 text-[var(--text-tertiary)] shrink-0" strokeWidth={1.8} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[15px] font-medium text-[var(--text-heading)]">{s.device}</p>
-                  <p className={SETTING_DESC}>{s.browser} · {s.location}</p>
-                </div>
-                {s.current && (
-                  <span className="text-xs font-semibold text-[var(--brand)] shrink-0">Current</span>
-                )}
+          <div className="mt-4 pt-4 border-t border-[var(--border-default)]">
+            <div className="flex flex-wrap items-center justify-between gap-4 py-1">
+              <div className="min-w-0">
+                <p className="text-[15px] font-medium text-[var(--text-heading)]">Reset Password</p>
+                <p className={SETTING_DESC}>Send a password reset link to your email.</p>
               </div>
-            );
-          })}
-        </div>
-      </Card>
+              <Button
+                variant="secondary"
+                className={`${BTN_SECONDARY} shrink-0`}
+                onClick={() => { setResetPasswordError(null); setResetPasswordModalOpen(true); }}
+              >
+                Reset Password
+              </Button>
+            </div>
+          </div>
+        </Card>
+      ) : authProvider === "google" ? (
+        <Card className={SETTINGS_CARD} as="article">
+          <SectionHeader
+            title="Password"
+            description="Manage your password."
+          />
+          <div className="mt-4 pt-4 border-t border-[var(--border-default)]">
+            <div className="flex flex-wrap items-center justify-between gap-4 py-1">
+              <div className="flex items-center gap-3 min-w-0">
+                <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden className="shrink-0">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                <div className="min-w-0">
+                  <p className="text-[15px] font-medium text-[var(--text-heading)]">
+                    Signed in with Google
+                  </p>
+                  <p className={SETTING_DESC}>
+                    Your password is managed by your Google account.
+                  </p>
+                </div>
+              </div>
+              <a
+                href="https://myaccount.google.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${BTN_SECONDARY} shrink-0`}
+              >
+                Manage Google account ↗
+              </a>
+            </div>
+          </div>
+        </Card>
+      ) : null}
 
       {/* Collapsible Danger Zone */}
-      <Card className={`${SETTINGS_CARD} border-[var(--color-danger-border)]`} as="article" style={{ background: "rgba(229,72,77,0.05)" }}>
+      <Card className={SETTINGS_CARD} as="article">
         <button
           type="button"
           onClick={() => setAdvancedOpen(!advancedOpen)}
@@ -2976,6 +3010,55 @@ function SecurityTab() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+        </ModalPortal>
+      )}
+
+      {/* Reset password modal */}
+      {resetPasswordModalOpen && (
+        <ModalPortal>
+        <div
+          className="fixed inset-0 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
+          style={{ zIndex: MODAL_LAYER_Z_INDEX }}
+          onClick={() => !resetPasswordSending && setResetPasswordModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reset-password-title"
+        >
+          <div
+            className="rounded-2xl shadow-lg bg-white p-6 max-w-md w-full cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="reset-password-title" className="text-[20px] font-semibold text-[var(--text-heading)]">
+              Reset Password
+            </h3>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">
+              We&apos;ll send a password reset link to{" "}
+              <strong className="text-[var(--text-heading)]">{authEmail ?? "your email"}</strong>.
+              {" "}Click the link in the email to set a new password.
+            </p>
+            {resetPasswordError && (
+              <p className="mt-3 text-sm text-[var(--color-danger)]">{resetPasswordError}</p>
+            )}
+            <div className="flex justify-end gap-2 pt-5">
+              <button
+                type="button"
+                onClick={() => setResetPasswordModalOpen(false)}
+                disabled={resetPasswordSending}
+                className={BTN_SECONDARY}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleResetPasswordSubmit()}
+                disabled={resetPasswordSending}
+                className={BTN_PRIMARY}
+              >
+                {resetPasswordSending ? "Sending…" : "Send Reset Email"}
+              </button>
+            </div>
           </div>
         </div>
         </ModalPortal>

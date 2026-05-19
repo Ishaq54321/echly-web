@@ -15,6 +15,18 @@ export async function POST(req: NextRequest) {
     return toAuthorizationResponse(err);
   }
 
+  const userRecord = await getAuth().getUser(user.uid);
+  const primaryProvider = userRecord.providerData[0]?.providerId;
+
+  if (primaryProvider !== "password") {
+    return apiError({
+      code: "GOOGLE_AUTH_NO_PASSWORD",
+      message:
+        "Cannot send password reset for accounts that don't use email/password sign-in.",
+      status: 400,
+    });
+  }
+
   let body: { email?: string };
   try {
     body = (await req.json()) as { email?: string };

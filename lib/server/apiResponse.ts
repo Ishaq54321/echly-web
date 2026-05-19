@@ -17,7 +17,9 @@ export type ApiErrorCode =
   | "ENTERPRISE_REQUIRES_MANUAL_OVERRIDE"
   | "CANNOT_DOWNGRADE_PAID_TO_STARTER"
   | "NEVER_PAID_REQUIRES_MANUAL_OVERRIDE"
-  | "PROVIDER_UPDATE_FAILED";
+  | "PROVIDER_UPDATE_FAILED"
+  // Password reset gate — account signs in via Google/SSO, not email+password.
+  | "GOOGLE_AUTH_NO_PASSWORD";
 
 export type ApiResponse<T = unknown> = {
   success: boolean;
