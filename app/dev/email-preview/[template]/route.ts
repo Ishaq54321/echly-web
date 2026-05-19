@@ -24,6 +24,13 @@ import { subscriptionConfirmationEmailHtml, subscriptionConfirmationEmailText } 
 import { subscriptionCancelledEmailHtml, subscriptionCancelledEmailText } from "@/lib/email/templates/subscriptionCancelled";
 import { paymentFailedEmailHtml, paymentFailedEmailText } from "@/lib/email/templates/paymentFailed";
 import { workspaceDeletedConfirmationHtml, workspaceDeletedConfirmationText } from "@/lib/email/templates/workspaceDeletedConfirmation";
+import { welcomeEmailHtml, welcomeEmailText } from "@/lib/email/templates/welcome";
+import { sessionOpenedEmailHtml, sessionOpenedEmailText } from "@/lib/email/templates/sessionOpened";
+import { newCommentEmailHtml, newCommentEmailText } from "@/lib/email/templates/newComment";
+import { mentionEmailHtml, mentionEmailText } from "@/lib/email/templates/mention";
+import { ticketAssignedEmailHtml, ticketAssignedEmailText } from "@/lib/email/templates/ticketAssigned";
+import { planLimitApproachingEmailHtml, planLimitApproachingEmailText } from "@/lib/email/templates/planLimitApproaching";
+import { planLimitHitEmailHtml, planLimitHitEmailText } from "@/lib/email/templates/planLimitHit";
 
 export const dynamic = "force-dynamic";
 
@@ -192,6 +199,83 @@ const TEMPLATES: Record<string, () => Variant> = {
       html: workspaceDeletedConfirmationHtml(p),
       text: workspaceDeletedConfirmationText(p),
     };
+  },
+
+  // ── Phase 4: new event-driven templates ──
+  "welcome": () => {
+    const p = { firstName: "Sam" };
+    return { html: welcomeEmailHtml(p), text: welcomeEmailText(p) };
+  },
+  "session-opened": () => {
+    const p = {
+      recipientName: "Sarah Chen",
+      sessionName: "Homepage redesign feedback",
+      sessionUrl: "https://annote.ai/s/PLACEHOLDER",
+    };
+    return {
+      html: sessionOpenedEmailHtml(p),
+      text: sessionOpenedEmailText(p),
+    };
+  },
+  "new-comment": () => {
+    const p = {
+      commenterName: "Jordan Lee",
+      ticketTitle: "CTA button is below the fold on mobile",
+      sessionName: "Homepage redesign feedback",
+      commentExcerpt:
+        "Confirmed on iPhone 14 — the primary button only shows after a scroll. We should pull it up above the testimonial block.",
+      commentUrl: "https://annote.ai/s/PLACEHOLDER#feedback-abc123",
+    };
+    return { html: newCommentEmailHtml(p), text: newCommentEmailText(p) };
+  },
+  "mention": () => {
+    const p = {
+      mentionerName: "Jordan Lee",
+      ticketTitle: "CTA button is below the fold on mobile",
+      sessionName: "Homepage redesign feedback",
+      commentExcerpt:
+        "@sam can you take this one? It overlaps with the nav work you're already doing.",
+      commentUrl: "https://annote.ai/s/PLACEHOLDER#feedback-abc123",
+    };
+    return { html: mentionEmailHtml(p), text: mentionEmailText(p) };
+  },
+  "ticket-assigned": () => {
+    const p = {
+      assignerName: "Jordan Lee",
+      ticketTitle: "CTA button is below the fold on mobile",
+      sessionName: "Homepage redesign feedback",
+      ticketUrl: "https://annote.ai/s/PLACEHOLDER#feedback-abc123",
+    };
+    return {
+      html: ticketAssignedEmailHtml(p),
+      text: ticketAssignedEmailText(p),
+    };
+  },
+  "plan-approaching": () => {
+    const p = {
+      firstName: "Sam",
+      planName: "Starter",
+      usageCount: 40,
+      planLimit: 50,
+      workspaceName: "Acme Design",
+      daysRemaining: 6,
+      resetDate: "June 19, 2026",
+      upgradeUrl: "https://annote.ai/settings?tab=billing",
+    };
+    return {
+      html: planLimitApproachingEmailHtml(p),
+      text: planLimitApproachingEmailText(p),
+    };
+  },
+  "plan-hit": () => {
+    const p = {
+      firstName: "Sam",
+      planLimit: 50,
+      workspaceName: "Acme Design",
+      resetDate: "June 19, 2026",
+      upgradeUrl: "https://annote.ai/settings?tab=billing",
+    };
+    return { html: planLimitHitEmailHtml(p), text: planLimitHitEmailText(p) };
   },
 };
 
