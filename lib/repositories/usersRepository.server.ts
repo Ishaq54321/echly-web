@@ -1,6 +1,6 @@
 import "server-only";
 import { adminDb } from "@/lib/server/firebaseAdmin";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { MISSING_USER_WORKSPACE_ERROR } from "@/lib/constants/userWorkspace";
 import {
   createWorkspaceRepo,
@@ -354,6 +354,37 @@ export interface UserDoc {
    * other workspaces the user has been invited to. */
   workspaceMemberships?: string[];
   isAdmin?: boolean;
+
+  /**
+   * Last time the user made an authenticated request. Written by requireAuth,
+   * throttled to at most once per hour (see maybeUpdateLastActive in
+   * lib/server/auth.ts). Approximate by design — last-write-wins under races.
+   */
+  lastActiveAt?: Timestamp;
+
+  /**
+   * Per-category email opt-out preferences. Field is OPTIONAL: existing users
+   * won't have it, and a missing field (or missing key) means that category is
+   * still enabled. Always read via getEmailPreferences() in
+   * lib/email/preferences.ts so defaults apply. Transactional email
+   * (password reset, verification, billing, security) ignores this entirely.
+   */
+  emailPreferences?: {
+    lifecycle: boolean; // welcome, drip, milestone emails
+    notifications: boolean; // comment, mention, assignment, session-opened
+    digest: boolean; // weekly digest (deferred to post-launch)
+    marketing: boolean; // future product announcements
+  };
+
+  /**
+   * Tracks one-time email sends so cron retries / duplicate triggers don't
+   * re-send. Each key is set to the server timestamp of the first send.
+   */
+  emailSends?: {
+    welcome?: Timestamp;
+    // Future: day1Capture, day3Sessions, day7InviteTeam, day14CheckIn, inactivity
+  };
+
   [key: string]: unknown;
 }
 
