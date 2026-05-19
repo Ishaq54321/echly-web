@@ -31,9 +31,9 @@ import { useToast } from "@/components/dashboard/context/ToastContext";
 import { CommentItem } from "@/components/comments/CommentItem";
 import {
   TiptapCommentEditor,
-  extractFromDoc,
   type TiptapEditorParticipant,
 } from "@/components/comments/TiptapCommentEditor";
+import { extractFromDoc } from "@/lib/tiptap/extractFromDoc";
 import { Tooltip } from "@/components/ui/Tooltip";
 import {
   assertIdentityResolved,

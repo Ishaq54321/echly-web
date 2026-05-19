@@ -5,7 +5,7 @@ import { WorkspaceStoreProvider } from "@/lib/client/workspaceStore";
 import { WorkspaceSuspendedGuard } from "@/components/workspace/WorkspaceSuspendedGuard";
 import { WorkspaceIdentityGate } from "@/components/workspace/WorkspaceIdentityGate";
 import { BillingUsageCacheInitializer } from "@/components/billing/BillingUsageCacheInitializer";
-import { GlobalSearch } from "@/components/search/GlobalSearch";
+import { LazyGlobalSearch } from "@/components/search/LazyGlobalSearch";
 import { AppBootReadinessBridge } from "@/components/providers/AppBootGate";
 
 export default function AppLayout({
@@ -28,7 +28,7 @@ export default function AppLayout({
               </div>
             </main>
           </div>
-          <GlobalSearch />
+          <LazyGlobalSearch />
           <div className="fixed bottom-4 right-6 text-[12px] text-meta pointer-events-none">
             All changes saved • Secure session
           </div>

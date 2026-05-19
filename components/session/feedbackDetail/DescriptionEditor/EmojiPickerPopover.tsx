@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import dynamic from "next/dynamic";
 import { usePortalHost } from "./PortalHost";
 
-const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
+// React.lazy (not next/dynamic) so esbuild's code-splitting actually emits
+// emoji-picker-react (~299 KB) as its own chunk for the extension build.
+// next/dynamic is a Next.js construct esbuild inlines. The component only
+// renders behind the open/position/portalHost guard below (never on the
+// server), so no SSR handling is needed.
+const EmojiPicker = lazy(() => import("emoji-picker-react"));
 
 export interface EmojiPickerPopoverProps {
   anchorEl: HTMLElement | null;
@@ -112,15 +116,25 @@ export function EmojiPickerPopover({
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <EmojiPicker
-        onEmojiClick={(emojiData: { emoji: string }) => {
-          onSelect(emojiData.emoji);
-        }}
-        width={POPOVER_WIDTH}
-        height={POPOVER_HEIGHT}
-        searchPlaceHolder="Search emoji..."
-        previewConfig={{ showPreview: false }}
-      />
+      <Suspense
+        fallback={
+          <div
+            style={{ width: POPOVER_WIDTH, height: POPOVER_HEIGHT }}
+            aria-busy="true"
+            aria-label="Loading emoji picker"
+          />
+        }
+      >
+        <EmojiPicker
+          onEmojiClick={(emojiData: { emoji: string }) => {
+            onSelect(emojiData.emoji);
+          }}
+          width={POPOVER_WIDTH}
+          height={POPOVER_HEIGHT}
+          searchPlaceHolder="Search emoji..."
+          previewConfig={{ showPreview: false }}
+        />
+      </Suspense>
     </div>,
     portalHost,
   );

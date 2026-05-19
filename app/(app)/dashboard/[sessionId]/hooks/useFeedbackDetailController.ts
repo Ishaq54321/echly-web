@@ -21,6 +21,8 @@ import {
 import { useCommentsRepoSubscription } from "@/lib/hooks/useCommentsRepoSubscription";
 import { handlePermissionError } from "@/lib/client/permissionError";
 import { safeResolveAction } from "@/lib/client/safeResolveAction";
+import { authFetch } from "@/lib/authFetch";
+import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 
 type PendingCommentPatch = { message?: string; resolved?: boolean };
 
@@ -510,12 +512,36 @@ export function useFeedbackDetailController(args: {
 
   useEffect(() => {
     if (!sessionId) return;
-    fetch(`/api/sessions/${sessionId}/participants`)
-      .then((res) => res.json())
-      .then((data: { data?: { participants?: { uid: string; displayName: string; email: string; avatarUrl: string | null }[] } }) => {
-        if (data.data?.participants) setParticipants(data.data.participants);
-      })
-      .catch(() => {});
+    let cancelled = false;
+
+    (async () => {
+      try {
+        // authFetch attaches the Bearer token — the participants route
+        // requires auth and 401s on a raw fetch (silently leaving the
+        // @-mention list empty for signed-in users).
+        const res = await authFetch(
+          `/api/sessions/${encodeURIComponent(sessionId)}/participants`
+        );
+        if (!res?.ok) return;
+        const json = await res.json();
+        const { participants: list } = requireApiSuccessData<{
+          participants?: {
+            uid: string;
+            displayName: string;
+            email: string;
+            avatarUrl: string | null;
+          }[];
+        }>(json);
+        if (!cancelled && list) setParticipants(list);
+      } catch {
+        // Best-effort: mentions still work via other participant sources;
+        // a failure here just means no preloaded directory.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [sessionId]);
 
   return {

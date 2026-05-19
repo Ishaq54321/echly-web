@@ -46,7 +46,6 @@ export type SessionOverlayProps = {
   onResetVoice?: () => void;
   onSelectMicrophone?: (deviceId: string) => void;
   voiceMicDeviceId?: string;
-  theme?: "light" | "dark";
   __extensionSavingState?: boolean;
   onModeChange?: (mode: "voice" | "text") => void;
   /** When true, suspend hover highlighting and click capture (e.g. mouse is over the Echly tray). */

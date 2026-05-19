@@ -595,6 +595,7 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
           <UserAvatar
             photoURL={n.actor?.photoURL || null}
             name={n.actor?.name}
+            colorSeed={n.actor?.id}
             alt={n.actor?.name || "Notification"}
             className="h-full w-full"
           />
@@ -693,6 +694,7 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
           <UserAvatar
             photoURL={latest.actor?.photoURL || null}
             name={latest.actor?.name}
+            colorSeed={latest.actor?.id}
             alt={latest.actor?.name || "Notification"}
             className="h-full w-full"
           />

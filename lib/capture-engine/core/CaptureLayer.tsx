@@ -59,8 +59,6 @@ export type CaptureLayerProps = {
   onResetVoice?: () => void;
   onSelectMicrophone?: (deviceId: string) => void;
   voiceMicDeviceId?: string;
-  /** Matches widget theme for text feedback modal (light/dark glass). */
-  theme?: "light" | "dark";
   /** Extension: derived saving indicator for session chrome. */
   __extensionSavingState?: boolean;
   /** Called when user switches mode from within an overlay — syncs the header toggle. */
@@ -108,7 +106,6 @@ export function CaptureLayer({
   onResetVoice,
   onSelectMicrophone,
   voiceMicDeviceId = "",
-  theme = "dark",
   __extensionSavingState,
   onModeChange,
   captureSuspended = false,
@@ -155,7 +152,6 @@ export function CaptureLayer({
           onSaveText={onSessionSaveText}
           onCancel={onSessionFeedbackCancel}
           onStopVoiceForModeSwitch={onStopVoiceForModeSwitch}
-          theme={theme}
           __extensionSavingState={__extensionSavingState}
           onModeChange={onModeChange}
           captureSuspended={captureSuspended}

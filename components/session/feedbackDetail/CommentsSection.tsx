@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { AtSign, Smile, Paperclip, X } from "lucide-react";
 import type { Comment, CommentAttachment, CommentPosition } from "@/lib/domain/comment";
 import { CommentItem } from "@/components/comments/CommentItem";
-import { extractFromDoc } from "@/components/comments/TiptapCommentEditor";
+import { extractFromDoc } from "@/lib/tiptap/extractFromDoc";
 import { Tooltip } from "@/components/ui/Tooltip";
 
 const TiptapCommentEditor = dynamic(
@@ -804,6 +804,18 @@ export function CommentsSection({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (att) => (att as any)._loading
   );
+
+  // Don't render the section (incl. the "Comments" title) when there is
+  // nothing to show: no composer (non-commenting viewer) and no existing
+  // comments. Keeps anonymous/view-only viewers from seeing an orphan
+  // header. `loading` is intentionally NOT part of this guard: for anon
+  // viewers the comments subscription is gated off, so `loading` latches
+  // true after the first ticket change and never clears. Authed commenters
+  // always have a truthy `sendComment`, so the section stays visible
+  // mid-fetch for them regardless.
+  if (!sendComment && roots.length === 0) {
+    return null;
+  }
 
   return (
     <section className="mt-12 min-w-0">

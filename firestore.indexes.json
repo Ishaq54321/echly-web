@@ -236,6 +236,15 @@
       "collectionGroup": "activityEvents",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "sessionId", "order": "ASCENDING" },
+        { "fieldPath": "feedbackId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "activityEvents",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "eventType", "order": "ASCENDING" },
         { "fieldPath": "feedbackId", "order": "ASCENDING" },
         { "fieldPath": "actor.id", "order": "ASCENDING" },

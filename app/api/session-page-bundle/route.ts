@@ -166,12 +166,14 @@ export async function GET(req: NextRequest) {
         });
       }
     }
-    // Bundle includes feedback whenever the viewer cannot use Firestore listeners:
-    //   - anonymous viewers (no auth)
-    //   - authed link_view viewers (no member doc, no sessionAccess mirror — rules
-    //     would deny their listener attach, so they need bundle feedback)
-    // Workspace members and explicit session-members skip — they use realtime listeners.
-    const needsBundleFeedback = !access.hasDirectSessionGrant;
+    // Phase 2.1: ALL viewers get the first feedback page inline.
+    //   - anon / authed link_view viewers: this is their ONLY feedback
+    //     source (rules deny their listener attach) — unchanged.
+    //   - workspace / session members: used purely to seed first paint
+    //     (hydrateFeedbackFromBundle) so the ticket list shows instantly
+    //     instead of blocking on the realtime listener's cold start; the
+    //     listener then attaches and becomes authoritative.
+    const needsBundleFeedback = true;
     const canResolveAccess = !!access?.capabilities.canResolve;
 
     const [sessionWithBranding, feedbackPageResult, pendingAccessList] = await Promise.all([

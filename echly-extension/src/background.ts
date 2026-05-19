@@ -1241,13 +1241,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ success: false, error: "No tab ID" });
       return;
     }
+    // The widget is now an ES module (esbuild format:"esm" + splitting), so
+    // it cannot be injected as a classic script via `files`. Instead inject a
+    // tiny classic wrapper that dynamically import()s the widget module from
+    // the extension origin. The wrapper returns the import promise so
+    // executeScript only resolves once the module (and its chunks) finished
+    // loading and the widget signalled ECHLY_WIDGET_READY itself.
+    const widgetUrl = chrome.runtime.getURL("widget/widget.js");
     chrome.scripting.executeScript({
       target: { tabId },
-      files: ["widget.js"],
+      // ISOLATED world (default) keeps the widget in the content-script
+      // context, same as the previous classic-script injection.
+      func: (url: string) => {
+        const w = window as Window & { __ECHLY_WIDGET_LOADED__?: boolean };
+        if (w.__ECHLY_WIDGET_LOADED__) return;
+        return import(url).catch((err) => {
+          console.error("[Echly] widget module load failed:", err);
+          throw err;
+        });
+      },
+      args: [widgetUrl],
     }).then(() => {
       sendResponse({ success: true });
     }).catch((err) => {
-      console.error("[Echly] Failed to inject widget.js:", err);
+      console.error("[Echly] Failed to inject widget module:", err);
       sendResponse({ success: false, error: err?.message });
     });
     return true;

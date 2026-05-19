@@ -38,6 +38,40 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   ]);
 }
 
+// PERF (Phase 2.3): member count is read from the lightweight
+// /api/workspace/member-count endpoint (Firestore .count(), no roster fan-out)
+// instead of the heavy /api/workspace/members/all. Module-level 30s cache so
+// tab navigation / provider remounts within the window don't refetch. Short
+// enough that invite/removal changes still surface quickly.
+const MEMBER_COUNT_TTL_MS = 30_000;
+const memberCountCache = new Map<string, { count: number; expires: number }>();
+
+async function fetchWorkspaceMemberCount(
+  workspaceId: string
+): Promise<number | null> {
+  const cached = memberCountCache.get(workspaceId);
+  if (cached && Date.now() < cached.expires) {
+    return cached.count;
+  }
+  try {
+    const res = await authFetch("/api/workspace/member-count");
+    if (!res?.ok) return null;
+    const body = (await res.json()) as {
+      success?: boolean;
+      data?: { totalMembers?: number };
+    } | null;
+    const count = body?.data?.totalMembers;
+    if (typeof count !== "number" || !Number.isFinite(count)) return null;
+    memberCountCache.set(workspaceId, {
+      count,
+      expires: Date.now() + MEMBER_COUNT_TTL_MS,
+    });
+    return count;
+  } catch {
+    return null;
+  }
+}
+
 export type WorkspaceMembership = {
   workspaceId: string;
   name: string;
@@ -242,6 +276,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       if (currentGen !== authSyncGenerationRef.current) return;
 
       let workspaceIdFromResponse: string | null = null;
+      // Default to true so a missing field (older deployment / parse failure)
+      // preserves the original always-force-refresh behavior.
+      let claimsChanged = true;
       if (res != null && res.ok) {
         try {
           const body = await res.json() as {
@@ -251,8 +288,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
               avatarUrl?: string | null;
               firstName?: string;
               lastName?: string;
+              claimsChanged?: boolean;
             };
           };
+          if (typeof body?.data?.claimsChanged === "boolean") {
+            claimsChanged = body.data.claimsChanged;
+          }
           if (body?.data?.avatarUrl) {
             setAvatarUrl(body.data.avatarUrl);
           }
@@ -277,12 +318,16 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       if (currentGen !== authSyncGenerationRef.current) return;
 
       const currentUser = auth.currentUser;
-      if (currentUser) {
+      if (currentUser && claimsChanged) {
         try {
           await withTimeout(currentUser.getIdToken(true), 5000, "getIdToken");
           // Phase 28.X — this forced refresh picks up updated custom claims
           // (e.g. workspaceId). Drop the authFetch token cache so the next
           // request sends the new token, not the stale cached one.
+          // PERF (Phase 2.2): skipped entirely when the server reports
+          // claimsChanged=false — the existing token already carries correct
+          // claims, so the ~0.5-2s round-trip to Google's token endpoint is
+          // pure waste for returning users.
           clearAuthTokenCache();
         } catch (err) {
           console.warn("[WorkspaceContext] Token refresh failed/timed out:", err);
@@ -523,15 +568,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     };
   }, [claimsReady, authUid, membershipsRefreshTick]);
 
-  // Fetch member count once when active workspace changes
+  // Fetch member count when active workspace changes (30s module cache;
+  // lightweight count endpoint — see fetchWorkspaceMemberCount).
   useEffect(() => {
     if (!activeWorkspaceId || !claimsReady) return;
-    authFetch("/api/workspace/members/all")
-      .then((res) => res?.ok ? res.json() : null)
-      .then((body: { success?: boolean; data?: { totalMembers?: number } } | null) =>
-        setMemberCount(body?.data?.totalMembers ?? 0)
-      )
-      .catch(() => setMemberCount(0));
+    let cancelled = false;
+    void (async () => {
+      const count = await fetchWorkspaceMemberCount(activeWorkspaceId);
+      if (cancelled) return;
+      setMemberCount(count ?? 0);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [activeWorkspaceId, claimsReady]);
 
   // Phase 28.X — warm the member-list cache on every page load so the Assign

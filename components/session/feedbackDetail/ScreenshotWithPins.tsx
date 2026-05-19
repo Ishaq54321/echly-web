@@ -2,7 +2,6 @@
 
 import React, { useState, useCallback, useRef, memo, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
-import Image from "next/image";
 import { Expand, Info, Loader2, MessageSquare, Pencil, Smile, Paperclip, X, AtSign } from "lucide-react";
 import EmojiPicker from "emoji-picker-react";
 import type { Editor } from "@tiptap/react";
@@ -12,7 +11,9 @@ import { parseDeviceInfo, formatLocalDateTime } from "@/lib/utils/captureInfo";
 import type { Comment } from "@/lib/domain/comment";
 import type { CommentPosition, CommentAttachment } from "@/lib/domain/comment";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { TiptapCommentEditor, extractFromDoc, type TiptapEditorParticipant } from "@/components/comments/TiptapCommentEditor";
+import { UserAvatar } from "@/components/ui/UserAvatar";
+import { TiptapCommentEditor, type TiptapEditorParticipant } from "@/components/comments/TiptapCommentEditor";
+import { extractFromDoc } from "@/lib/tiptap/extractFromDoc";
 
 function getUploadBoxColor(fileName: string): string {
   const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
@@ -243,7 +244,7 @@ const ScreenshotWithPinsInner = ({
   const deviceLine = parseDeviceInfo(userAgent, viewportWidth, viewportHeight, devicePixelRatio);
   const dateLine = formatLocalDateTime(createdAt);
   const tooltipContent = [trimmedPageArea, deviceLine, dateLine].filter(Boolean).join("\n");
-  const { displayName, authEmail, authPhotoUrl } = useWorkspace();
+  const { displayName, authEmail, authPhotoUrl, authUid } = useWorkspace();
   const containerRef = useRef<HTMLDivElement>(null);
   const draftPopoverRef = useRef<HTMLDivElement>(null);
   const pinEditorRef = useRef<Editor | null>(null);
@@ -540,13 +541,14 @@ const ScreenshotWithPinsInner = ({
 
                 {/* Row 1: Avatar + textarea */}
                 <div className="flex items-start gap-3 px-4 pt-4">
-                  <div className="w-[28px] h-[28px] rounded-full bg-[var(--brand-subtle)] text-[var(--brand)] font-semibold text-[14px] flex items-center justify-center shrink-0 overflow-hidden mt-0.5">
-                    {userAvatar ? (
-                      <Image src={userAvatar} alt="" width={28} height={28} className="w-full h-full object-cover" unoptimized />
-                    ) : (
-                      userName.charAt(0).toUpperCase()
-                    )}
-                  </div>
+                  <UserAvatar
+                    photoURL={userAvatar || null}
+                    name={userName}
+                    colorSeed={authUid}
+                    size={28}
+                    alt=""
+                    className="mt-0.5"
+                  />
                   <div className="flex-1 min-w-0 py-1.5">
                     <TiptapCommentEditor
                       placeholder="Add a comment..."

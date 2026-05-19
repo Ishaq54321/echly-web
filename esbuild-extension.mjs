@@ -97,12 +97,21 @@ await esbuild.build({
   absWorkingDir: root,
 });
 
-// Widget: heavy React UI, lazy-loaded via <script src="widget.js"> by bootstrap.
+// Widget: heavy React UI, lazy-loaded by bootstrap via a dynamic import().
+//
+// format:"esm" + splitting lets esbuild emit shared/lazy chunks so the
+// editor stack (TipTap/ProseMirror/emoji-picker) only downloads on first
+// ticket edit. iife silently inlined every dynamic import, defeating that.
+// Output is a directory (echly-extension/widget/) — the entry resolves its
+// chunks by relative path from the extension origin at runtime.
 await esbuild.build({
   entryPoints: [path.join(extDir, "src", "content.tsx")],
   bundle: true,
-  format: "iife",
-  outfile: path.join(extDir, "widget.js"),
+  format: "esm",
+  splitting: true,
+  outdir: path.join(extDir, "widget"),
+  entryNames: "widget",
+  chunkNames: "chunks/[name]-[hash]",
   platform: "browser",
   target: "chrome110",
   minify: isProd,

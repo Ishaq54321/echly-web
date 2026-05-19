@@ -42,6 +42,9 @@ import {
 import {
   retainFeedbackListener,
   useFeedbackStore,
+  hydrateFeedbackFromBundle,
+  loadMoreFeedback as loadMoreFeedbackTail,
+  feedbackHasMoreTail,
 } from "@/lib/realtime/feedbackStore";
 import {
   retainPresenceListener,
@@ -111,6 +114,50 @@ import { Modal } from "@/components/ui/Modal";
 
 /** Session page: single GET for session + first feedback page. Set false to restore legacy `/api/sessions` + `/api/feedback` first page. */
 const USE_BUNDLE = true;
+
+/**
+ * PERF R-006 — module-level session-page-bundle cache.
+ *
+ * A→B→A tab navigation previously refetched the full bundle every time.
+ * This caches the parsed 200 body keyed by sessionId + viewer identity
+ * for a short TTL so the return trip paints instantly. Only successful
+ * (200) bodies are cached — never 403/error, so access changes are never
+ * masked. Realtime listeners still correct the list after first paint;
+ * the cache only accelerates that first paint. Cleared on sign-out to
+ * prevent cross-account leakage.
+ */
+const BUNDLE_CACHE_TTL_MS = 30_000;
+const bundleResponseCache = new Map<
+  string,
+  { body: unknown; expires: number }
+>();
+
+function bundleCacheKey(sessionId: string, viewerId: string): string {
+  return `${sessionId.trim()}::${viewerId || "anon"}`;
+}
+
+function getCachedBundle(key: string): unknown | null {
+  const hit = bundleResponseCache.get(key);
+  if (!hit) return null;
+  if (Date.now() >= hit.expires) {
+    bundleResponseCache.delete(key);
+    return null;
+  }
+  return hit.body;
+}
+
+function setCachedBundle(key: string, body: unknown): void {
+  bundleResponseCache.set(key, {
+    body,
+    expires: Date.now() + BUNDLE_CACHE_TTL_MS,
+  });
+}
+
+/** Drop every cached bundle — called on identity changes so a different
+ *  account never reads the previous user's session data from cache. */
+function clearBundleCache(): void {
+  bundleResponseCache.clear();
+}
 
 /** Broadcast ticket update to extension tray so tray stays in sync. */
 function broadcastTicketUpdated(ticket: { id: string; title: string; description?: string | null; type?: string }) {
@@ -432,6 +479,15 @@ export default function SessionPageClient({
     [session?.workspaceId, ctxWorkspaceId]
   );
 
+  // Stable presence-of-workspaceId signal for the realtime retain-effects.
+  // effectiveWorkspaceId's *value* flips (ctxWorkspaceId → session.workspaceId)
+  // once the bundle hydrates the session, which would detach + re-attach the
+  // SAME listener query mid-flight (the "ca9" SDK assertion trigger). The retain
+  // effects only care *whether* a workspaceId exists, not which one — they read
+  // the up-to-date value from workspaceIdForListenersRef at attach time. Gating
+  // on this boolean means it goes false→true exactly once and never flips back.
+  const hasWorkspaceId = Boolean(effectiveWorkspaceId?.trim());
+
   /**
    * Clear the optimistic overlay only after the listener has had time to catch up
    * to the mutation (500ms grace). Clearing on every listener tick would wipe an
@@ -447,6 +503,12 @@ export default function SessionPageClient({
   }, [sessionStoreState.version, optimisticSession]);
   const authUidRef = useRef<string | null>(null);
   useEffect(() => {
+    // Identity actually changed (sign-in / sign-out / account switch) →
+    // drop cached bundles so the new identity never reads the old one's
+    // session data. Skip the initial null→value mount transition.
+    if (authUidRef.current !== null && authUidRef.current !== authUid) {
+      clearBundleCache();
+    }
     authUidRef.current = authUid;
   }, [authUid]);
   const { showToast, dismissToast } = useToast();
@@ -1098,16 +1160,27 @@ export default function SessionPageClient({
     anonymousBundledFeedback == null ? feedbackStoreState.loading : false;
   const feedbackCountsLoading = feedbackLoading;
   const isCountsSynced = !feedbackLoading;
-  // Bundle-mode pagination: real flags when bundle is the source list, otherwise
-  // listener-mode (which has no append-pagination — the listener delivers the
-  // whole collection).
+  // Pagination flags. Two modes:
+  //  • Bundle-mode (anon / link_view): bundle is the source list, paginate
+  //    via /api/feedback.
+  //  • Listener-mode (members): the listener now caps at 500 (Phase 2.2),
+  //    so >500-ticket sessions have a non-realtime deep tail paged via the
+  //    store's loadMoreFeedbackTail. <=500 (the common case) → no tail.
+  const listenerTailHasMore =
+    anonymousBundledFeedback == null && feedbackHasMoreTail(sessionId);
   const hasMoreFeedback =
-    anonymousBundledFeedback != null ? hasMoreFeedbackPaginated : false;
+    anonymousBundledFeedback != null
+      ? hasMoreFeedbackPaginated
+      : listenerTailHasMore;
   const feedbackReachedLimit = false;
   const feedbackLoadingMore = feedbackLoadingMorePaginated;
   const feedbackLoadingResolved = false;
   const feedbackLoadMoreRef: React.RefObject<HTMLDivElement | null> | undefined =
-    anonymousBundledFeedback != null ? feedbackLoadMoreRefInternal : undefined;
+    anonymousBundledFeedback != null
+      ? feedbackLoadMoreRefInternal
+      : listenerTailHasMore
+        ? feedbackLoadMoreRefInternal
+        : undefined;
 
   // Load-more for bundle-mode viewers. Calls /api/feedback (auth-aware, supports
   // anon share-token via authFetchOrAnonCookie) with the cursor and appends to
@@ -1178,6 +1251,32 @@ export default function SessionPageClient({
     observer.observe(node);
     return () => observer.disconnect();
   }, [anonymousBundledFeedback, hasMoreFeedbackPaginated, loadMoreFeedback]);
+
+  // Listener-mode (members) deep-tail observer: only sessions beyond the
+  // 500-row realtime window (Phase 2.2) have a tail. Pages it in via the
+  // store's loadMoreFeedbackTail; the store re-emits the composed list so
+  // the existing TicketList renders the appended rows. No-op for the
+  // common <=500-ticket session (feedbackHasMoreTail is false).
+  useEffect(() => {
+    if (anonymousBundledFeedback != null) return; // bundle-mode handled above
+    if (!listenerTailHasMore) return;
+    const node = feedbackLoadMoreRefInternal.current;
+    if (!node) return;
+    let loading = false;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !loading) {
+          loading = true;
+          void loadMoreFeedbackTail(sessionId.trim()).finally(() => {
+            loading = false;
+          });
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [anonymousBundledFeedback, listenerTailHasMore, sessionId]);
 
   // Listener-derived counts auto-update from optimistic overlays, so the deltas
   // the deleted hook tracked are no longer needed.
@@ -1546,18 +1645,44 @@ export default function SessionPageClient({
       if (cancelled || effectNonce !== sessionLoadEffectNonceRef.current) return;
 
       if (USE_BUNDLE) {
-        // PERF R-006: cache short-circuit happens synchronously above, before
-        // the identity gate. By the time we get here, no cached entry exists.
         const bundleSp = new URLSearchParams({ sessionId: sessionId.trim() });
         if (!authUidRef.current?.trim()) {
           const anonId = getViewerId(null);
           if (anonId) bundleSp.set("viewerId", anonId);
         }
         const bundleUrl = `/api/session-page-bundle?${bundleSp.toString()}`;
-        const res = await authFetchOrAnonCookie(bundleUrl);
-        if (cancelled || effectNonce !== sessionLoadEffectNonceRef.current) return;
-        const body = await res.json().catch(() => null);
-        if (cancelled || effectNonce !== sessionLoadEffectNonceRef.current) return;
+
+        // PERF R-006: real module-level cache short-circuit. A→B→A tab
+        // navigation within the TTL paints from the cached 200 body with
+        // zero network. Realtime listeners still correct the list after.
+        const cacheKey = bundleCacheKey(
+          sessionId,
+          getViewerId(authUidRef.current) || ""
+        );
+        const cachedBody = getCachedBundle(cacheKey);
+
+        let body: unknown;
+        // Cached bodies are 200-only by construction, so a cache hit is
+        // equivalent to a fresh 200 for all downstream status branching.
+        let responseStatus: number;
+        let responseOk: boolean;
+        if (cachedBody !== null) {
+          body = cachedBody;
+          responseStatus = 200;
+          responseOk = true;
+        } else {
+          const res = await authFetchOrAnonCookie(bundleUrl);
+          if (cancelled || effectNonce !== sessionLoadEffectNonceRef.current) return;
+          body = await res.json().catch(() => null);
+          if (cancelled || effectNonce !== sessionLoadEffectNonceRef.current) return;
+          responseStatus = res.status;
+          responseOk = res.ok;
+          // Cache only successful payloads — never 403/error, so an
+          // access change is never masked by a stale cached allow.
+          if (res.status === 200 && body !== null && typeof body === "object") {
+            setCachedBundle(cacheKey, body);
+          }
+        }
         if (body === null || typeof body !== "object") {
           setAnonymousBundledFeedback(null);
           setSessionFetchError("error");
@@ -1566,7 +1691,7 @@ export default function SessionPageClient({
         const accessRoot = body as {
           access?: { capabilities?: Partial<AccessCapabilities>; isWorkspaceMember?: boolean };
         };
-        if (res.status === 403) {
+        if (responseStatus === 403) {
           setAnonymousBundledFeedback(null);
           const errorBody = body as {
             data?: {
@@ -1608,7 +1733,7 @@ export default function SessionPageClient({
           setSessionFetchError("forbidden");
           return;
         }
-        if (res.status === 404) {
+        if (responseStatus === 404) {
           setAnonymousBundledFeedback(null);
           setAccessBlocked(false);
           setSession(null);
@@ -1617,7 +1742,7 @@ export default function SessionPageClient({
           setSessionFetchError("not_found");
           return;
         }
-        if (!res.ok) {
+        if (!responseOk) {
           setAnonymousBundledFeedback(null);
           setAccessBlocked(false);
           setSession(null);
@@ -1713,18 +1838,50 @@ export default function SessionPageClient({
         const assembledPendingResolve =
           requestPayload !== undefined && requestPayload.pendingResolve === true;
         setPendingResolveRequest(assembledPendingResolve);
-        // Bundle-mode viewers (anon + authed link_view) get the first page of feedback
-        // for first paint — they cannot subscribe to Firestore. Listener-mode viewers
-        // get null here and useFeedbackStore drives the list.
+        // Phase 2.1: the bundle now carries the first feedback page for
+        // ALL viewers. How it's consumed depends on the viewer mode:
+        //
+        //  • Listener-mode (workspace / session members — hasDirectSessionGrant):
+        //    SEED the realtime store for instant first paint, then let the
+        //    Firestore listener attach and become authoritative.
+        //    anonymousBundledFeedback stays null so useFeedbackStore drives
+        //    the list (realtime preserved — no bundle-only switch).
+        //
+        //  • Bundle-only (anon + authed link_view): unchanged — the bundle
+        //    is their ONLY source; drive the list off anonymousBundledFeedback
+        //    and paginate via /api/feedback.
+        // A direct-grant VIEWER (sessionAccess mirror doc, canResolve: false)
+        // has hasDirectSessionGrant=true but the privacy serializer nulls
+        // session.workspaceId for them. The realtime listener can't query
+        // without the session's real workspaceId — effectiveWorkspaceId would
+        // silently fall back to the VIEWER'S OWN ctxWorkspaceId and attach a
+        // listener to the wrong workspace (empty / rules-denied), yielding the
+        // empty-state bug. Gate listener-mode on the SERIALIZED workspaceId
+        // being present; without it, fall back to bundle-mode (same tradeoff
+        // as anon viewers: data shown, no realtime).
+        const serializedSessionWorkspaceId =
+          typeof (assembledSession as { workspaceId?: unknown }).workspaceId === "string"
+            ? ((assembledSession as { workspaceId: string }).workspaceId).trim()
+            : "";
+        const hasUsableListenerWorkspaceId = serializedSessionWorkspaceId.length > 0;
+        const canUseListenerMode =
+          assembledHasDirectSessionGrant && hasUsableListenerWorkspaceId;
         if (bundleFeedbackRows != null) {
           const mapped: Feedback[] = [];
           for (const row of bundleFeedbackRows) {
             const f = bundleFeedbackRowToFeedback(row, sessionId);
             if (f) mapped.push(f);
           }
-          setAnonymousBundledFeedback(mapped);
-          setFeedbackCursor(bundleNextCursor);
-          setHasMoreFeedbackPaginated(bundleHasMore);
+          if (canUseListenerMode) {
+            hydrateFeedbackFromBundle(sessionId.trim(), mapped);
+            setAnonymousBundledFeedback(null);
+            setFeedbackCursor(null);
+            setHasMoreFeedbackPaginated(false);
+          } else {
+            setAnonymousBundledFeedback(mapped);
+            setFeedbackCursor(bundleNextCursor);
+            setHasMoreFeedbackPaginated(bundleHasMore);
+          }
         } else {
           setAnonymousBundledFeedback(null);
           setFeedbackCursor(null);
@@ -1885,12 +2042,23 @@ export default function SessionPageClient({
     };
   }, [sessionId, authReady]);
 
+  // True only when the SESSION'S OWN workspaceId is present (not the
+  // ctxWorkspaceId fallback baked into effectiveWorkspaceId). For direct-grant
+  // VIEWERs the privacy serializer nulls session.workspaceId, so this is false
+  // and they must not attach a realtime listener — effectiveWorkspaceId would
+  // resolve to the viewer's own workspace and query the wrong feedback path.
+  const hasSessionOwnWorkspaceId = Boolean(
+    typeof session?.workspaceId === "string" && session.workspaceId.trim()
+  );
+
   // Listener-attach gate: only users with a direct realtime-eligible grant
-  // (workspace member, session-member doc, or sessionAccess mirror) may attach
-  // listeners. Authed link_view viewers are intentionally excluded — Firestore
-  // rules would deny their listener attach. They receive feedback via the
-  // bundle (REST mode) instead.
-  const canSubscribeToFirestore = hasDirectSessionGrant;
+  // (workspace member, session-member doc, or sessionAccess mirror) AND a
+  // usable session workspaceId may attach listeners. Authed link_view viewers
+  // are intentionally excluded — Firestore rules would deny their listener
+  // attach. Direct-grant VIEWERs (workspaceId nulled by the serializer) are
+  // also excluded here so they don't attach to the wrong workspace. Both
+  // receive feedback via the bundle (REST mode) instead.
+  const canSubscribeToFirestore = hasDirectSessionGrant && hasSessionOwnWorkspaceId;
 
   // Read workspaceId for listeners via a ref so it stays out of the retain-effect
   // dep array. session?.workspaceId hydrates from the bundle after first mount;
@@ -1911,7 +2079,7 @@ export default function SessionPageClient({
     if (!sid || !wid) return;
     const release = retainSessionListener(sid, wid);
     return () => release();
-  }, [isIdentityReady, canSubscribeToFirestore, sessionId, effectiveWorkspaceId]);
+  }, [isIdentityReady, canSubscribeToFirestore, sessionId, hasWorkspaceId]);
 
   // Realtime feedback subscription. Same gating as the session listener;
   // anonymous and unauthorized authed viewers fall through to the REST/bundle path.
@@ -1923,7 +2091,7 @@ export default function SessionPageClient({
     if (!sid || !wid) return;
     const release = retainFeedbackListener(sid, wid);
     return () => release();
-  }, [isIdentityReady, canSubscribeToFirestore, sessionId, effectiveWorkspaceId]);
+  }, [isIdentityReady, canSubscribeToFirestore, sessionId, hasWorkspaceId]);
 
   // Realtime presence subscription. Same gating as the other listeners.
   // The store filters stale heartbeats client-side and runs a 15s GC interval
@@ -2407,6 +2575,66 @@ export default function SessionPageClient({
     }
     setIsCommentMode(next);
   }, [isCommentMode, showToast, dismissToast]);
+
+  /* ===== Stable ExecutionView prop closures (Phase 1.7) =====
+     ExecutionView is React.memo'd; these were inline arrow funcs /
+     object literals in JSX, so they changed identity every render and
+     defeated the memo. Setters are stable, so empty deps are correct. */
+  const handleExecEdit = useCallback(() => {
+    setOpenImageInEditMode(true);
+    setIsImageExpanded(true);
+  }, []);
+
+  const handleExitCommentMode = useCallback(() => {
+    setIsCommentMode(false);
+  }, []);
+
+  const handlePinClick = useCallback((commentId: string) => {
+    // Phase 26.7: pin clicks navigate to the middle-panel comment
+    // (scroll + brief highlight) instead of opening the right rail.
+    setActivePinIdForPopover(null);
+    setHighlightedCommentId(commentId);
+    setAnimatingCommentId(commentId);
+    setTimeout(() => setAnimatingCommentId(null), 1100);
+  }, []);
+
+  const handleOpenThreadPanel = useCallback((id: string) => {
+    setActiveThreadId(id);
+    setActivePinIdForPopover(null);
+  }, []);
+
+  const handleCloseInlinePopover = useCallback(() => {
+    setActivePinIdForPopover(null);
+  }, []);
+
+  const handleCommentPlaced = useCallback((newCommentId?: string) => {
+    // Exit comment mode once the comment lands. Do NOT set activeThreadId
+    // here — that opens the right Activity rail, which the user doesn't
+    // want on placement. The pin still pulses.
+    setIsCommentMode(false);
+    if (newCommentId) {
+      setAnimatingCommentId(newCommentId);
+      setTimeout(() => setAnimatingCommentId(null), 1100);
+    }
+  }, []);
+
+  const execReadOnlyPermissions = useMemo(
+    () => ({
+      canComment: sessionAccess?.canComment === true,
+      canResolve: sessionAccess?.canResolve === true,
+    }),
+    [sessionAccess?.canComment, sessionAccess?.canResolve]
+  );
+
+  /* NOTE: ExecutionView is memo()'d and these closures are now stable,
+     but several sibling props (sendComment / sendReply / sendPinComment /
+     sendTextComment / updateComment / deleteComment from the controller,
+     plus saveTitle/saveDescription/saveTags/handleResolvedChange here)
+     are still plain per-render functions. Until those are stabilized
+     (a deliberately-deferred controller refactor), memo() will not skip
+     ExecutionView renders. Stabilizing these closures is still correct:
+     it removes per-render allocations passed deep into the tree and makes
+     memo() effective the moment the controller handlers are stabilized. */
 
   /* ================= SAVE TITLE (optimistic update, then PATCH) ================= */
 
@@ -3592,15 +3820,14 @@ export default function SessionPageClient({
         onSaveDescription={isWorkspaceMember ? saveDescription : undefined}
         onSaveTags={isWorkspaceMember ? saveTags : undefined}
         setIsImageExpanded={setIsImageExpanded}
-        onEdit={() => {
-          setOpenImageInEditMode(true);
-          setIsImageExpanded(true);
-        }}
+        onEdit={handleExecEdit}
         canEdit={isWorkspaceMember && Boolean(selectedItem?.screenshotId)}
         isCommentMode={isCommentMode}
         onTogglePinMode={handleTogglePinMode}
-        onExitCommentMode={() => setIsCommentMode(false)}
-        onToggleActivity={handleToggleActivity}
+        onExitCommentMode={handleExitCommentMode}
+        onToggleActivity={
+          sessionAccess?.canResolve ? handleToggleActivity : undefined
+        }
         isActivityPanelOpen={isActivityPanelOpen}
         highlightedCommentId={highlightedCommentId}
         impactScore={(selectedItem as { impactScore?: number } | null)?.impactScore}
@@ -3618,33 +3845,12 @@ export default function SessionPageClient({
         currentUserAvatarUrl={avatarUrl || authPhotoUrl || undefined}
         activePinIdForPopover={activePinIdForPopover}
         activeThreadId={activeThreadId}
-        onPinClick={(commentId: string) => {
-          // Phase 26.7: pin clicks now navigate to the middle-panel
-          // comment (scroll + brief highlight) instead of opening the
-          // right rail. The pin pulse animation is preserved.
-          setActivePinIdForPopover(null);
-          setHighlightedCommentId(commentId);
-          setAnimatingCommentId(commentId);
-          setTimeout(() => setAnimatingCommentId(null), 1100);
-        }}
-        onOpenThreadPanel={(id) => {
-          setActiveThreadId(id);
-          setActivePinIdForPopover(null);
-        }}
-        onCloseInlinePopover={() => setActivePinIdForPopover(null)}
+        onPinClick={handlePinClick}
+        onOpenThreadPanel={handleOpenThreadPanel}
+        onCloseInlinePopover={handleCloseInlinePopover}
         updateComment={updateComment}
         sendTextComment={sendTextComment}
-        onCommentPlaced={(newCommentId?: string) => {
-          // Exit comment mode once the comment lands. Do NOT set
-          // activeThreadId here — that opens the right Activity rail
-          // (see grid/aside gated on `activeThreadId != null`), which
-          // the user doesn't want on placement. The pin still pulses.
-          setIsCommentMode(false);
-          if (newCommentId) {
-            setAnimatingCommentId(newCommentId);
-            setTimeout(() => setAnimatingCommentId(null), 1100);
-          }
-        }}
+        onCommentPlaced={handleCommentPlaced}
         updatePinPosition={updatePinPosition}
         onDelete={
           canDeleteSelectedTicket ? () => setShowDeleteModal(true) : undefined
@@ -3654,10 +3860,7 @@ export default function SessionPageClient({
             ? true
             : !sessionAccess.canComment && !sessionAccess.canResolve
         }
-        readOnlyPermissions={{
-          canComment: sessionAccess?.canComment === true,
-          canResolve: sessionAccess?.canResolve === true,
-        }}
+        readOnlyPermissions={execReadOnlyPermissions}
         accessResolve={
           sessionAccess?.canView &&
           sessionAccess?.canResolve === false
@@ -3822,7 +4025,8 @@ export default function SessionPageClient({
               middle panel (ExecutionView). */}
           {(isActivityPanelOpen || activeThreadId != null) &&
             effectiveSelectedId &&
-            effectiveWorkspaceId && (
+            effectiveWorkspaceId &&
+            sessionAccess?.canResolve && (
               <aside
                 className="flex flex-col min-h-0 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300"
                 style={{ animationTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)' }}
@@ -3831,6 +4035,7 @@ export default function SessionPageClient({
                   <TicketActivityPanel
                     workspaceId={effectiveWorkspaceId as string}
                     feedbackId={effectiveSelectedId}
+                    sessionId={sessionId}
                     onClose={() => {
                       setActiveThreadId(null);
                       setIsActivityPanelOpen(false);

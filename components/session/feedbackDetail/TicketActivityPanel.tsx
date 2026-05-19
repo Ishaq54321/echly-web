@@ -21,6 +21,7 @@ import type { ActivityEvent } from "@/lib/activity/groupEvents";
 interface TicketActivityPanelProps {
   workspaceId: string;
   feedbackId: string;
+  sessionId: string;
   onClose: () => void;
 }
 
@@ -35,9 +36,14 @@ const KNOWN_EVENTS = new Set([
 export function TicketActivityPanel({
   workspaceId,
   feedbackId,
+  sessionId,
   onClose,
 }: TicketActivityPanelProps) {
-  const { events, loading } = useTicketActivity(workspaceId, feedbackId);
+  const { events, loading } = useTicketActivity(
+    workspaceId,
+    feedbackId,
+    sessionId
+  );
   const visible = events.filter((e) => KNOWN_EVENTS.has(e.eventType));
 
   return (

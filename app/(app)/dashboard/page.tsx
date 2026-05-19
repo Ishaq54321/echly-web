@@ -33,7 +33,10 @@ const EmptyDashboardCarousel = dynamic(
 import { ArchiveEmptyState } from "@/components/empty/ArchiveEmptyState";
 import { ToastProvider, useToast } from "@/components/dashboard/context/ToastContext";
 import { SessionsSearchProvider } from "@/components/dashboard/context/SessionsSearchContext";
-import DashboardCaptureHost from "./components/DashboardCaptureHost";
+const DashboardCaptureHost = dynamic(
+  () => import("./components/DashboardCaptureHost"),
+  { ssr: false }
+);
 import { DashboardUpgradeBanner } from "@/components/dashboard/DashboardUpgradeBanner";
 
 const DeleteSessionModal = dynamic(
@@ -62,7 +65,7 @@ function sessionSortKey(session: Session): number {
 import { useSessionEntryCta } from "@/components/dashboard/hooks/useSessionEntryCta";
 import { useStableState } from "@/lib/client/perception/useStableState";
 import { useWorkspace } from "@/lib/client/workspaceContext";
-import BrandLoader from "@/components/ui/BrandLoader";
+import { SessionRowSkeleton } from "@/components/dashboard/SessionRowSkeleton";
 import { SESSION_FEEDBACK_PATH } from "@/utils/getSessionLink";
 
 function DashboardContent() {
@@ -288,13 +291,7 @@ function DashboardContent() {
 
               <div>
                 {isLoading ? (
-                  <div
-                    className="mt-12 flex justify-center py-16"
-                    aria-busy="true"
-                    aria-label="Loading sessions"
-                  >
-                    <BrandLoader />
-                  </div>
+                  <SessionRowSkeleton count={2} />
                 ) : listArchiveTab === "archived" && archivedSessions.length === 0 ? (
                   <ArchiveEmptyState />
                 ) : listArchiveTab === "archived" ? (
@@ -331,11 +328,9 @@ function DashboardContent() {
                         <SessionsWorkspace
                           sections={workspaceSections}
                           onView={handleView}
-                          onRenameSuccess={(session) =>
-                            updateSession(session.id, { title: session.title })
-                          }
+                          onRenameSuccess={handleRenameSuccess}
                           onSetArchived={setSessionArchived}
-                          onRequestDelete={(session) => setDeleteTarget(session)}
+                          onRequestDelete={handleRequestDelete}
                           onDeleteSession={deleteSession}
                           viewMode={sessionViewMode}
                           onViewModeChange={setSessionViewMode}

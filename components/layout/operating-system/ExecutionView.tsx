@@ -1,6 +1,6 @@
 "use client";
 
-import type { Ref } from "react";
+import { memo, type Ref } from "react";
 import type { FeedbackItemShape } from "@/components/session/feedbackDetail/types";
 import { FeedbackContent } from "@/components/session/feedbackDetail/FeedbackContent";
 import type { ActionItemsSectionHandle } from "@/components/session/feedbackDetail/ActionItemsSection";
@@ -111,7 +111,7 @@ export interface ExecutionViewProps {
   actionItemsRef?: Ref<ActionItemsSectionHandle>;
 }
 
-export function ExecutionView({
+function ExecutionViewInner({
   item,
   resolveAffirmationKey = 0,
   onSaveTitle,
@@ -285,3 +285,5 @@ export function ExecutionView({
     </div>
   );
 }
+
+export const ExecutionView = memo(ExecutionViewInner);

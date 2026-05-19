@@ -34,6 +34,7 @@ export function ProfileDropdown() {
             displayName: user?.displayName,
             email: user?.email,
           })}
+          colorSeed={user?.uid}
           className="h-9 w-9 cursor-pointer"
         />
       </button>

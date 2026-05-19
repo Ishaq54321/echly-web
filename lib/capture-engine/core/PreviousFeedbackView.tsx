@@ -55,8 +55,6 @@ type PreviousFeedbackViewProps = {
   onOpenLogin?: () => void;
   captureMode?: "voice" | "text";
   onModeChange?: (mode: "voice" | "text") => void;
-  theme?: "light" | "dark";
-  onThemeToggle?: () => void;
   onHeaderMouseDown?: (e: ReactMouseEvent) => void;
   logoUrl?: string;
 };

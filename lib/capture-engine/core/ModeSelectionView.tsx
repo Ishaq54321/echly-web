@@ -49,8 +49,6 @@ type ModeSelectionViewProps = {
   onBack: () => void;
   onClose: () => void;
   pageUrl?: string;
-  theme?: "light" | "dark";
-  onThemeToggle?: () => void;
   isStarting?: boolean;
   logoUrl?: string;
 };

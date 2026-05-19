@@ -35,8 +35,12 @@ interface Subscription {
 
 const subs = new Map<string, Subscription>();
 
-function keyFor(workspaceId: string, feedbackId: string): string {
-  return `${workspaceId}:${feedbackId}`;
+function keyFor(
+  workspaceId: string,
+  feedbackId: string,
+  sessionId: string
+): string {
+  return `${workspaceId}:${sessionId}:${feedbackId}`;
 }
 
 function mapEvent(
@@ -66,14 +70,21 @@ function mapEvent(
 
 function ensureSubscription(
   workspaceId: string,
-  feedbackId: string
+  feedbackId: string,
+  sessionId: string
 ): Subscription {
-  const key = keyFor(workspaceId, feedbackId);
+  const key = keyFor(workspaceId, feedbackId, sessionId);
   const cached = subs.get(key);
   if (cached) return cached;
 
+  // sessionId filter is required, not just defensive: the activityEvents
+  // read rule passes non-workspace-members via hasSessionAccess(uid,
+  // resource.data.sessionId). Firestore "rules are not filters" — without
+  // where("sessionId", ...) it can't statically prove every matched doc is
+  // readable and rejects the whole query (mirrors commentsStore).
   const q = query(
     collection(db, `workspaces/${workspaceId}/activityEvents`),
+    where("sessionId", "==", sessionId),
     where("feedbackId", "==", feedbackId),
     orderBy("createdAt", "desc"),
     fsLimit(50)
@@ -120,13 +131,15 @@ function ensureSubscription(
 export function subscribeToTicketActivity(
   workspaceId: string,
   feedbackId: string,
+  sessionId: string,
   listener: Listener
 ): () => void {
   const wid = workspaceId.trim();
   const fid = feedbackId.trim();
-  if (!wid || !fid) return () => {};
+  const sid = sessionId.trim();
+  if (!wid || !fid || !sid) return () => {};
 
-  const sub = ensureSubscription(wid, fid);
+  const sub = ensureSubscription(wid, fid, sid);
   sub.listeners.add(listener);
   if (sub.settled) listener(sub.lastValue);
 
@@ -137,7 +150,7 @@ export function subscribeToTicketActivity(
     sub.listeners.delete(listener);
     if (sub.listeners.size === 0) {
       sub.unsubscribe();
-      subs.delete(keyFor(wid, fid));
+      subs.delete(keyFor(wid, fid, sid));
     }
   };
 }
@@ -155,21 +168,24 @@ const PENDING: readonly ActivityEvent[] = Object.freeze([]);
 export function subscribeToTicketActivitySync(
   workspaceId: string,
   feedbackId: string,
+  sessionId: string,
   onStoreChange: () => void
 ): () => void {
-  return subscribeToTicketActivity(workspaceId, feedbackId, () =>
+  return subscribeToTicketActivity(workspaceId, feedbackId, sessionId, () =>
     onStoreChange()
   );
 }
 
 export function getTicketActivitySnapshot(
   workspaceId: string,
-  feedbackId: string
+  feedbackId: string,
+  sessionId: string
 ): readonly ActivityEvent[] | null {
   const wid = workspaceId.trim();
   const fid = feedbackId.trim();
-  if (!wid || !fid) return PENDING;
-  const sub = subs.get(keyFor(wid, fid));
+  const sid = sessionId.trim();
+  if (!wid || !fid || !sid) return PENDING;
+  const sub = subs.get(keyFor(wid, fid, sid));
   if (!sub || !sub.settled) return null;
   return sub.lastValue;
 }

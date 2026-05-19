@@ -74,7 +74,8 @@
   --brand-primary-rgb: 28, 27, 31;
 }
 
-/* App dark mode (next-themes: class "dark" on <html>) — same tokens as #echly-root[data-theme="dark"] */
+/* Dashboard dark mode (next-themes: class "dark" on <html>). The
+   extension is light-only and does not use these. */
 html.dark {
   --glass-voice-capture-bg: rgba(20, 20, 20, 0.98);
   --voice-capture-dim-bg: rgba(0, 0, 0, 0.62);
@@ -1809,15 +1810,37 @@ textarea:focus-visible {
 .capture-skeleton-dot {
   background: linear-gradient(
     90deg,
-    rgba(0, 0, 0, 0.06) 0%,
-    rgba(0, 0, 0, 0.12) 50%,
-    rgba(0, 0, 0, 0.06) 100%
+    var(--glass-shimmer-base) 0%,
+    var(--glass-shimmer-highlight) 50%,
+    var(--glass-shimmer-base) 100%
   );
   background-size: 400px 100%;
-  animation: shimmer 1.8s linear infinite;
+  animation: shimmer 1.8s ease-in-out infinite;
 }
 .capture-skeleton-dot {
   background-size: 200px 100%;
+}
+
+/* Dashboard session-row skeleton — placeholder rows shown in place of the
+   full-area BrandLoader so the layout appears instantly on first paint. */
+/* Same fade mechanic as the discussion `.skel-block` (percentage keyframe
+   sweep), but a lighter neutral pair so it stays airy on flat white instead
+   of the warm glass tokens. */
+.session-row-skeleton__bar {
+  background: linear-gradient(
+    90deg,
+    rgba(17, 24, 39, 0.055) 25%,
+    rgba(17, 24, 39, 0.11) 50%,
+    rgba(17, 24, 39, 0.055) 75%
+  );
+  background-size: 200% 100%;
+  animation: echly-skeleton-shimmer 1.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .session-row-skeleton__bar {
+    animation: none;
+    background: rgba(17, 24, 39, 0.08);
+  }
 }
 
 /* Skeleton card — integrated status footer (subtle, premium) */
@@ -1840,8 +1863,6 @@ textarea:focus-visible {
   font-size: 13px;
   color: rgba(0, 0, 0, 0.5);
 }
-#echly-root[data-theme="dark"] .echly-processing-text,
-#echly-root:not([data-theme]) .echly-processing-text,
 .dark .echly-processing-text {
   color: #fff;
 }
@@ -1939,7 +1960,7 @@ textarea:focus-visible {
 
 /* ======================================
    ECHLY — Premium 2026 design system (extension + app)
-   Theme tokens. #echly-root[data-theme] scopes widget styles.
+   Extension widget tokens are scoped to #echly-root (light only).
    Typography: Plus Jakarta Sans + system stack.
    Colors: neutral-first, accent #155DFC. Subtle glass.
 ====================================== */
@@ -1955,69 +1976,9 @@ textarea:focus-visible {
   --echly-shadow-hover: 0 10px 28px rgba(0, 0, 0, 0.28);
 }
 
-#echly-root[data-theme="dark"] {
-  --panel-bg: #101826;
-  --panel-border: rgba(255, 255, 255, 0.08);
-  --accent-color: #5b7cff;
-  --bg-primary: rgba(20, 22, 28, 0.82);
-  --bg-surface: rgba(30, 32, 40, 0.65);
-  --bg-surface-hover: rgba(255, 255, 255, 0.08);
-  --glass-highlight: rgba(255, 255, 255, 0.06);
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --text-primary: #F3F4F6;
-  --text-secondary: #A1A1AA;
-  --color-accent: #155DFC;
-  --color-accent-soft: rgba(21, 93, 252, 0.12);
-  --color-success: #10B981;
-  --color-warning: #F59E0B;
-  --color-alert: #EF4444;
-  --button-primary-bg: #155DFC;
-  --button-primary-text: #ffffff;
-  --button-secondary-bg: rgba(255, 255, 255, 0.08);
-  --button-secondary-text: rgba(255, 255, 255, 0.9);
-  --button-secondary-hover-bg: rgba(255, 255, 255, 0.12);
-  --button-secondary-hover-text: #F3F4F6;
-  --shadow-depth: 0 10px 30px rgba(0, 0, 0, 0.35);
-  --shadow-strong: 0 14px 40px rgba(0, 0, 0, 0.45);
-  --bg-widget-gradient: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.04) 0%,
-    transparent 100%
-  );
-  --shadow-depth-recording: 0 0 0 1px rgba(255, 255, 255, 0.08),
-    0 10px 30px rgba(0, 0, 0, 0.35);
-  --input-bg: rgba(255, 255, 255, 0.06);
-  --input-border: rgba(255, 255, 255, 0.08);
-  --input-border-focus: rgba(255, 255, 255, 0.2);
-  --icon-color: #A1A1AA;
-  --icon-hover: #F3F4F6;
-  --priority-medium: rgba(255, 255, 255, 0.4);
-  --priority-low: rgba(255, 255, 255, 0.25);
-  --confirm-icon-hover-bg: rgba(255, 255, 255, 0.08);
-  --confirm-icon-active-bg: rgba(255, 255, 255, 0.12);
-  --glass-voice-capture-bg: rgba(20, 20, 20, 0.6);
-  --voice-capture-dim-bg: rgba(0, 0, 0, 0.45);
-  --voice-capture-card-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-  --voice-capture-screenshot-fade: linear-gradient(
-    180deg,
-    rgba(20, 20, 20, 0) 0%,
-    rgba(20, 20, 20, 0.92) 100%
-  );
-  --echly-waveform-fill: rgba(96, 165, 250, 0.75);
-
-  /* GLASS — dark-theme overrides (extension surfaces only).
-     Light values come from :host/:root in styles/tokens.css. */
-  --glass-surface:          rgba(21, 16, 31, 0.86);
-  --glass-surface-elevated: rgba(28, 22, 38, 0.92);
-  --glass-border:           rgba(255, 255, 255, 0.08);
-  --glass-border-strong:    rgba(255, 255, 255, 0.14);
-  --glass-edge-highlight:   rgba(255, 255, 255, 0.06);
-  --glass-shadow-stack:
-    0 5px 15px rgba(0, 0, 0, 0.14),
-    0 1px 4px rgba(0, 0, 0, 0.09);
-}
-
-#echly-root[data-theme="light"] {
+/* Extension is light-mode only — single unconditional token set
+   for every extension surface. */
+#echly-root {
   --panel-bg: #ffffff;
   --panel-border: rgba(0, 0, 0, 0.08);
   --accent-color: #5b7cff;
@@ -2067,8 +2028,7 @@ textarea:focus-visible {
   );
   --echly-waveform-fill: rgba(26, 86, 219, 0.85);
 
-  /* GLASS — explicit light values. Restated here so an explicit
-     light theme overrides the dark-default fallback below. */
+  /* GLASS — light values (the only theme). */
   --glass-surface:          rgba(252, 251, 249, 0.86);
   --glass-surface-elevated: rgba(254, 253, 251, 0.92);
   --glass-border:           rgba(28, 25, 23, 0.08);
@@ -2077,70 +2037,7 @@ textarea:focus-visible {
   --glass-shadow-stack:
     0 5px 15px rgba(28, 25, 23, 0.05),
     0 1px 4px rgba(28, 25, 23, 0.035);
-}
-
-/* Fallback when widget is used without data-theme (e.g. app embed): default dark */
-#echly-root:not([data-theme]) {
-  --panel-bg: #101826;
-  --panel-border: rgba(255, 255, 255, 0.08);
-  --accent-color: #5b7cff;
-  --bg-primary: rgba(20, 22, 28, 0.82);
-  --bg-surface: rgba(30, 32, 40, 0.65);
-  --bg-surface-hover: rgba(255, 255, 255, 0.08);
-  --glass-highlight: rgba(255, 255, 255, 0.06);
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --text-primary: #F3F4F6;
-  --text-secondary: #A1A1AA;
-  --color-accent: #155DFC;
-  --color-accent-soft: rgba(21, 93, 252, 0.12);
-  --color-success: #10B981;
-  --color-warning: #F59E0B;
-  --color-alert: #EF4444;
-  --button-primary-bg: #155DFC;
-  --button-primary-text: #ffffff;
-  --button-secondary-bg: rgba(255, 255, 255, 0.08);
-  --button-secondary-text: rgba(255, 255, 255, 0.9);
-  --button-secondary-hover-bg: rgba(255, 255, 255, 0.12);
-  --button-secondary-hover-text: #F3F4F6;
-  --shadow-depth: 0 10px 30px rgba(0, 0, 0, 0.35);
-  --shadow-strong: 0 14px 40px rgba(0, 0, 0, 0.45);
-  --bg-widget-gradient: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.04) 0%,
-    transparent 100%
-  );
-  --shadow-depth-recording: 0 0 0 1px rgba(255, 255, 255, 0.08),
-    0 10px 30px rgba(0, 0, 0, 0.35);
-  --input-bg: rgba(255, 255, 255, 0.06);
-  --input-border: rgba(255, 255, 255, 0.08);
-  --input-border-focus: rgba(255, 255, 255, 0.2);
-  --icon-color: #A1A1AA;
-  --icon-hover: #F3F4F6;
-  --priority-medium: rgba(255, 255, 255, 0.4);
-  --priority-low: rgba(255, 255, 255, 0.25);
-  --confirm-icon-hover-bg: rgba(255, 255, 255, 0.08);
-  --confirm-icon-active-bg: rgba(255, 255, 255, 0.12);
-  --glass-voice-capture-bg: rgba(20, 20, 20, 0.6);
-  --voice-capture-dim-bg: rgba(0, 0, 0, 0.45);
-  --voice-capture-card-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-  --voice-capture-screenshot-fade: linear-gradient(
-    180deg,
-    rgba(20, 20, 20, 0) 0%,
-    rgba(20, 20, 20, 0.92) 100%
-  );
-  --echly-waveform-fill: rgba(96, 165, 250, 0.75);
-  color-scheme: dark;
-
-  /* GLASS — dark-default fallback (no data-theme set). Mirrors the
-     #echly-root[data-theme="dark"] glass values. */
-  --glass-surface:          rgba(21, 16, 31, 0.86);
-  --glass-surface-elevated: rgba(28, 22, 38, 0.92);
-  --glass-border:           rgba(255, 255, 255, 0.08);
-  --glass-border-strong:    rgba(255, 255, 255, 0.14);
-  --glass-edge-highlight:   rgba(255, 255, 255, 0.06);
-  --glass-shadow-stack:
-    0 5px 15px rgba(0, 0, 0, 0.14),
-    0 1px 4px rgba(0, 0, 0, 0.09);
+  color-scheme: light;
 }
 
 #echly-root {
@@ -2154,7 +2051,9 @@ textarea:focus-visible {
     "Segoe UI",
     Roboto,
     sans-serif;
-  will-change: background, color;
+  /* No will-change: paint-only properties (background/color) gain nothing
+     from a compositor hint and keeping it pins a layer for the whole
+     widget root. The transition below still animates fine without it. */
   transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
 }
 #echly-root,
@@ -2170,13 +2069,7 @@ textarea:focus-visible {
     Roboto,
     sans-serif;
 }
-#echly-root[data-theme="dark"] {
-  color-scheme: dark;
-}
-#echly-root[data-theme="light"] {
-  color-scheme: light;
-}
-#echly-root[data-theme="light"] .tile-description {
+#echly-root .tile-description {
   color: #222;
   font-size: 13px;
 }
@@ -2228,18 +2121,7 @@ textarea:focus-visible {
   font-family: var(--echly-font);
   transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
-/* Dark mode: glass border + shadow already swing dark via the
-   #echly-root[data-theme] token overrides, so this block only needs to
-   keep parity with the base recipe (kept explicit for clarity). */
-#echly-root[data-theme="dark"] .echly-sidebar-surface,
-#echly-root:not([data-theme]) .echly-sidebar-surface {
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow-stack);
-}
 .echly-sidebar-surface:hover {
-  box-shadow: var(--echly-shadow-hover);
-}
-#echly-root[data-theme="light"] .echly-sidebar-surface:hover {
   box-shadow:
     0 8px 22px rgba(0, 0, 0, 0.08),
     0 3px 8px rgba(0, 0, 0, 0.05);
@@ -2360,26 +2242,26 @@ textarea:focus-visible {
   white-space: nowrap;
 }
 
-/* Light mode: title text and input color */
-.echly-sidebar-surface[data-theme="light"] .echly-session-title-text,
+/* Title text and input color */
+.echly-sidebar-surface .echly-session-title-text,
 .light .echly-session-title-text {
   color: var(--text-heading);
 }
-.echly-sidebar-surface[data-theme="light"] .echly-session-title-input.session-title-input,
+.echly-sidebar-surface .echly-session-title-input.session-title-input,
 .light .echly-session-title-input.session-title-input {
   color: var(--text-heading);
   background: rgba(0, 0, 0, 0.03);
   border: none;
   box-shadow: none;
 }
-.echly-sidebar-surface[data-theme="light"] .echly-session-title-input.session-title-input:focus,
+.echly-sidebar-surface .echly-session-title-input.session-title-input:focus,
 .light .echly-session-title-input.session-title-input:focus {
   outline: none;
   box-shadow: none;
   border: none;
   background: rgba(0, 0, 0, 0.05);
 }
-.echly-sidebar-surface[data-theme="light"] .echly-session-title-input.session-title-input:focus-visible,
+.echly-sidebar-surface .echly-session-title-input.session-title-input:focus-visible,
 .light .echly-session-title-input.session-title-input:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.12);
@@ -2735,61 +2617,28 @@ input.session-title-input.session-title-input--light-surface:focus-visible {
   border: 1px solid rgba(59, 130, 246, 0.55);
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.08));
 }
-/* Light mode: selected card = solid blue fill + white text/icons */
-#echly-root[data-theme="light"] .echly-mode-tile.selected {
+/* Selected card = solid blue fill + white text/icons */
+#echly-root .echly-mode-tile.selected {
   background: #3B82F6;
   border-color: #3B82F6;
   color: white;
 }
-#echly-root[data-theme="light"] .echly-mode-tile.selected .tile-title,
-#echly-root[data-theme="light"] .echly-mode-tile.selected .echly-mode-card-title {
+#echly-root .echly-mode-tile.selected .tile-title,
+#echly-root .echly-mode-tile.selected .echly-mode-card-title {
   color: white;
 }
-#echly-root[data-theme="light"] .echly-mode-tile.selected .tile-description {
+#echly-root .echly-mode-tile.selected .tile-description {
   color: rgba(255, 255, 255, 0.85);
 }
-#echly-root[data-theme="light"] .echly-mode-tile.selected .tile-icon,
-#echly-root[data-theme="light"] .echly-mode-tile.selected .echly-mode-card-icon,
-#echly-root[data-theme="light"] .echly-mode-tile.selected .echly-mode-card-icon svg,
-#echly-root[data-theme="light"] .echly-mode-tile.selected .echly-mode-card-gem svg,
-#echly-root[data-theme="light"] .echly-mode-tile.selected .mode-icon,
-#echly-root[data-theme="light"] .echly-mode-tile.selected .mode-icon svg,
-#echly-root[data-theme="light"] .echly-mode-tile.selected .voice-recommended-icon,
-#echly-root[data-theme="light"] .echly-mode-tile.selected svg {
+#echly-root .echly-mode-tile.selected .tile-icon,
+#echly-root .echly-mode-tile.selected .echly-mode-card-icon,
+#echly-root .echly-mode-tile.selected .echly-mode-card-icon svg,
+#echly-root .echly-mode-tile.selected .echly-mode-card-gem svg,
+#echly-root .echly-mode-tile.selected .mode-icon,
+#echly-root .echly-mode-tile.selected .mode-icon svg,
+#echly-root .echly-mode-tile.selected .voice-recommended-icon,
+#echly-root .echly-mode-tile.selected svg {
   color: white;
-}
-/* Dark mode: selected card = dark background + blue text/icons */
-#echly-root[data-theme="dark"] .echly-mode-tile.selected,
-#echly-root:not([data-theme]) .echly-mode-tile.selected {
-  color: #60A5FA;
-}
-#echly-root[data-theme="dark"] .echly-mode-tile.selected .tile-title,
-#echly-root[data-theme="dark"] .echly-mode-tile.selected .echly-mode-card-title,
-#echly-root:not([data-theme]) .echly-mode-tile.selected .tile-title,
-#echly-root:not([data-theme]) .echly-mode-tile.selected .echly-mode-card-title {
-  color: #60A5FA;
-}
-#echly-root[data-theme="dark"] .echly-mode-tile.selected .tile-description,
-#echly-root:not([data-theme]) .echly-mode-tile.selected .tile-description {
-  color: rgba(96, 165, 250, 0.85);
-}
-#echly-root[data-theme="dark"] .echly-mode-tile.selected .tile-icon,
-#echly-root[data-theme="dark"] .echly-mode-tile.selected .echly-mode-card-icon,
-#echly-root[data-theme="dark"] .echly-mode-tile.selected .echly-mode-card-icon svg,
-#echly-root[data-theme="dark"] .echly-mode-tile.selected .echly-mode-card-gem svg,
-#echly-root[data-theme="dark"] .echly-mode-tile.selected .mode-icon,
-#echly-root[data-theme="dark"] .echly-mode-tile.selected .mode-icon svg,
-#echly-root[data-theme="dark"] .echly-mode-tile.selected .voice-recommended-icon,
-#echly-root[data-theme="dark"] .echly-mode-tile.selected svg,
-#echly-root:not([data-theme]) .echly-mode-tile.selected .tile-icon,
-#echly-root:not([data-theme]) .echly-mode-tile.selected .echly-mode-card-icon,
-#echly-root:not([data-theme]) .echly-mode-tile.selected .echly-mode-card-icon svg,
-#echly-root:not([data-theme]) .echly-mode-tile.selected .echly-mode-card-gem svg,
-#echly-root:not([data-theme]) .echly-mode-tile.selected .mode-icon,
-#echly-root:not([data-theme]) .echly-mode-tile.selected .mode-icon svg,
-#echly-root:not([data-theme]) .echly-mode-tile.selected .voice-recommended-icon,
-#echly-root:not([data-theme]) .echly-mode-tile.selected svg {
-  color: #60A5FA;
 }
 .echly-mode-tile.selected .tile-icon,
 .echly-mode-tile.selected .echly-mode-card-icon,
@@ -2848,10 +2697,6 @@ input.session-title-input.session-title-input--light-surface:focus-visible {
   font-size: 13px;
   color: #222;
 }
-#echly-root[data-theme="dark"] .tile-description,
-#echly-root:not([data-theme]) .tile-description {
-  color: rgba(255, 255, 255, 0.75);
-}
 
 /* ---- Mode cards: Loom-style selectable cards (Voice / Text) ---- */
 .echly-mode-card {
@@ -2898,10 +2743,6 @@ input.session-title-input.session-title-input--light-surface:focus-visible {
   background: rgba(59, 130, 246, 0.9);
   flex-shrink: 0;
   display: inline-block;
-}
-#echly-root[data-theme="dark"] .echly-mode-selection-dot,
-#echly-root:not([data-theme]) .echly-mode-selection-dot {
-  background: rgba(59, 130, 246, 0.9);
 }
 .echly-mode-tile.selected .echly-mode-selection-dot {
   background: white;
@@ -3204,12 +3045,10 @@ html.dark .echly-capture-card {
   cursor: default;
 }
 .echly-voice-mic-dropdown--selecting .echly-mic-item:hover,
-html.dark .echly-voice-mic-dropdown--selecting .echly-mic-item:hover,
-#echly-root[data-theme="dark"] .echly-voice-mic-dropdown--selecting .echly-mic-item:hover {
+html.dark .echly-voice-mic-dropdown--selecting .echly-mic-item:hover {
   background: transparent;
 }
-html.dark .echly-voice-mic-dropdown,
-#echly-root[data-theme="dark"] .echly-voice-mic-dropdown {
+html.dark .echly-voice-mic-dropdown {
   background: #1f1f1f;
 }
 .echly-voice-mic-dropdown::-webkit-scrollbar {
@@ -3222,8 +3061,7 @@ html.dark .echly-voice-mic-dropdown,
   background: rgba(28,25,23,0.10);
   border-radius: 4px;
 }
-html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
-#echly-root[data-theme="dark"] .echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
+html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.22);
 }
 
@@ -3537,9 +3375,9 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
 .skeleton {
   background: linear-gradient(
     90deg,
-    var(--surface-subtle) 25%,
-    #f0f0f0 37%,
-    var(--surface-subtle) 63%
+    var(--glass-shimmer-base) 25%,
+    var(--glass-shimmer-highlight) 37%,
+    var(--glass-shimmer-base) 63%
   );
   background-size: 400% 100%;
   animation: skeleton-loading 1.2s ease infinite;
@@ -3882,20 +3720,20 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--button-secondary-bg);
-  color: var(--button-secondary-text);
-  border: none;
+  background: var(--glass-button-surface);
+  color: var(--text-heading);
+  border: 1px solid var(--glass-button-border);
   border-radius: 999px;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 0 var(--glass-button-highlight);
   transition: background var(--transition-fast), color var(--transition-fast);
 }
 .echly-recording-cancel-pill:hover,
 .echly-recording-cancel-pill:focus-visible {
-  background: var(--button-secondary-hover-bg);
-  color: var(--button-secondary-hover-text);
+  background: var(--glass-button-surface-hover);
+  color: var(--text-heading);
 }
 /* Done: primary button with subtle elevation */
 .echly-recording-done {
@@ -4221,12 +4059,13 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
   transform: translateY(0);
 }
 .echly-confirmation-btn--edit {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-on-dark);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--glass-button-surface);
+  color: var(--text-heading);
+  border: 1px solid var(--glass-button-border);
+  box-shadow: inset 0 1px 0 var(--glass-button-highlight);
 }
 .echly-confirmation-btn--edit:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--glass-button-surface-hover);
   transform: translateY(-1px);
 }
 .echly-confirmation-btn--edit:active {
@@ -5373,7 +5212,7 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
 }
 
 .notif-item:hover {
-  background: var(--surface-subtle);
+  background: rgba(28, 25, 23, 0.04);
 }
 
 .notif-item:focus {
@@ -5575,9 +5414,9 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
 .skel {
   background: linear-gradient(
     90deg,
-    var(--surface-subtle) 25%,
-    var(--surface-hover) 50%,
-    var(--surface-subtle) 75%
+    var(--glass-shimmer-base) 25%,
+    var(--glass-shimmer-highlight) 50%,
+    var(--glass-shimmer-base) 75%
   );
   background-size: 200% 100%;
   animation: notif-shimmer 1.5s ease-in-out infinite;
@@ -6001,7 +5840,9 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
 ====================================== */
 
 .description-editor-shell {
-  background: var(--surface-card);
+  background: var(--glass-surface-elevated);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--border);
   border-radius: 12px;
   overflow: visible;
@@ -6013,7 +5854,9 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb,
   position: sticky;
   top: 0;
   z-index: 5;
-  background: var(--surface-card);
+  background: var(--glass-surface-elevated);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-top-left-radius: 12px;
   border-top-right-radius: 12px;
   border-bottom: 1px solid var(--border) !important;
@@ -6642,7 +6485,7 @@ h6 [data-ai-touched="true"] {
   color: var(--soft);
   transition: background .12s, color .12s;
 }
-.echly-v2 .pill-icon-btn:hover { background: var(--surface-hover); color: var(--ink); }
+.echly-v2 .pill-icon-btn:hover { background: var(--glass-icon-hover-bg); color: var(--ink); }
 .echly-v2 .pill-icon-btn svg {
   width: 15px;
   height: 15px;
@@ -6736,7 +6579,9 @@ h6 [data-ai-touched="true"] {
 .echly-v2 .ghost-btn {
   height: var(--btn-h);
   border-radius: var(--btn-r);
-  background: var(--surface-subtle);
+  background: var(--glass-button-surface);
+  border: 1px solid var(--glass-button-border);
+  box-shadow: inset 0 1px 0 var(--glass-button-highlight);
   color: var(--ink);
   display: inline-flex;
   align-items: center;
@@ -6747,7 +6592,7 @@ h6 [data-ai-touched="true"] {
   letter-spacing: -0.005em;
   transition: background .12s;
 }
-.echly-v2 .ghost-btn:hover { background: var(--surface-hover); }
+.echly-v2 .ghost-btn:hover { background: var(--glass-button-surface-hover); }
 .echly-v2 .ghost-btn:disabled {
   opacity: 0.6;
   pointer-events: none;
@@ -6771,7 +6616,7 @@ h6 [data-ai-touched="true"] {
 .echly-v2 .mode-seg-mini {
   display: inline-flex;
   align-items: center;
-  background: var(--surface-subtle);
+  background: rgba(28, 25, 23, 0.05);
   border-radius: var(--btn-r);
   padding: var(--sp-xs);
   height: var(--btn-h);
@@ -6789,7 +6634,8 @@ h6 [data-ai-touched="true"] {
   padding: 0;
 }
 .echly-v2 .mode-seg-mini button.active {
-  background: #fff;
+  background: var(--glass-button-surface-hover);
+  border: 1px solid var(--glass-button-border);
   color: var(--ink);
   box-shadow: 0 1px 0 rgba(28,25,23,0.04), 0 1px 3px rgba(28,25,23,0.08);
 }
@@ -6925,9 +6771,9 @@ h6 [data-ai-touched="true"] {
   gap: var(--sp-sm);
   overflow: hidden;
 }
-.echly-v2 .mode-card:hover { background: var(--surface-hover); }
+.echly-v2 .mode-card:hover { background: rgba(28, 25, 23, 0.04); }
 .echly-v2 .mode-card.active {
-  background: var(--brand-soft);
+  background: rgba(90, 73, 191, 0.10);
   border-color: rgba(90,73,191,0.28);
 }
 .echly-v2 .mode-card.active .mode-card-glyph {
@@ -7530,7 +7376,9 @@ h6 [data-ai-touched="true"] {
   min-height: 32px;
   flex-shrink: 0;
   margin: var(--sp-md) var(--sp-lg) var(--sp-sm);
-  background: var(--surface-subtle);
+  background: var(--glass-button-surface);
+  border: 1px solid var(--glass-button-border);
+  box-shadow: inset 0 1px 0 var(--glass-button-highlight);
   border-radius: 999px;
   color: var(--muted);
   font-size: 14px;
@@ -7595,7 +7443,7 @@ h6 [data-ai-touched="true"] {
 }
 .echly-v2 .ps-chips-divider {
   height: 1px;
-  background: var(--hair);
+  background: var(--glass-border);
   margin: var(--sp-xs) var(--sp-lg) 0;
 }
 
@@ -7625,7 +7473,7 @@ h6 [data-ai-touched="true"] {
   cursor: pointer;
   transition: background .12s;
 }
-.echly-v2 .ps-row:hover { background: var(--surface-subtle); }
+.echly-v2 .ps-row:hover { background: rgba(28, 25, 23, 0.04); }
 .echly-v2 .ps-row-icon {
   width: 37px;
   height: 37px;
@@ -7934,17 +7782,18 @@ h6 [data-ai-touched="true"] {
   height: var(--btn-h);
   padding: 0 var(--sp-lg);
   border-radius: var(--btn-r);
-  background: var(--surface-subtle);
+  background: var(--glass-button-surface);
+  border: 1px solid var(--glass-button-border);
+  box-shadow: inset 0 1px 0 var(--glass-button-highlight);
   color: var(--ink);
   font-size: 13px;
   font-weight: 500;
-  border: none;
   cursor: pointer;
   transition: background .12s;
   white-space: nowrap;
 }
 .echly-v2 .rec-cancel:hover {
-  background: var(--surface-hover);
+  background: var(--glass-button-surface-hover);
 }
 
 /* Finish / submit button */
@@ -8528,7 +8377,7 @@ h6 [data-ai-touched="true"] {
   overflow: hidden;
 }
 .echly-v2 .ticket + .ticket { margin-top: var(--sp-xs); }
-.echly-v2 .ticket:hover { background: var(--surface-subtle); }
+.echly-v2 .ticket:hover { background: rgba(28, 25, 23, 0.04); }
 
 
 .echly-v2 .ticket-thumb {
@@ -8615,7 +8464,7 @@ h6 [data-ai-touched="true"] {
   transition: background .12s, color .12s;
 }
 .echly-v2 .ticket-action-btn:hover {
-  background: var(--surface-subtle);
+  background: var(--glass-icon-hover-bg);
   color: var(--ink);
 }
 .echly-v2 .ticket-action-btn--danger:hover {
@@ -8641,7 +8490,12 @@ h6 [data-ai-touched="true"] {
 .echly-v2 .skel-line {
   height: 10px;
   border-radius: 3.5px;
-  background: linear-gradient(90deg, #DCE7F5, #ECF2FB);
+  background: linear-gradient(
+    90deg,
+    var(--glass-shimmer-base),
+    var(--glass-shimmer-highlight),
+    var(--glass-shimmer-base)
+  );
   background-size: 200% 100%;
   animation: echly-v2-skel-pulse 1.6s ease-in-out infinite;
 }
@@ -9509,7 +9363,7 @@ h6 [data-ai-touched="true"] {
   transition: background .12s, color .12s;
 }
 .echly-v2 .editor-close-btn:hover {
-  background: var(--surface-hover);
+  background: var(--glass-icon-hover-bg);
   color: var(--ink);
 }
 
@@ -9773,7 +9627,7 @@ h6 [data-ai-touched="true"] {
 /* ── Divider ──────────────────────────────────────────────── */
 .echly-v2 .editor-overlay-body .editor-divider {
   height: 1px;
-  background: var(--hair);
+  background: var(--glass-border);
   margin: 0 0 14px 0;
 }
 
@@ -9801,7 +9655,7 @@ h6 [data-ai-touched="true"] {
   padding: 6px 5px 6px 9px;
   transition: background .12s;
 }
-.echly-v2 .editor-overlay-body .step-row:hover { background: var(--surface-subtle); }
+.echly-v2 .editor-overlay-body .step-row:hover { background: rgba(28, 25, 23, 0.04); }
 .echly-v2 .editor-overlay-body .step-row:hover .step-delete { opacity: 1; }
 .echly-v2 .editor-overlay-body .step-number {
   font-size: 14px;
@@ -9913,7 +9767,7 @@ h6 [data-ai-touched="true"] {
   width: 160px;
   height: 14px;
   border-radius: 7px;
-  background: linear-gradient(90deg, var(--surface-subtle) 25%, var(--surface-hover) 50%, var(--surface-subtle) 75%);
+  background: linear-gradient(90deg, var(--glass-shimmer-base) 25%, var(--glass-shimmer-highlight) 50%, var(--glass-shimmer-base) 75%);
   background-size: 200% 100%;
   animation: echly-skeleton-shimmer 1.5s ease-in-out infinite;
 }
@@ -9932,9 +9786,9 @@ h6 [data-ai-touched="true"] {
 .skel-block {
   background: linear-gradient(
     90deg,
-    rgba(0, 0, 0, 0.03) 25%,
-    rgba(0, 0, 0, 0.06) 50%,
-    rgba(0, 0, 0, 0.03) 75%
+    var(--glass-shimmer-base) 25%,
+    var(--glass-shimmer-highlight) 50%,
+    var(--glass-shimmer-base) 75%
   );
   background-size: 200% 100%;
   animation: echly-skeleton-shimmer 1.8s ease-in-out infinite;
@@ -10004,6 +9858,21 @@ h6 [data-ai-touched="true"] {
   flex: 0 0 auto;
 }
 
+/* Phase 2.3 — native row virtualization for large sessions (1000+ tickets).
+   content-visibility:auto lets the browser skip layout/paint for rows
+   outside the viewport while keeping them in the DOM, so the existing
+   Open/Resolved sections, search, deep-link scroll, and the load-more
+   IntersectionObserver all keep working untouched. contain-intrinsic-size
+   is the placeholder height the browser reserves for an unrendered row
+   (px-3 py-2.5 + 30px icon ≈ 50px tall) so the scrollbar stays accurate.
+   Rationale for not using a JS virtualizer here: TicketList is a grouped,
+   search-aware, observer-driven list — a true virtualization rewrite is
+   Phase-3-scale risk on the most-used surface for marginal extra gain. */
+.tl-vrow {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 50px;
+}
+
 /* ─── Center pane (execution view) skeleton ─── */
 /* Wrapper: no padding — parent provides px-8 pt-11 pb-20. */
 .exec-skeleton {
@@ -10050,14 +9919,14 @@ h6 [data-ai-touched="true"] {
   aspect-ratio: 2.62 / 1;
   max-height: 317px;
   border-radius: 14px;
-  border: 1px solid var(--hair, #E5E7EB);
+  border: 1px solid var(--glass-border);
   margin-bottom: 0;
   box-shadow: 0 10px 30px -16px rgba(28,25,23,0.18);
   background: linear-gradient(
     90deg,
-    rgba(0, 0, 0, 0.02) 25%,
-    rgba(0, 0, 0, 0.05) 50%,
-    rgba(0, 0, 0, 0.02) 75%
+    var(--glass-shimmer-base) 25%,
+    var(--glass-shimmer-highlight) 50%,
+    var(--glass-shimmer-base) 75%
   );
   background-size: 200% 100%;
   animation: echly-skeleton-shimmer 2.2s ease-in-out infinite;
@@ -10516,7 +10385,7 @@ h6 [data-ai-touched="true"] {
 }
 
 .echly-v2 .tl-save-btn:hover {
-  background: var(--brand-soft);
+  background: var(--glass-icon-hover-bg);
 }
 
 .echly-v2 .tl-head .tl-icon-group .pill-icon-btn:not(:last-child) {
@@ -10531,7 +10400,10 @@ h6 [data-ai-touched="true"] {
   transform: translateX(-50%);
   padding: 6px 12px;
   border-radius: 8px;
-  background: var(--ink);
+  background: rgba(21, 16, 31, 0.92);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
   color: #fff;
   font-size: 12px;
   font-weight: 600;
@@ -10566,7 +10438,10 @@ h6 [data-ai-touched="true"] {
   gap: 8px;
   padding: 8px 14px;
   border-radius: 10px;
-  background: var(--ink);
+  background: rgba(21, 16, 31, 0.92);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
   color: #fff;
   font-size: 12px;
   font-weight: 500;
@@ -10903,7 +10778,7 @@ h6 [data-ai-touched="true"] {
   flex-shrink: 0;
   font-family: inherit;
 }
-.echly-pill-icon-btn:hover { color: var(--pill-ink); }
+.echly-pill-icon-btn:hover { background: var(--glass-icon-hover-bg); color: var(--pill-ink); border-radius: 6px; }
 .echly-pill-icon-btn:active { transform: scale(0.9); }
 .echly-pill-icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 

@@ -3,19 +3,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { X, Home, Mic, PenLine } from "lucide-react";
 
-const SunIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-    <circle cx="12" cy="12" r="4" />
-    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
-  </svg>
-);
-
-const MoonIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-  </svg>
-);
-
 type CaptureHeaderProps = {
   onClose: () => void;
   /** When true, show editable session title + ticket count. Otherwise show "Echly" and optional summary. */
@@ -31,8 +18,6 @@ type CaptureHeaderProps = {
   summary?: string | null;
   /** When true (e.g. extension mode), show Home icon button instead of "Echly" title. */
   showHomeButton?: boolean;
-  theme?: "dark" | "light";
-  onThemeToggle?: () => void;
   /** Current capture mode (voice vs text). When set with onCaptureModeToggle, shows mode toggle in header. */
   captureMode?: "voice" | "text";
   /** Called when user clicks the capture mode toggle. */
@@ -57,8 +42,6 @@ export default function CaptureHeader({
   title = null,
   summary = null,
   showHomeButton = false,
-  theme = "dark",
-  onThemeToggle,
   captureMode = "voice",
   onCaptureModeToggle,
   handlers,
@@ -138,7 +121,7 @@ export default function CaptureHeader({
         ) : showHomeButton ? (
           <button
             type="button"
-            className={`echly-header-home-wrap${theme === "dark" ? " dark" : ""}`}
+            className="echly-header-home-wrap"
             onClick={() => onOpenDashboard?.()}
             aria-label="Open Annote dashboard"
           >
@@ -156,18 +139,6 @@ export default function CaptureHeader({
         )}
       </div>
       <div className="echly-header-actions echly-session-icons">
-        {!showOnlyClose && onThemeToggle && (
-          <button
-            type="button"
-            id="theme-toggle"
-            onClick={onThemeToggle}
-            className="echly-theme-toggle"
-            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-          >
-            {theme === "dark" ? <SunIcon /> : <MoonIcon />}
-          </button>
-        )}
         {!showOnlyClose && onCaptureModeToggle && (
           <button
             type="button"

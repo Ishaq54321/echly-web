@@ -1,11 +1,19 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { Info, X, PencilLine } from "lucide-react";
 import type { StructuredFeedback } from "./types";
 import { getTicketIconFromTags } from "@/lib/utils/getTicketIconFromTags";
 import { parseDeviceInfo, formatLocalDateTime } from "@/lib/utils/captureInfo";
-import { DescriptionEditor } from "@/components/session/feedbackDetail/DescriptionEditor/DescriptionEditor";
+
+// Lazy-loaded so the heavy editor stack (TipTap / ProseMirror / emoji-picker,
+// ~480 KB) only downloads the first time a user opens a ticket to edit.
+// Requires esbuild format:"esm" + splitting to actually emit a separate chunk.
+const DescriptionEditor = lazy(() =>
+  import("@/components/session/feedbackDetail/DescriptionEditor/DescriptionEditor").then(
+    (mod) => ({ default: mod.DescriptionEditor })
+  )
+);
 
 function priorityFromType(type: string | undefined): "critical" | "high" | "medium" | "low" {
   const t = (type ?? "").toLowerCase();
@@ -414,29 +422,43 @@ export function TicketEditorOverlay({
           {/* Description — full TipTap editor (toolbar, AI Improve, voice dictate). */}
           <div className="editor-steps">
             <div className="editor-steps-label">Description</div>
-            <DescriptionEditor
-              value={editedDescription}
-              onSave={async () => {
-                // The outer overlay owns the Save button. The editor's
-                // internal save is hidden via hideInternalActions; this
-                // handler is required by the prop type but won't be hit.
-              }}
-              onCancel={() => {
-                // Outer overlay handles Cancel. The editor's Escape key
-                // routes through here — close the overlay so it matches
-                // user expectation.
-                onClose();
-              }}
-              placeholder="Description..."
-              autoFocus={false}
-              isEditing
-              participants={[]}
-              onContentChange={(markdown) => setEditedDescription(markdown)}
-              fetchClient={fetchClient}
-              hideInternalActions
-              portalContainer={portalContainer}
-              appearance="extension"
-            />
+            <Suspense
+              fallback={
+                <div
+                  aria-busy="true"
+                  aria-label="Loading editor"
+                  style={{ display: "flex", flexDirection: "column", gap: 8, padding: "4px 0" }}
+                >
+                  <div className="capture-skeleton-line" style={{ height: 12, borderRadius: 4, width: "100%" }} />
+                  <div className="capture-skeleton-line" style={{ height: 12, borderRadius: 4, width: "92%" }} />
+                  <div className="capture-skeleton-line" style={{ height: 12, borderRadius: 4, width: "60%" }} />
+                </div>
+              }
+            >
+              <DescriptionEditor
+                value={editedDescription}
+                onSave={async () => {
+                  // The outer overlay owns the Save button. The editor's
+                  // internal save is hidden via hideInternalActions; this
+                  // handler is required by the prop type but won't be hit.
+                }}
+                onCancel={() => {
+                  // Outer overlay handles Cancel. The editor's Escape key
+                  // routes through here — close the overlay so it matches
+                  // user expectation.
+                  onClose();
+                }}
+                placeholder="Description..."
+                autoFocus={false}
+                isEditing
+                participants={[]}
+                onContentChange={(markdown) => setEditedDescription(markdown)}
+                fetchClient={fetchClient}
+                hideInternalActions
+                portalContainer={portalContainer}
+                appearance="extension"
+              />
+            </Suspense>
           </div>
         </div>
 

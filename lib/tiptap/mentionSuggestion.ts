@@ -1,4 +1,6 @@
 import type { MutableRefObject } from "react";
+import { getInitials } from "@/lib/utils/getInitials";
+import { getAvatarColor } from "@/lib/utils/getAvatarColor";
 
 export interface MentionParticipant {
   uid: string;
@@ -100,7 +102,13 @@ export function createMentionSuggestion({
             img.alt = "";
             avatarDiv.appendChild(img);
           } else {
-            avatarDiv.textContent = item.displayName.charAt(0).toUpperCase();
+            // Route through the shared helpers so the mention dropdown matches
+            // every other avatar surface: full initials ("IM" not "I") on the
+            // user's stable per-uid color. CSS gives a flat --brand-subtle bg;
+            // override it inline and flip the text to white for contrast.
+            avatarDiv.textContent = getInitials(item.displayName);
+            avatarDiv.style.backgroundColor = getAvatarColor(item.uid);
+            avatarDiv.style.color = "#fff";
           }
           btn.appendChild(avatarDiv);
 

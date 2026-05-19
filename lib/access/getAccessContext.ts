@@ -230,6 +230,61 @@ function finalizeAccessContextResult(params: {
   };
 }
 
+/**
+ * Cheap access context for a session already proven to be in the viewer's own
+ * workspace (caller has verified `session.workspaceId === viewerWorkspaceId`,
+ * and `viewerWorkspaceId` is the viewer's canonical workspace from
+ * `getUserWorkspaceIdRepo`). Mirrors what {@link resolveAccess} returns for the
+ * workspace-member branch WITHOUT the access read fan-out
+ * (`getSessionMember` + `getRequestByUser` + `getWorkspaceMemberRepo` +
+ * sessionAccess doc).
+ *
+ * SCOPE: built for the dashboard session-list filter, which consumes only
+ * `capabilities.canView` and the `session`. A workspace member always resolves
+ * to at least RESOLVER (`canView: true`); this helper returns RESOLVER as a
+ * correct lower bound. It deliberately does NOT distinguish workspace OWNER
+ * (that needs the workspace-member doc read) and so MUST NOT be used where
+ * owner-only capabilities (`canDeleteTicket`) are load-bearing. Per-session
+ * surfaces still call the full {@link getAccessContext}.
+ */
+export function buildWorkspaceMemberAccessContextForList(params: {
+  uid: string;
+  session: Session;
+  viewerWorkspaceId: string;
+}): GetAccessContextResult {
+  const { uid, session, viewerWorkspaceId } = params;
+  const sid = session.id;
+  const { role, sessionGranted, isWorkspaceMember } = resolveAccess({
+    session: {
+      id: session.id,
+      workspaceId: session.workspaceId.trim(),
+      accessLevel: session.accessLevel,
+      ownerUserId: session.createdByUserId.trim(),
+      generalAccess: session.generalAccess,
+    },
+    user: { uid, workspaceId: viewerWorkspaceId },
+    memberAccess: null,
+    workspaceRole: null,
+  });
+
+  const access = toAccessContext({
+    sessionId: sid,
+    workspaceId: session.workspaceId.trim(),
+    user: { uid },
+    role,
+    sessionGranted,
+    isWorkspaceMember,
+    hasDirectSessionGrant: true,
+  });
+
+  return {
+    session,
+    access,
+    request: { pendingResolve: false, requestStatus: null },
+    debug: { member: null, invite: null, inviteIgnoredReason: null },
+  };
+}
+
 export async function getAccessContext(options: {
   sessionId: string;
   context: SystemContext;

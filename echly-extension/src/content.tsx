@@ -44,7 +44,6 @@ function logRuntimeLastError(context: string): void {
 
 const ROOT_ID = "echly-root";
 const SHADOW_HOST_ID = "echly-shadow-host";
-const THEME_STORAGE_KEY = "widget-theme";
 /** App origin for opening dashboard (same as API base). */
 const APP_ORIGIN = API_BASE;
 const inFlightFeedbackIds = new Set<string>();
@@ -73,27 +72,7 @@ class EchlyWidgetErrorBoundary extends React.Component<
   }
 }
 
-function getPreferredTheme(): "dark" | "light" {
-  try {
-    const saved = localStorage.getItem(THEME_STORAGE_KEY);
-    if (saved === "dark" || saved === "light") return saved;
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  } catch (e) {
-    console.error("[ECHLY] getPreferredTheme failed", e);
-    return "dark";
-  }
-}
-
-function applyThemeToRoot(root: HTMLElement, theme: "dark" | "light"): void {
-  root.setAttribute("data-theme", theme);
-  try {
-    localStorage.setItem(THEME_STORAGE_KEY, theme);
-  } catch (e) {
-    console.error("[ECHLY] applyThemeToRoot persistence failed", e);
-  }
-}
-
-type AuthUser = { uid: string; name: string | null; email: string | null; photoURL: string | null; workspaceName: string | null };
+type AuthUser ={ uid: string; name: string | null; email: string | null; photoURL: string | null; workspaceName: string | null };
 
 type GlobalUIState = {
   visible: boolean;
@@ -300,13 +279,11 @@ const BOOTSTRAP_GLOBAL_UI: GlobalUIState = {
 
 type ContentAppProps = {
   widgetRoot: HTMLElement;
-  initialTheme: "dark" | "light";
 };
 
-function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
+function ContentApp({ widgetRoot }: ContentAppProps) {
   const [user, setUser] = React.useState<AuthUser | null>(null);
   const [authState, setAuthState] = React.useState<"loading" | "authenticated" | "unauthenticated">("loading");
-  const [theme, setTheme] = React.useState<"dark" | "light">(initialTheme);
   /** Null until first confirmed state from background (ECHLY_GET_GLOBAL_STATE or ECHLY_GLOBAL_STATE). No placeholder “last known” UI. */
   const [globalState, setGlobalState] = React.useState<GlobalUIState | null>(null);
   const [widgetResetKey, setWidgetResetKey] = React.useState(0);
@@ -670,11 +647,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
     );
   }, []);
 
-  const onThemeToggle = React.useCallback(() => {
-    const next = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    applyThemeToRoot(widgetRoot, next);
-  }, [theme, widgetRoot]);
 
   /* Auth only when widget is opened (Loom-style). Do NOT trigger auth on content script mount. */
   React.useEffect(() => {
@@ -1487,8 +1459,6 @@ function ContentApp({ widgetRoot, initialTheme }: ContentAppProps) {
           onExpandRequest={onExpandRequest}
           onCollapseRequest={onCollapseRequest}
           captureDisabled={false}
-          theme={theme}
-          onThemeToggle={onThemeToggle}
           fetchSessions={fetchSessions}
           hasPreviousSessions={hasPreviousSessions}
           onPreviousSessionSelect={onPreviousSessionSelect}
@@ -1665,13 +1635,11 @@ function mountReactApp(host: HTMLDivElement): void {
   container.style.pointerEvents = "auto";
   container.style.width = "auto";
   container.style.height = "auto";
-  const initialTheme = getPreferredTheme();
-  container.setAttribute("data-theme", initialTheme);
   shadowRoot.appendChild(container);
 
   logger.debug("extension", "mounting_widget_root");
   const reactRoot = createRoot(container);
-  reactRoot.render(<ContentApp widgetRoot={container} initialTheme={initialTheme} />);
+  reactRoot.render(<ContentApp widgetRoot={container} />);
 }
 
 function normalizeGlobalState(state: GlobalUIState | undefined): GlobalUIState | null {
@@ -1814,4 +1782,8 @@ function installHostPositionUpdater(host: HTMLDivElement): void {
   if (window.__ECHLY_WIDGET_LOADED__) return;
   window.__ECHLY_WIDGET_LOADED__ = true;
   injectWidgetUI();
+  // Signal the bootstrap immediately instead of letting it poll the
+  // __ECHLY_WIDGET_LOADED__ flag. The flag stays set above for any
+  // backward-compatible synchronous checks.
+  window.dispatchEvent(new CustomEvent("ECHLY_WIDGET_READY"));
 })();

@@ -14,8 +14,6 @@ export type ResumeSessionModalProps = {
   onClose: () => void;
   fetchSessions?: () => Promise<SessionOption[]>;
   onSelectSession: (sessionId: string) => void;
-  /** Theme for modal (dark/light). Defaults to "dark". */
-  theme?: "dark" | "light";
   /** Extension: run before loading sessions. If returns false, show login-required UI and do not call fetchSessions. */
   checkAuth?: () => Promise<boolean>;
   /** Extension: called when user clicks "Open Login" in login-required state. */

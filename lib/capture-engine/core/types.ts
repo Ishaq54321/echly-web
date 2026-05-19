@@ -140,10 +140,6 @@ export type CaptureWidgetProps = {
   onCollapseRequest?: () => void;
   /** When true, Add Feedback button is disabled (e.g. no active session in extension). No message shown. */
   captureDisabled?: boolean;
-  /** Theme for widget (dark/light). When provided with onThemeToggle, theme toggle is shown. */
-  theme?: "dark" | "light";
-  /** Called when user clicks theme toggle. */
-  onThemeToggle?: () => void;
   /** Extension: fetch sessions for Previous Sessions picker. */
   fetchSessions?: () => Promise<import("./ResumeSessionModal").SessionOption[]>;
   /** Extension: true when backend has at least one session (from /api/sessions?limit=1). Used to show Previous Sessions button only when sessions exist. */

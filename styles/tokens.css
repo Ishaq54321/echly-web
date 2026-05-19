@@ -389,9 +389,8 @@
   /* ─── GLASS — EXTENSION SURFACES ONLY ────────
      Warm-tinted translucent surface + heavy blur + saturate boost.
      Recipe mirrors .echly-pill-hint--dark (the reference glass chip).
-     These are the LIGHT-theme values; dark overrides live in
-     app/globals.css under #echly-root[data-theme="dark"] (the real
-     theming hook in this codebase — there is no [data-theme] at :root).
+     The extension is light-only; these are the sole glass values
+     (no dark overrides — dark mode was removed pre-launch).
      NOTE: deliberately NOT named --glass-highlight; that token already
      exists in globals.css with a different meaning. */
   --glass-surface:          rgba(252, 251, 249, 0.86);
@@ -403,7 +402,20 @@
     0 5px 15px rgba(28, 25, 23, 0.05),
     0 1px 4px rgba(28, 25, 23, 0.035);
   --glass-blur:        blur(28px) saturate(140%);
-  --glass-blur-strong: blur(40px) saturate(150%);
+  --glass-blur-strong: blur(24px) saturate(140%);
+
+  /* "Harder glass" for secondary/tertiary buttons */
+  --glass-button-surface:       rgba(255, 255, 255, 0.55);
+  --glass-button-surface-hover: rgba(255, 255, 255, 0.72);
+  --glass-button-border:        rgba(28, 25, 23, 0.10);
+  --glass-button-highlight:     rgba(255, 255, 255, 0.50);
+
+  /* Hover wash for transparent icon buttons */
+  --glass-icon-hover-bg: rgba(28, 25, 23, 0.05);
+
+  /* Warm, translucent shimmer */
+  --glass-shimmer-base:      rgba(245, 243, 240, 0.45);
+  --glass-shimmer-highlight: rgba(255, 255, 255, 0.85);
 }
 
 /* Duplicate of the :root block above, scoped to :host so shadow DOM
@@ -789,8 +801,8 @@
   --topbar-icon:     var(--text-tertiary);
 
   /* ─── GLASS — EXTENSION SURFACES ONLY ────────
-     Light-theme values. Kept identical to the :root block above.
-     Dark overrides: app/globals.css #echly-root[data-theme="dark"]. */
+     Light-only values. Kept identical to the :root block above.
+     (Extension dark mode was removed pre-launch.) */
   --glass-surface:          rgba(252, 251, 249, 0.86);
   --glass-surface-elevated: rgba(254, 253, 251, 0.92);
   --glass-border:           rgba(28, 25, 23, 0.08);
@@ -800,7 +812,20 @@
     0 5px 15px rgba(28, 25, 23, 0.05),
     0 1px 4px rgba(28, 25, 23, 0.035);
   --glass-blur:        blur(28px) saturate(140%);
-  --glass-blur-strong: blur(40px) saturate(150%);
+  --glass-blur-strong: blur(24px) saturate(140%);
+
+  /* "Harder glass" for secondary/tertiary buttons */
+  --glass-button-surface:       rgba(255, 255, 255, 0.55);
+  --glass-button-surface-hover: rgba(255, 255, 255, 0.72);
+  --glass-button-border:        rgba(28, 25, 23, 0.10);
+  --glass-button-highlight:     rgba(255, 255, 255, 0.50);
+
+  /* Hover wash for transparent icon buttons */
+  --glass-icon-hover-bg: rgba(28, 25, 23, 0.05);
+
+  /* Warm, translucent shimmer */
+  --glass-shimmer-base:      rgba(245, 243, 240, 0.45);
+  --glass-shimmer-highlight: rgba(255, 255, 255, 0.85);
 }
 
 /* ─── GLOBAL BASE ────────────────────────── */

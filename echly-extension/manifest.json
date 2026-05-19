@@ -33,7 +33,8 @@
     {
       "resources": [
         "popup.css",
-        "widget.js",
+        "widget/widget.js",
+        "widget/chunks/*",
         "assets/*",
         "fonts/*"
       ],

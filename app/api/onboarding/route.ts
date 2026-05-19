@@ -178,10 +178,14 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // Workspace logo must be independent of the owner's profile photo.
+      // Default to null so a workspace with no uploaded icon shows the
+      // name-initial fallback, not the owner's face. ownerPhotoUrl is still
+      // used below for the owner's member-roster avatar (legitimately theirs).
       const payload = defaultWorkspaceDoc({
         ownerId: user.uid,
         name: workspaceName,
-        logoUrl: ownerPhotoUrl,
+        logoUrl: null,
         ...(reservedSlug ? { slug: reservedSlug } : {}),
       });
 

@@ -6,6 +6,9 @@ import StarterKit from "@tiptap/starter-kit";
 import Mention from "@tiptap/extension-mention";
 import Placeholder from "@tiptap/extension-placeholder";
 import { createMentionSuggestion } from "@/lib/tiptap/mentionSuggestion";
+import { extractFromDoc } from "@/lib/tiptap/extractFromDoc";
+
+export { extractFromDoc } from "@/lib/tiptap/extractFromDoc";
 
 export type TiptapEditorParticipant = {
   uid: string;
@@ -23,37 +26,6 @@ export interface TiptapCommentEditorProps {
   onContentChange?: (hasContent: boolean) => void;
   onEscape?: () => void;
   className?: string;
-}
-
-export function extractFromDoc(doc: {
-  toJSON: () => {
-    content?: Array<{
-      content?: Array<{ type?: string; text?: string; attrs?: { label?: string; id?: string } }>;
-    }>;
-  };
-}): { text: string; mentionedUserIds: string[] } {
-  const json = doc.toJSON();
-  const blocks = json.content ?? [];
-  const mentionedUserIds: string[] = [];
-
-  const text = blocks
-    .map((block) =>
-      (block.content ?? [])
-        .map((node) => {
-          if (node.type === "mention") {
-            const id = node.attrs?.id ?? "";
-            const label = node.attrs?.label ?? id;
-            if (id) mentionedUserIds.push(id);
-            return `@[${label}](${id})`;
-          }
-          return node.text ?? "";
-        })
-        .join("")
-    )
-    .join("\n")
-    .trim();
-
-  return { text, mentionedUserIds: [...new Set(mentionedUserIds)] };
 }
 
 export function TiptapCommentEditor({

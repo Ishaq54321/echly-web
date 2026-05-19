@@ -3,9 +3,12 @@
 import { useSyncExternalStore } from "react";
 import {
   collection,
+  getDocs,
+  limit,
   onSnapshot,
   orderBy,
   query,
+  startAfter,
   Timestamp,
   where,
   type DocumentData,
@@ -31,11 +34,37 @@ export interface FeedbackState {
   version: number;
 }
 
+/**
+ * Newest-N the realtime listener watches. Chosen so the common case
+ * (sessions with ~100+ tickets — see perf audit Q4) is fully covered:
+ * a member editing any of their session's tickets still gets realtime
+ * within this window, no edit blind spot. The rare 1000+ tail is served
+ * by cursor pagination (loadMoreFeedback) for the deep, non-realtime
+ * portion. Bounding the listener also caps the per-write re-download
+ * that the unbounded query previously incurred on every ticket change.
+ */
+const FEEDBACK_LISTENER_LIMIT = 500;
+
 interface FeedbackEntry {
   state: FeedbackState;
   unsubscribe: (() => void) | null;
   retainCount: number;
   workspaceId: string | null;
+  /** Raw listener-window list (live), kept separate from the composed
+   *  state.feedback so re-composing with the tail is deterministic. */
+  windowList: Feedback[];
+  /** Oldest doc the listener window currently holds — cursor for loadMore. */
+  lastWindowDoc: QueryDocumentSnapshot<DocumentData> | null;
+  /** True if the listener window is full (count === limit) — more may exist. */
+  mayHaveMore: boolean;
+  /** Appended pages from loadMoreFeedback (older than the listener window). */
+  paginatedTail: Feedback[];
+  /** Cursor for the next loadMore page. */
+  tailCursor: QueryDocumentSnapshot<DocumentData> | null;
+  tailExhausted: boolean;
+  /** True once the bundle seeded first paint, so the listener's first
+   *  snapshot replaces (not flickers) the seed. */
+  bundleSeeded: boolean;
 }
 
 const initialState = (): FeedbackState => ({
@@ -61,7 +90,19 @@ const listenersBySession = new Map<string, Set<() => void>>();
 function getOrCreateEntry(sessionId: string): FeedbackEntry {
   let e = entries.get(sessionId);
   if (!e) {
-    e = { state: initialState(), unsubscribe: null, retainCount: 0, workspaceId: null };
+    e = {
+      state: initialState(),
+      unsubscribe: null,
+      retainCount: 0,
+      workspaceId: null,
+      windowList: [],
+      lastWindowDoc: null,
+      mayHaveMore: false,
+      paginatedTail: [],
+      tailCursor: null,
+      tailExhausted: false,
+      bundleSeeded: false,
+    };
     entries.set(sessionId, e);
   }
   return e;
@@ -171,6 +212,25 @@ function mapFeedbackFromSnap(snap: QueryDocumentSnapshot<DocumentData>): Feedbac
   };
 }
 
+/** newest createdAt-desc first, id tiebreaker — single source of order. */
+function sortFeedbackDesc(list: Feedback[]): Feedback[] {
+  return list.sort((a, b) => {
+    const diff = getMillis(b.createdAt) - getMillis(a.createdAt);
+    if (diff !== 0) return diff;
+    return b.id.localeCompare(a.id);
+  });
+}
+
+/** Compose the listener window with any paginated older tail, de-duped. */
+function composeFeedback(e: FeedbackEntry, windowList: Feedback[]): Feedback[] {
+  if (e.paginatedTail.length === 0) return sortFeedbackDesc(windowList);
+  const byId = new Map<string, Feedback>();
+  // Listener window wins over tail for any overlap (it's the live copy).
+  for (const f of e.paginatedTail) byId.set(f.id, f);
+  for (const f of windowList) byId.set(f.id, f);
+  return sortFeedbackDesc([...byId.values()]);
+}
+
 function attachListener(sessionId: string, workspaceId: string) {
   const e = getOrCreateEntry(sessionId);
   if (e.unsubscribe) return;
@@ -180,7 +240,8 @@ function attachListener(sessionId: string, workspaceId: string) {
     collection(db, "feedback"),
     where("sessionId", "==", sessionId),
     where("workspaceId", "==", workspaceId),
-    orderBy("createdAt", "desc")
+    orderBy("createdAt", "desc"),
+    limit(FEEDBACK_LISTENER_LIMIT)
   );
 
   const unsub = onSnapshot(
@@ -188,16 +249,24 @@ function attachListener(sessionId: string, workspaceId: string) {
     (snap) => {
       try {
         const list: Feedback[] = [];
+        let lastDoc: QueryDocumentSnapshot<DocumentData> | null = null;
         snap.forEach((doc) => {
+          lastDoc = doc;
           const f = mapFeedbackFromSnap(doc);
           if (f) list.push(f);
         });
-        list.sort((a, b) => {
-          const diff = getMillis(b.createdAt) - getMillis(a.createdAt);
-          if (diff !== 0) return diff;
-          return b.id.localeCompare(a.id);
+        sortFeedbackDesc(list);
+        // Track the window edge so loadMoreFeedback can page past it, and
+        // whether the window is full (more docs may exist beyond it).
+        e.windowList = list;
+        e.lastWindowDoc = lastDoc;
+        e.mayHaveMore = snap.size === FEEDBACK_LISTENER_LIMIT;
+        e.bundleSeeded = false; // listener is now authoritative
+        setState(sessionId, {
+          feedback: composeFeedback(e, list),
+          loading: false,
+          error: null,
         });
-        setState(sessionId, { feedback: list, loading: false, error: null });
         recordListenerUpdate("feedback", sessionId, {
           count: list.length,
           fromCache: snap.metadata.fromCache,
@@ -243,6 +312,13 @@ function tearDownAllOnSignOut() {
     const e = entries.get(sid);
     if (!e) continue;
     e.retainCount = 0;
+    e.windowList = [];
+    e.lastWindowDoc = null;
+    e.mayHaveMore = false;
+    e.paginatedTail = [];
+    e.tailCursor = null;
+    e.tailExhausted = false;
+    e.bundleSeeded = false;
     e.state = { ...initialState(), version: e.state.version + 1 };
     emitFor(sid);
   }
@@ -309,4 +385,101 @@ export function useFeedbackStore(sessionId: string): FeedbackState {
   const subscribe = (l: () => void) => subscribeToFeedback(sessionId, l);
   const get = () => getFeedbackSnapshot(sessionId);
   return useSyncExternalStore(subscribe, get, get);
+}
+
+/**
+ * Phase 2.1 — seed first paint from the session-page bundle for
+ * listener-mode viewers (workspace members). Mirrors
+ * hydrateSessionFromBundle: it fills the store synchronously so the
+ * ticket list paints without waiting for the first onSnapshot tick,
+ * then the realtime listener replaces it on attach.
+ *
+ * Guard: if a listener is already active it is authoritative — don't
+ * clobber live data with a (possibly staler) bundle snapshot.
+ */
+export function hydrateFeedbackFromBundle(
+  sessionId: string,
+  feedback: Feedback[]
+): void {
+  const sid = typeof sessionId === "string" ? sessionId.trim() : "";
+  if (!sid || !Array.isArray(feedback) || feedback.length === 0) return;
+  const e = getOrCreateEntry(sid);
+  // Listener already supplying data, or a prior seed present → skip.
+  if (e.unsubscribe || e.bundleSeeded || e.state.feedback.length > 0) return;
+  e.bundleSeeded = true;
+  e.state = {
+    ...e.state,
+    feedback: sortFeedbackDesc([...feedback]),
+    loading: false,
+    error: null,
+    version: e.state.version + 1,
+  };
+  emitFor(sid);
+}
+
+/**
+ * Phase 2.2 — page past the realtime window for the rare deep tail
+ * (sessions beyond FEEDBACK_LISTENER_LIMIT). These pages are NOT
+ * realtime (the listener only watches the newest window); they are a
+ * one-shot read appended below the live window.
+ *
+ * Returns true if a page was loaded, false if exhausted / unavailable.
+ */
+export async function loadMoreFeedback(sessionId: string): Promise<boolean> {
+  const sid = typeof sessionId === "string" ? sessionId.trim() : "";
+  if (!sid) return false;
+  const e = entries.get(sid);
+  if (!e || !e.workspaceId || e.tailExhausted) return false;
+
+  // Cursor: continue from the last tail page, else from the listener edge.
+  const cursorDoc = e.tailCursor ?? e.lastWindowDoc;
+  if (!cursorDoc) return false;
+  // Nothing beyond the window and we've never paged → no tail to load.
+  if (e.tailCursor === null && !e.mayHaveMore) return false;
+
+  const moreQ = query(
+    collection(db, "feedback"),
+    where("sessionId", "==", sid),
+    where("workspaceId", "==", e.workspaceId),
+    orderBy("createdAt", "desc"),
+    startAfter(cursorDoc),
+    limit(FEEDBACK_LISTENER_LIMIT)
+  );
+
+  try {
+    const snap = await getDocs(moreQ);
+    if (snap.empty) {
+      e.tailExhausted = true;
+      return false;
+    }
+    const page: Feedback[] = [];
+    let last: QueryDocumentSnapshot<DocumentData> | null = null;
+    snap.forEach((doc) => {
+      last = doc;
+      const f = mapFeedbackFromSnap(doc);
+      if (f) page.push(f);
+    });
+    e.tailCursor = last;
+    if (snap.size < FEEDBACK_LISTENER_LIMIT) e.tailExhausted = true;
+
+    // Merge into the persisted tail (de-dupe by id), then re-emit the
+    // composed list (live window + full tail).
+    const tailById = new Map<string, Feedback>();
+    for (const f of e.paginatedTail) tailById.set(f.id, f);
+    for (const f of page) tailById.set(f.id, f);
+    e.paginatedTail = sortFeedbackDesc([...tailById.values()]);
+
+    setState(sid, { feedback: composeFeedback(e, e.windowList) });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Whether a deep (non-realtime) tail page may still be loadable. */
+export function feedbackHasMoreTail(sessionId: string): boolean {
+  const e = entries.get(typeof sessionId === "string" ? sessionId.trim() : "");
+  if (!e) return false;
+  if (e.tailExhausted) return false;
+  return e.mayHaveMore || e.tailCursor !== null;
 }

@@ -601,4 +601,7 @@ function TicketListInner({
   );
 }
 
-export const TicketList = TicketListInner;
+// memo: TicketList is rendered twice (desktop + mobile) and re-renders
+// on every parent state change. Props are mostly primitives/stable refs;
+// memo skips the subtree when they're unchanged.
+export const TicketList = React.memo(TicketListInner);

@@ -27,11 +27,13 @@ const EMPTY_EVENTS: ActivityEvent[] = [];
  */
 export function useTicketActivity(
   workspaceId: string | null | undefined,
-  feedbackId: string | null | undefined
+  feedbackId: string | null | undefined,
+  sessionId: string | null | undefined
 ): { events: ActivityEvent[]; loading: boolean } {
   const wid = workspaceId?.trim() || "";
   const fid = feedbackId?.trim() || "";
-  const active = Boolean(wid && fid);
+  const sid = sessionId?.trim() || "";
+  const active = Boolean(wid && fid && sid);
 
   // useSyncExternalStore (same pattern as commentsStore) — structurally
   // avoids setState-in-effect. getSnapshot returns the store's stable
@@ -39,13 +41,13 @@ export function useTicketActivity(
   const subscribe = useCallback(
     (onStoreChange: () => void) =>
       active
-        ? subscribeToTicketActivitySync(wid, fid, onStoreChange)
+        ? subscribeToTicketActivitySync(wid, fid, sid, onStoreChange)
         : () => {},
-    [active, wid, fid]
+    [active, wid, fid, sid]
   );
   const getSnapshot = useCallback(
-    () => (active ? getTicketActivitySnapshot(wid, fid) : EMPTY_EVENTS),
-    [active, wid, fid]
+    () => (active ? getTicketActivitySnapshot(wid, fid, sid) : EMPTY_EVENTS),
+    [active, wid, fid, sid]
   );
   const snapshot = useSyncExternalStore(
     subscribe,

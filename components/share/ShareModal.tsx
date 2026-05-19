@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import { Check, ChevronDown, Link, Loader2, Trash2, Users, X } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import type {
   ShareAccess,
   ShareAccessRequestItem,
@@ -562,17 +563,16 @@ export function ShareModal({
                   <ul className="share-access-request-list m-0 list-none p-0">
                     {allWithSelf.map(member => {
                       const isYou = member.uid === currentUserUid;
-                      const initials = (member.displayName ?? member.email)[0]?.toUpperCase() ?? "?";
                       return (
                         <li key={member.uid} className="share-access-request-row flex items-center gap-3 py-3 px-0">
                           <div className="share-member-info">
-                            <div className="share-user-avatar" aria-hidden>
-                              <MemberAvatar
-                                avatarUrl={member.avatarUrl}
-                                alt={member.displayName ?? member.email}
-                                initial={initials}
-                              />
-                            </div>
+                            <UserAvatar
+                              avatarUrl={member.avatarUrl}
+                              name={member.displayName ?? member.email}
+                              colorSeed={member.uid}
+                              size={30}
+                              alt={member.displayName ?? member.email}
+                            />
                             <div className="min-w-0 flex-1">
                               <span className="share-user-email">
                                 {member.displayName ?? member.email}

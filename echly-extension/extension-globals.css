@@ -2236,7 +2236,7 @@
   width: 160px;
   height: 14px;
   border-radius: 7px;
-  background: linear-gradient(90deg, var(--surface-subtle) 25%, var(--surface-hover) 50%, var(--surface-subtle) 75%);
+  background: linear-gradient(90deg, var(--glass-shimmer-base) 25%, var(--glass-shimmer-highlight) 50%, var(--glass-shimmer-base) 75%);
   background-size: 200% 100%;
   animation: echly-skeleton-shimmer 1.5s ease-in-out infinite;
 }

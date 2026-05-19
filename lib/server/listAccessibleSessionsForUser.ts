@@ -1,11 +1,42 @@
 import "server-only";
 
-import { getAccessContext } from "@/lib/access/getAccessContext";
+import {
+  getAccessContext,
+  buildWorkspaceMemberAccessContextForList,
+} from "@/lib/access/getAccessContext";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import type { Session } from "@/lib/domain/session";
+import { requireGeneralAccess } from "@/lib/domain/session";
+import { requireAccessLevel } from "@/lib/domain/accessLevel";
 import { assertQueryLimit } from "@/lib/querySafety";
 import { getUserWorkspaceIdRepo } from "@/lib/repositories/usersRepository.server";
 import { buildSystemContext } from "@/lib/server/systemContext";
+import type { QueryDocumentSnapshot } from "firebase-admin/firestore";
+
+/**
+ * Map a Firestore session doc to {@link Session}. Mirrors `getSessionByIdRepo`'s
+ * mapping so list rows and single-fetch rows are shaped identically. Returns
+ * null for docs missing the required `workspaceId` / `createdByUserId`.
+ */
+function mapSessionDoc(snap: QueryDocumentSnapshot): Session | null {
+  const data = snap.data() as Record<string, unknown>;
+  const workspaceId =
+    typeof data.workspaceId === "string" ? data.workspaceId.trim() : "";
+  const createdByUserId =
+    typeof data.createdByUserId === "string"
+      ? data.createdByUserId.trim()
+      : "";
+  if (!workspaceId || !createdByUserId) return null;
+  return {
+    ...(data as Omit<Session, "id">),
+    id: snap.id,
+    workspaceId,
+    createdByUserId,
+    accessLevel: requireAccessLevel(data.accessLevel),
+    generalAccess: requireGeneralAccess(data.generalAccess),
+    hasConfiguredShare: data.hasConfiguredShare === true,
+  };
+}
 
 const DEFAULT_OWNER_SESSIONS_QUERY_LIMIT = 80;
 
@@ -47,34 +78,61 @@ export async function listAccessibleSessionsForUser(args: {
   const uid = args.userId.trim();
   if (!uid) return [];
 
-  const ids = new Set<string>();
-
   const workspaceId = await getUserWorkspaceIdRepo(uid);
-  // TODO: remove before production
-  console.log("[listAccessibleSessions] workspaceId:", workspaceId, "uid:", uid);
+  const wsTrim = workspaceId.trim();
   const workspaceSnap = await adminDb
     .collection("sessions")
     .where("workspaceId", "==", workspaceId)
     .orderBy("updatedAt", "desc")
     .limit(ownerSessionsQueryLimit)
     .get();
-  for (const d of workspaceSnap.docs) ids.add(d.id);
 
-  const wsTrim = workspaceId.trim();
+  // The query filters by `workspaceId == <viewer workspace>`, so every row is a
+  // session in the viewer's own workspace. A workspace member always resolves to
+  // at least RESOLVER (canView=true) — proven by `resolveAccess` — so the full
+  // per-session access fan-out (5 reads/session) is redundant here and is
+  // replaced by `buildWorkspaceMemberAccessContextForList`. The slow path
+  // (`getAccessContext` with the already-fetched session, no re-fetch) is kept
+  // only as a defensive fallback for the structurally-impossible case where a
+  // returned doc's workspaceId does not equal the viewer's workspace.
   const accessCallerContext = buildSystemContext({
     userId: uid,
     workspaceId: wsTrim === "" ? null : wsTrim,
   });
 
+  let fastPathCount = 0;
+  let slowPathCount = 0;
+
   const resolved = await Promise.all(
-    [...ids].map(async (sessionId) => {
-      const { session, access } = await getAccessContext({
-        sessionId,
+    workspaceSnap.docs.map(async (doc) => {
+      const session = mapSessionDoc(doc);
+      if (!session) return null;
+
+      if (wsTrim !== "" && session.workspaceId.trim() === wsTrim) {
+        fastPathCount += 1;
+        const { access } = buildWorkspaceMemberAccessContextForList({
+          uid,
+          session,
+          viewerWorkspaceId: wsTrim,
+        });
+        if (!access.capabilities.canView) return null;
+        return session;
+      }
+
+      slowPathCount += 1;
+      const { session: resolvedSession, access } = await getAccessContext({
+        sessionId: session.id,
         context: accessCallerContext,
+        session,
       });
       if (!access.capabilities.canView) return null;
-      return session;
+      return resolvedSession;
     })
+  );
+
+  // TEMP (Phase 2.1c verification — remove after Firestore-read drop confirmed):
+  console.log(
+    `[sessions] fast-path: ${fastPathCount}, slow-path: ${slowPathCount}`
   );
 
   const sessions = resolved.filter((s): s is Session => s != null);

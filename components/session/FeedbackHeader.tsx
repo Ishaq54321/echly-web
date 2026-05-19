@@ -172,13 +172,6 @@ export function SessionFeedbackHeader({
     else onBlocked({ reason: "app", action: "resolve" });
   };
 
-  const gateComment = () => {
-    if (!shareGating) return;
-    const { permissions, onBlocked } = shareGating;
-    if (!permissions.canComment) onBlocked({ reason: "tier", action: "comment" });
-    else onBlocked({ reason: "app", action: "comment" });
-  };
-
   return (
     <header className="sticky top-0 z-20 shrink-0 bg-[var(--surface)] pt-0 px-0 pb-0">
       <div className="mb-6">
@@ -350,16 +343,7 @@ export function SessionFeedbackHeader({
                     />
                   </div>
                 ) : null}
-                {/* Activity */}
-                <button
-                  type="button"
-                  className={actionBtn}
-                  onClick={gateComment}
-                  aria-label="Open activity"
-                >
-                  <CalendarCheck2 size={14} strokeWidth={1.5} />
-                  Activity
-                </button>
+                {/* Activity button removed — share-gated viewers don't see Activity */}
               </>
             ) : null
           ) : ro ? (
@@ -398,32 +382,7 @@ export function SessionFeedbackHeader({
                     </button>
                   )
                 ) : null}
-                {/* Activity (read-only) */}
-                {readOnlyPermissions?.canComment ? (
-                  <button
-                    type="button"
-                    disabled
-                    className={`${actionBtn} opacity-60 cursor-not-allowed`}
-                    aria-label="Open activity"
-                  >
-                    <CalendarCheck2 size={14} strokeWidth={1.5} />
-                    Activity
-                  </button>
-                ) : isAnonymousViewer ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      window.location.href = `/login?returnUrl=${encodeURIComponent(
-                        window.location.pathname + window.location.search
-                      )}`;
-                    }}
-                    className={actionBtn}
-                    aria-label="Open activity"
-                  >
-                    <CalendarCheck2 size={14} strokeWidth={1.5} />
-                    Activity
-                  </button>
-                ) : null}
+                {/* Activity button removed — view-only viewers don't see Activity */}
                 {/* Assign (read-only dropdown) */}
                 {item && assigneeId && (
                   <div>

@@ -67,6 +67,23 @@ if (window.__ECHLY_BOOTSTRAP_LOADED__) {
   let latestGlobalState: GlobalUIState | null = null;
   const pendingEvents: Array<{ type: string; detail?: unknown }> = [];
 
+  // ─── Widget-ready signal ────────────────────────────────────────
+  // The widget dispatches "ECHLY_WIDGET_READY" once it has mounted.
+  // We resolve a promise on that event instead of polling the
+  // __ECHLY_WIDGET_LOADED__ flag every 50ms (pure artificial latency).
+  let widgetReadyResolver: (() => void) | null = null;
+  const widgetReadyPromise = new Promise<void>((resolve) => {
+    widgetReadyResolver = resolve;
+  });
+  window.addEventListener(
+    "ECHLY_WIDGET_READY",
+    () => {
+      widgetReadyResolver?.();
+      widgetReadyResolver = null;
+    },
+    { once: true }
+  );
+
   // ─── Keepalive port ─────────────────────────────────────────────
   let keepalivePort: chrome.runtime.Port | null = null;
   let keepaliveSessionActive = false;
@@ -178,32 +195,47 @@ if (window.__ECHLY_BOOTSTRAP_LOADED__) {
           return;
         }
         if (response?.success) {
-          const checkReady = (attempts: number) => {
-            if (window.__ECHLY_WIDGET_LOADED__) {
-              widgetLoaded = true;
-              widgetLoading = null;
-              if (latestGlobalState) {
-                try { window.__ECHLY_APPLY_GLOBAL_STATE__?.(latestGlobalState); } catch (e) {
-                  console.error("[ECHLY] apply state on load failed", e);
-                }
-                window.dispatchEvent(
-                  new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state: latestGlobalState } })
-                );
+          const onWidgetReady = () => {
+            widgetLoaded = true;
+            widgetLoading = null;
+            if (latestGlobalState) {
+              try { window.__ECHLY_APPLY_GLOBAL_STATE__?.(latestGlobalState); } catch (e) {
+                console.error("[ECHLY] apply state on load failed", e);
               }
-              for (const ev of pendingEvents) {
-                window.dispatchEvent(new CustomEvent(ev.type, { detail: ev.detail }));
-              }
-              pendingEvents.length = 0;
-              setTimeout(() => fetchAndApplyState(), 50);
-              resolve();
-            } else if (attempts < 50) {
-              setTimeout(() => checkReady(attempts + 1), 50);
-            } else {
-              widgetLoading = null;
-              reject(new Error("Widget failed to initialize"));
+              window.dispatchEvent(
+                new CustomEvent("ECHLY_GLOBAL_STATE", { detail: { state: latestGlobalState } })
+              );
             }
+            for (const ev of pendingEvents) {
+              window.dispatchEvent(new CustomEvent(ev.type, { detail: ev.detail }));
+            }
+            pendingEvents.length = 0;
+            fetchAndApplyState();
+            resolve();
           };
-          checkReady(0);
+
+          // The widget is already mounted if it fired ECHLY_WIDGET_READY
+          // before this listener attached (re-injection / fast path).
+          if (window.__ECHLY_WIDGET_LOADED__) {
+            onWidgetReady();
+            return;
+          }
+
+          // Otherwise wait for the widget's ready event. The 5s timeout is a
+          // safety net so a failed injection rejects instead of hanging.
+          let settled = false;
+          const timeoutId = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            widgetLoading = null;
+            reject(new Error("Widget failed to initialize"));
+          }, 5000);
+          void widgetReadyPromise.then(() => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeoutId);
+            onWidgetReady();
+          });
         } else {
           widgetLoading = null;
           reject(new Error(response?.error || "Background failed to inject widget"));

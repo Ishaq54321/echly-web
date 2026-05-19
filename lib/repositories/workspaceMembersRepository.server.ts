@@ -82,6 +82,19 @@ export async function getWorkspaceMembersRepo(
   return snap.docs.map((d) => docToMember(d.id, d.data()));
 }
 
+/**
+ * Active member count via Firestore aggregation (`.count()`) — one read unit,
+ * no per-doc fan-out. Backs GET /api/workspace/member-count, which replaced the
+ * full /members/all roster fetch that the dashboard used only for a count.
+ */
+export async function getWorkspaceMemberCountRepo(
+  workspaceId: string
+): Promise<number> {
+  const agg = await membersCol(workspaceId).count().get();
+  const n = agg.data().count;
+  return typeof n === "number" && Number.isFinite(n) ? n : 0;
+}
+
 export async function getWorkspaceMemberRepo(
   workspaceId: string,
   uid: string

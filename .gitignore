@@ -43,3 +43,7 @@ serviceAccountKey.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# extension build source maps (dev-only, never packaged/committed)
+echly-extension/*.map
+echly-extension/widget/**/*.map

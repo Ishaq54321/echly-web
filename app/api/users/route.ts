@@ -197,7 +197,11 @@ async function ensureUserAndRespond(
             activeWorkspaceId = null;
           }
         }
-        await setWorkspaceClaims(user.uid, activeWorkspaceId, memberships);
+        const { changed: claimsChanged } = await setWorkspaceClaims(
+          user.uid,
+          activeWorkspaceId,
+          memberships
+        );
         const headers = await buildHeadersWithOnboardedCookie(
           req,
           user.uid,
@@ -211,6 +215,7 @@ async function ensureUserAndRespond(
             firstName,
             lastName,
             displayName: composeFullName(firstName, lastName),
+            claimsChanged,
           },
           null,
           { headers }
@@ -231,6 +236,7 @@ async function ensureUserAndRespond(
           firstName,
           lastName,
           displayName: composeFullName(firstName, lastName),
+          claimsChanged: false,
         },
         null,
         { headers }
@@ -242,6 +248,7 @@ async function ensureUserAndRespond(
       email: user.email ?? null,
       authDisplayName: user.displayName ?? null,
     });
+    let claimsChanged = false;
     if (workspaceId) {
       const ensuredSnap = await adminDb.doc(`users/${user.uid}`).get();
       const ensuredData = (ensuredSnap.data() ?? {}) as Record<string, unknown>;
@@ -251,7 +258,12 @@ async function ensureUserAndRespond(
           )
         : [];
       if (!memberships.includes(workspaceId)) memberships.push(workspaceId);
-      await setWorkspaceClaims(user.uid, workspaceId, memberships);
+      const claimResult = await setWorkspaceClaims(
+        user.uid,
+        workspaceId,
+        memberships
+      );
+      claimsChanged = claimResult.changed;
     }
     // Re-read so the freshly-seeded firstName/lastName are returned to the client.
     const freshSnap = await adminDb.doc(`users/${user.uid}`).get();
@@ -271,6 +283,7 @@ async function ensureUserAndRespond(
         firstName,
         lastName,
         displayName: composeFullName(firstName, lastName),
+        claimsChanged,
       },
       null,
       { headers }

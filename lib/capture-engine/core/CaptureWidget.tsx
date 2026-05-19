@@ -13,7 +13,7 @@ import { SessionLimitUpgradeView } from "./SessionLimitUpgradeView";
 import ModeSelectionView from "./ModeSelectionView";
 import PreviousFeedbackView from "./PreviousFeedbackView";
 import { KeepRecordingPill } from "@/components/CaptureWidget/KeepRecordingPill";
-import { PencilLine, Check, Link as LinkIcon, Loader2, X, Mic, Pen, Sun, Moon } from "lucide-react";
+import { PencilLine, Check, Link as LinkIcon, Loader2, X, Mic, Pen } from "lucide-react";
 import type { CaptureWidgetProps, CaptureState } from "./types";
 import { ECHLY_DEBUG } from "@/lib/utils/logger";
 
@@ -34,8 +34,6 @@ export default function CaptureWidget({
   onExpandRequest,
   onCollapseRequest,
   captureDisabled = false,
-  theme = "dark",
-  onThemeToggle,
   fetchSessions,
   hasPreviousSessions = false,
   onPreviousSessionSelect,
@@ -627,7 +625,6 @@ export default function CaptureWidget({
             onPreviousSessionSelect(sessionId);
             setResumeModalOpen(false);
           }}
-          theme={theme}
           checkAuth={verifySessionBeforeSessions}
           onOpenLogin={onTriggerLogin}
         />
@@ -675,7 +672,6 @@ export default function CaptureWidget({
           onSessionSaveText={handlers.handleSessionFeedbackSubmit}
           onSessionFeedbackCancel={handlers.handleSessionFeedbackCancel}
           onStopVoiceForModeSwitch={handlers.stopVoiceForModeSwitch}
-          theme={theme}
           onModeChange={(mode) => setMode(mode)}
           captureSuspended={trayHovered || editingTicketId != null}
         />
@@ -787,14 +783,13 @@ export default function CaptureWidget({
               />
             )}
 
-            <div className="echly-sidebar-surface" data-theme={theme}>
+            <div className="echly-sidebar-surface">
               {/* ── Case 1: Session limit upgrade view ── */}
               {effectiveSessionLimitReached && !sessionId ? (
                 <>
                   <CaptureHeader
                     onClose={handleClose}
                     showOnlyClose
-                    theme={theme}
                   />
                   <div className="echly-sidebar-body echly-upgrade-card-body">
                     <SessionLimitUpgradeView
@@ -893,8 +888,6 @@ export default function CaptureWidget({
                       onOpenLogin={onTriggerLogin}
                       captureMode={captureMode}
                       onModeChange={(mode) => setMode(mode)}
-                      theme={theme}
-                      onThemeToggle={onThemeToggle}
                       onHeaderMouseDown={handleHeaderMouseDown}
                       logoUrl={launcherLogoUrl ?? (getAssetUrl ? getAssetUrl("assets/annote-logo-icon.svg") : "/annote-logo-icon.svg")}
                     />
@@ -909,8 +902,6 @@ export default function CaptureWidget({
                       }}
                       onBack={() => setShowModeSelection(false)}
                       onClose={handleClose}
-                      theme={theme}
-                      onThemeToggle={onThemeToggle}
                       isStarting={isStartingSession}
                       logoUrl={launcherLogoUrl ?? (getAssetUrl ? getAssetUrl("assets/annote-logo-icon.svg") : "/annote-logo-icon.svg")}
                     />
@@ -969,19 +960,6 @@ export default function CaptureWidget({
                           </span>
                         </div>
                         <div className="tl-icon-group">
-                          <button
-                            type="button"
-                            className="pill-icon-btn"
-                            onClick={onThemeToggle}
-                            aria-label="Toggle theme"
-                          >
-                            {theme === "dark" ? (
-                              <Sun size={13} strokeWidth={2.25} />
-                            ) : (
-                              <Moon size={13} strokeWidth={2.25} />
-                            )}
-                            <span className="echly-tooltip">{theme === "dark" ? "Light mode" : "Dark mode"}</span>
-                          </button>
                           <button
                             type="button"
                             className="pill-icon-btn"
@@ -1432,8 +1410,6 @@ export default function CaptureWidget({
                     title={undefined}
                     summary={summary}
                     showHomeButton={extensionMode && !(effectiveSessionLimitReached && !sessionId)}
-                    theme={theme}
-                    onThemeToggle={isStartingSession ? undefined : onThemeToggle}
                     captureMode={captureMode}
                     onCaptureModeToggle={isStartingSession ? undefined : (extensionMode ? () => setMode(captureMode === "voice" ? "text" : "voice") : undefined)}
                     onShowCommandScreen={() => setShowCommandScreen(true)}

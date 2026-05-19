@@ -336,24 +336,14 @@ export function ProfileCommandPanel({
             }}
           >
             <div style={{ position: "relative", flexShrink: 0 }}>
-              <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: "50%",
-                  overflow: "hidden",
-                  background:
-                    "linear-gradient(135deg, var(--brand) 0%, var(--brand-text) 100%)",
-                }}
-              >
-                <UserAvatar
-                  avatarUrl={avatarUrl}
-                  image={(user as { image?: string | null } | null)?.image}
-                  photoURL={user?.photoURL}
-                  name={displayName}
-                  className="h-full w-full"
-                />
-              </div>
+              <UserAvatar
+                avatarUrl={avatarUrl}
+                image={(user as { image?: string | null } | null)?.image}
+                photoURL={user?.photoURL}
+                name={displayName}
+                colorSeed={user?.uid}
+                size={44}
+              />
               <span
                 style={{
                   position: "absolute",
