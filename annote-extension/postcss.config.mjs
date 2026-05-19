@@ -1,7 +1,7 @@
 export default {
   plugins: {
     "@tailwindcss/postcss": {
-      base: "./echly-extension",
+      base: "./annote-extension",
       optimize: { minify: true },
     },
   },

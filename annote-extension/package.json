@@ -1,5 +1,5 @@
 {
-  "name": "@echly/extension",
+  "name": "@annote/extension",
   "private": true,
   "version": "0.0.0",
   "description": "Chrome extension dependencies only. Bundled via esbuild-extension.mjs; do not import these packages from the Next.js web app.",

@@ -5,7 +5,7 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname);
-const extDir = path.resolve(root, "echly-extension");
+const extDir = path.resolve(root, "annote-extension");
 
 function resolveFilePath(dir, base) {
   const candidates = [
@@ -102,7 +102,7 @@ await esbuild.build({
 // format:"esm" + splitting lets esbuild emit shared/lazy chunks so the
 // editor stack (TipTap/ProseMirror/emoji-picker) only downloads on first
 // ticket edit. iife silently inlined every dynamic import, defeating that.
-// Output is a directory (echly-extension/widget/) — the entry resolves its
+// Output is a directory (annote-extension/widget/) — the entry resolves its
 // chunks by relative path from the extension origin at runtime.
 await esbuild.build({
   entryPoints: [path.join(extDir, "src", "content.tsx")],

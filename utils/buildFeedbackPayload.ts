@@ -1,1 +1,1 @@
-export { buildFeedbackPayload } from "../echly-extension/src/utils/buildFeedbackPayload";
+export { buildFeedbackPayload } from "../annote-extension/src/utils/buildFeedbackPayload";

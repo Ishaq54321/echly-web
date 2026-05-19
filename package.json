@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "workspaces": [
-    "echly-extension"
+    "annote-extension"
   ],
   "scripts": {
     "dev": "next dev",
@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "build:extension": "npm run build:extension:css && npm run build:extension:js",
-    "build:extension:css": "npx postcss app/globals.css -o echly-extension/popup.css && node -e \"const fs=require('fs'); const f=fs.readFileSync('echly-extension/extension-fonts.css','utf8'); const m=fs.readFileSync('echly-extension/popup.css','utf8'); fs.writeFileSync('echly-extension/popup.css', f+m);\"",
+    "build:extension:css": "npx postcss app/globals.css -o annote-extension/popup.css && node -e \"const fs=require('fs'); const f=fs.readFileSync('annote-extension/extension-fonts.css','utf8'); const m=fs.readFileSync('annote-extension/popup.css','utf8'); fs.writeFileSync('annote-extension/popup.css', f+m);\"",
     "build:extension:js": "node esbuild-extension.mjs"
   },
   "dependencies": {

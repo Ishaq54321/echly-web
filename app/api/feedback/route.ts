@@ -54,7 +54,7 @@ export async function OPTIONS(req: NextRequest) {
  * NOTE: As of Phase 2 the web session page no longer uses this endpoint —
  * authenticated viewers get tickets via the Firestore listener in
  * `lib/realtime/feedbackStore.ts`. Remaining live consumers are:
- *   - `echly-extension/src/background.ts` (paginated session ticket sync)
+ *   - `annote-extension/src/background.ts` (paginated session ticket sync)
  *   - `app/(app)/discussion/page.tsx` (no-sessionId inbox + mentions paths)
  *   - `app/api/session-page-bundle/route.ts` for anonymous share-link viewers (first page only)
  */
