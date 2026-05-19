@@ -133,6 +133,17 @@ export interface Workspace {
 
   /** Pre-aggregated counts for insights. One workspace doc read replaces 6 count + 3 getDocs. */
   stats?: WorkspaceStats;
+
+  /**
+   * Phase 5: per-billing-cycle dedupe for plan-limit emails. `lastSentAt` is
+   * the server timestamp of the last send; a send is allowed again only once
+   * it predates the current cycle start (usage.feedbackResetDate). Optional —
+   * absent means "never sent". Written by lib/email/planLimitDispatch.server.
+   */
+  planLimitWarnings?: {
+    approaching?: { lastSentAt: Timestamp };
+    hit?: { lastSentAt: Timestamp };
+  };
 }
 
 export type WorkspaceDoc = Omit<Workspace, "id">;

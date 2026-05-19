@@ -422,6 +422,40 @@ export const PATCH = withAuthorization(
                     : null,
                 },
               });
+
+              // Phase 5: ticket-assigned email. Only on a real (re)assignment
+              // to someone OTHER than the actor — self-assignment and
+              // unassignment (afterAssigneeId === null) send nothing.
+              // assignmentChanged already guarantees after !== before.
+              if (
+                typeof afterAssigneeId === "string" &&
+                afterAssigneeId.trim() &&
+                afterAssigneeId !== activityActorId
+              ) {
+                const ticketTitleForEmail =
+                  (typeof existingForOwnership.title === "string"
+                    ? existingForOwnership.title.trim()
+                    : "") || "a ticket";
+                const sessionNameForEmail =
+                  (typeof context.session?.title === "string"
+                    ? context.session.title.trim()
+                    : "") || "a session";
+                try {
+                  const { sendTicketAssignedEmail } = await import(
+                    "@/lib/email/notificationEmails"
+                  );
+                  await sendTicketAssignedEmail({
+                    assigneeUid: afterAssigneeId,
+                    assignerName: actor.actorName,
+                    ticketTitle: ticketTitleForEmail,
+                    sessionName: sessionNameForEmail,
+                    sessionId: activitySessionId,
+                    feedbackId: id,
+                  });
+                } catch (err) {
+                  console.error("[ticket-assigned-email] failed:", err);
+                }
+              }
             }
           });
         }

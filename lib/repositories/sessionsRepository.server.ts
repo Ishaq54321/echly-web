@@ -225,6 +225,14 @@ export async function recordSessionViewIfNewRepo(
   const viewerRef = adminDb.doc(`sessionViews/${sessionId}/views/${viewerId}`);
   const sessionRef = adminDb.doc(`sessions/${sessionId}`);
 
+  // Captured inside the txn so we can fire the "first viewer" email AFTER the
+  // view is durably recorded (and only when this call was the first to record
+  // a non-creator viewer). Stays null on early-returns / repeat views.
+  let firstView: {
+    ownerUid: string;
+    sessionName: string;
+  } | null = null;
+
   await adminDb.runTransaction(async (tx) => {
     const [viewerSnap, sessionSnap] = await Promise.all([
       tx.get(viewerRef),
@@ -272,7 +280,75 @@ export async function recordSessionViewIfNewRepo(
       viewCount: FieldValue.increment(1),
       recentViewers: trimmed,
     });
+
+    // This call just recorded a brand-new non-creator viewer (creator/repeat
+    // views returned above). Mark it for the post-commit email dispatch.
+    const ownerUid =
+      typeof sessionData.createdByUserId === "string"
+        ? sessionData.createdByUserId.trim()
+        : "";
+    if (ownerUid) {
+      const title =
+        typeof sessionData.title === "string" ? sessionData.title.trim() : "";
+      firstView = {
+        ownerUid,
+        sessionName: title || "Untitled Session",
+      };
+    }
   });
+
+  // Phase 5: session-opened email. Fire-and-forget — never block view tracking.
+  // The emailSends.firstViewerNotified transaction guarantees exactly one send
+  // per session even if multiple viewers land simultaneously.
+  if (firstView) {
+    const fv: { ownerUid: string; sessionName: string } = firstView;
+    void (async () => {
+      try {
+        const notified = await adminDb.runTransaction(async (tx) => {
+          const snap = await tx.get(sessionRef);
+          if (!snap.exists) return false;
+          if (snap.data()?.emailSends?.firstViewerNotified) return false;
+          tx.set(
+            sessionRef,
+            {
+              emailSends: {
+                firstViewerNotified: FieldValue.serverTimestamp(),
+              },
+            },
+            { merge: true }
+          );
+          return true;
+        });
+        if (!notified) return;
+
+        const { getUserByIdRepo } = await import(
+          "@/lib/repositories/usersRepository.server"
+        );
+        const { sendSessionOpenedEmail, displayName } = await import(
+          "@/lib/email/notificationEmails"
+        );
+        const owner = await getUserByIdRepo(fv.ownerUid);
+        if (!owner?.email) return;
+
+        const viewerName =
+          (viewerProfile?.displayName ?? "").trim() ||
+          (viewerId.startsWith("anon_")
+            ? "Someone"
+            : displayName(
+                (await getUserByIdRepo(viewerId)) ?? { email: null }
+              ));
+
+        await sendSessionOpenedEmail({
+          owner,
+          viewerName,
+          sessionId,
+          sessionName: fv.sessionName,
+        });
+      } catch (err) {
+        console.error("[session-opened-email] failed:", err);
+      }
+    })();
+  }
 }
 
 /**

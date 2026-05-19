@@ -243,6 +243,44 @@ export async function ensureUserRepo(user: UserLike): Promise<{ workspaceId: str
     }
     await userRef.set(newUserDoc, { merge: true });
     await mirrorUserProfileFromUserDoc(user.uid);
+
+    // Phase 5: fire-and-forget welcome email. The fresh-signup branch only
+    // runs when the user doc didn't exist, but two concurrent ensureUserRepo
+    // calls could both reach here for the same uid — so claim the
+    // emailSends.welcome marker in a transaction and only the winner sends.
+    // Signup must never block on (or fail because of) the email send.
+    void (async () => {
+      try {
+        const claimed = await adminDb.runTransaction(async (tx) => {
+          const snap = await tx.get(userRef);
+          if (snap.data()?.emailSends?.welcome) return false;
+          tx.set(
+            userRef,
+            { emailSends: { welcome: FieldValue.serverTimestamp() } },
+            { merge: true }
+          );
+          return true;
+        });
+        if (claimed) {
+          const { sendWelcomeEmail } = await import(
+            "@/lib/email/notificationEmails"
+          );
+          await sendWelcomeEmail({
+            user: {
+              uid: user.uid,
+              email,
+              emailPreferences: undefined,
+              firstName: seedFirstName || null,
+              lastName: seedLastName || null,
+              authDisplayName: user.authDisplayName ?? null,
+            },
+          });
+        }
+      } catch (err) {
+        console.error("[welcome-email] failed:", err);
+      }
+    })();
+
     return { workspaceId: null, avatarUrl: resolvedAvatarUrl };
   }
 

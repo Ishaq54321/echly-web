@@ -82,6 +82,16 @@ export interface Session {
   ownerBrandLogoUrl?: string | null;
   /** Hydrated server-side; true when owner workspace plan/entitlement allows custom branding. */
   ownerBrandingEnabled?: boolean;
+
+  /**
+   * Phase 5: one-time email-send markers for this session. `firstViewerNotified`
+   * is the server timestamp of the session-opened email send; its presence is
+   * the guard that ensures the owner is emailed only on the FIRST non-creator
+   * view. Written transactionally by recordSessionViewIfNewRepo.
+   */
+  emailSends?: {
+    firstViewerNotified?: Timestamp;
+  };
 }
 
 /** Counts by status for one session (aligned with session denormalized count fields). */

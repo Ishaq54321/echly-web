@@ -252,6 +252,44 @@ export async function addCommentRepo(
         body: previewBody,
       });
     }
+
+    // Phase 5: email notifications. Same recipient split as the in-app
+    // notifications above — commentRecipients already excludes the commenter
+    // AND mentioned users (they get the more-specific mention email instead).
+    // sendEmailWithPreferencesByUid loads each recipient, applies the
+    // notifications opt-out gate, and never throws here (each is awaited
+    // inside this fireAndForget block; failures only log).
+    const emailSessionName = sessionTitle || "a session";
+    const emailTicketTitle = feedbackTitle || "a ticket";
+    const {
+      sendNewCommentEmail,
+      sendMentionEmail,
+    } = await import("@/lib/email/notificationEmails");
+
+    await Promise.allSettled([
+      ...mentionRecipients.map((uid) =>
+        sendMentionEmail({
+          recipientUid: uid,
+          mentionerName: actor.actorName,
+          ticketTitle: emailTicketTitle,
+          sessionName: emailSessionName,
+          message: data.message,
+          sessionId,
+          feedbackId,
+        })
+      ),
+      ...commentRecipients.map((uid) =>
+        sendNewCommentEmail({
+          recipientUid: uid,
+          commenterName: actor.actorName,
+          ticketTitle: emailTicketTitle,
+          sessionName: emailSessionName,
+          message: data.message,
+          sessionId,
+          feedbackId,
+        })
+      ),
+    ]);
   });
 
   fireAndForget("addCommentRepo-sessionUpdatedAt", () =>

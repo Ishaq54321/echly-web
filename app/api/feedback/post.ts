@@ -269,6 +269,18 @@ export async function POST(req: NextRequest) {
       } catch (limitErr) {
         const planErr = limitErr as PlanLimitError;
         if (planErr.code === "PLAN_LIMIT_REACHED") {
+          // Phase 5: plan-limit-hit email. Fire-and-forget; once-per-cycle
+          // dedupe lives in maybeSendPlanLimitHit. Never block the 4xx.
+          void (async () => {
+            try {
+              const { maybeSendPlanLimitHit } = await import(
+                "@/lib/email/planLimitDispatch.server"
+              );
+              await maybeSendPlanLimitHit({ workspace });
+            } catch (e) {
+              console.error("[plan-hit-email] failed:", e);
+            }
+          })();
           const errParams = planLimitReachedApiError(planErr);
           return apiError({ ...errParams, init: { headers: corsHeaders(req) } });
         }
@@ -336,9 +348,30 @@ export async function POST(req: NextRequest) {
       });
       // Increment monthly ticket counter (best-effort; does not fail the request)
       if (sessionWorkspaceId) {
-        incrementFeedbackCreatedThisMonthRepo(sessionWorkspaceId).catch((e) =>
-          console.error("Failed to increment feedbackCreatedThisMonth:", e)
-        );
+        incrementFeedbackCreatedThisMonthRepo(sessionWorkspaceId)
+          .then(async () => {
+            // Phase 5: plan-limit-approaching email. Re-read the workspace so
+            // usage.feedbackCreatedThisMonth reflects THIS create (and any
+            // month-rollover reset checkFeedbackTicketLimit performed). The
+            // 80%-crossing + once-per-cycle logic lives in the dispatcher.
+            try {
+              const fresh = await getWorkspace(sessionWorkspaceId);
+              if (!fresh) return;
+              const { maybeSendPlanLimitApproaching } = await import(
+                "@/lib/email/planLimitDispatch.server"
+              );
+              await maybeSendPlanLimitApproaching({
+                workspace: fresh,
+                postIncrementUsage:
+                  fresh.usage?.feedbackCreatedThisMonth ?? 0,
+              });
+            } catch (e) {
+              console.error("[plan-approaching-email] failed:", e);
+            }
+          })
+          .catch((e) =>
+            console.error("Failed to increment feedbackCreatedThisMonth:", e)
+          );
       }
     } else {
       const existing = result.existingFeedback;
