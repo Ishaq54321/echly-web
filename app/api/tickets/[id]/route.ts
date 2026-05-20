@@ -129,6 +129,8 @@ export const PATCH = withAuthorization(
       assigneeName?: string | null;
       assigneeAvatarUrl?: string | null;
       priority?: "high" | "medium" | "low" | null;
+      /** Optional note included on resolve; surfaced in the ticket-resolved email. */
+      resolutionNote?: string;
     };
     let id: string;
     try {
@@ -345,6 +347,48 @@ export const PATCH = withAuthorization(
           return apiError({ code: "NOT_FOUND", message: "Not found", status: 404 });
         }
         console.log("[Resolve] Repo done:", Date.now() - start, "ms");
+
+        // Ticket-resolved email. Fires only on open → resolved transitions
+        // (not reopen) and only when the reporter is someone other than the
+        // resolver. Fire-and-forget; never blocks the route response.
+        const wasOpen = existingForOwnership.isResolved === false;
+        if (patchStatus === "resolved" && wasOpen) {
+          const reporterUid =
+            typeof existingForOwnership.userId === "string"
+              ? existingForOwnership.userId.trim()
+              : "";
+          if (reporterUid && reporterUid !== actorId) {
+            const ticketTitleForEmail =
+              (typeof existingForOwnership.title === "string"
+                ? existingForOwnership.title.trim()
+                : "") || "a ticket";
+            const sessionNameForEmail =
+              (typeof context.session?.title === "string"
+                ? context.session.title.trim()
+                : "") || "a session";
+            const resolutionNote =
+              typeof body.resolutionNote === "string" &&
+              body.resolutionNote.trim()
+                ? body.resolutionNote.trim()
+                : undefined;
+            const sessionId = existingForOwnership.sessionId;
+            fireAndForget("notification:ticket-resolved-email", async () => {
+              const actor = await resolveActorForActivityEvent(actorId);
+              const { sendTicketResolvedEmail } = await import(
+                "@/lib/email/notificationEmails"
+              );
+              const { ticketUrl } = await import("@/lib/email/urls");
+              await sendTicketResolvedEmail({
+                recipientUid: reporterUid,
+                ticketTitle: ticketTitleForEmail,
+                sessionName: sessionNameForEmail,
+                resolverName: actor.actorName,
+                ticketUrl: ticketUrl(sessionId, id),
+                resolutionNote,
+              });
+            });
+          }
+        }
       } else {
         const typeIsChanging = "type" in contentUpdates;
         await updateFeedbackRepo(id, contentUpdates, { skipPreRead: !typeIsChanging });
@@ -503,6 +547,28 @@ export const PATCH = withAuthorization(
                 entityTitle: feedbackTitle,
                 body: null,
               });
+
+              // Mirror the comment.mention email path so description mentions
+              // also send the mention email (not just an in-app notification).
+              // recipientIds already excludes the actor (self-mention guard
+              // above).
+              const emailSessionName = sessionTitle || "a session";
+              const { sendMentionEmail } = await import(
+                "@/lib/email/notificationEmails"
+              );
+              await Promise.allSettled(
+                recipientIds.map((uid) =>
+                  sendMentionEmail({
+                    recipientUid: uid,
+                    mentionerName: actor.actorName,
+                    ticketTitle: feedbackTitle,
+                    sessionName: emailSessionName,
+                    message: contentUpdates.description ?? "",
+                    sessionId,
+                    feedbackId: id,
+                  })
+                )
+              );
             });
           }
         }

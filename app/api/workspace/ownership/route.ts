@@ -12,6 +12,14 @@ import {
 import { setWorkspaceClaims } from "@/lib/server/setWorkspaceClaim";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { getPaymentProvider } from "@/lib/billing/payments";
+import {
+  sendOwnershipTransferredOldEmail,
+  sendOwnershipTransferredNewEmail,
+} from "@/lib/email/workspaceEmails";
+import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
+import type { PlanId } from "@/lib/billing/plans";
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://annote.ai";
 
 export const dynamic = "force-dynamic";
 
@@ -116,6 +124,116 @@ export async function PATCH(req: NextRequest) {
       setWorkspaceClaims(user.uid, workspaceId, readMemberships(callerSnap, workspaceId)),
       setWorkspaceClaims(newOwnerUid, workspaceId, readMemberships(newOwnerSnap, workspaceId)),
     ]);
+
+    // ─── Notify both parties (fire-and-forget) ────────────────────────
+    // Security-significant event: previous + new owner both get email,
+    // bypasses preferences (handled inside the helpers via sendEmailOrLog).
+    // Must NOT block the route response.
+    void (async () => {
+      try {
+        const callerData = (callerSnap.data() ?? {}) as {
+          email?: string;
+          displayName?: string;
+          name?: string;
+        };
+        const newOwnerData = (newOwnerSnap.data() ?? {}) as {
+          email?: string;
+          displayName?: string;
+          name?: string;
+        };
+        const previousOwnerEmail = callerData.email?.trim() ?? "";
+        const newOwnerEmail = newOwnerData.email?.trim() ?? "";
+        const previousOwnerName =
+          (callerData.displayName ?? callerData.name ?? "").trim() ||
+          previousOwnerEmail ||
+          "the previous owner";
+        const newOwnerName =
+          (newOwnerData.displayName ?? newOwnerData.name ?? "").trim() ||
+          newOwnerEmail ||
+          "the new owner";
+
+        // Pull billing summary for the new-owner email so the recipient
+        // immediately sees what they're now financially responsible for.
+        const wsBillingFull = (workspace as {
+          billing?: {
+            plan?: PlanId;
+            seats?: number;
+            billingCycle?: "monthly" | "annual";
+            nextBilledAt?: { toDate?: () => Date } | Date | null;
+          };
+        }).billing;
+
+        let planName: string | null = null;
+        let priceFormatted: string | null = null;
+        const seatCount = wsBillingFull?.seats ?? null;
+        let nextBillingDate: Date | null = null;
+
+        const rawNext = wsBillingFull?.nextBilledAt;
+        if (rawNext) {
+          if (rawNext instanceof Date) nextBillingDate = rawNext;
+          else if (typeof (rawNext as { toDate?: () => Date }).toDate === "function") {
+            nextBillingDate = (rawNext as { toDate: () => Date }).toDate();
+          }
+        }
+
+        if (wsBillingFull?.plan && wsBillingFull.plan !== "starter") {
+          try {
+            const catalog = await getPlanCatalog();
+            const entry = catalog[wsBillingFull.plan];
+            if (entry) {
+              const cycle = wsBillingFull.billingCycle ?? "monthly";
+              planName =
+                cycle === "annual" ? `${entry.name} Annual` : `${entry.name} Monthly`;
+              const seats = seatCount ?? 1;
+              if (cycle === "annual" && entry.annualPricePerSeat != null) {
+                priceFormatted = `$${(seats * entry.annualPricePerSeat * 12).toFixed(2)}/year`;
+              } else if (cycle === "monthly" && entry.pricePerSeat != null) {
+                priceFormatted = `$${(seats * entry.pricePerSeat).toFixed(2)}/month`;
+              }
+            }
+          } catch (catalogErr) {
+            console.error(
+              "[ownership transfer] plan catalog lookup failed (non-fatal):",
+              catalogErr
+            );
+          }
+        }
+
+        const settingsUrl = `${APP_URL}/settings?tab=workspace`;
+
+        await Promise.allSettled([
+          previousOwnerEmail
+            ? sendOwnershipTransferredOldEmail({
+                previousOwnerEmail,
+                previousOwnerName,
+                workspaceName: workspace.name,
+                newOwnerName,
+                newOwnerEmail: newOwnerEmail || "the new owner",
+              })
+            : Promise.resolve({ sent: false, reason: "no-email" }),
+          newOwnerEmail
+            ? sendOwnershipTransferredNewEmail({
+                newOwnerEmail,
+                newOwnerName,
+                previousOwnerName,
+                workspaceName: workspace.name,
+                planName,
+                seatCount,
+                nextBillingDate,
+                priceFormatted,
+                settingsUrl,
+              })
+            : Promise.resolve({ sent: false, reason: "no-email" }),
+        ]);
+      } catch (emailErr) {
+        console.error(
+          "[ownership transfer] ownership emails failed (non-fatal):",
+          emailErr
+        );
+      }
+    })().catch((err) =>
+      console.error("[ownership transfer] email side-effect crashed:", err)
+    );
 
     return apiSuccess({ success: true });
   } catch (err) {

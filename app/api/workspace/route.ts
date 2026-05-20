@@ -7,9 +7,13 @@ import { assertWorkspaceActive } from "@/lib/server/assertWorkspaceActive";
 import { workspaceGuardErrorResponse } from "@/lib/server/workspaceGuardErrorResponse";
 import {
   getWorkspaceMemberRepo,
+  getWorkspaceMembersRepo,
   softDeleteWorkspaceRepo,
 } from "@/lib/repositories/workspaceMembersRepository.server";
-import { sendWorkspaceDeletionConfirmationEmail } from "@/lib/email/workspaceEmails";
+import {
+  sendWorkspaceDeletionConfirmationEmail,
+  sendWorkspaceDeletedMemberEmail,
+} from "@/lib/email/workspaceEmails";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { getPaymentProvider } from "@/lib/billing/payments";
 
@@ -77,6 +81,42 @@ export async function DELETE(req: NextRequest) {
         );
       }
     }
+
+    // ─── Fan out deletion notice to non-owner members ─────────────────
+    // Each member needs to know they have until the purge date to export
+    // their work. Fire-and-forget so the route response isn't blocked
+    // on Resend latency; Promise.allSettled so one bad recipient doesn't
+    // skip the rest.
+    const ownerName =
+      (typeof userData.displayName === "string" && userData.displayName.trim()) ||
+      (typeof userData.name === "string" && userData.name.trim()) ||
+      ownerEmail ||
+      "the workspace owner";
+
+    void (async () => {
+      try {
+        const members = await getWorkspaceMembersRepo(workspaceId);
+        const memberSends = members
+          .filter((m) => m.uid !== user.uid && m.email && m.email.trim().length > 0)
+          .map((m) =>
+            sendWorkspaceDeletedMemberEmail({
+              memberEmail: m.email,
+              memberName: m.displayName ?? "",
+              workspaceName: workspace.name,
+              ownerName,
+              deletionDate: purgeDate,
+            })
+          );
+        await Promise.allSettled(memberSends);
+      } catch (fanoutErr) {
+        console.error(
+          "DELETE /api/workspace: member deletion-notice fanout failed (non-fatal):",
+          fanoutErr
+        );
+      }
+    })().catch((err) =>
+      console.error("DELETE /api/workspace: fanout side-effect crashed:", err)
+    );
 
     return apiSuccess({
       success: true,

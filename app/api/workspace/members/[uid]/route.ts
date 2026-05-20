@@ -11,8 +11,12 @@ import {
   removeWorkspaceMemberRepo,
 } from "@/lib/repositories/workspaceMembersRepository.server";
 import { repointWorkspaceClaim } from "@/lib/server/repointWorkspaceClaim";
+import { adminDb } from "@/lib/server/firebaseAdmin";
+import { sendMemberRemovedEmail } from "@/lib/email/workspaceEmails";
 
 export const dynamic = "force-dynamic";
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://annote.ai";
 
 export async function DELETE(
   req: NextRequest,
@@ -85,6 +89,36 @@ export async function DELETE(
         claimErr
       );
     }
+
+    // Member-removed email. Removed user gets notified that they lost access.
+    // Fire-and-forget so a transient email failure never blocks the removal.
+    (async () => {
+      try {
+        const removedEmail = (targetMember.email ?? "").trim();
+        if (!removedEmail) return;
+        const removedName =
+          (targetMember.displayName ?? "").trim() || removedEmail;
+        const removerSnap = await adminDb.doc(`users/${user.uid}`).get();
+        const removerData = (removerSnap.data() ?? {}) as Record<string, unknown>;
+        const removerName =
+          (typeof removerData.displayName === "string" &&
+            removerData.displayName.trim()) ||
+          (typeof user.email === "string" ? user.email : "") ||
+          "your workspace owner";
+        const workspaceName =
+          (typeof workspace?.name === "string" && workspace.name.trim()) ||
+          "your workspace";
+        await sendMemberRemovedEmail({
+          removedEmail,
+          removedName,
+          workspaceName,
+          removerName,
+          dashboardUrl: `${APP_URL}/dashboard`,
+        });
+      } catch (emailErr) {
+        console.error("[member-removed-email] failed:", emailErr);
+      }
+    })();
 
     return apiSuccess({ success: true });
   } catch (err) {

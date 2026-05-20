@@ -38,6 +38,11 @@ import {
   planLimitHitEmailText,
   planLimitHitSubject,
 } from "./templates/planLimitHit";
+import {
+  ticketResolvedEmailHtml,
+  ticketResolvedEmailText,
+  ticketResolvedSubject,
+} from "./templates/ticketResolved";
 
 /**
  * Phase 5 — event-driven email senders.
@@ -340,6 +345,60 @@ export async function sendPlanLimitHitEmail(params: {
   });
   console.log(
     `[plan-hit-email] owner=${owner.uid} sent=${result.sent}${
+      !result.sent ? ` reason=${result.reason}` : ""
+    }`
+  );
+  return result;
+}
+
+/**
+ * 8. Ticket resolved — fires when a ticket's status changes to "resolved".
+ * Sent to the original reporter (skips self-resolves). Loads the recipient
+ * doc by uid. Notifications category, system voice.
+ */
+export async function sendTicketResolvedEmail(params: {
+  recipientUid: string;
+  ticketTitle: string;
+  sessionName: string;
+  resolverName: string;
+  ticketUrl: string;
+  resolutionNote?: string;
+}): Promise<EmailSendResult> {
+  const {
+    recipientUid,
+    ticketTitle,
+    sessionName,
+    resolverName,
+    ticketUrl,
+    resolutionNote,
+  } = params;
+
+  const { getUserByIdRepo } = await import(
+    "@/lib/repositories/usersRepository.server"
+  );
+  const recipient = await getUserByIdRepo(recipientUid);
+  if (!recipient) {
+    return { sent: false, reason: "user-not-found" };
+  }
+  const reporterFirstName = greetingNameForUser(recipient) ?? "there";
+  const props = {
+    reporterFirstName,
+    resolverName,
+    ticketTitle,
+    sessionName,
+    ticketUrl,
+    resolutionNote,
+  };
+
+  const result = await sendEmailWithPreferences({
+    user: recipient,
+    category: "notifications",
+    subject: ticketResolvedSubject(ticketTitle),
+    htmlBuilder: () => ticketResolvedEmailHtml(props),
+    textBuilder: () => ticketResolvedEmailText(props),
+  });
+  console.log(
+    `[ticket-resolved-email] recipient=${recipientUid} sent=${result.sent}${
       !result.sent ? ` reason=${result.reason}` : ""
     }`
   );

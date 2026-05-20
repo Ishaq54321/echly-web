@@ -33,6 +33,23 @@ import { planLimitApproachingEmailHtml, planLimitApproachingEmailText } from "@/
 import { planLimitHitEmailHtml, planLimitHitEmailText } from "@/lib/email/templates/planLimitHit";
 import { inviteAcceptedEmailHtml, inviteAcceptedEmailText } from "@/lib/email/templates/inviteAccepted";
 import { seatAddedEmailHtml, seatAddedEmailText } from "@/lib/email/templates/seatAdded";
+import { ticketResolvedEmailHtml, ticketResolvedEmailText } from "@/lib/email/templates/ticketResolved";
+import { memberRemovedEmailHtml, memberRemovedEmailText } from "@/lib/email/templates/memberRemoved";
+import { emailChangeNoticeHtml, emailChangeNoticeText } from "@/lib/email/templates/emailChangeNotice";
+import { planChangedEmailHtml, planChangedEmailText } from "@/lib/email/templates/planChanged";
+import {
+  ownershipTransferredOldHtml,
+  ownershipTransferredOldText,
+} from "@/lib/email/templates/ownershipTransferredOld";
+import {
+  ownershipTransferredNewHtml,
+  ownershipTransferredNewText,
+} from "@/lib/email/templates/ownershipTransferredNew";
+import {
+  workspaceDeletedMemberHtml,
+  workspaceDeletedMemberText,
+} from "@/lib/email/templates/workspaceDeletedMember";
+import { refundIssuedEmailHtml, refundIssuedEmailText } from "@/lib/email/templates/refundIssued";
 
 export const dynamic = "force-dynamic";
 
@@ -310,6 +327,126 @@ const TEMPLATES: Record<string, () => Variant> = {
     };
     return { html: seatAddedEmailHtml(p), text: seatAddedEmailText(p) };
   },
+  "ticket-resolved": () => {
+    const p = {
+      reporterFirstName: "Ishaq",
+      resolverName: "Sarah Chen",
+      ticketTitle: "Login button broken on iOS Safari",
+      sessionName: "Acme onboarding flow",
+      ticketUrl: "https://annote.ai/s/PLACEHOLDER#feedback-abc123",
+      resolutionNote:
+        "Fixed by removing the legacy event listener — should ship in 2.4.1.",
+    };
+    return {
+      html: ticketResolvedEmailHtml(p),
+      text: ticketResolvedEmailText(p),
+    };
+  },
+  "member-removed": () => {
+    const p = {
+      removedFirstName: "Alex",
+      workspaceName: "Acme Engineering",
+      removerName: "Ishaq",
+      dashboardUrl: "https://annote.ai/dashboard",
+    };
+    return {
+      html: memberRemovedEmailHtml(p),
+      text: memberRemovedEmailText(p),
+    };
+  },
+  "email-change-notice": () => {
+    const p = {
+      firstName: "Ishaq",
+      newEmail: "ishaq@new.com",
+      passwordResetUrl: "https://annote.ai/forgot-password",
+    };
+    return {
+      html: emailChangeNoticeHtml(p),
+      text: emailChangeNoticeText(p),
+    };
+  },
+  // ── Phase C: tier-3 polish emails ──
+  "plan-changed-upgrade": () => {
+    const p = {
+      ownerFirstName: "Ishaq",
+      workspaceName: "Acme Engineering",
+      oldPlanName: "Business Monthly",
+      newPlanName: "Business Annual",
+      billingCycle: "annual",
+      changeType: "upgrade" as const,
+      nextBillingDate: "June 19, 2027",
+      prorationFormatted: "$156.00",
+      prorationDirection: "charge" as const,
+      billingUrl: "https://annote.ai/settings?tab=billing",
+    };
+    return { html: planChangedEmailHtml(p), text: planChangedEmailText(p) };
+  },
+  "plan-changed-downgrade": () => {
+    const p = {
+      ownerFirstName: "Ishaq",
+      workspaceName: "Acme Engineering",
+      oldPlanName: "Business Annual",
+      newPlanName: "Business Monthly",
+      billingCycle: "monthly",
+      changeType: "downgrade" as const,
+      nextBillingDate: "June 19, 2026",
+      prorationFormatted: null,
+      prorationDirection: null,
+      billingUrl: "https://annote.ai/settings?tab=billing",
+    };
+    return { html: planChangedEmailHtml(p), text: planChangedEmailText(p) };
+  },
+  "ownership-transferred-old": () => {
+    const p = {
+      previousOwnerFirstName: "Ishaq",
+      workspaceName: "Acme Engineering",
+      newOwnerName: "Sarah Chen",
+      newOwnerEmail: "sarah@acme.com",
+    };
+    return {
+      html: ownershipTransferredOldHtml(p),
+      text: ownershipTransferredOldText(p),
+    };
+  },
+  "ownership-transferred-new": () => {
+    const p = {
+      newOwnerFirstName: "Sarah",
+      previousOwnerName: "Ishaq",
+      workspaceName: "Acme Engineering",
+      planName: "Business Monthly",
+      seatCount: 5,
+      nextBillingDate: "June 19, 2026",
+      priceFormatted: "$95.00/month",
+      settingsUrl: "https://annote.ai/settings?tab=workspace",
+    };
+    return {
+      html: ownershipTransferredNewHtml(p),
+      text: ownershipTransferredNewText(p),
+    };
+  },
+  "workspace-deleted-member": () => {
+    const p = {
+      memberFirstName: "Alex",
+      workspaceName: "Acme Engineering",
+      ownerName: "Ishaq",
+      deletionDate: "June 20, 2026",
+    };
+    return {
+      html: workspaceDeletedMemberHtml(p),
+      text: workspaceDeletedMemberText(p),
+    };
+  },
+  "refund-issued": () => {
+    const p = {
+      ownerFirstName: "Ishaq",
+      amountFormatted: "$24.99",
+      last4: "4242",
+      refundReason: "a request from you",
+      receiptUrl: "https://pay.stripe.com/receipts/PLACEHOLDER",
+    };
+    return { html: refundIssuedEmailHtml(p), text: refundIssuedEmailText(p) };
+  },
+
   "seat-added-no-proration": () => {
     const p = {
       ownerFirstName: "Ishaq",

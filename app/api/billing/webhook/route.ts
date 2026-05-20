@@ -11,7 +11,11 @@ import {
   sendUpcomingRenewalReminderEmail,
   sendCardExpiringEmail,
   sendPaymentMethodUpdatedEmail,
+  sendPlanChangedEmail,
+  sendRefundIssuedEmail,
 } from "@/lib/email/billingEmails";
+import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
+import type { PlanId } from "@/lib/billing/plans";
 import type { WebhookEvent } from "@/lib/billing/payments/types";
 
 export const runtime = "nodejs";
@@ -26,19 +30,50 @@ const BILLING_PORTAL_URL = `${APP_URL}/settings?tab=billing`;
  */
 async function getWorkspaceContext(
   workspaceId: string
-): Promise<{ ownerEmail: string | null; workspaceName: string }> {
+): Promise<{
+  ownerEmail: string | null;
+  ownerName: string;
+  workspaceName: string;
+}> {
   try {
     const wsSnap = await adminDb.doc(`workspaces/${workspaceId}`).get();
-    if (!wsSnap.exists) return { ownerEmail: null, workspaceName: "Your workspace" };
+    if (!wsSnap.exists)
+      return { ownerEmail: null, ownerName: "there", workspaceName: "Your workspace" };
     const ws = wsSnap.data() as { ownerId?: string; name?: string } | undefined;
     const workspaceName = ws?.name ?? "Your workspace";
-    if (!ws?.ownerId) return { ownerEmail: null, workspaceName };
+    if (!ws?.ownerId) return { ownerEmail: null, ownerName: "there", workspaceName };
     const userSnap = await adminDb.doc(`users/${ws.ownerId}`).get();
-    if (!userSnap.exists) return { ownerEmail: null, workspaceName };
-    const u = userSnap.data() as { email?: string } | undefined;
-    return { ownerEmail: u?.email ?? null, workspaceName };
+    if (!userSnap.exists) return { ownerEmail: null, ownerName: "there", workspaceName };
+    const u = userSnap.data() as { email?: string; displayName?: string; name?: string } | undefined;
+    const ownerName = (u?.displayName ?? u?.name ?? "").trim() || "there";
+    return { ownerEmail: u?.email ?? null, ownerName, workspaceName };
   } catch {
-    return { ownerEmail: null, workspaceName: "Your workspace" };
+    return { ownerEmail: null, ownerName: "there", workspaceName: "Your workspace" };
+  }
+}
+
+/**
+ * Resolve a human plan name + the canonical plan ID inferred from the
+ * stored plan and billing cycle. Reads from the plans catalog (Firestore
+ * fallback → PLANS defaults). Returns `null` for an unknown plan id so
+ * the caller can skip emails that depend on plan naming.
+ */
+async function resolvePlanDisplay(
+  planId: PlanId | undefined | null,
+  billingCycle: "monthly" | "annual" | string
+): Promise<{ planName: string; cycleLabel: string } | null> {
+  if (!planId) return null;
+  try {
+    const catalog = await getPlanCatalog();
+    const entry = catalog[planId as PlanId];
+    if (!entry) return null;
+    const cycleLabel =
+      billingCycle === "annual"
+        ? `${entry.name} Annual`
+        : `${entry.name} Monthly`;
+    return { planName: entry.name, cycleLabel };
+  } catch {
+    return null;
   }
 }
 
@@ -334,8 +369,21 @@ async function handleSubscriptionUpdated(
 
   const wsRef = snapshot.docs[0].ref;
   const ws = snapshot.docs[0].data() as
-    | { billing?: { manualOverride?: boolean } }
+    | {
+        billing?: {
+          manualOverride?: boolean;
+          plan?: PlanId;
+          billingCycle?: "monthly" | "annual";
+          seats?: number;
+        };
+      }
     | undefined;
+
+  // Snapshot pre-update plan + cycle so we can detect a real plan change
+  // (vs seats-only / payment-method-only update) AFTER the convergent write.
+  const previousPlan = ws?.billing?.plan ?? null;
+  const previousCycle = ws?.billing?.billingCycle ?? null;
+  const previousSeats = ws?.billing?.seats ?? null;
 
   // Re-fetch current state from provider (convergent — don't trust the delta).
   const subData = await provider.getSubscriptionData(
@@ -387,6 +435,64 @@ async function handleSubscriptionUpdated(
   }
 
   await wsRef.update(updates);
+
+  // ─── Plan-change email ────────────────────────────────────────────
+  // Fire planChanged when the billing cycle changes on an active paid
+  // subscription (monthly ↔ annual). Seat-only changes are skipped —
+  // those are covered by sendSeatAddedEmail upstream.
+  //
+  // The plan tier (starter/business/enterprise) cannot change via
+  // subscription_updated in this codebase — that flows through
+  // subscription_started (initial paid) or admin set_plan. So the only
+  // self-serve "plan change" surfaced here is a cycle switch.
+  const cycleChanged =
+    previousCycle != null && previousCycle !== subData.billingCycle;
+  const seatsChanged =
+    previousSeats != null && previousSeats !== subData.seatCount;
+
+  if (cycleChanged && previousPlan) {
+    try {
+      const oldDisplay = await resolvePlanDisplay(previousPlan, previousCycle ?? "monthly");
+      const newDisplay = await resolvePlanDisplay(previousPlan, subData.billingCycle);
+      if (oldDisplay && newDisplay) {
+        const { ownerEmail, ownerName, workspaceName } = await getWorkspaceContext(
+          wsRef.id
+        );
+        if (ownerEmail) {
+          // Cycle change with monthly→annual = upgrade-ish (long-term commit);
+          // annual→monthly = downgrade-ish. We classify by tier-direction +
+          // cycle: keeping the same tier but switching to annual is "upgrade".
+          const changeType: "upgrade" | "downgrade" | "lateral" =
+            previousCycle === "monthly" && subData.billingCycle === "annual"
+              ? "upgrade"
+              : previousCycle === "annual" && subData.billingCycle === "monthly"
+              ? "downgrade"
+              : "lateral";
+
+          void sendPlanChangedEmail({
+            ownerEmail,
+            ownerName,
+            workspaceName,
+            oldPlanName: oldDisplay.cycleLabel,
+            newPlanName: newDisplay.cycleLabel,
+            billingCycle: subData.billingCycle,
+            changeType,
+            nextBillingDate: subData.currentPeriodEnd,
+            prorationAmountCents: null,
+            prorationCurrency: null,
+            billingUrl: BILLING_PORTAL_URL,
+          }).catch((err) => {
+            console.error("[webhook] plan changed email failed:", err);
+          });
+        }
+      }
+    } catch (err) {
+      console.error("[webhook] plan-change email setup failed:", err);
+    }
+  }
+  // Suppress unused-warning when only seats changed without a cycle delta —
+  // intentional: seatAdded covers that path.
+  void seatsChanged;
 }
 
 async function handleSubscriptionCanceled(
@@ -573,6 +679,9 @@ async function handleUnknownEvent(
     case "payment_method.attached":
       await handlePaymentMethodEvent(event, stripeEventType);
       break;
+    case "charge.refunded":
+      await handleChargeRefunded(event);
+      break;
     default:
       console.log(
         `[webhook] No-op Stripe event ${stripeEventType}, eventId=${event.eventId}`
@@ -717,6 +826,87 @@ async function handleInvoiceUpcoming(
   });
   if (!renewalResult.sent) {
     console.error("[webhook] upcoming renewal reminder failed:", renewalResult.reason);
+  }
+}
+
+async function handleChargeRefunded(
+  event: Extract<WebhookEvent, { type: "unknown" }>
+) {
+  const stripeEvent = event.data.stripeEvent as {
+    data: { object: Record<string, unknown> };
+  };
+  const charge = stripeEvent.data.object;
+
+  const customerId =
+    typeof charge.customer === "string"
+      ? charge.customer
+      : (charge.customer as { id?: string } | undefined)?.id;
+  if (!customerId) {
+    console.warn("[webhook] charge.refunded without customer — skipping");
+    return;
+  }
+
+  const snapshot = await adminDb
+    .collection("workspaces")
+    .where("billing.customerId", "==", customerId)
+    .limit(1)
+    .get();
+
+  if (snapshot.empty) {
+    console.warn(`[webhook] charge.refunded: no workspace for customer ${customerId}`);
+    return;
+  }
+
+  const workspaceId = snapshot.docs[0].id;
+  const { ownerEmail, ownerName } = await getWorkspaceContext(workspaceId);
+  if (!ownerEmail) {
+    console.warn(`[webhook] charge.refunded: no owner email for workspace ${workspaceId}`);
+    return;
+  }
+
+  const amountCents = (charge.amount_refunded as number | undefined) ?? 0;
+  if (amountCents <= 0) {
+    console.log("[webhook] charge.refunded with zero amount_refunded — skipping");
+    return;
+  }
+  const currency = ((charge.currency as string) ?? "usd").toUpperCase();
+
+  // Card last4 — stored on payment_method_details.card.last4 when card.
+  const pmDetails = charge.payment_method_details as
+    | { card?: { last4?: string } }
+    | undefined;
+  const last4 = pmDetails?.card?.last4;
+
+  // Refund reason — Stripe puts the latest refund in `refunds.data[0]`.
+  // Reasons are machine values ("requested_by_customer", "duplicate",
+  // "fraudulent") — map to human copy for the email body.
+  const refundsContainer = charge.refunds as
+    | { data?: Array<{ reason?: string | null }> }
+    | undefined;
+  const rawReason = refundsContainer?.data?.[0]?.reason ?? null;
+  const reasonMap: Record<string, string> = {
+    requested_by_customer: "a request from you",
+    duplicate: "a duplicate charge",
+    fraudulent: "a charge you flagged as fraudulent",
+  };
+  const refundReason = rawReason && reasonMap[rawReason] ? reasonMap[rawReason] : undefined;
+
+  // Receipt URL: prefer the Stripe-hosted receipt on the charge, fall
+  // back to the billing portal so the recipient always has somewhere to go.
+  const receiptUrl =
+    (charge.receipt_url as string | null | undefined) ?? BILLING_PORTAL_URL;
+
+  const refundResult = await sendRefundIssuedEmail({
+    ownerEmail,
+    ownerName,
+    amountCents,
+    currency,
+    last4,
+    refundReason,
+    receiptUrl,
+  });
+  if (!refundResult.sent) {
+    console.error("[webhook] refund issued email failed:", refundResult.reason);
   }
 }
 

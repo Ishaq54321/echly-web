@@ -5,7 +5,10 @@ import { adminDb } from "@/lib/server/firebaseAdmin";
 import { getAuth } from "firebase-admin/auth";
 import { Timestamp } from "firebase-admin/firestore";
 import { randomBytes } from "crypto";
-import { sendEmailChangeConfirmation } from "@/lib/email/workspaceEmails";
+import {
+  sendEmailChangeConfirmation,
+  sendEmailChangeNoticeEmail,
+} from "@/lib/email/workspaceEmails";
 
 export const dynamic = "force-dynamic";
 
@@ -82,11 +85,41 @@ export async function POST(req: NextRequest) {
   const userSnap = await adminDb.doc(`users/${user.uid}`).get();
   const userName = (userSnap.data()?.displayName as string | undefined) ?? currentEmail;
 
-  await sendEmailChangeConfirmation({
-    to: newEmail,
-    newEmail,
-    confirmUrl,
-    userName,
+  // Send both in parallel:
+  //   1. Confirmation link → NEW email (the existing flow)
+  //   2. Security notice  → ORIGINAL email so the rightful owner is alerted
+  //      even if someone else initiated the change. Security-critical, must
+  //      always send (bypasses preferences via sendEmailOrLog).
+  // Fire-and-forget so a transient email failure does not block the route
+  // response, but log failures because this is security-critical.
+  const passwordResetUrl = `${APP_URL}/forgot-password`;
+  Promise.allSettled([
+    sendEmailChangeConfirmation({
+      to: newEmail,
+      newEmail,
+      confirmUrl,
+      userName,
+    }),
+    sendEmailChangeNoticeEmail({
+      originalEmail: currentEmail,
+      userName,
+      newEmail,
+      passwordResetUrl,
+    }),
+  ]).then((results) => {
+    results.forEach((r, i) => {
+      if (r.status === "rejected") {
+        console.error(
+          `[change-email] email send ${i === 0 ? "confirmation" : "notice"} failed:`,
+          r.reason
+        );
+      } else if (!r.value.sent) {
+        console.error(
+          `[change-email] email ${i === 0 ? "confirmation" : "notice"} not sent:`,
+          r.value.reason
+        );
+      }
+    });
   });
 
   return apiSuccess({ message: `Confirmation email sent to ${newEmail}` });

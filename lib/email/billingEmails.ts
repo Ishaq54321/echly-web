@@ -33,6 +33,16 @@ import {
   seatAddedEmailHtml,
   seatAddedEmailText,
 } from "./templates/seatAdded";
+import {
+  planChangedEmailHtml,
+  planChangedEmailText,
+  type PlanChangeType,
+} from "./templates/planChanged";
+import {
+  refundIssuedEmailHtml,
+  refundIssuedEmailText,
+  refundIssuedSubject,
+} from "./templates/refundIssued";
 import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://annote.ai";
@@ -274,6 +284,117 @@ export async function sendPaymentMethodUpdatedEmail(params: {
     return { sent: true };
   } catch (err) {
     console.error("[sendPaymentMethodUpdatedEmail] failed:", err);
+    return { sent: false, reason: failureReason(err) };
+  }
+}
+
+export async function sendPlanChangedEmail(params: {
+  ownerEmail: string;
+  ownerName: string;
+  workspaceName: string;
+  oldPlanName: string;
+  newPlanName: string;
+  billingCycle: string;
+  changeType: PlanChangeType;
+  nextBillingDate: Date;
+  prorationAmountCents: number | null;
+  prorationCurrency: string | null;
+  billingUrl: string;
+}): Promise<EmailSendResult> {
+  try {
+    const ownerFirstName =
+      (params.ownerName ?? "").trim().split(/\s+/)[0] || "there";
+    const currency = params.prorationCurrency ?? "USD";
+    const formatter = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+    });
+    const prorationFormatted =
+      params.prorationAmountCents != null
+        ? formatter.format(Math.abs(params.prorationAmountCents) / 100)
+        : null;
+    const prorationDirection: "charge" | "refund" | null =
+      params.prorationAmountCents == null
+        ? null
+        : params.prorationAmountCents < 0
+        ? "refund"
+        : "charge";
+    const nextBillingDateStr = params.nextBillingDate.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
+    const props = {
+      ownerFirstName,
+      workspaceName: params.workspaceName,
+      oldPlanName: params.oldPlanName,
+      newPlanName: params.newPlanName,
+      billingCycle: params.billingCycle,
+      changeType: params.changeType,
+      nextBillingDate: nextBillingDateStr,
+      prorationFormatted,
+      prorationDirection,
+      billingUrl: params.billingUrl,
+    };
+
+    const subject =
+      params.changeType === "upgrade"
+        ? `Welcome to ${params.newPlanName}`
+        : params.changeType === "downgrade"
+        ? `Your plan changed to ${params.newPlanName}`
+        : `Subscription update for ${params.workspaceName}`;
+
+    await sendEmailOrLog({
+      to: params.ownerEmail,
+      subject,
+      html: planChangedEmailHtml(props),
+      text: planChangedEmailText(props),
+      fromVariant: "founder",
+    });
+    return { sent: true };
+  } catch (err) {
+    console.error("[sendPlanChangedEmail] failed:", err);
+    return { sent: false, reason: failureReason(err) };
+  }
+}
+
+export async function sendRefundIssuedEmail(params: {
+  ownerEmail: string;
+  ownerName: string;
+  amountCents: number;
+  currency: string;
+  last4?: string;
+  refundReason?: string;
+  receiptUrl?: string;
+}): Promise<EmailSendResult> {
+  try {
+    const ownerFirstName =
+      (params.ownerName ?? "").trim().split(/\s+/)[0] || "there";
+    const formatter = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: (params.currency ?? "USD").toUpperCase(),
+    });
+    const amountFormatted = formatter.format(Math.abs(params.amountCents) / 100);
+
+    const props = {
+      ownerFirstName,
+      amountFormatted,
+      last4: params.last4,
+      refundReason: params.refundReason,
+      receiptUrl: params.receiptUrl,
+    };
+
+    await sendEmailOrLog({
+      to: params.ownerEmail,
+      subject: refundIssuedSubject(amountFormatted),
+      html: refundIssuedEmailHtml(props),
+      text: refundIssuedEmailText(props),
+      fromVariant: "founder",
+    });
+    return { sent: true };
+  } catch (err) {
+    console.error("[sendRefundIssuedEmail] failed:", err);
     return { sent: false, reason: failureReason(err) };
   }
 }
