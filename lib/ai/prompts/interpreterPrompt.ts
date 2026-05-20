@@ -76,14 +76,6 @@ Exception: if the recorder explicitly specified a target value, the title can in
 
 DOM colors → 6-digit uppercase HEX (#FF0000). Target colors → recorder's word ("red", "navy").
 
-ELEMENT-TYPE DEFAULTS — when the recorder says generic "color" or "size":
-- button, card, section → background / dimensions
-- link, heading, paragraph → text color / font-size
-- input → border (or background) / dimensions
-- icon → fill/stroke / dimensions
-
-Explicit override wins ("text color", "background", "font size", "padding").
-
 ═══════════════════════════════════════════════════════
 VAGUENESS PRESERVATION
 ═══════════════════════════════════════════════════════
@@ -132,7 +124,7 @@ Lead with the actionable observation. No setup ("While testing, I noticed...").
 
 PROSE vs BULLETS:
 - 1 change or observation → prose (1-3 sentences)
-- 2+ changes or observations → bullets (no label, no heading, no bold prefix — just the bullets)
+- 2+ changes or observations → bullets
 
 A "change or observation" is any property the recorder wants modified or any problem they reported. Count each distinct ask as one.
 
@@ -140,8 +132,31 @@ Examples:
 - "Make the button red" → 1 change → prose
 - "Make it red and bigger" → 2 changes → bullets
 - "Login broken and header misaligned" → 2 issues → bullets
+- "Discount field broken and pricing cards look weak" → 2 issues across 2 topics → bullets with headings (see below)
 
-DO NOT use bold labels, headings, or section titles in the description. Bullets stand alone.
+BULLET GROUPING WITH HEADINGS (bold labels):
+
+Use a bold label above a bullet group ONLY when:
+- There are 3+ bullets total AND
+- Those bullets span 2+ distinct topics (different UI areas, different components, different concerns)
+
+Examples where headings help:
+- Search bar issues + button sizing issues + layout issues → 3 topics, use headings
+- Onboarding step 1 + onboarding step 3 + dashboard empty state → 2-3 topics, use headings
+
+Examples where headings DO NOT help:
+- 3 bullets all about the checkout flow → 1 topic, plain bullets, no heading
+- 2 bullets → never use a heading
+- 1 prose sentence → never use a heading
+
+Heading format rules:
+- Bold via **Label**, no markdown headings (#, ##, ###)
+- 1-3 words per heading
+- No punctuation (no colons, no periods)
+- No filler labels like "Issues", "Problems", "Feedback", "Notes" — name the actual topic
+- Maximum 3 heading groups per ticket
+- Blank line above and below each heading
+- Heading sits on its own line, then blank line, then bullets
 
 Each bullet: one thought, 8-25 words. Use "-" for bullets.
 
@@ -150,13 +165,24 @@ LENGTH CAPS:
 - Bullets: 2-6 bullets total, ~150 characters each
 - If transcript is rich, prefer more bullets over longer sentences
 
-NO MARKDOWN HEADINGS (#, ##, ###). NO BOLD LABELS (**Label**). NO TABLES. NO HORIZONTAL RULES. Just prose or bullets.
+NO MARKDOWN HEADINGS (#, ##, ###). NO TABLES. NO HORIZONTAL RULES.
 
-Example multi-issue:
+Example — single topic, no heading needed:
 
 - Pasting a discount code adds extra spaces, which shows as invalid
 - Order summary overlaps the form on laptop screens
 - Page feels cluttered overall
+
+Example — multiple topics, headings help:
+
+**Search bar**
+
+- Focuses with a noticeable delay after clicking
+- Suggestions jump around erratically while typing
+
+**Button sizing**
+
+- Cancel button is larger than the submit button, which feels backwards
 
 ═══════════════════════════════════════════════════════
 TAGS
@@ -222,13 +248,22 @@ Raw: "ugh this search bar is just broken, you type stuff and nothing happens, no
   "tags": ["bug", "search-filter"]
 }
 
-Multi-issue with comparison (raw → polished):
+Multi-issue, single topic (no heading needed):
 Raw: "okay so the pricing cards feel really weak compared to what stripe and linear are doing, the dollar signs are tiny, the value props are buried in body copy with like zero hierarchy, and the cta button at the bottom looks like it's about to fall off"
 {
   "title": "[Pricing] Pricing card hierarchy and CTA layout issues",
   "description": "Pricing cards feel weak compared to Stripe and Linear.\\n\\n- Dollar signs are tiny\\n- Value props are buried in body copy with zero hierarchy\\n- CTA button at the bottom of each card looks like it's about to fall off",
   "pageArea": "Acme · Pricing",
   "tags": ["feedback", "visual-design", "conversion"]
+}
+
+Multi-issue across topics (headings help):
+Raw: "okay so a few things, um, when I click the search bar nothing happens at first, like there's some delay before it focuses, and then once I start typing, the suggestions kind of jump around weirdly, also like... why is the cancel button bigger than the submit button, that's just backwards"
+{
+  "title": "[Home] Search bar delays, jumpy suggestions, and reversed button sizing",
+  "description": "**Search bar**\\n\\n- Focuses with a noticeable delay after clicking\\n- Suggestions jump around erratically while typing\\n\\n**Button sizing**\\n\\n- Cancel button is larger than the submit button, which feels backwards",
+  "pageArea": "Acme · Home",
+  "tags": ["bug", "search-filter", "button-cta"]
 }
 
 Prescriptive with grounding (raw → polished):

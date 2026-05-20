@@ -250,7 +250,7 @@ export function CapturePill(props: CapturePillProps) {
     if (errorType === "mic_permission_site_blocked") return "This site blocks microphone access.";
     if (errorType === "mic_permission_blocked") return "Microphone blocked — change it in browser settings.";
     if (errorType === "mic_permission_initial") return "Allow microphone access to record.";
-    if (voiceError === "no_audio") return "We didn't detect any sound.";
+    if (voiceError === "no_audio") return "We didn't catch any audio — try switching mics or check that your microphone isn't muted.";
     if (voiceError === "transcription_failed") return "Couldn't process that — try again.";
     return undefined;
   }, [voiceError, errorType]);
@@ -293,6 +293,8 @@ export function CapturePill(props: CapturePillProps) {
               onCancel={onCancel}
               onSwitchToWrite={handleSwitchToText}
               hostnameForDisplay={hostnameForDisplay}
+              onSelectMic={onSelectMic}
+              selectedMicId={selectedMicId}
             />
           )}
           {!showError && mode === "voice" && (
