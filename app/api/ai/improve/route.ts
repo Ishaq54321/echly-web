@@ -118,6 +118,39 @@ export async function POST(req: NextRequest): Promise<Response> {
     );
   }
 
+  const trimmed = text.trim();
+  if (trimmed.length < 3) {
+    const encoder = new TextEncoder();
+    const sseStream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ type: "start" })}\n\n`),
+        );
+        if (trimmed.length > 0) {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ type: "chunk", text: trimmed })}\n\n`,
+            ),
+          );
+        }
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({ type: "end", fullText: trimmed })}\n\n`,
+          ),
+        );
+        controller.close();
+      },
+    });
+    return new Response(sseStream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        ...corsHeaders,
+      },
+    });
+  }
+
   console.log("\n═══ AI IMPROVE REQUEST ═══");
   console.log("Action:", action);
   console.log("Input text (" + text.length + " chars):");
