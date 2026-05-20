@@ -301,13 +301,16 @@ async function handleSubscriptionStarted(
 
   const { ownerEmail, workspaceName } = await getWorkspaceContext(workspaceId);
   if (ownerEmail) {
-    await sendSubscriptionConfirmationEmail({
+    const confirmResult = await sendSubscriptionConfirmationEmail({
       to: ownerEmail,
       workspaceName,
       seatCount: subData.seatCount,
       billingCycle: subData.billingCycle,
       nextBillingDate: subData.currentPeriodEnd,
     });
+    if (!confirmResult.sent) {
+      console.error("[webhook] subscription confirmation email failed:", confirmResult.reason);
+    }
   }
 }
 
@@ -458,10 +461,13 @@ async function handleSubscriptionCanceled(
   if (wasOnPaidPlan) {
     const { ownerEmail, workspaceName } = await getWorkspaceContext(wsRef.id);
     if (ownerEmail) {
-      await sendSubscriptionCancelledEmail({
+      const cancelResult = await sendSubscriptionCancelledEmail({
         to: ownerEmail,
         workspaceName,
       });
+      if (!cancelResult.sent) {
+        console.error("[webhook] subscription cancelled email failed:", cancelResult.reason);
+      }
     }
   }
 }
@@ -522,11 +528,14 @@ async function handlePaymentFailed(
   if (!wasSuspended) {
     const { ownerEmail, workspaceName } = await getWorkspaceContext(wsRef.id);
     if (ownerEmail) {
-      await sendPaymentFailedEmail({
+      const failResult = await sendPaymentFailedEmail({
         to: ownerEmail,
         workspaceName,
         portalUrl: BILLING_PORTAL_URL,
       });
+      if (!failResult.sent) {
+        console.error("[webhook] payment failed email failed:", failResult.reason);
+      }
     }
     await logAdminAction({
       adminId: "billing-webhook",
@@ -630,7 +639,7 @@ async function handleInvoicePaid(
     currency: currency.toUpperCase(),
   }).format(amountInMinorUnits / 100);
 
-  await sendRenewalReceiptEmail({
+  const receiptResult = await sendRenewalReceiptEmail({
     to: ownerEmail,
     workspaceName,
     amount,
@@ -641,6 +650,9 @@ async function handleInvoicePaid(
     nextBillingDate: subData.currentPeriodEnd,
     invoicePdfUrl: (invoice.invoice_pdf as string | null) ?? null,
   });
+  if (!receiptResult.sent) {
+    console.error("[webhook] renewal receipt email failed:", receiptResult.reason);
+  }
 }
 
 async function handleInvoiceUpcoming(
@@ -693,7 +705,7 @@ async function handleInvoiceUpcoming(
     currency: currency.toUpperCase(),
   }).format(amountInMinorUnits / 100);
 
-  await sendUpcomingRenewalReminderEmail({
+  const renewalResult = await sendUpcomingRenewalReminderEmail({
     to: ownerEmail,
     workspaceName,
     amount,
@@ -703,6 +715,9 @@ async function handleInvoiceUpcoming(
     cardBrand: ws?.billing?.paymentMethod?.brand,
     cardLast4: ws?.billing?.paymentMethod?.last4,
   });
+  if (!renewalResult.sent) {
+    console.error("[webhook] upcoming renewal reminder failed:", renewalResult.reason);
+  }
 }
 
 async function handlePaymentMethodEvent(
@@ -744,7 +759,7 @@ async function handlePaymentMethodEvent(
       exp_year?: number;
     };
     if (!card.brand || !card.last4 || !card.exp_month || !card.exp_year) return;
-    await sendCardExpiringEmail({
+    const expiringResult = await sendCardExpiringEmail({
       to: ownerEmail,
       workspaceName,
       cardBrand: card.brand,
@@ -752,14 +767,20 @@ async function handlePaymentMethodEvent(
       expiryMonth: card.exp_month,
       expiryYear: card.exp_year,
     });
+    if (!expiringResult.sent) {
+      console.error("[webhook] card expiring email failed:", expiringResult.reason);
+    }
   } else if (stripeEventType === "payment_method.attached") {
     const pm = obj as { card?: { brand: string; last4: string } };
     if (!pm.card) return;
-    await sendPaymentMethodUpdatedEmail({
+    const pmUpdatedResult = await sendPaymentMethodUpdatedEmail({
       to: ownerEmail,
       workspaceName,
       cardBrand: pm.card.brand,
       cardLast4: pm.card.last4,
     });
+    if (!pmUpdatedResult.sent) {
+      console.error("[webhook] payment method updated email failed:", pmUpdatedResult.reason);
+    }
   }
 }

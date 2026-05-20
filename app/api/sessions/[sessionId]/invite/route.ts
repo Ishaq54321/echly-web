@@ -193,7 +193,11 @@ export async function POST(
       workspaceName: sessionWorkspaceId,
       accessLevel: access,
       sessionUrl: `${APP_URL}/dashboard/${sessionId}`,
-    }).catch(() => {});
+    }).then((r) => {
+      if (!r.sent) {
+        console.error("[session-invite] email failed:", r.reason);
+      }
+    });
 
     // Canonical member row — same shape GET /members produces per item, so the
     // client can reconcile its optimistic row in place without a re-fetch.
@@ -318,7 +322,7 @@ export async function POST(
                   : null,
             })
           : "Someone";
-        await sendSessionInviteEmail({
+        const newAcctInviteResult = await sendSessionInviteEmail({
           to: email,
           invitedByName: inviterName2,
           sessionName: sessionTitle,
@@ -327,6 +331,12 @@ export async function POST(
           sessionUrl: `${APP_URL}/dashboard/${sessionId}`,
           requiresAccount: true,
         });
+        if (!newAcctInviteResult.sent) {
+          console.error(
+            "[session-invite/new-account] email failed:",
+            newAcctInviteResult.reason
+          );
+        }
       } catch {
         // email failure must not fail the route
       }

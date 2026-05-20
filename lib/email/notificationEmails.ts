@@ -3,6 +3,7 @@ import {
   sendEmailWithPreferences,
   sendEmailWithPreferencesByUid,
 } from "./sendEmailWithPreferences";
+import type { EmailSendResult } from "./types";
 import type { UserDoc } from "@/lib/repositories/usersRepository.server";
 import { commentExcerpt, displayName, greetingName } from "./helpers";
 import { sessionUrl, ticketUrl, EXTENSION_INSTALL_URL } from "./urls";
@@ -70,7 +71,7 @@ type UserLike = Pick<
 export async function sendWelcomeEmail(params: {
   user: UserLike;
   installUrl?: string;
-}): Promise<{ sent: boolean; reason?: string }> {
+}): Promise<EmailSendResult> {
   const { user } = params;
   const firstName =
     (user.firstName ?? "").trim() ||
@@ -88,7 +89,7 @@ export async function sendWelcomeEmail(params: {
   });
   console.log(
     `[welcome-email] uid=${user.uid} sent=${result.sent}${
-      result.reason ? ` reason=${result.reason}` : ""
+      !result.sent ? ` reason=${result.reason}` : ""
     }`
   );
   return result;
@@ -104,7 +105,7 @@ export async function sendSessionOpenedEmail(params: {
   viewerName: string;
   sessionId: string;
   sessionName: string;
-}): Promise<{ sent: boolean; reason?: string }> {
+}): Promise<EmailSendResult> {
   const { owner, viewerName, sessionId, sessionName } = params;
   const props = {
     recipientName: viewerName,
@@ -121,7 +122,7 @@ export async function sendSessionOpenedEmail(params: {
   });
   console.log(
     `[session-opened-email] owner=${owner.uid} session=${sessionId} sent=${result.sent}${
-      result.reason ? ` reason=${result.reason}` : ""
+      !result.sent ? ` reason=${result.reason}` : ""
     }`
   );
   return result;
@@ -140,7 +141,7 @@ export async function sendNewCommentEmail(params: {
   message: string;
   sessionId: string;
   feedbackId: string;
-}): Promise<{ sent: boolean; reason?: string }> {
+}): Promise<EmailSendResult> {
   const {
     recipientUid,
     commenterName,
@@ -168,7 +169,7 @@ export async function sendNewCommentEmail(params: {
   });
   console.log(
     `[new-comment-email] recipient=${recipientUid} feedback=${feedbackId} sent=${result.sent}${
-      result.reason ? ` reason=${result.reason}` : ""
+      !result.sent ? ` reason=${result.reason}` : ""
     }`
   );
   return result;
@@ -186,7 +187,7 @@ export async function sendMentionEmail(params: {
   message: string;
   sessionId: string;
   feedbackId: string;
-}): Promise<{ sent: boolean; reason?: string }> {
+}): Promise<EmailSendResult> {
   const {
     recipientUid,
     mentionerName,
@@ -214,7 +215,7 @@ export async function sendMentionEmail(params: {
   });
   console.log(
     `[mention-email] recipient=${recipientUid} feedback=${feedbackId} sent=${result.sent}${
-      result.reason ? ` reason=${result.reason}` : ""
+      !result.sent ? ` reason=${result.reason}` : ""
     }`
   );
   return result;
@@ -232,7 +233,7 @@ export async function sendTicketAssignedEmail(params: {
   sessionName: string;
   sessionId: string;
   feedbackId: string;
-}): Promise<{ sent: boolean; reason?: string }> {
+}): Promise<EmailSendResult> {
   const {
     assigneeUid,
     assignerName,
@@ -257,7 +258,7 @@ export async function sendTicketAssignedEmail(params: {
   });
   console.log(
     `[ticket-assigned-email] assignee=${assigneeUid} feedback=${feedbackId} sent=${result.sent}${
-      result.reason ? ` reason=${result.reason}` : ""
+      !result.sent ? ` reason=${result.reason}` : ""
     }`
   );
   return result;
@@ -277,7 +278,7 @@ export async function sendPlanLimitApproachingEmail(params: {
   daysRemaining: number;
   resetDate: string;
   upgradeUrl: string;
-}): Promise<{ sent: boolean; reason?: string }> {
+}): Promise<EmailSendResult> {
   const { owner, planName } = params;
   const firstName = greetingNameForUser(owner);
   const props = {
@@ -301,7 +302,7 @@ export async function sendPlanLimitApproachingEmail(params: {
   });
   console.log(
     `[plan-approaching-email] owner=${owner.uid} sent=${result.sent}${
-      result.reason ? ` reason=${result.reason}` : ""
+      !result.sent ? ` reason=${result.reason}` : ""
     }`
   );
   return result;
@@ -318,7 +319,7 @@ export async function sendPlanLimitHitEmail(params: {
   workspaceName: string;
   resetDate: string;
   upgradeUrl: string;
-}): Promise<{ sent: boolean; reason?: string }> {
+}): Promise<EmailSendResult> {
   const { owner } = params;
   const firstName = greetingNameForUser(owner);
   const props = {
@@ -339,7 +340,7 @@ export async function sendPlanLimitHitEmail(params: {
   });
   console.log(
     `[plan-hit-email] owner=${owner.uid} sent=${result.sent}${
-      result.reason ? ` reason=${result.reason}` : ""
+      !result.sent ? ` reason=${result.reason}` : ""
     }`
   );
   return result;

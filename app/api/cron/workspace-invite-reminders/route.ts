@@ -49,12 +49,20 @@ export async function GET(req: Request) {
       const expiresInDays = 5;
 
       try {
-        await sendWorkspaceInviteReminderEmail({
+        const reminderResult = await sendWorkspaceInviteReminderEmail({
           to: data.email,
           workspaceName: data.workspaceName,
           token: doc.id,
           expiresInDays,
         });
+        if (!reminderResult.sent) {
+          console.error(
+            `[invite-reminders] Email failed for token ${doc.id}:`,
+            reminderResult.reason
+          );
+          failed++;
+          continue;
+        }
         await updateWorkspaceInvitationRepo(doc.id, {
           reminderSentAt: Timestamp.now(),
         });

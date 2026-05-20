@@ -30,6 +30,10 @@ import type { PlanLimitError } from "@/lib/billing/checkPlanLimit";
 import { planLimitReachedApiError } from "@/lib/billing/planLimitResponse";
 import { composeFullName } from "@/lib/utils/nameSplit";
 import { logAdminAction } from "@/lib/admin/adminLogs";
+import { sendInviteAcceptedEmail } from "@/lib/email/workspaceEmails";
+import { sendSeatAddedEmail } from "@/lib/email/billingEmails";
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://annote.ai";
 
 export const dynamic = "force-dynamic";
 
@@ -205,6 +209,16 @@ export async function POST(
     // If members now exceed the purchased seats, grow Stripe + Firestore.
     // On failure, we cannot roll back the member-add (already committed via
     // FieldValue.increment), so we mark the workspace for reconciliation.
+    let seatGrew = false;
+    let seatGrowNewCount = 0;
+    let seatProrationPreview:
+      | {
+          amountCents: number;
+          currency: string;
+          prorationDate: Date;
+          nextBillingDate: Date;
+        }
+      | null = null;
     if (
       updatedWorkspace?.billing?.plan === "business" &&
       updatedWorkspace.billing.subscriptionId
@@ -213,14 +227,34 @@ export async function POST(
 
       if (actualMemberCount > currentSeats) {
         const newSeatCount = actualMemberCount;
+        const provider = getPaymentProvider();
+        // Preview proration BEFORE growing seats so the email reflects the
+        // exact amount Stripe will charge. If the preview fails we still
+        // proceed with the grow and degrade the email to no-amount copy.
+        if (provider.previewSeatChange) {
+          try {
+            seatProrationPreview = await provider.previewSeatChange(
+              updatedWorkspace.billing.subscriptionId,
+              newSeatCount
+            );
+          } catch (previewErr) {
+            console.error(
+              "[invite accept] proration preview failed (continuing):",
+              previewErr
+            );
+            seatProrationPreview = null;
+          }
+        }
         try {
-          await getPaymentProvider().updateSubscriptionSeats(
+          await provider.updateSubscriptionSeats(
             updatedWorkspace.billing.subscriptionId,
             newSeatCount
           );
           await adminDb.doc(`workspaces/${invitation.workspaceId}`).update({
             "billing.seats": newSeatCount,
           });
+          seatGrew = true;
+          seatGrowNewCount = newSeatCount;
         } catch (providerErr) {
           // Stripe sync failed AFTER the member was added. We cannot roll back
           // the member-add atomically, so we record the divergence for an
@@ -278,6 +312,121 @@ export async function POST(
       ? currentMemberships
       : [...currentMemberships, invitation.workspaceId];
     await setWorkspaceClaims(user.uid, invitation.workspaceId, updatedMemberships);
+
+    // ─── Email notifications (fire-and-forget) ────────────────────────
+    // Skip the inviteAccepted email if the acceptor is the inviter (rare
+    // self-test scenario). Inviter doc lookup is best-effort; missing email
+    // or doc => skip silently.
+    const acceptedByDisplayName =
+      composedProfileName ||
+      profileEmailLocal ||
+      callerEmail ||
+      "A new member";
+
+    if (invitation.invitedBy && invitation.invitedBy !== user.uid) {
+      void (async () => {
+        try {
+          const inviterSnap = await adminDb
+            .doc(`users/${invitation.invitedBy}`)
+            .get();
+          const inviterData = (inviterSnap.data() ?? {}) as Record<string, unknown>;
+          const inviterEmail =
+            typeof inviterData.email === "string" ? inviterData.email : null;
+          if (!inviterEmail) return;
+          const inviterFullName =
+            composeFullName(
+              typeof inviterData.firstName === "string" ? inviterData.firstName : null,
+              typeof inviterData.lastName === "string" ? inviterData.lastName : null
+            ) ||
+            (typeof inviterData.displayName === "string" ? inviterData.displayName : "") ||
+            invitation.invitedByName ||
+            "there";
+
+          const workspaceMembersUrl = `${APP_URL}/settings?tab=workspace`;
+          const acceptedResult = await sendInviteAcceptedEmail({
+            inviterUid: invitation.invitedBy,
+            inviterName: inviterFullName,
+            acceptedByName: acceptedByDisplayName,
+            acceptedByEmail: callerEmail,
+            workspaceName: invitation.workspaceName,
+            memberCount: actualMemberCount,
+            workspaceMembersUrl,
+          });
+          if (!acceptedResult.sent) {
+            console.error(
+              "[invite accept] inviteAccepted email failed:",
+              acceptedResult.reason
+            );
+          }
+
+          // Seat-added (founder voice) — only when Stripe seats actually grew.
+          // Send to the workspace OWNER (not necessarily the inviter), since
+          // that's whose card is charged. If owner === inviter, the inviter
+          // gets both emails — by design (they're complementary).
+          if (
+            seatGrew &&
+            updatedWorkspace?.ownerId &&
+            updatedWorkspace.billing?.plan === "business"
+          ) {
+            try {
+              const ownerSnap = await adminDb
+                .doc(`users/${updatedWorkspace.ownerId}`)
+                .get();
+              const ownerData = (ownerSnap.data() ?? {}) as Record<string, unknown>;
+              const ownerEmail =
+                typeof ownerData.email === "string" ? ownerData.email : null;
+              if (!ownerEmail) return;
+              const ownerFullName =
+                composeFullName(
+                  typeof ownerData.firstName === "string" ? ownerData.firstName : null,
+                  typeof ownerData.lastName === "string" ? ownerData.lastName : null
+                ) ||
+                (typeof ownerData.displayName === "string"
+                  ? ownerData.displayName
+                  : "") ||
+                "there";
+
+              const fallbackNextBilling = (() => {
+                const ts = updatedWorkspace.billing?.nextBilledAt as
+                  | { toMillis?: () => number }
+                  | null
+                  | undefined;
+                if (ts && typeof ts.toMillis === "function") {
+                  return new Date(ts.toMillis());
+                }
+                return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+              })();
+
+              const seatResult = await sendSeatAddedEmail({
+                ownerEmail,
+                ownerName: ownerFullName,
+                workspaceName: invitation.workspaceName,
+                newSeatCount: seatGrowNewCount,
+                acceptedByName: acceptedByDisplayName,
+                prorationAmountCents: seatProrationPreview?.amountCents ?? null,
+                prorationCurrency: seatProrationPreview?.currency ?? null,
+                nextBillingDate:
+                  seatProrationPreview?.nextBillingDate ?? fallbackNextBilling,
+                billingUrl: `${APP_URL}/settings/billing`,
+              });
+              if (!seatResult.sent) {
+                console.error(
+                  "[invite accept] seatAdded email failed:",
+                  seatResult.reason
+                );
+              }
+            } catch (ownerLookupErr) {
+              console.error(
+                "[invite accept] owner lookup for seatAdded email failed:",
+                ownerLookupErr
+              );
+            }
+          }
+        } catch (emailErr) {
+          console.error("[invite accept] post-accept email block failed:", emailErr);
+        }
+      })();
+    }
 
     return apiSuccess({
       workspaceId: invitation.workspaceId,

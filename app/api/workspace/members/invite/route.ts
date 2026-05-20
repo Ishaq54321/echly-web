@@ -190,16 +190,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    try {
-      await sendWorkspaceInviteEmail({
-        to: email,
-        invitedByName: String(inviterName),
-        workspaceName: workspace.name,
-        role,
-        token,
-      });
-    } catch (emailErr) {
-      console.error("POST /api/workspace/members/invite: email send failed", emailErr);
+    const inviteEmailResult = await sendWorkspaceInviteEmail({
+      to: email,
+      invitedByName: String(inviterName),
+      workspaceName: workspace.name,
+      role,
+      token,
+    });
+    if (!inviteEmailResult.sent) {
+      console.error(
+        "POST /api/workspace/members/invite: email send failed",
+        inviteEmailResult.reason
+      );
     }
 
     return apiSuccess({ invitation });

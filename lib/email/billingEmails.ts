@@ -1,5 +1,6 @@
 import "server-only";
 import { sendEmailOrLog } from "./resend";
+import type { EmailSendResult } from "./types";
 import {
   subscriptionConfirmationEmailHtml,
   subscriptionConfirmationEmailText,
@@ -28,9 +29,17 @@ import {
   paymentMethodUpdatedEmailHtml,
   paymentMethodUpdatedEmailText,
 } from "./templates/paymentMethodUpdated";
+import {
+  seatAddedEmailHtml,
+  seatAddedEmailText,
+} from "./templates/seatAdded";
 import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://annote.ai";
+
+function failureReason(err: unknown): string {
+  return err instanceof Error ? err.message : "unknown";
+}
 
 export async function sendSubscriptionConfirmationEmail(params: {
   to: string;
@@ -38,7 +47,7 @@ export async function sendSubscriptionConfirmationEmail(params: {
   seatCount: number;
   billingCycle: "monthly" | "annual";
   nextBillingDate: Date;
-}): Promise<void> {
+}): Promise<EmailSendResult> {
   try {
     const catalog = await getPlanCatalog();
     const business = catalog.business;
@@ -49,7 +58,7 @@ export async function sendSubscriptionConfirmationEmail(params: {
       console.error(
         "[sendSubscriptionConfirmationEmail] business plan catalog missing prices; skipping email"
       );
-      return;
+      return { sent: false, reason: "catalog-missing-prices" };
     }
 
     const props = {
@@ -69,15 +78,17 @@ export async function sendSubscriptionConfirmationEmail(params: {
       text: subscriptionConfirmationEmailText(props),
       fromVariant: "founder",
     });
+    return { sent: true };
   } catch (err) {
-    console.error("[sendSubscriptionConfirmationEmail] failed", err);
+    console.error("[sendSubscriptionConfirmationEmail] failed:", err);
+    return { sent: false, reason: failureReason(err) };
   }
 }
 
 export async function sendSubscriptionCancelledEmail(params: {
   to: string;
   workspaceName: string;
-}): Promise<void> {
+}): Promise<EmailSendResult> {
   try {
     const catalog = await getPlanCatalog();
     const starter = catalog.starter;
@@ -86,7 +97,7 @@ export async function sendSubscriptionCancelledEmail(params: {
       console.error(
         "[sendSubscriptionCancelledEmail] starter plan catalog missing; skipping email"
       );
-      return;
+      return { sent: false, reason: "catalog-missing-starter" };
     }
 
     const props = {
@@ -106,8 +117,10 @@ export async function sendSubscriptionCancelledEmail(params: {
       text: subscriptionCancelledEmailText(props),
       fromVariant: "founder",
     });
+    return { sent: true };
   } catch (err) {
-    console.error("[sendSubscriptionCancelledEmail] failed", err);
+    console.error("[sendSubscriptionCancelledEmail] failed:", err);
+    return { sent: false, reason: failureReason(err) };
   }
 }
 
@@ -115,7 +128,7 @@ export async function sendPaymentFailedEmail(params: {
   to: string;
   workspaceName: string;
   portalUrl: string;
-}): Promise<void> {
+}): Promise<EmailSendResult> {
   try {
     const props = {
       workspaceName: params.workspaceName,
@@ -129,8 +142,10 @@ export async function sendPaymentFailedEmail(params: {
       text: paymentFailedEmailText(props),
       fromVariant: "founder",
     });
+    return { sent: true };
   } catch (err) {
-    console.error("[sendPaymentFailedEmail] failed", err);
+    console.error("[sendPaymentFailedEmail] failed:", err);
+    return { sent: false, reason: failureReason(err) };
   }
 }
 
@@ -144,7 +159,7 @@ export async function sendRenewalReceiptEmail(params: {
   invoiceDate: Date;
   nextBillingDate: Date;
   invoicePdfUrl: string | null;
-}): Promise<void> {
+}): Promise<EmailSendResult> {
   try {
     const props = {
       workspaceName: params.workspaceName,
@@ -164,8 +179,10 @@ export async function sendRenewalReceiptEmail(params: {
       text: renewalReceiptEmailText(props),
       fromVariant: "founder",
     });
+    return { sent: true };
   } catch (err) {
-    console.error("[sendRenewalReceiptEmail] failed", err);
+    console.error("[sendRenewalReceiptEmail] failed:", err);
+    return { sent: false, reason: failureReason(err) };
   }
 }
 
@@ -178,7 +195,7 @@ export async function sendUpcomingRenewalReminderEmail(params: {
   nextBillingDate: Date;
   cardBrand?: string;
   cardLast4?: string;
-}): Promise<void> {
+}): Promise<EmailSendResult> {
   try {
     const props = {
       workspaceName: params.workspaceName,
@@ -197,8 +214,10 @@ export async function sendUpcomingRenewalReminderEmail(params: {
       text: upcomingRenewalReminderEmailText(props),
       fromVariant: "founder",
     });
+    return { sent: true };
   } catch (err) {
-    console.error("[sendUpcomingRenewalReminderEmail] failed", err);
+    console.error("[sendUpcomingRenewalReminderEmail] failed:", err);
+    return { sent: false, reason: failureReason(err) };
   }
 }
 
@@ -209,7 +228,7 @@ export async function sendCardExpiringEmail(params: {
   cardLast4: string;
   expiryMonth: number;
   expiryYear: number;
-}): Promise<void> {
+}): Promise<EmailSendResult> {
   try {
     const props = {
       workspaceName: params.workspaceName,
@@ -226,8 +245,10 @@ export async function sendCardExpiringEmail(params: {
       text: cardExpiringEmailText(props),
       fromVariant: "founder",
     });
+    return { sent: true };
   } catch (err) {
-    console.error("[sendCardExpiringEmail] failed", err);
+    console.error("[sendCardExpiringEmail] failed:", err);
+    return { sent: false, reason: failureReason(err) };
   }
 }
 
@@ -236,7 +257,7 @@ export async function sendPaymentMethodUpdatedEmail(params: {
   workspaceName: string;
   cardBrand: string;
   cardLast4: string;
-}): Promise<void> {
+}): Promise<EmailSendResult> {
   try {
     const props = {
       workspaceName: params.workspaceName,
@@ -250,7 +271,62 @@ export async function sendPaymentMethodUpdatedEmail(params: {
       text: paymentMethodUpdatedEmailText(props),
       fromVariant: "founder",
     });
+    return { sent: true };
   } catch (err) {
-    console.error("[sendPaymentMethodUpdatedEmail] failed", err);
+    console.error("[sendPaymentMethodUpdatedEmail] failed:", err);
+    return { sent: false, reason: failureReason(err) };
+  }
+}
+
+export async function sendSeatAddedEmail(params: {
+  ownerEmail: string;
+  ownerName: string;
+  workspaceName: string;
+  newSeatCount: number;
+  acceptedByName: string;
+  prorationAmountCents: number | null;
+  prorationCurrency: string | null;
+  nextBillingDate: Date;
+  billingUrl: string;
+}): Promise<EmailSendResult> {
+  try {
+    const ownerFirstName =
+      (params.ownerName ?? "").trim().split(/\s+/)[0] || "there";
+    const currency = params.prorationCurrency ?? "USD";
+    const formatter = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+    });
+    const prorationFormatted =
+      params.prorationAmountCents != null
+        ? formatter.format(params.prorationAmountCents / 100)
+        : null;
+    const nextBillingDateStr = params.nextBillingDate.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
+    const props = {
+      ownerFirstName,
+      acceptedByName: params.acceptedByName,
+      workspaceName: params.workspaceName,
+      newSeatCount: params.newSeatCount,
+      prorationFormatted,
+      nextBillingDate: nextBillingDateStr,
+      billingUrl: params.billingUrl,
+    };
+
+    await sendEmailOrLog({
+      to: params.ownerEmail,
+      subject: `A new seat was added to ${params.workspaceName}`,
+      html: seatAddedEmailHtml(props),
+      text: seatAddedEmailText(props),
+      fromVariant: "founder",
+    });
+    return { sent: true };
+  } catch (err) {
+    console.error("[sendSeatAddedEmail] failed:", err);
+    return { sent: false, reason: failureReason(err) };
   }
 }

@@ -253,7 +253,11 @@ export async function PATCH(
         sessionName: sessionTitle,
         sessionUrl: `${APP_URL}/dashboard/${sessionId}`,
         workspaceName: workspaceId,
-      }).catch(() => {});
+      }).then((r) => {
+        if (!r.sent) {
+          console.error("[access-request/reject] email failed:", r.reason);
+        }
+      });
     }
     return apiSuccess({
       type: "rejected" as const,
@@ -376,7 +380,11 @@ export async function PATCH(
       sessionName: sessionTitle,
       sessionUrl: `${APP_URL}/dashboard/${sessionId}`,
       workspaceName: workspaceId,
-    }).catch(() => {});
+    }).then((r) => {
+      if (!r.sent) {
+        console.error("[access-request/approve] email failed:", r.reason);
+      }
+    });
   }
 
   // Canonical member row — same shape GET /members produces per item, so the

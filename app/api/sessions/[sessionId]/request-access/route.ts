@@ -148,13 +148,19 @@ export async function POST(
       ).filter((e) => e !== requesterEmail);
       if (emails.length === 0) return;
 
-      await sendAccessRequestNotificationEmail({
+      const requestNotifResult = await sendAccessRequestNotificationEmail({
         to: emails,
         requesterEmail,
         sessionName: sess.title ?? "a session",
         sessionUrl: `${APP_URL}/dashboard/${sessionId}`,
         workspaceName: workspaceId,
       });
+      if (!requestNotifResult.sent) {
+        console.error(
+          "[request-access] notification email failed:",
+          requestNotifResult.reason
+        );
+      }
     } catch {
       // email failure must not fail the route
     }

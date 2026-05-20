@@ -521,14 +521,14 @@ export default function GlobalRail({ forceExpanded = false, expandedWidthClass =
           </div>
           <div className="flex flex-col gap-1">
             <a
-              href="/settings?tab=general"
+              href="/settings?tab=workspace"
               onClick={() => setWorkspacePopoverOpen(false)}
               className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-[var(--text-body)] hover:bg-[var(--surface-hover)] transition"
             >
               Workspace settings
             </a>
             <a
-              href="/settings?tab=members"
+              href="/settings?tab=workspace"
               onClick={() => setWorkspacePopoverOpen(false)}
               className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-[var(--text-body)] hover:bg-[var(--surface-hover)] transition"
             >

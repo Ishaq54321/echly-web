@@ -1,6 +1,7 @@
 import "server-only";
 import { sendEmailOrLog, type FromVariant } from "./resend";
 import { canSendEmail, type OptOutCategory } from "./preferences";
+import type { EmailSendResult } from "./types";
 import {
   makeUnsubscribeToken,
   type UnsubscribeCategory,
@@ -59,7 +60,7 @@ export async function sendEmailWithPreferences(params: {
   textBuilder?: (unsubscribeUrl: string) => string;
   fromVariant?: FromVariant;
   replyTo?: string;
-}): Promise<{ sent: boolean; reason?: string }> {
+}): Promise<EmailSendResult> {
   const { user, category, subject, htmlBuilder, textBuilder } = params;
 
   if (!user.email) {
@@ -80,16 +81,21 @@ export async function sendEmailWithPreferences(params: {
     ? substituteUnsub(textBuilder(unsubscribeUrl), unsubscribeUrl)
     : undefined;
 
-  await sendEmailOrLog({
-    to: user.email,
-    subject,
-    html,
-    text,
-    fromVariant: params.fromVariant,
-    replyTo: params.replyTo,
-  });
-
-  return { sent: true };
+  try {
+    await sendEmailOrLog({
+      to: user.email,
+      subject,
+      html,
+      text,
+      fromVariant: params.fromVariant,
+      replyTo: params.replyTo,
+    });
+    return { sent: true };
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : "unknown";
+    console.error(`[email] send failed for ${user.email} (${category}):`, err);
+    return { sent: false, reason };
+  }
 }
 
 /**
@@ -105,7 +111,7 @@ export async function sendEmailWithPreferencesByUid(params: {
   textBuilder?: (unsubscribeUrl: string) => string;
   fromVariant?: FromVariant;
   replyTo?: string;
-}): Promise<{ sent: boolean; reason?: string }> {
+}): Promise<EmailSendResult> {
   const user = await getUserByIdRepo(params.uid);
   if (!user) {
     return { sent: false, reason: "user-not-found" };

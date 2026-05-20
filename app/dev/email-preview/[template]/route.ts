@@ -31,6 +31,8 @@ import { mentionEmailHtml, mentionEmailText } from "@/lib/email/templates/mentio
 import { ticketAssignedEmailHtml, ticketAssignedEmailText } from "@/lib/email/templates/ticketAssigned";
 import { planLimitApproachingEmailHtml, planLimitApproachingEmailText } from "@/lib/email/templates/planLimitApproaching";
 import { planLimitHitEmailHtml, planLimitHitEmailText } from "@/lib/email/templates/planLimitHit";
+import { inviteAcceptedEmailHtml, inviteAcceptedEmailText } from "@/lib/email/templates/inviteAccepted";
+import { seatAddedEmailHtml, seatAddedEmailText } from "@/lib/email/templates/seatAdded";
 
 export const dynamic = "force-dynamic";
 
@@ -276,6 +278,55 @@ const TEMPLATES: Record<string, () => Variant> = {
       upgradeUrl: "https://annote.ai/settings?tab=billing",
     };
     return { html: planLimitHitEmailHtml(p), text: planLimitHitEmailText(p) };
+  },
+
+  // ── Phase A: tier-1 missing emails ──
+  "invite-accepted": () => {
+    const p = {
+      inviterFirstName: "Ishaq",
+      acceptedByName: "Sarah Chen",
+      acceptedByEmail: "sarah@acme.com",
+      workspaceName: "Acme Engineering",
+      memberCount: 4,
+      workspaceMembersUrl: "https://annote.ai/settings?tab=workspace",
+    };
+    return { html: inviteAcceptedEmailHtml(p), text: inviteAcceptedEmailText(p) };
+  },
+  "seat-added": () => {
+    const p = {
+      ownerFirstName: "Ishaq",
+      acceptedByName: "Sarah Chen",
+      workspaceName: "Acme Engineering",
+      newSeatCount: 4,
+      prorationFormatted: "$7.18",
+      nextBillingDate: new Date(
+        Date.now() + 30 * 24 * 60 * 60 * 1000
+      ).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      }),
+      billingUrl: "https://annote.ai/settings/billing",
+    };
+    return { html: seatAddedEmailHtml(p), text: seatAddedEmailText(p) };
+  },
+  "seat-added-no-proration": () => {
+    const p = {
+      ownerFirstName: "Ishaq",
+      acceptedByName: "Sarah Chen",
+      workspaceName: "Acme Engineering",
+      newSeatCount: 4,
+      prorationFormatted: null,
+      nextBillingDate: new Date(
+        Date.now() + 30 * 24 * 60 * 60 * 1000
+      ).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      }),
+      billingUrl: "https://annote.ai/settings/billing",
+    };
+    return { html: seatAddedEmailHtml(p), text: seatAddedEmailText(p) };
   },
 };
 

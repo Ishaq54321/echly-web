@@ -118,4 +118,26 @@ export interface PaymentProvider {
   // Synchronous — reads env vars only, no SDK call. Keeps callers (e.g. the
   // admin set_plan route) from leaking provider-specific env var names.
   resolveBusinessPriceId(billingCycle: "monthly" | "annual"): string;
+  /**
+   * Preview the prorated charge that would result from changing seats on an
+   * active subscription. Returns null if the provider doesn't support preview
+   * or if the lookup fails — callers must tolerate this and degrade gracefully
+   * (e.g. an email that omits the amount line).
+   */
+  previewSeatChange?(
+    subscriptionId: string,
+    newSeatCount: number
+  ): Promise<{
+    amountCents: number;
+    currency: string;
+    prorationDate: Date;
+    nextBillingDate: Date;
+  } | null>;
+}
+
+export interface SeatChangePreview {
+  amountCents: number;
+  currency: string;
+  prorationDate: Date;
+  nextBillingDate: Date;
 }

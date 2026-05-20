@@ -65,14 +65,16 @@ export async function DELETE(req: NextRequest) {
     const ownerEmail = typeof userData.email === "string" ? userData.email : user.email;
 
     if (ownerEmail) {
-      try {
-        await sendWorkspaceDeletionConfirmationEmail({
-          to: ownerEmail,
-          workspaceName: workspace.name,
-          purgeDate,
-        });
-      } catch (emailErr) {
-        console.error("DELETE /api/workspace: email send failed", emailErr);
+      const deletionEmailResult = await sendWorkspaceDeletionConfirmationEmail({
+        to: ownerEmail,
+        workspaceName: workspace.name,
+        purgeDate,
+      });
+      if (!deletionEmailResult.sent) {
+        console.error(
+          "DELETE /api/workspace: email send failed",
+          deletionEmailResult.reason
+        );
       }
     }
 

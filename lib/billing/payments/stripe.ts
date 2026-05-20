@@ -168,6 +168,65 @@ export class StripeProvider implements PaymentProvider {
     });
   }
 
+  async previewSeatChange(
+    subscriptionId: string,
+    newSeatCount: number
+  ): Promise<{
+    amountCents: number;
+    currency: string;
+    prorationDate: Date;
+    nextBillingDate: Date;
+  } | null> {
+    const stripe = getStripe();
+    try {
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+      const item = subscription.items.data[0];
+      if (!item) {
+        console.warn(
+          `[stripe] previewSeatChange: subscription ${subscriptionId} has no items`
+        );
+        return null;
+      }
+
+      // API 2026-04-22.dahlia uses invoices.createPreview, not the legacy
+      // invoices.retrieveUpcoming. Pass the subscription id explicitly along
+      // with the new quantity so the preview reflects the proration that would
+      // result from updateSubscriptionSeats.
+      const preview = await stripe.invoices.createPreview({
+        subscription: subscriptionId,
+        subscription_details: {
+          items: [{ id: item.id, quantity: newSeatCount }],
+          proration_behavior: "always_invoice",
+        },
+      });
+
+      // Sum proration line items (positive seat-add prorations and negative
+      // credit prorations should net to the actual incremental charge).
+      let prorationCents = 0;
+      for (const line of preview.lines.data) {
+        if (line.parent?.subscription_item_details?.proration === true) {
+          prorationCents += line.amount;
+        }
+      }
+      const amountCents = prorationCents !== 0 ? prorationCents : preview.amount_due ?? 0;
+
+      const periodEndSecs = item.current_period_end;
+      const nextBillingDate = periodEndSecs
+        ? new Date(periodEndSecs * 1000)
+        : new Date();
+
+      return {
+        amountCents,
+        currency: (preview.currency ?? "usd").toUpperCase(),
+        prorationDate: new Date(),
+        nextBillingDate,
+      };
+    } catch (err) {
+      console.error("[stripe] previewSeatChange failed:", err);
+      return null;
+    }
+  }
+
   async updateSubscriptionPlan(
     subscriptionId: string,
     newPriceId: string,

@@ -80,16 +80,15 @@ export async function POST(
       activeInvitation = newInvitation;
     }
 
-    try {
-      await sendWorkspaceInviteEmail({
-        to: activeInvitation.email,
-        invitedByName: activeInvitation.invitedByName,
-        workspaceName: activeInvitation.workspaceName,
-        role: activeInvitation.role,
-        token: activeInvitation.id,
-      });
-    } catch (emailErr) {
-      console.error("POST .../resend: email send failed", emailErr);
+    const resendResult = await sendWorkspaceInviteEmail({
+      to: activeInvitation.email,
+      invitedByName: activeInvitation.invitedByName,
+      workspaceName: activeInvitation.workspaceName,
+      role: activeInvitation.role,
+      token: activeInvitation.id,
+    });
+    if (!resendResult.sent) {
+      console.error("POST .../resend: email send failed", resendResult.reason);
     }
 
     return apiSuccess({ invitation: activeInvitation });
