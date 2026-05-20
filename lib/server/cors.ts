@@ -3,7 +3,6 @@ import { NextRequest } from "next/server";
 const allowedOrigins = [
   "http://localhost:3000",
   "https://annote.ai",
-  "https://echly-web.vercel.app",
 ];
 
 export function corsHeaders(req: NextRequest) {

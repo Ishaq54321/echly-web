@@ -27,7 +27,7 @@
   font-style: normal;
   font-display: swap;
 }
-/*! tailwindcss v4.2.1 | MIT License | https://tailwindcss.com */
+/*! tailwindcss v4.2.4 | MIT License | https://tailwindcss.com */
 @layer properties;
 :root {
   --brand: #5A49BF;
@@ -3105,6 +3105,9 @@ body {
     --tw-border-style: none;
     border-style: none;
   }
+  .border-\[\#ECECEA\] {
+    border-color: #ECECEA;
+  }
   .border-\[var\(--accent-operational\)\]\/20 {
     border-color: var(--accent-operational);
     @supports (color: color-mix(in lab, red, red)) {
@@ -3269,6 +3272,9 @@ body {
   }
   .bg-\[\#54495F\] {
     background-color: #54495F;
+  }
+  .bg-\[\#F9F8F6\] {
+    background-color: #F9F8F6;
   }
   .bg-\[\#FEF0CD\] {
     background-color: #FEF0CD;
@@ -4279,6 +4285,9 @@ body {
   }
   .text-\[\#15101F\] {
     color: #15101F;
+  }
+  .text-\[\#54495F\] {
+    color: #54495F;
   }
   .text-\[\#E5484D\] {
     color: #E5484D;
@@ -6004,6 +6013,11 @@ body {
   .disabled\:opacity-60 {
     &:disabled {
       opacity: 60%;
+    }
+  }
+  .disabled\:opacity-70 {
+    &:disabled {
+      opacity: 70%;
     }
   }
   .disabled\:opacity-100 {

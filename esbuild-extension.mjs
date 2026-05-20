@@ -55,17 +55,21 @@ function makeAliasPlugin(useContentAuthFetch = false) {
 const nodeEnv = process.env.NODE_ENV || "production";
 const isProd = nodeEnv === "production";
 
-// ECHLY_WEB_APP_URL must be set in CI/CD for production builds.
-// Falls back to localhost for local development.
+// ECHLY_WEB_APP_URL must be set for production builds. Falls back to localhost
+// only in dev builds; in prod we exit hard so a misconfigured CI never ships an
+// extension that points at localhost (this happened once already — see audit).
+if (isProd && !process.env.ECHLY_WEB_APP_URL) {
+  console.error(
+    "[esbuild] ECHLY_WEB_APP_URL is not set but NODE_ENV=production.\n" +
+    "         Refusing to build an extension that would point at localhost.\n" +
+    "         Set ECHLY_WEB_APP_URL=https://annote.ai (and optionally\n" +
+    "         ECHLY_API_BASE) before running this script."
+  );
+  process.exit(1);
+}
+
 const webAppUrl = process.env.ECHLY_WEB_APP_URL || "http://localhost:3000";
 const apiBase = process.env.ECHLY_API_BASE || webAppUrl;
-
-if (isProd && webAppUrl === "http://localhost:3000") {
-  console.error(
-    "[esbuild] WARNING: Building in production mode but ECHLY_WEB_APP_URL is not set. " +
-    "The extension will point at localhost and will not work for real users."
-  );
-}
 
 const define = {
   "process.env.NODE_ENV": JSON.stringify(nodeEnv),
