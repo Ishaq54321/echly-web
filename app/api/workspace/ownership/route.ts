@@ -11,6 +11,7 @@ import {
 } from "@/lib/repositories/workspaceMembersRepository.server";
 import { setWorkspaceClaims } from "@/lib/server/setWorkspaceClaim";
 import { adminDb } from "@/lib/server/firebaseAdmin";
+import { getPaymentProvider } from "@/lib/billing/payments";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,38 @@ export async function PATCH(req: NextRequest) {
     }
 
     await transferWorkspaceOwnershipRepo(workspaceId, user.uid, newOwnerUid);
+
+    // Sync the Stripe customer email to the new owner so Stripe Dashboard,
+    // hosted receipts, and the Customer Portal all show the right person.
+    // Echly-side billing emails already auto-route via the webhook's per-event
+    // ownerId→email lookup (see app/api/billing/webhook getWorkspaceContext),
+    // so this only fixes the Stripe-visible email.
+    //
+    // Skipped when there's no Stripe customer (Starter or comp workspaces).
+    // Non-fatal: the transfer has already committed, so a Stripe failure must
+    // not surface as a 500 — worst case Stripe's email lags until the next
+    // manual sync.
+    const wsBilling = (workspace as { billing?: { customerId?: string | null } })
+      .billing;
+    const customerId = wsBilling?.customerId ?? null;
+    if (customerId) {
+      try {
+        const newOwnerSnap = await adminDb.doc(`users/${newOwnerUid}`).get();
+        const newOwnerEmail = (newOwnerSnap.data() as { email?: string } | undefined)
+          ?.email;
+        if (newOwnerEmail && newOwnerEmail.trim()) {
+          await getPaymentProvider().updateCustomerEmail(
+            customerId,
+            newOwnerEmail.trim()
+          );
+        }
+      } catch (stripeErr) {
+        console.error(
+          "[ownership transfer] Failed to sync Stripe customer email (non-fatal):",
+          stripeErr
+        );
+      }
+    }
 
     // Refresh claims for both users (memberships unchanged on transfer, but
     // we still re-issue so token shape stays consistent).

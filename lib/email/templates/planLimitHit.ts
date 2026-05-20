@@ -3,7 +3,6 @@ import {
   emailCardV2,
   emailButtonV2,
   emailButtonRowV2,
-  emailHeadingV2,
   emailParagraphV2,
   emailSignoffV2,
   emailSpacerV2,
@@ -43,9 +42,10 @@ export function planLimitHitEmailHtml({
   return emailShellV2({
     preheader:
       "Existing sessions and shares still work. Only new captures pause.",
+    category: "Plan usage",
+    title: "You've reached your monthly limit",
     content: emailCardV2({
       content: `
-        ${emailHeadingV2("You've hit this month's capture limit")}
         ${emailParagraphV2(`Hey ${greetingName},`)}
         ${emailParagraphV2(
           `You've used all ${planLimit} captures on <strong>${safeWorkspace}</strong> this month. Here's exactly what that means:`

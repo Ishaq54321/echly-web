@@ -3,7 +3,6 @@ import {
   emailCardV2,
   emailButtonV2,
   emailButtonRowV2,
-  emailHeadingV2,
   emailParagraphV2,
   emailSignoffV2,
   emailSpacerV2,
@@ -42,9 +41,10 @@ export function sessionOpenedEmailHtml({
 
   return emailShellV2({
     preheader: `"${sessionName}" — opened a moment ago.`,
+    category: "Session ready",
+    title: "Your session is ready to view",
     content: emailCardV2({
       content: `
-        ${emailHeadingV2(`${safeRecipient} just opened your session`)}
         ${emailParagraphV2(
           `${safeRecipient} just opened the session you shared: &ldquo;${safeSession}.&rdquo;`
         )}

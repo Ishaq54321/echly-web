@@ -3,7 +3,6 @@ import {
   emailCardV2,
   emailButtonV2,
   emailButtonRowV2,
-  emailHeadingV2,
   emailParagraphV2,
   emailSignoffV2,
   emailSpacerV2,
@@ -44,6 +43,7 @@ function daysLabel(days: number): string {
 
 export function planLimitApproachingEmailHtml({
   firstName,
+  planName,
   usageCount,
   planLimit,
   workspaceName,
@@ -55,12 +55,15 @@ export function planLimitApproachingEmailHtml({
   const safeWorkspace = escapeEmailHtml(workspaceName);
   const safeReset = escapeEmailHtml(resetDate);
   const days = daysLabel(daysRemaining);
+  const usagePct = planLimit > 0 ? Math.round((usageCount / planLimit) * 100) : 0;
 
   return emailShellV2({
     preheader: "Nothing breaks — just want you to know where you stand.",
+    category: "Plan usage",
+    title: "You're approaching your monthly limit",
+    metadata: `${usagePct}% of ${escapeEmailHtml(planName)} plan used`,
     content: emailCardV2({
       content: `
-        ${emailHeadingV2("You're close to the plan limit")}
         ${emailParagraphV2(`Hey ${greetingName},`)}
         ${emailParagraphV2(
           `You've used ${usageCount} of your ${planLimit} captures this month on <strong>${safeWorkspace}</strong>. At your current pace, you'll hit the limit in about ${days}.`

@@ -3,7 +3,6 @@ import {
   emailCardV2,
   emailButtonV2,
   emailButtonRowV2,
-  emailHeadingV2,
   emailParagraphV2,
   emailSignoffV2,
   emailSpacerV2,
@@ -31,9 +30,10 @@ export function workspaceInviteEmailHtml({
 
   return emailShellV2({
     preheader: "One click to join. No password setup required.",
+    category: "Workspace invitation",
+    title: `${invitedByName} invited you to '${workspaceName}'`,
     content: emailCardV2({
       content: `
-        ${emailHeadingV2(`${safeInviter} invited you to ${safeWorkspace}`)}
         ${emailParagraphV2(
           `${safeInviter} invited you to join their workspace on Annote: <strong>${safeWorkspace}</strong>.`
         )}

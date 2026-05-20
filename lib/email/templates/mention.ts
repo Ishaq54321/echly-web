@@ -3,7 +3,6 @@ import {
   emailCardV2,
   emailButtonV2,
   emailButtonRowV2,
-  emailHeadingV2,
   emailParagraphV2,
   emailSignoffV2,
   emailSpacerV2,
@@ -52,9 +51,11 @@ export function mentionEmailHtml({
 
   return emailShellV2({
     preheader: `"${commentExcerpt}"`,
+    category: "You were mentioned",
+    title: `${mentionerName} tagged you in a comment`,
+    metadata: `On '${safeSession}'`,
     content: emailCardV2({
       content: `
-        ${emailHeadingV2(`${safeMentioner} mentioned you`)}
         ${emailParagraphV2(
           `${safeMentioner} mentioned you in a comment on &ldquo;${safeTitle}&rdquo; in ${safeSession}:`
         )}

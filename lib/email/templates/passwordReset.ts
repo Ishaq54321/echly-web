@@ -3,7 +3,6 @@ import {
   emailCardV2,
   emailButtonV2,
   emailButtonRowV2,
-  emailHeadingV2,
   emailParagraphV2,
   emailSignoffV2,
   emailSpacerV2,
@@ -19,9 +18,10 @@ interface PasswordResetProps {
 export function passwordResetEmailHtml({ resetUrl }: PasswordResetProps): string {
   return emailShellV2({
     preheader: "Link expires in 60 minutes.",
+    category: "Account security",
+    title: "Reset your password",
     content: emailCardV2({
       content: `
-        ${emailHeadingV2("Reset your Annote password")}
         ${emailParagraphV2("We got a request to reset the password for your Annote account.")}
         ${emailSpacerV2({ height: 8 })}
         ${emailButtonRowV2(emailButtonV2({ label: "Reset password", href: resetUrl }))}

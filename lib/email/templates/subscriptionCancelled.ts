@@ -1,7 +1,6 @@
 import {
   emailShellV2,
   emailCardV2,
-  emailHeadingV2,
   emailParagraphV2,
   emailSignoffV2,
   escapeEmailHtml,
@@ -39,9 +38,11 @@ export function subscriptionCancelledEmailHtml(
 
   return emailShellV2({
     preheader: "Your data stays put. The door's open whenever.",
+    category: "Subscription update",
+    title: "Your plan is cancelled",
+    metadata: periodEndDate ? `Access until ${escapeEmailHtml(periodEndDate)}` : undefined,
     content: emailCardV2({
       content: `
-        ${emailHeadingV2("Your Annote subscription is canceled")}
         ${emailParagraphV2(`Hey ${greetingName},`)}
         ${emailParagraphV2(
           `Your Annote subscription is canceled. You won't be charged again. ${throughClause}`

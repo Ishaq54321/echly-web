@@ -3,7 +3,6 @@ import {
   emailCardV2,
   emailButtonV2,
   emailButtonRowV2,
-  emailHeadingV2,
   emailParagraphV2,
   emailInfoRowV2,
   emailDividerV2,
@@ -66,12 +65,16 @@ export function subscriptionConfirmationEmailHtml(
   const amount = computeAmount(props);
   const seatLabel = seatCount === 1 ? "1 seat" : `${seatCount} seats`;
 
+  const cycleTitleCase = cycleLabel === "annual" ? "Annual" : "Monthly";
+
   return emailShellV2({
     preheader: `${planName}, ${cycleLabel}. Next charge ${formatDate(nextBillingDate)}.`,
+    category: `Welcome to ${planName}`,
+    title: "You're upgraded",
+    metadata: `${escapeEmailHtml(planName)} &middot; ${cycleTitleCase}`,
     content:
       emailCardV2({
         content: `
-          ${emailHeadingV2(`You're on Annote ${safePlan} — here's what's next`)}
           ${emailParagraphV2(`Hey ${greetingName},`)}
           ${emailParagraphV2(
             `Thanks for upgrading <strong>${safeWorkspace}</strong> to Annote ${safePlan}. Here's what you're paying for:`

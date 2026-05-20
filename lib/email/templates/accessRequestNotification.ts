@@ -3,7 +3,6 @@ import {
   emailCardV2,
   emailButtonV2,
   emailButtonRowV2,
-  emailHeadingV2,
   emailParagraphV2,
   emailSignoffV2,
   emailSpacerV2,
@@ -33,9 +32,11 @@ export function accessRequestNotificationEmailHtml({
 
   return emailShellV2({
     preheader: "Review and approve from your dashboard.",
+    category: "Access request",
+    title: `${requesterEmail} wants access to your session`,
+    metadata: `'${escapeEmailHtml(sessionName)}'`,
     content: emailCardV2({
       content: `
-        ${emailHeadingV2(`${safeRequester} requested access`)}
         ${emailParagraphV2(
           `${safeRequester} requested access to your session &ldquo;${safeSession}.&rdquo;`
         )}

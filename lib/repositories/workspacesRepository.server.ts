@@ -3,7 +3,6 @@ import { adminDb } from "@/lib/server/firebaseAdmin";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import type { Workspace, WorkspaceDoc } from "@/lib/domain/workspace";
 import { defaultWorkspaceDoc } from "@/lib/domain/workspace";
-import type { PlanId } from "@/lib/billing/plans";
 import { addWorkspaceMemberRepo } from "@/lib/repositories/workspaceMembersRepository.server";
 import { addWorkspaceMembershipRepo } from "@/lib/repositories/userMembershipsRepository.server";
 
@@ -155,18 +154,6 @@ export async function updateWorkspaceSettings(
     updatedAt: FieldValue.serverTimestamp(),
   };
   await adminDb.doc(`workspaces/${resolvedWorkspaceId}`).update(payload);
-  invalidateWorkspaceDocCache(resolvedWorkspaceId);
-}
-
-export async function updateWorkspacePlanRepo(
-  workspaceId: string,
-  newPlan: PlanId
-): Promise<void> {
-  const resolvedWorkspaceId = requireWorkspaceId(workspaceId, "updateWorkspacePlanRepo");
-  await adminDb.doc(`workspaces/${resolvedWorkspaceId}`).update({
-    "billing.plan": newPlan,
-    updatedAt: FieldValue.serverTimestamp(),
-  } as Record<string, unknown>);
   invalidateWorkspaceDocCache(resolvedWorkspaceId);
 }
 

@@ -3,7 +3,6 @@ import {
   emailCardV2,
   emailButtonV2,
   emailButtonRowV2,
-  emailHeadingV2,
   emailParagraphV2,
   emailSignoffV2,
   emailSpacerV2,
@@ -42,9 +41,10 @@ export function ticketAssignedEmailHtml({
 
   return emailShellV2({
     preheader: `${ticketTitle} — in ${sessionName}.`,
+    category: "Ticket assigned",
+    title: `${assignerName} assigned you a ticket`,
     content: emailCardV2({
       content: `
-        ${emailHeadingV2(`${safeAssigner} assigned you a ticket`)}
         ${emailParagraphV2(
           `${safeAssigner} assigned you a ticket in &ldquo;${safeSession}&rdquo;:`
         )}

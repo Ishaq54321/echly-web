@@ -179,7 +179,11 @@ async function handleSubscriptionStarted(
   const wsRef = adminDb.collection("workspaces").doc(workspaceId);
   const wsSnap = await wsRef.get();
   const ws = wsSnap.data() as
-    | { name?: string; billing?: { plan?: string; subscriptionId?: string | null; manualOverride?: boolean } }
+    | {
+        name?: string;
+        billing?: { plan?: string; subscriptionId?: string | null; manualOverride?: boolean };
+        usage?: { members?: number };
+      }
     | undefined;
 
   if (!ws) {
@@ -228,6 +232,47 @@ async function handleSubscriptionStarted(
     startedUpdates["billing.paymentMethod"] = subData.paymentMethod;
   }
   await wsRef.update(startedUpdates);
+
+  // ─── Race condition reconciliation ─────────────────────────────────
+  // If members were added between checkout and this webhook landing
+  // (because checkout success was instant but webhook took a moment),
+  // the Stripe seat count from initial purchase is lower than the actual
+  // member count. Grow seats now to match.
+  const actualMemberCount = ws.usage?.members ?? 1;
+  if (actualMemberCount > subData.seatCount) {
+    console.log(
+      `[webhook] subscription_started race detected: members=${actualMemberCount} > purchased seats=${subData.seatCount}. Growing seats.`
+    );
+    try {
+      await provider.updateSubscriptionSeats(
+        event.data.subscriptionId,
+        actualMemberCount
+      );
+      await wsRef.update({
+        "billing.seats": actualMemberCount,
+      });
+      await logAdminAction({
+        adminId: "billing-webhook",
+        action: "subscription_started_race_reconciled",
+        workspaceId,
+        metadata: {
+          purchasedSeats: subData.seatCount,
+          adjustedToSeats: actualMemberCount,
+          subscriptionId: event.data.subscriptionId,
+        },
+      });
+    } catch (raceErr) {
+      console.error(
+        "[webhook] Failed to reconcile race condition seat count",
+        raceErr
+      );
+      await wsRef.update({
+        "billing.seatSyncFailedAt": FieldValue.serverTimestamp(),
+        "billing.seatSyncExpectedCount": actualMemberCount,
+        "billing.seatSyncCurrentCount": subData.seatCount,
+      });
+    }
+  }
 
   await logAdminAction({
     adminId: "billing-webhook",

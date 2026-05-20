@@ -29,6 +29,7 @@ import { checkPlanLimit } from "@/lib/billing/checkPlanLimit";
 import type { PlanLimitError } from "@/lib/billing/checkPlanLimit";
 import { planLimitReachedApiError } from "@/lib/billing/planLimitResponse";
 import { composeFullName } from "@/lib/utils/nameSplit";
+import { logAdminAction } from "@/lib/admin/adminLogs";
 
 export const dynamic = "force-dynamic";
 
@@ -200,22 +201,67 @@ export async function POST(
     const updatedWorkspace = await getWorkspace(invitation.workspaceId);
     const actualMemberCount = updatedWorkspace?.usage?.members ?? 1;
 
+    // ─── Seat capacity sync (Notion-style: grow-only) ──────────────────
+    // If members now exceed the purchased seats, grow Stripe + Firestore.
+    // On failure, we cannot roll back the member-add (already committed via
+    // FieldValue.increment), so we mark the workspace for reconciliation.
     if (
       updatedWorkspace?.billing?.plan === "business" &&
       updatedWorkspace.billing.subscriptionId
     ) {
-      try {
-        const newSeatCount = Math.max(actualMemberCount, 1);
-        await getPaymentProvider().updateSubscriptionSeats(
-          updatedWorkspace.billing.subscriptionId,
-          newSeatCount
-        );
-        await adminDb.doc(`workspaces/${invitation.workspaceId}`).update({
-          "billing.seats": newSeatCount,
-        });
-      } catch (providerErr) {
-        console.error("[invite accept] failed to sync subscription seats:", providerErr);
+      const currentSeats = updatedWorkspace.billing.seats ?? 1;
+
+      if (actualMemberCount > currentSeats) {
+        const newSeatCount = actualMemberCount;
+        try {
+          await getPaymentProvider().updateSubscriptionSeats(
+            updatedWorkspace.billing.subscriptionId,
+            newSeatCount
+          );
+          await adminDb.doc(`workspaces/${invitation.workspaceId}`).update({
+            "billing.seats": newSeatCount,
+          });
+        } catch (providerErr) {
+          // Stripe sync failed AFTER the member was added. We cannot roll back
+          // the member-add atomically, so we record the divergence for an
+          // out-of-band reconciliation. The owner is currently UNDER-BILLED:
+          // they have N members but Stripe is billing for N-1 seats.
+          console.error(
+            "[invite accept] Stripe seat sync FAILED — workspace under-billed",
+            {
+              workspaceId: invitation.workspaceId,
+              subscriptionId: updatedWorkspace.billing.subscriptionId,
+              actualMemberCount,
+              billedSeats: currentSeats,
+              error: providerErr,
+            }
+          );
+          await adminDb.doc(`workspaces/${invitation.workspaceId}`).update({
+            "billing.seatSyncFailedAt": FieldValue.serverTimestamp(),
+            "billing.seatSyncExpectedCount": newSeatCount,
+            "billing.seatSyncCurrentCount": currentSeats,
+          });
+          try {
+            await logAdminAction({
+              adminId: "system",
+              action: "seat_sync_failed",
+              workspaceId: invitation.workspaceId,
+              metadata: {
+                expectedSeats: newSeatCount,
+                currentSeats,
+                subscriptionId: updatedWorkspace.billing.subscriptionId,
+                errorMessage:
+                  providerErr instanceof Error
+                    ? providerErr.message
+                    : String(providerErr),
+              },
+            });
+          } catch {
+            // logAdminAction failure shouldn't propagate
+          }
+        }
       }
+      // else: member fits within existing seats — no Stripe call needed.
     }
 
     const userRef = adminDb.doc(`users/${user.uid}`);

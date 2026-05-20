@@ -112,6 +112,9 @@ export interface PaymentProvider {
   getInvoicePdfUrl(transactionId: string): Promise<string | null>;
   /** Customer ID a transaction belongs to (ownership check before PDF fetch). */
   getTransactionCustomerId(transactionId: string): Promise<string | null>;
+  /** Update the customer's email at the provider. Used after ownership transfer
+   *  so Stripe Dashboard / receipts / portal show the new owner's email. */
+  updateCustomerEmail(customerId: string, email: string): Promise<void>;
   // Synchronous — reads env vars only, no SDK call. Keeps callers (e.g. the
   // admin set_plan route) from leaking provider-specific env var names.
   resolveBusinessPriceId(billingCycle: "monthly" | "annual"): string;

@@ -43,7 +43,7 @@ import {
   updateWorkspaceName,
 } from "@/lib/repositories/workspacesRepository";
 import { MinimalLoader } from "@/components/ui/MinimalLoader";
-import { authFetch } from "@/lib/authFetch";
+import { authFetch, clearAuthTokenCache } from "@/lib/authFetch";
 import { useWorkspaceRealtimeStore } from "@/lib/realtime/workspaceStore";
 import { openUpgradeCheckout } from "@/lib/billing/openUpgradeCheckout";
 import { PlansAndPricingView } from "@/components/billing/PlansAndPricingView";
@@ -2723,6 +2723,13 @@ function SecurityTab() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const deleteConfirmInputRef = useRef<HTMLInputElement>(null);
 
+  // Leave workspace state (non-owner self-leave)
+  const [leaveModalOpen, setLeaveModalOpen] = useState(false);
+  const [leaveConfirmName, setLeaveConfirmName] = useState("");
+  const [leaveSubmitting, setLeaveSubmitting] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+  const leaveConfirmInputRef = useRef<HTMLInputElement>(null);
+
   function openTransferModal() {
     setTransferModalOpen(true);
     setSelectedNewOwnerUid("");
@@ -2807,6 +2814,47 @@ function SecurityTab() {
   useEffect(() => {
     if (deleteModalOpen) setTimeout(() => deleteConfirmInputRef.current?.focus(), 50);
   }, [deleteModalOpen]);
+
+  useEffect(() => {
+    if (leaveModalOpen) setTimeout(() => leaveConfirmInputRef.current?.focus(), 50);
+  }, [leaveModalOpen]);
+
+  async function handleLeaveSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (leaveConfirmName !== workspaceName) { setLeaveError("Workspace name does not match."); return; }
+    setLeaveError(null);
+    setLeaveSubmitting(true);
+    try {
+      const res = await authFetch("/api/workspace/leave", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res) { setLeaveError("Request failed. Try again."); return; }
+      const json = await res.json() as { success: boolean; data?: { newActiveWorkspaceId: string | null }; error?: { message: string } };
+      if (!res.ok || !json.success) {
+        setLeaveError(json.error?.message ?? "Failed to leave workspace. Try again.");
+        return;
+      }
+      // Custom claims changed server-side; refresh the Firebase ID token and
+      // drop the authFetch cache so subsequent requests carry the new claims.
+      try {
+        const { auth } = await import("@/lib/firebase");
+        if (auth.currentUser) {
+          await auth.currentUser.getIdToken(true);
+        }
+      } catch { /* non-fatal */ }
+      clearAuthTokenCache();
+      setLeaveModalOpen(false);
+      // Hard navigate so the workspace context fully resets — same pattern as
+      // workspace switch flows. If no remaining workspaces, land on onboarding.
+      const nextWs = json.data?.newActiveWorkspaceId ?? null;
+      window.location.href = nextWs ? "/" : "/onboarding";
+    } catch {
+      setLeaveError("Failed to leave workspace. Try again.");
+    } finally {
+      setLeaveSubmitting(false);
+    }
+  }
 
   return (
     <div className={CARD_GAP}>
@@ -2928,7 +2976,19 @@ function SecurityTab() {
               </div>
             )}
             {!isWorkspaceOwner && (
-              <p className="text-sm text-[var(--text-secondary)] py-2">Only the workspace owner can perform these actions.</p>
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <p className="text-[15px] font-semibold text-[var(--text-heading)]">Leave Workspace</p>
+                  <p className={SETTING_DESC}>Remove yourself from this workspace. You&apos;ll lose access to all of its sessions and feedback.</p>
+                </div>
+                <button
+                  type="button"
+                  className="rounded-[var(--radius-btn)] px-4 py-2.5 text-sm font-semibold shrink-0 bg-[var(--color-danger)] text-white hover:opacity-95 hover:shadow-[0_2px_8px_rgba(229,72,77,0.35)] transition-all duration-200"
+                  onClick={() => { setLeaveConfirmName(""); setLeaveError(null); setLeaveModalOpen(true); }}
+                >
+                  Leave Workspace
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -3121,6 +3181,70 @@ function SecurityTab() {
                   }`}
                 >
                   {deleteSubmitting ? "Deleting…" : "Schedule Deletion"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+        </ModalPortal>
+      )}
+
+      {/* Leave workspace modal (non-owner) */}
+      {leaveModalOpen && (
+        <ModalPortal>
+        <div
+          className="fixed inset-0 flex items-center justify-center p-4 bg-black/50 cursor-pointer"
+          style={{ zIndex: MODAL_LAYER_Z_INDEX }}
+          onClick={() => !leaveSubmitting && setLeaveModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="leave-workspace-title"
+        >
+          <div
+            className="rounded-2xl shadow-lg bg-white p-6 max-w-md w-full cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="leave-workspace-title" className="text-[20px] font-semibold text-[var(--text-heading)]">
+              Leave workspace?
+            </h3>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">
+              You&apos;ll lose access to all sessions and feedback in <strong className="text-[var(--text-heading)]">{workspaceName}</strong>. The workspace owner can re-invite you later.
+            </p>
+            <form onSubmit={handleLeaveSubmit} className="mt-4 space-y-3">
+              <div>
+                <label htmlFor="leave-confirm-name" className="block text-sm font-medium text-[var(--text-body)] mb-1">
+                  Type <strong>{workspaceName}</strong> to confirm
+                </label>
+                <input
+                  ref={leaveConfirmInputRef}
+                  id="leave-confirm-name"
+                  type="text"
+                  placeholder={workspaceName ?? ""}
+                  value={leaveConfirmName}
+                  onChange={(e) => setLeaveConfirmName(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text-heading)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-danger)] focus:border-transparent"
+                />
+                {leaveError && <p className="mt-1.5 text-sm text-[var(--color-danger)]">{leaveError}</p>}
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setLeaveModalOpen(false)}
+                  disabled={leaveSubmitting}
+                  className={BTN_SECONDARY}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={leaveSubmitting || leaveConfirmName !== workspaceName}
+                  className={`inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none text-[14px] font-medium transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none ${
+                    leaveConfirmName === workspaceName
+                      ? "bg-[var(--color-danger)] text-white hover:opacity-95"
+                      : "bg-[var(--surface-hover)] text-[var(--text-tertiary)] disabled:opacity-100"
+                  }`}
+                >
+                  {leaveSubmitting ? "Leaving…" : "Leave Workspace"}
                 </button>
               </div>
             </form>

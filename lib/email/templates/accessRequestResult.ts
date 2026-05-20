@@ -3,7 +3,6 @@ import {
   emailCardV2,
   emailButtonV2,
   emailButtonRowV2,
-  emailHeadingV2,
   emailParagraphV2,
   emailSignoffV2,
   emailSpacerV2,
@@ -33,9 +32,11 @@ export function accessRequestResultEmailHtml({
   if (approved) {
     return emailShellV2({
       preheader: "Open the session anytime.",
+      category: "Access request",
+      title: "You're in",
+      metadata: `'${safeSession}'`,
       content: emailCardV2({
         content: `
-          ${emailHeadingV2(`You now have access to ${safeSession}`)}
           ${emailParagraphV2(
             `Your access request for &ldquo;${safeSession}&rdquo; was approved.`
           )}
@@ -50,9 +51,10 @@ export function accessRequestResultEmailHtml({
 
   return emailShellV2({
     preheader: "Request declined.",
+    category: "Access request",
+    title: "Request declined",
     content: emailCardV2({
       content: `
-        ${emailHeadingV2(`Access request for ${safeSession}`)}
         ${emailParagraphV2(
           `Your access request for &ldquo;${safeSession}&rdquo; was declined.`
         )}

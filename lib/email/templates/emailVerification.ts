@@ -3,7 +3,6 @@ import {
   emailCardV2,
   emailButtonV2,
   emailButtonRowV2,
-  emailHeadingV2,
   emailParagraphV2,
   emailSignoffV2,
   emailSpacerV2,
@@ -19,9 +18,10 @@ interface EmailVerificationProps {
 export function emailVerificationHtml({ verifyUrl }: EmailVerificationProps): string {
   return emailShellV2({
     preheader: "Link expires in 24 hours.",
+    category: "Verify your email",
+    title: "One step left",
     content: emailCardV2({
       content: `
-        ${emailHeadingV2("Verify your email")}
         ${emailParagraphV2("Confirm the email address on your Annote account by clicking below.")}
         ${emailSpacerV2({ height: 8 })}
         ${emailButtonRowV2(emailButtonV2({ label: "Verify email", href: verifyUrl }))}

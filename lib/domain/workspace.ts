@@ -99,6 +99,14 @@ export interface Workspace {
       expiryMonth?: number; // optional — provider may omit on subscription events
       expiryYear?: number;
     } | null;
+    /**
+     * Reconciliation markers — present only when a seat sync to the payment
+     * provider has failed and the workspace state is out of sync with billing.
+     * Cleared by the admin `reconcile_seat_sync` action once the sync is fixed.
+     */
+    seatSyncFailedAt?: Timestamp | null;
+    seatSyncExpectedCount?: number | null;
+    seatSyncCurrentCount?: number | null;
   };
 
   /** Only explicit overrides. Plan-derived limits come from plan catalog; missing = use catalog. */

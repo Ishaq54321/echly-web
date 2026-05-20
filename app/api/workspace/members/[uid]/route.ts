@@ -10,9 +10,7 @@ import {
   getWorkspaceMembersRepo,
   removeWorkspaceMemberRepo,
 } from "@/lib/repositories/workspaceMembersRepository.server";
-import { adminDb } from "@/lib/server/firebaseAdmin";
-import { getPaymentProvider } from "@/lib/billing/payments";
-import { setWorkspaceClaims } from "@/lib/server/setWorkspaceClaim";
+import { repointWorkspaceClaim } from "@/lib/server/repointWorkspaceClaim";
 
 export const dynamic = "force-dynamic";
 
@@ -61,60 +59,23 @@ export async function DELETE(
 
     await removeWorkspaceMemberRepo(workspaceId, targetUid);
 
-    // Re-read workspace after atomic member decrement to get accurate count for the payment provider
-    const updatedWorkspace = await getWorkspace(workspaceId);
-    const actualMemberCount = updatedWorkspace?.usage?.members ?? 1;
-
-    if (
-      updatedWorkspace?.billing?.plan === "business" &&
-      updatedWorkspace.billing.subscriptionId
-    ) {
-      try {
-        const newSeatCount = Math.max(actualMemberCount, 1);
-        await getPaymentProvider().updateSubscriptionSeats(
-          updatedWorkspace.billing.subscriptionId,
-          newSeatCount
-        );
-        await adminDb.doc(`workspaces/${workspaceId}`).update({
-          "billing.seats": newSeatCount,
-        });
-      } catch (providerErr) {
-        console.error("[member remove] failed to sync subscription seats:", providerErr);
-      }
-    }
+    // Notion-style: seats are capacity. Member removal does NOT decrement seats —
+    // the owner paid for the period and keeps the capacity until renewal. The vacated
+    // seat can be filled by a different invite without extra charge.
+    // (Future: at renewal time, we may want to right-size via invoice.upcoming webhook,
+    //  but for v1 we accept that owners pay for purchased seats until they explicitly
+    //  reduce via the Customer Portal or admin tools.)
+    //
+    // No-op. Firestore billing.seats stays as-is. Stripe quantity stays as-is.
 
     // Repoint the removed user's active-workspace pointer and clear their auth
     // claims. removeWorkspaceMemberRepo already arrayRemove'd workspaceId from
     // users/{targetUid}.workspaceMemberships, but it leaves
     // users/{targetUid}.workspaceId and the Firebase custom claims pointing at
     // the workspace they were just removed from — which lets the self-heal
-    // sites re-grant access permanently. Read fresh so the arrayRemove is
-    // reflected.
+    // sites re-grant access permanently.
     try {
-      const targetUserSnap = await adminDb.doc(`users/${targetUid}`).get();
-      const targetUserData = targetUserSnap.data() ?? {};
-      const remainingMemberships: string[] = Array.isArray(
-        targetUserData.workspaceMemberships
-      )
-        ? (targetUserData.workspaceMemberships as unknown[]).filter(
-            (v): v is string =>
-              typeof v === "string" && v.trim() !== "" && v !== workspaceId
-          )
-        : [];
-
-      // Deterministic pick: first remaining workspace, or null if none.
-      const newActiveWorkspaceId: string | null =
-        remainingMemberships[0] ?? null;
-
-      await adminDb.doc(`users/${targetUid}`).update({
-        workspaceId: newActiveWorkspaceId,
-      });
-
-      await setWorkspaceClaims(
-        targetUid,
-        newActiveWorkspaceId,
-        remainingMemberships
-      );
+      await repointWorkspaceClaim(targetUid, workspaceId);
     } catch (claimErr) {
       // Removal already succeeded (membership doc is deleted). Don't 500 — the
       // stale claim expires naturally and server-side resolution already

@@ -3,7 +3,6 @@ import {
   emailCardV2,
   emailButtonV2,
   emailButtonRowV2,
-  emailHeadingV2,
   emailParagraphV2,
   emailSignoffV2,
   emailSpacerV2,
@@ -56,9 +55,11 @@ export function paymentFailedEmailHtml(props: PaymentFailedProps): string {
 
   return emailShellV2({
     preheader: "Quick fix — usually just an expired card.",
+    category: "Payment issue",
+    title: "We couldn't process your payment",
+    metadata: props.cardLast4 ? `Card ending ${escapeEmailHtml(props.cardLast4)}` : undefined,
     content: emailCardV2({
       content: `
-        ${emailHeadingV2("We couldn't process your payment")}
         ${emailParagraphV2(`Hey ${greetingName},`)}
         ${emailParagraphV2(chargeLine(props, escapeEmailHtml))}
         ${emailSpacerV2({ height: 8 })}

@@ -3,7 +3,6 @@ import {
   emailCardV2,
   emailButtonV2,
   emailButtonRowV2,
-  emailHeadingV2,
   emailParagraphV2,
   emailSignoffV2,
   emailSpacerV2,
@@ -50,9 +49,10 @@ export function newCommentEmailHtml({
 
   return emailShellV2({
     preheader: `"${commentExcerpt}"`,
+    category: "New comment",
+    title: `${commenterName} commented on '${sessionName}'`,
     content: emailCardV2({
       content: `
-        ${emailHeadingV2(`${safeCommenter} left a comment`)}
         ${emailParagraphV2(
           `${safeCommenter} left a comment on a ticket you captured in &ldquo;${safeSession}&rdquo;:`
         )}

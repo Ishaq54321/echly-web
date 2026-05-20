@@ -3,7 +3,6 @@ import {
   emailCardV2,
   emailButtonV2,
   emailButtonRowV2,
-  emailHeadingV2,
   emailParagraphV2,
   emailSignoffV2,
   emailSpacerV2,
@@ -24,11 +23,15 @@ export function workspaceInviteReminderHtml({
 }: WorkspaceInviteReminderProps): string {
   const safeWorkspace = escapeEmailHtml(workspaceName);
 
+  const daysLabel = expiresInDays === 1 ? "1 day" : `${expiresInDays} days`;
+
   return emailShellV2({
     preheader: "Still time to join the workspace.",
+    category: "Reminder",
+    title: `Your invitation to '${workspaceName}' is still open`,
+    metadata: `Expires in ${daysLabel}`,
     content: emailCardV2({
       content: `
-        ${emailHeadingV2(`Your invitation to ${safeWorkspace} expires in ${expiresInDays} days`)}
         ${emailParagraphV2(
           `Your invitation to join <strong>${safeWorkspace}</strong> on Annote expires in ${expiresInDays} days.`
         )}

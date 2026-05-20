@@ -109,7 +109,7 @@ export function ExtensionStep({ onContinue, onBack }: Props) {
               style={{ padding: "0 12px" }}
               onClick={onContinue}
             >
-              I&apos;ve installed it
+              Continue without installing
             </button>
           )
         }
@@ -125,19 +125,6 @@ export function ExtensionStep({ onContinue, onBack }: Props) {
               Add to Chrome
             </button>
           )
-        }
-        hint={
-          !isInstalled ? (
-            <span style={{ color: "var(--ob-muted)" }}>
-              On a different device?{" "}
-              <a
-                onClick={onContinue}
-                style={{ color: "var(--ob-brand)", textDecoration: "none", fontWeight: 500, cursor: "pointer" }}
-              >
-                Continue without installing
-              </a>
-            </span>
-          ) : undefined
         }
       />
     </StepShell>

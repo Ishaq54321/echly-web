@@ -3,7 +3,6 @@ import {
   emailCardV2,
   emailButtonV2,
   emailButtonRowV2,
-  emailHeadingV2,
   emailParagraphV2,
   emailSignoffV2,
   emailSpacerV2,
@@ -23,9 +22,11 @@ export function emailChangeEmailHtml({ newEmail, confirmUrl }: EmailChangeProps)
 
   return emailShellV2({
     preheader: "Click to confirm your new email. Link expires in 24 hours.",
+    category: "Account update",
+    title: "Confirm your new email",
+    metadata: `New email: <strong>${safeNewEmail}</strong>`,
     content: emailCardV2({
       content: `
-        ${emailHeadingV2("Confirm your new email address")}
         ${emailParagraphV2(
           `You requested to change your Annote email to <strong>${safeNewEmail}</strong>.`
         )}

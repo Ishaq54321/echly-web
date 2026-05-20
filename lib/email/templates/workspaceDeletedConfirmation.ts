@@ -3,7 +3,6 @@ import {
   emailCardV2,
   emailButtonV2,
   emailButtonRowV2,
-  emailHeadingV2,
   emailParagraphV2,
   emailSignoffV2,
   emailSpacerV2,
@@ -45,9 +44,11 @@ export function workspaceDeletedConfirmationHtml({
   if (restoreUrl) {
     return emailShellV2({
       preheader: "Restore anytime within 30 days.",
+      category: "Workspace deleted",
+      title: "Your workspace is gone",
+      metadata: `Can be restored until ${safePurge}`,
       content: emailCardV2({
         content: `
-          ${emailHeadingV2(`Your workspace "${safeWorkspace}" is scheduled for deletion`)}
           ${emailParagraphV2(`Hey ${greetingName},`)}
           ${emailParagraphV2(
             `You scheduled <strong>"${safeWorkspace}"</strong> for deletion. Everything (sessions, captures, comments, members) will be permanently deleted on <strong>${safePurge}</strong> — 30 days from today.`
@@ -72,9 +73,10 @@ export function workspaceDeletedConfirmationHtml({
   // No-CTA fallback (current product reality — no restore UI exists).
   return emailShellV2({
     preheader: "Reply within 30 days to cancel.",
+    category: "Workspace deleted",
+    title: "Your workspace is gone",
     content: emailCardV2({
       content: `
-        ${emailHeadingV2(`Your workspace "${safeWorkspace}" is scheduled for deletion`)}
         ${emailParagraphV2(`Hey ${greetingName},`)}
         ${emailParagraphV2(
           `You scheduled <strong>"${safeWorkspace}"</strong> for deletion. Everything (sessions, captures, comments, members) will be permanently deleted on <strong>${safePurge}</strong> — 30 days from today.`

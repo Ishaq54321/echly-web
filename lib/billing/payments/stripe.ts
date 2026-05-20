@@ -253,6 +253,11 @@ export class StripeProvider implements PaymentProvider {
       return null;
     }
   }
+
+  async updateCustomerEmail(customerId: string, email: string): Promise<void> {
+    const stripe = getStripe();
+    await stripe.customers.update(customerId, { email });
+  }
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -366,7 +371,21 @@ function mapStripeSubscriptionToDTO(sub: Stripe.Subscription): SubscriptionData 
     ? new Date(periodEndSecs * 1000)
     : new Date();
 
-  const cancelAtPeriodEnd = sub.cancel_at_period_end === true;
+  // Pending cancellation detection — Stripe has two schedules:
+  //   1. cancel_at_period_end=true (no specific timestamp; cancels at period end)
+  //   2. cancel_at=<unix timestamp> (specific scheduled date, used by Customer Portal)
+  // Either case = "subscription is pending cancellation." The webhook handler
+  // uses this boolean to set billing.cancelAt in Firestore.
+  const cancelAtPeriodEnd =
+    sub.cancel_at_period_end === true || sub.cancel_at != null;
+
+  // If Stripe has a specific cancel_at date, prefer it over the period end —
+  // the webhook handler uses currentPeriodEnd as the value to write to
+  // billing.cancelAt, and we want the actual scheduled cancellation date.
+  const effectivePeriodEnd =
+    cancelAtPeriodEnd && sub.cancel_at
+      ? new Date(sub.cancel_at * 1000)
+      : currentPeriodEnd;
 
   // Payment method extraction — default_payment_method is expanded
   let paymentMethod: SubscriptionData["paymentMethod"] = null;
@@ -384,7 +403,7 @@ function mapStripeSubscriptionToDTO(sub: Stripe.Subscription): SubscriptionData 
     status,
     seatCount,
     billingCycle,
-    currentPeriodEnd,
+    currentPeriodEnd: effectivePeriodEnd,
     cancelAtPeriodEnd,
     paymentMethod,
   };

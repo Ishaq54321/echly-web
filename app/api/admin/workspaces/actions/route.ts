@@ -26,6 +26,9 @@ const VALID_PLANS: PlanId[] = ["starter", "business", "enterprise"];
  *                            skip downgrade/suspend for this workspace.
  *   remove_manual_override — sets billing.manualOverride=false. Leaves the workspace on
  *                            its current plan until a real billing event mutates it.
+ *   reconcile_seat_sync  — { workspaceId } — for workspaces with billing.seatSyncFailedAt,
+ *                          retries the Stripe seat sync to billing.seatSyncExpectedCount
+ *                          and clears the markers on success.
  */
 export async function POST(req: Request) {
   let admin;
@@ -219,6 +222,48 @@ export async function POST(req: Request) {
             status: 400,
           });
         }
+
+        // Check if workspace has an existing Stripe subscription. If yes, we must
+        // cancel it before granting the comp — otherwise the customer continues to
+        // be charged while we treat them as a free comp account.
+        const wsSnap = await ref.get();
+        const ws = wsSnap.data() as
+          | { billing?: { subscriptionId?: string | null } }
+          | undefined;
+        const existingSubId = ws?.billing?.subscriptionId;
+
+        if (existingSubId) {
+          try {
+            // Cancel immediately — comp customer should stop being charged right now,
+            // not at period end. The webhook subscription.deleted will fire but the
+            // manual override write below will preempt the Starter downgrade.
+            await getPaymentProvider().cancelSubscription(existingSubId, false);
+            await logAdminAction({
+              adminId: admin.uid,
+              action: "comp_cancelled_existing_subscription",
+              workspaceId,
+              metadata: {
+                subscriptionId: existingSubId,
+                reason: "granting_manual_override",
+              },
+            });
+          } catch (cancelErr) {
+            // Cancellation failed — STOP. Don't grant the comp because we'd
+            // orphan the live subscription and silently keep charging the customer.
+            console.error(
+              "[admin set_manual_override] Failed to cancel existing subscription before granting comp",
+              cancelErr
+            );
+            return apiError({
+              code: "PROVIDER_UPDATE_FAILED",
+              message:
+                "Could not cancel the workspace's existing Stripe subscription. " +
+                "Cancel it manually via the Stripe Dashboard first, then grant the comp.",
+              status: 500,
+            });
+          }
+        }
+
         const catalog = await getPlanCatalog();
         const entry = catalog[plan as PlanId] ?? catalog.starter;
         await ref.update({
@@ -227,17 +272,24 @@ export async function POST(req: Request) {
           "billing.seats": seats,
           "billing.pricePerSeat": entry.pricePerSeat ?? 0,
           "billing.suspended": false,
-          // Comp has no real subscription — clear any stale legacy sub id so
-          // provider webhooks for an old sub can't match this workspace.
+          // Comp has no real subscription — clear any stale subscription id so
+          // provider webhooks for the just-cancelled sub can't match this workspace
+          // and accidentally downgrade it back to Starter.
           "billing.subscriptionId": null,
           updatedAt: FieldValue.serverTimestamp(),
         });
         await logAdminAction({
           adminId: admin.uid,
           action: "workspace.set_manual_override",
-          metadata: { workspaceId, plan, seats },
+          metadata: { workspaceId, plan, seats, cancelledExistingSub: !!existingSubId },
         });
-        return apiSuccess({ workspaceId, action, plan, seats });
+        return apiSuccess({
+          workspaceId,
+          action,
+          plan,
+          seats,
+          cancelledExistingSubscription: !!existingSubId,
+        });
       }
 
       case "remove_manual_override":
@@ -350,6 +402,73 @@ export async function POST(req: Request) {
         });
 
         return apiSuccess({ workspaceId, action, effective });
+      }
+
+      case "reconcile_seat_sync": {
+        const wsSnap = await ref.get();
+        const ws = wsSnap.data() as
+          | {
+              billing?: {
+                subscriptionId?: string | null;
+                seatSyncExpectedCount?: number | null;
+              };
+            }
+          | undefined;
+
+        if (!ws) {
+          return apiError({
+            code: "NOT_FOUND",
+            message: "Workspace not found",
+            status: 404,
+          });
+        }
+
+        const subscriptionId = ws.billing?.subscriptionId;
+        const expectedSeats = ws.billing?.seatSyncExpectedCount;
+
+        if (!subscriptionId) {
+          return apiError({
+            code: "INVALID_INPUT",
+            message: "Workspace has no Stripe subscription to reconcile",
+            status: 400,
+          });
+        }
+
+        if (!expectedSeats || typeof expectedSeats !== "number") {
+          return apiError({
+            code: "INVALID_INPUT",
+            message: "Workspace has no pending seat sync to reconcile",
+            status: 400,
+          });
+        }
+
+        try {
+          await getPaymentProvider().updateSubscriptionSeats(
+            subscriptionId,
+            expectedSeats
+          );
+          await ref.update({
+            "billing.seats": expectedSeats,
+            "billing.seatSyncFailedAt": FieldValue.delete(),
+            "billing.seatSyncExpectedCount": FieldValue.delete(),
+            "billing.seatSyncCurrentCount": FieldValue.delete(),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+          await logAdminAction({
+            adminId: admin.uid,
+            action: "seat_sync_reconciled",
+            workspaceId,
+            metadata: { subscriptionId, reconciledToSeats: expectedSeats },
+          });
+          return apiSuccess({ workspaceId, action, reconciledSeats: expectedSeats });
+        } catch (err) {
+          console.error("[admin reconcile_seat_sync] Stripe call failed:", err);
+          return apiError({
+            code: "PROVIDER_UPDATE_FAILED",
+            message: "Stripe seat update still failing. Investigate manually.",
+            status: 500,
+          });
+        }
       }
 
       default:

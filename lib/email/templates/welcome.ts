@@ -3,7 +3,6 @@ import {
   emailCardV2,
   emailButtonV2,
   emailButtonRowV2,
-  emailHeadingV2,
   emailParagraphV2,
   emailSignoffV2,
   emailSpacerV2,
@@ -33,9 +32,10 @@ export function welcomeEmailHtml({
 
   return emailShellV2({
     preheader: "Thanks for signing up — here's the quick guide.",
+    category: "Welcome to Annote",
+    title: "You're in",
     content: emailCardV2({
       content: `
-        ${emailHeadingV2("You're in.")}
         ${emailParagraphV2(`Hey ${greetingName},`)}
         ${emailParagraphV2(
           "Thanks for signing up. Annote is, in one sentence: click anywhere on a page, say what you mean, get a clean ticket. The faster you try it on a real page, the faster it makes sense."

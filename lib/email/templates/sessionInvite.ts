@@ -3,7 +3,6 @@ import {
   emailCardV2,
   emailButtonV2,
   emailButtonRowV2,
-  emailHeadingV2,
   emailParagraphV2,
   emailSignoffV2,
   emailSpacerV2,
@@ -50,9 +49,11 @@ export function sessionInviteEmailHtml({
     preheader: requiresAccount
       ? "Click to open — free account required."
       : "Click to open — no account needed.",
+    category: "Session invitation",
+    title: `${invitedByName} invited you to a session`,
+    metadata: `'${escapeEmailHtml(sessionName)}'`,
     content: emailCardV2({
       content: `
-        ${emailHeadingV2(`${safeInviter} shared an Annote session with you`)}
         ${emailParagraphV2(
           `${inviterWithEmail} shared a session with you on Annote: &ldquo;${safeSession}.&rdquo;`
         )}

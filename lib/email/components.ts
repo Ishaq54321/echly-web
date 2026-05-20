@@ -44,13 +44,18 @@ export const EMAIL_SIZES = {
   footerFontSize: 13,
 } as const;
 
-// Annote logo — hosted PNG (Gmail strips inline <svg>, so we point at the
-// public/email/annote-logo.png asset). Source: public/annote-logo-full.svg
-// (gradient icon + wordmark), rasterized at 2x for retina (212x50) and
-// displayed at 106x25.
-const logoSrc = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://annote.ai"}/email/annote-logo.png`;
-const ANNOTE_LOGO_SVG = `<a href="https://annote.ai" style="text-decoration:none;display:inline-block;">
-  <img src="${logoSrc}" width="106" height="25" alt="Annote" style="display:block;border:0;outline:none;text-decoration:none;" />
+// Annote brand header — solid-black logomark + "Annote" wordmark in HTML text.
+// Gmail strips inline <svg>, so the icon is a PNG (public/email/annote-logomark-black.png,
+// 48x48 source, displayed at 24x24). Wordmark is HTML so it stays selectable
+// and crisp, and screen readers say "Annote" once (img has alt=""). Layout is
+// table-based so Outlook renders the gap correctly; flex/inline-flex are
+// unreliable in email clients.
+const logomarkSrc = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://annote.ai"}/email/annote-logomark-black.png`;
+const ANNOTE_BRAND_HEADER = `<a href="https://annote.ai" style="text-decoration:none;color:#15101F;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+    <td style="vertical-align:middle;padding:0;"><img src="${logomarkSrc}" width="24" height="24" alt="" style="display:block;border:0;outline:none;text-decoration:none;" /></td>
+    <td style="vertical-align:middle;padding:0 0 0 10px;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;font-weight:500;color:#15101F;letter-spacing:-0.01em;line-height:24px;">Annote</td>
+  </tr></table>
 </a>`;
 
 interface ShellV2Options {
@@ -63,6 +68,22 @@ interface ShellV2Options {
    * Defaults to the placeholder token Phase 3 will substitute.
    */
   unsubscribeUrl?: string;
+  /**
+   * Card-header strip rendered inside the first card, above body content.
+   * Tier 1 (category) is the small muted label; tier 2 (title) is the big
+   * heading; tier 3 (metadata) is an optional small muted line below.
+   *
+   * Templates own their own card composition (some emit multiple cards), so
+   * this header is rendered as a standalone card row above whatever `content`
+   * provides. When all three are omitted, no strip is rendered and shell
+   * behavior matches the pre-migration layout.
+   *
+   * `metadata` is raw HTML (templates may include bullets, em-dashes, quoted
+   * names); `category` and `title` are HTML-escaped.
+   */
+  category?: string;
+  title?: string;
+  metadata?: string;
 }
 
 /**
@@ -76,8 +97,44 @@ export function emailShellV2({
   preheader,
   content,
   unsubscribeUrl = "{{UNSUBSCRIBE_URL}}",
+  category,
+  title,
+  metadata,
 }: ShellV2Options): string {
   const pre = preheader ?? "";
+
+  // Header strip (Direction C): category → title → metadata stacked above body.
+  // Rendered as its own emailCardV2-shaped row prepended to content; sits flush
+  // above the templates' existing cards inside the shared inner table.
+  // Composed only when category or title is provided so the pre-migration
+  // layout (just a card with inline H1) keeps working untouched.
+  let headerStripRow = "";
+  if (category || title) {
+    const titleMarginBottom = metadata ? "6px" : "16px";
+    const innerRows = [
+      category
+        ? `<p style="margin:0 0 6px 0;font-size:13px;color:${EMAIL_COLORS.textSecondary};font-weight:400;line-height:1.4;letter-spacing:0;">${escapeEmailHtml(category)}</p>`
+        : "",
+      title
+        ? `<h1 style="margin:0 0 ${titleMarginBottom} 0;font-size:24px;color:${EMAIL_COLORS.textPrimary};font-weight:500;letter-spacing:-0.01em;line-height:1.3;">${escapeEmailHtml(title)}</h1>`
+        : "",
+      metadata
+        ? `<p style="margin:0;font-size:13px;color:${EMAIL_COLORS.textSecondary};font-weight:400;line-height:1.4;">${metadata}</p>`
+        : "",
+    ].join("");
+
+    // Render as a standalone card (fully rounded) above the body cards, with
+    // an 8px spacer separating them. Architecting it as a literal "inside the
+    // first card" injection would require changing every template's content;
+    // the stacked-card variant preserves the visual hierarchy (header strip
+    // grouped above body) without coupling the shell to template internals.
+    headerStripRow = `<tr>
+      <td style="background-color:${EMAIL_COLORS.cardBackground};border-radius:${EMAIL_SIZES.cardBorderRadius}px;padding:${EMAIL_SIZES.cardPaddingDesktop}px;">
+        ${innerRows}
+      </td>
+    </tr>
+    <tr><td style="height:8px;line-height:8px;font-size:0;">&nbsp;</td></tr>`;
+  }
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -97,17 +154,18 @@ export function emailShellV2({
       <td align="center" style="padding:${EMAIL_SIZES.outerPaddingVertical}px ${EMAIL_SIZES.outerPaddingHorizontal}px;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="${EMAIL_SIZES.containerMaxWidth}" style="width:100%;max-width:${EMAIL_SIZES.containerMaxWidth}px;">
 
-          <!-- Header: logo only, 32px gap below -->
+          <!-- Header: brand strip (logomark + "Annote"), 32px gap below -->
           <tr>
             <td style="padding:0 0 32px 0;">
-              ${ANNOTE_LOGO_SVG}
+              ${ANNOTE_BRAND_HEADER}
             </td>
           </tr>
 
-          <!-- Content slot -->
+          <!-- Content slot — optional category/title/metadata strip prepended -->
           <tr>
             <td>
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                ${headerStripRow}
                 ${content}
               </table>
             </td>
