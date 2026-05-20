@@ -46,15 +46,15 @@ export const EMAIL_SIZES = {
 
 // Annote brand header — solid-black logomark + "Annote" wordmark in HTML text.
 // Gmail strips inline <svg>, so the icon is a PNG (public/email/annote-logomark-black.png,
-// 48x48 source, displayed at 24x24). Wordmark is HTML so it stays selectable
+// 48x48 source, displayed at 32x32). Wordmark is HTML so it stays selectable
 // and crisp, and screen readers say "Annote" once (img has alt=""). Layout is
 // table-based so Outlook renders the gap correctly; flex/inline-flex are
 // unreliable in email clients.
 const logomarkSrc = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://annote.ai"}/email/annote-logomark-black.png`;
 const ANNOTE_BRAND_HEADER = `<a href="https://annote.ai" style="text-decoration:none;color:#15101F;">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-    <td style="vertical-align:middle;padding:0;"><img src="${logomarkSrc}" width="24" height="24" alt="" style="display:block;border:0;outline:none;text-decoration:none;" /></td>
-    <td style="vertical-align:middle;padding:0 0 0 10px;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;font-weight:500;color:#15101F;letter-spacing:-0.01em;line-height:24px;">Annote</td>
+    <td style="vertical-align:middle;padding:0;"><img src="${logomarkSrc}" width="32" height="32" alt="" style="display:block;border:0;outline:none;text-decoration:none;" /></td>
+    <td style="vertical-align:middle;padding:0 0 0 12px;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:21px;font-weight:600;color:#15101F;letter-spacing:-0.01em;line-height:32px;">Annote</td>
   </tr></table>
 </a>`;
 
@@ -104,37 +104,38 @@ export function emailShellV2({
   const pre = preheader ?? "";
 
   // Header strip (Direction C): category → title → metadata stacked above body.
-  // Rendered as its own emailCardV2-shaped row prepended to content; sits flush
-  // above the templates' existing cards inside the shared inner table.
   // Composed only when category or title is provided so the pre-migration
   // layout (just a card with inline H1) keeps working untouched.
-  let headerStripRow = "";
+  //
+  // Spliced *inside* the first emailCardV2's inner table so the header and
+  // body share a single white card surface (no second card, no visible gap).
+  // The 24px spacer row after the strip is the only separation between the
+  // header block and the body content that follows.
+  let headerRows = "";
   if (category || title) {
-    const titleMarginBottom = metadata ? "6px" : "16px";
-    const innerRows = [
+    const titleMarginBottom = metadata ? "6px" : "0";
+    headerRows = [
       category
-        ? `<p style="margin:0 0 6px 0;font-size:13px;color:${EMAIL_COLORS.textSecondary};font-weight:400;line-height:1.4;letter-spacing:0;">${escapeEmailHtml(category)}</p>`
+        ? `<tr><td style="padding:0 0 6px 0;font-size:13px;color:${EMAIL_COLORS.textSecondary};font-weight:400;line-height:1.4;letter-spacing:0;">${escapeEmailHtml(category)}</td></tr>`
         : "",
       title
-        ? `<h1 style="margin:0 0 ${titleMarginBottom} 0;font-size:24px;color:${EMAIL_COLORS.textPrimary};font-weight:500;letter-spacing:-0.01em;line-height:1.3;">${escapeEmailHtml(title)}</h1>`
+        ? `<tr><td style="padding:0 0 ${titleMarginBottom} 0;font-size:24px;color:${EMAIL_COLORS.textPrimary};font-weight:500;letter-spacing:-0.01em;line-height:1.3;">${escapeEmailHtml(title)}</td></tr>`
         : "",
       metadata
-        ? `<p style="margin:0;font-size:13px;color:${EMAIL_COLORS.textSecondary};font-weight:400;line-height:1.4;">${metadata}</p>`
+        ? `<tr><td style="padding:0;font-size:13px;color:${EMAIL_COLORS.textSecondary};font-weight:400;line-height:1.4;">${metadata}</td></tr>`
         : "",
+      `<tr><td style="height:24px;line-height:24px;font-size:0;">&nbsp;</td></tr>`,
     ].join("");
-
-    // Render as a standalone card (fully rounded) above the body cards, with
-    // an 8px spacer separating them. Architecting it as a literal "inside the
-    // first card" injection would require changing every template's content;
-    // the stacked-card variant preserves the visual hierarchy (header strip
-    // grouped above body) without coupling the shell to template internals.
-    headerStripRow = `<tr>
-      <td style="background-color:${EMAIL_COLORS.cardBackground};border-radius:${EMAIL_SIZES.cardBorderRadius}px;padding:${EMAIL_SIZES.cardPaddingDesktop}px;">
-        ${innerRows}
-      </td>
-    </tr>
-    <tr><td style="height:8px;line-height:8px;font-size:0;">&nbsp;</td></tr>`;
   }
+
+  // Splice the header rows into the first card's inner <table>. emailCardV2
+  // always opens with this exact sequence; replacing only the first match
+  // ensures multi-card templates (renewalReceipt, subscriptionConfirmation)
+  // are unaffected past their first card.
+  const cardInnerTableOpen = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">`;
+  const contentWithHeader = headerRows
+    ? content.replace(cardInnerTableOpen, `${cardInnerTableOpen}\n      ${headerRows}`)
+    : content;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -161,12 +162,11 @@ export function emailShellV2({
             </td>
           </tr>
 
-          <!-- Content slot — optional category/title/metadata strip prepended -->
+          <!-- Content slot — category/title/metadata header is spliced into the first card -->
           <tr>
             <td>
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-                ${headerStripRow}
-                ${content}
+                ${contentWithHeader}
               </table>
             </td>
           </tr>
