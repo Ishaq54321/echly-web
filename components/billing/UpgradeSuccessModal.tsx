@@ -24,26 +24,9 @@ const SUCCESS_HOLD_MS = 800;
 const FALLBACK_TIMEOUT_MS = 15000;
 
 /**
- * Post-checkout bridge state. Opens immediately on Paddle's
- * `checkout.completed` (from BillingTab — see settings/page.tsx), then acts
- * as a redirecting/loading screen until Firestore catches up.
- *
- * This is NOT a dismissible celebration. There's no Continue button, close
- * button, Escape handler, or backdrop-click — it's a bridge that covers the
- * Firestore-catchup window so the user never glimpses the stale Plans view
- * mid-transition. Lifecycle is driven purely by `isOpen` + the live workspace
- * doc; it dismisses itself once state is consistent.
- *
- * Flow the user sees:
- *   spinner ("Setting up your Business plan")
- *     → webhook flips billing.plan starter → business in Firestore
- *     → success ("Welcome to Business") for ~800ms
- *     → auto-dismiss; BillingManagementView is already rendered behind it
- *
- * Rendered through {@link ModalPortal} into document.body so it's decoupled
- * from BillingTab's view-router re-render: when the webhook flips the plan,
- * BillingTab swaps PlansAndPricingView → BillingManagementView, and the
- * portal keeps this mounted at the canonical modal layer regardless.
+ * Post-checkout bridge state. Opens when the user returns from Stripe
+ * Checkout (driven by UpgradeCheckoutBridge in settings/page.tsx), then
+ * acts as a loading screen until the webhook updates Firestore.
  */
 export function UpgradeSuccessModal({
   isOpen,

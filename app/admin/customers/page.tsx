@@ -14,12 +14,15 @@ const PLAN_LABELS: Record<string, string> = {
   enterprise: "Enterprise",
 };
 
-function paddleDashboardUrl(path: string): string {
-  const base =
-    process.env.NEXT_PUBLIC_PADDLE_ENVIRONMENT === "production"
-      ? "https://vendors.paddle.com"
-      : "https://sandbox-vendors.paddle.com";
-  return `${base}${path}`;
+function stripeDashboardUrl(path: string): string {
+  // Stripe uses /test/ prefix in test mode, no prefix in live mode.
+  // We derive test vs live from the publishable key prefix (sk_test_* vs sk_live_*),
+  // which is set on the server. Since this is a client component, we use a separate
+  // public env var to communicate the mode.
+  const isTestMode =
+    process.env.NEXT_PUBLIC_STRIPE_MODE !== "live";
+  const prefix = isTestMode ? "/test" : "";
+  return `https://dashboard.stripe.com${prefix}${path}`;
 }
 
 export default function AdminCustomersPage() {
@@ -335,7 +338,7 @@ export default function AdminCustomersPage() {
                       <dt className="text-[var(--text-secondary)]">Customer</dt>
                       <dd className="font-mono text-xs break-all">
                         <a
-                          href={paddleDashboardUrl(`/customers/${selected.billing.customerId}`)}
+                          href={stripeDashboardUrl(`/customers/${selected.billing.customerId}`)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-[var(--brand)] hover:underline"
@@ -350,7 +353,7 @@ export default function AdminCustomersPage() {
                       <dt className="text-[var(--text-secondary)]">Subscription</dt>
                       <dd className="font-mono text-xs break-all">
                         <a
-                          href={paddleDashboardUrl(`/subscriptions/${selected.billing.subscriptionId}`)}
+                          href={stripeDashboardUrl(`/subscriptions/${selected.billing.subscriptionId}`)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-[var(--brand)] hover:underline"

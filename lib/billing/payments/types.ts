@@ -11,10 +11,8 @@ export interface CheckoutParams {
 }
 
 export interface CheckoutResult {
-  priceId: string;
-  customData: Record<string, string>; // includes { workspaceId }
-  customerEmail: string;
-  customerId?: string | null; // pass to Paddle.Checkout.open if existing
+  /** Hosted Checkout URL the client should redirect to. */
+  url: string;
 }
 
 export interface PortalParams {
@@ -76,12 +74,11 @@ export interface SubscriptionData {
   } | null;
 }
 
-export type ProrationMode =
-  | "prorated_immediately"
-  | "prorated_next_billing_period"
-  | "full_immediately"
-  | "full_next_billing_period"
-  | "do_not_bill";
+/**
+ * Proration behavior for plan changes. Currently only one mode is used —
+ * Stripe maps this to `proration_behavior: "always_invoice"`.
+ */
+export type ProrationMode = "prorated_immediately";
 
 export interface TransactionSummary {
   id: string;
@@ -94,6 +91,10 @@ export interface TransactionSummary {
 
 export interface PaymentProvider {
   createCheckoutSession(params: CheckoutParams): Promise<CheckoutResult>;
+  /** The HTTP header name where this provider sends its webhook signature. e.g. "stripe-signature". */
+  readonly signatureHeaderName: string;
+  /** Provider name for logging and idempotency keys. e.g. "stripe". */
+  readonly name: string;
   createPortalSession(params: PortalParams): Promise<PortalResult>;
   parseWebhookEvent(body: string | Buffer, signature: string): Promise<WebhookEvent>;
   getSubscriptionData(subscriptionId: string): Promise<SubscriptionData>;

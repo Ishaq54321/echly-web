@@ -145,6 +145,11 @@ service cloud.firestore {
       allow create, delete: if false;
     }
 
+    match /webhookEvents/{eventId} {
+      // Admin SDK only — clients should never read or write webhook event records.
+      allow read, write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

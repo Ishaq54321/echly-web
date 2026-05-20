@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, Fragment } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronDown,
   ChevronUp,
@@ -45,14 +45,12 @@ import {
 import { MinimalLoader } from "@/components/ui/MinimalLoader";
 import { authFetch } from "@/lib/authFetch";
 import { useWorkspaceRealtimeStore } from "@/lib/realtime/workspaceStore";
-import { usePaddle } from "@/lib/hooks/usePaddle";
 import { openUpgradeCheckout } from "@/lib/billing/openUpgradeCheckout";
 import { PlansAndPricingView } from "@/components/billing/PlansAndPricingView";
 import { BillingManagementView } from "@/components/billing/BillingManagementView";
 import { ReadOnlyBillingState } from "@/components/billing/ReadOnlyBillingState";
 import { BillingLoadingSkeleton } from "@/components/billing/BillingLoadingSkeleton";
 import { UpgradeSuccessModal } from "@/components/billing/UpgradeSuccessModal";
-import { CheckoutEventNames } from "@paddle/paddle-js";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { PLANS, type PlanId } from "@/lib/billing/plans";
 
@@ -221,32 +219,36 @@ function SettingsPageInner() {
 }
 
 /**
- * Post-checkout bridge owner. Holds the success-modal state, the Paddle
- * `checkout.completed` subscription, and the post-upgrade usage refetch.
+ * Post-checkout bridge owner. Watches for `?upgraded=true` in the URL after
+ * the user returns from Stripe Checkout, opens the success modal, refreshes
+ * usage, and consumes the query param so a page refresh doesn't re-trigger.
  *
  * Hoisted out of BillingTab: BillingTab has loading/error early returns that
- * unmount its whole subtree on a Firestore snapshot re-entry, which used to
- * tear down the modal mid-bridge (skeleton flash → modal reappears). Mounted
- * here it is unconditional and stable, so the modal survives ANY BillingTab
- * re-render, remount, loading, or error transition. usePaddle fans every
- * event out to all listeners, so BillingTab's own subscription (for its
- * checkout button spinner / error banner) keeps working independently.
+ * unmount its whole subtree on a Firestore snapshot re-entry, which would
+ * tear down the modal mid-bridge. Mounted here, the modal survives ANY
+ * BillingTab re-render, remount, loading, or error transition.
  */
 function UpgradeCheckoutBridge() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const { refetch: refetchUsage } = useBillingUsageContext();
 
-  usePaddle({
-    onEvent: (event) => {
-      if (event.name === CheckoutEventNames.CHECKOUT_COMPLETED) {
-        // Celebrate immediately — don't wait for Firestore. The modal itself
-        // handles the webhook-timing handoff and self-dismisses once the
-        // live workspace doc flips.
-        setShowSuccessModal(true);
-        void refetchUsage();
-      }
-    },
-  });
+  // Watch for `?upgraded=true` after returning from Stripe Checkout.
+  // Consumed-once semantics: open the modal, refresh usage, then strip the
+  // query param so a refresh doesn't re-trigger.
+  useEffect(() => {
+    if (searchParams.get("upgraded") !== "true") return;
+    setShowSuccessModal(true);
+    void refetchUsage();
+    // Replace the URL to drop ?upgraded=true without adding history entry
+    const newParams = new URLSearchParams(searchParams.toString());
+    newParams.delete("upgraded");
+    const query = newParams.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   return (
     <UpgradeSuccessModal
@@ -3211,56 +3213,17 @@ function BillingTab() {
     if (searchParams.get("upgraded") === "true") setBillingError(null);
   }, [searchParams]);
 
-  // Owns ONLY this tab's checkout button spinner + error banner. The success
-  // modal + post-upgrade usage refetch live in <UpgradeCheckoutBridge /> at
-  // the settings shell so they survive this tab's loading/error remounts.
-  // usePaddle fans every event out to all listeners, so both run.
-  const { paddle } = usePaddle({
-    onEvent: (event) => {
-      if (event.name === CheckoutEventNames.CHECKOUT_COMPLETED) {
-        setBillingError(null);
-        setCheckoutLoading(false);
-      } else if (
-        event.name === CheckoutEventNames.CHECKOUT_ERROR ||
-        event.name === CheckoutEventNames.CHECKOUT_PAYMENT_ERROR ||
-        event.name === CheckoutEventNames.CHECKOUT_FAILED
-      ) {
-        setBillingError("Checkout failed. Please try again.");
-        setCheckoutLoading(false);
-      } else if (event.name === CheckoutEventNames.CHECKOUT_CLOSED) {
-        setCheckoutLoading(false);
-      }
-    },
-  });
-
-  async function handleCheckout(
-    cycle: "monthly" | "annual",
-    seatCount?: number
-  ) {
-    if (!isWorkspaceOwner) {
-      setBillingError(
-        "Only the workspace owner can upgrade. Contact your owner to upgrade."
-      );
-      return;
-    }
-    if (!paddle) {
-      setBillingError(
-        "Checkout is still loading. Please try again in a moment."
-      );
-      return;
-    }
+  async function handleCheckout(cycle: "monthly" | "annual", seatCount?: number) {
+    if (!isWorkspaceOwner) return;
     setBillingError(null);
     setCheckoutLoading(true);
     try {
-      // seatCount is advisory — the server clamps it to the member floor.
-      await openUpgradeCheckout({ paddle, billingCycle: cycle, seatCount });
-      // Cleared by checkout.completed / closed / error events.
+      await openUpgradeCheckout({ billingCycle: cycle, seatCount });
+      // Redirecting to Stripe — no further state change needed.
     } catch (err) {
-      console.error("[upgrade] failed to open checkout:", err);
+      console.error("[billing tab] failed to start checkout:", err);
       setBillingError(
-        err instanceof Error
-          ? err.message
-          : "Failed to start checkout. Try again."
+        err instanceof Error ? err.message : "Failed to start checkout. Try again."
       );
       setCheckoutLoading(false);
     }

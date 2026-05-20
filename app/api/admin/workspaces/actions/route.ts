@@ -127,7 +127,7 @@ export async function POST(req: Request) {
             return apiError({
               code: "ENTERPRISE_REQUIRES_MANUAL_OVERRIDE",
               message:
-                "Enterprise plan has no Paddle price. Use set_manual_override to grant Enterprise access.",
+                "Enterprise plan has no provider price. Use set_manual_override to grant Enterprise access.",
               status: 400,
             });
           }

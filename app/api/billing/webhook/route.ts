@@ -7,6 +7,10 @@ import {
   sendSubscriptionConfirmationEmail,
   sendSubscriptionCancelledEmail,
   sendPaymentFailedEmail,
+  sendRenewalReceiptEmail,
+  sendUpcomingRenewalReminderEmail,
+  sendCardExpiringEmail,
+  sendPaymentMethodUpdatedEmail,
 } from "@/lib/email/billingEmails";
 import type { WebhookEvent } from "@/lib/billing/payments/types";
 
@@ -41,7 +45,8 @@ async function getWorkspaceContext(
 export async function POST(req: Request) {
   // Pre-validation (cheap 400 cases). Signature/body are checked before any
   // provider work so a malformed request never reaches the SDK.
-  const signature = req.headers.get("paddle-signature") ?? "";
+  const provider = getPaymentProvider();
+  const signature = req.headers.get(provider.signatureHeaderName) ?? "";
   const rawBody = await req.text();
 
   // DEV-ONLY: skip-signature mode for fixture testing. Guarded by NODE_ENV
@@ -55,7 +60,7 @@ export async function POST(req: Request) {
   if (!skipSignature) {
     if (!signature) {
       return NextResponse.json(
-        { error: "Missing paddle-signature header" },
+        { error: `Missing ${provider.signatureHeaderName} header` },
         { status: 400 }
       );
     }
@@ -70,8 +75,23 @@ export async function POST(req: Request) {
       // Dev mode: trust the body as an already-normalized fixture.
       event = JSON.parse(rawBody) as WebhookEvent;
     } else {
-      const provider = getPaymentProvider();
       event = await provider.parseWebhookEvent(rawBody, signature);
+    }
+
+    // ─── Idempotency check ─────────────────────────────────────────
+    // Dedup keyed by eventId. Protects against duplicate webhook deliveries —
+    // Stripe retries on non-2xx responses.
+    // Side-effect free if we've already processed this event.
+    const idempotencyDocId = `${provider.name}_${event.eventId}`;
+    const idempotencyRef = adminDb
+      .collection("webhookEvents")
+      .doc(idempotencyDocId);
+    const idempotencySnap = await idempotencyRef.get();
+    if (idempotencySnap.exists) {
+      console.log(
+        `[webhook] Duplicate delivery detected (already processed), eventId=${event.eventId} — skipping`
+      );
+      return NextResponse.json({ received: true, deduped: true });
     }
 
     switch (event.type) {
@@ -88,18 +108,29 @@ export async function POST(req: Request) {
         await handlePaymentFailed(event);
         break;
       case "unknown":
-        // No-op — includes transaction.completed and any unhandled type.
-        console.log(
-          `[webhook] Unhandled event type (no-op), eventId=${event.eventId}`
-        );
+        await handleUnknownEvent(event);
         break;
     }
+
+    // ─── Record successful processing ──────────────────────────────
+    // After all side effects succeed, record this event so a redelivery
+    // is recognized as a duplicate. Includes TTL field for Firestore auto-cleanup
+    // (configure 30-day TTL on `expiresAt` field in Firebase Console).
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+    await idempotencyRef.set({
+      provider: provider.name,
+      eventId: event.eventId,
+      eventType: event.type,
+      processedAt: FieldValue.serverTimestamp(),
+      expiresAt,
+    });
 
     return NextResponse.json({ received: true });
   } catch (err) {
     console.error("[webhook] handler error:", err);
-    // 500 — Paddle will retry. NOT 400: Paddle has no "stop retrying" status,
-    // and a 400 on a rotated/expired secret would silently drop events.
+    // 500 — provider will retry. NOT 400: a 400 on a rotated/expired secret
+    // would silently drop events.
     return NextResponse.json(
       { error: "Internal handler error", received: false },
       { status: 500 }
@@ -258,7 +289,7 @@ async function handleSubscriptionUpdated(
     | { billing?: { manualOverride?: boolean } }
     | undefined;
 
-  // Re-fetch current state from Paddle (convergent — don't trust the delta).
+  // Re-fetch current state from provider (convergent — don't trust the delta).
   const subData = await provider.getSubscriptionData(
     event.data.subscriptionId
   );
@@ -270,9 +301,9 @@ async function handleSubscriptionUpdated(
   const updates: Record<string, unknown> = {
     "billing.seats": subData.seatCount,
     "billing.billingCycle": subData.billingCycle,
-    // Keep the renewal date converged with Paddle. The card hides this line
-    // while a cancel is pending (`cancelAt` set), so it's safe to track the
-    // real period end here; self-heals if the cancel is reverted.
+    // Keep the renewal date converged with the provider. The card hides this
+    // line while a cancel is pending (`cancelAt` set), so it's safe to track
+    // the real period end here; self-heals if the cancel is reverted.
     "billing.nextBilledAt": subData.currentPeriodEnd,
     updatedAt: FieldValue.serverTimestamp(),
   };
@@ -281,7 +312,7 @@ async function handleSubscriptionUpdated(
   // banner. `cancelAtPeriodEnd` is true while a cancel is scheduled (the sub
   // is still active until `currentPeriodEnd`); reverting the cancel via the
   // portal flips it back to false → clear the field. Convergent: we re-read
-  // current state from Paddle above, so this self-heals on reversion.
+  // current state from the provider above, so this self-heals on reversion.
   updates["billing.cancelAt"] = subData.cancelAtPeriodEnd
     ? subData.currentPeriodEnd
     : null;
@@ -459,6 +490,231 @@ async function handlePaymentFailed(
       metadata: {
         subscriptionId: event.data.subscriptionId,
       },
+    });
+  }
+}
+
+/**
+ * Handles Stripe events that aren't part of the normalized WebhookEvent union.
+ * Reads the raw Stripe event from event.data.stripeEvent and dispatches to
+ * specialized handlers. For provider-agnostic events (none currently), no-op.
+ */
+async function handleUnknownEvent(
+  event: Extract<WebhookEvent, { type: "unknown" }>
+) {
+  const stripeEventType = event.data.stripeEventType as string | undefined;
+  if (!stripeEventType) {
+    console.log(`[webhook] Unknown event with no stripeEventType, eventId=${event.eventId}`);
+    return;
+  }
+
+  switch (stripeEventType) {
+    case "invoice.paid":
+      await handleInvoicePaid(event);
+      break;
+    case "invoice.upcoming":
+      await handleInvoiceUpcoming(event);
+      break;
+    case "customer.source.expiring":
+    case "payment_method.attached":
+      await handlePaymentMethodEvent(event, stripeEventType);
+      break;
+    default:
+      console.log(
+        `[webhook] No-op Stripe event ${stripeEventType}, eventId=${event.eventId}`
+      );
+  }
+}
+
+async function handleInvoicePaid(
+  event: Extract<WebhookEvent, { type: "unknown" }>
+) {
+  const stripeEvent = event.data.stripeEvent as {
+    data: { object: Record<string, unknown> };
+  };
+  const invoice = stripeEvent.data.object;
+  // Skip the first invoice (subscription creation) — subscription_started handles that.
+  // Stripe sends invoice.paid for both first payment AND renewals; filter to renewals only.
+  if (invoice.billing_reason !== "subscription_cycle") {
+    console.log(`[webhook] invoice.paid skipped — billing_reason=${invoice.billing_reason}`);
+    return;
+  }
+
+  // API 2026-04-22.dahlia: subscription ref lives on invoice.parent.subscription_details.subscription
+  const parent = invoice.parent as
+    | { subscription_details?: { subscription?: string | { id: string } } }
+    | null
+    | undefined;
+  const subRef = parent?.subscription_details?.subscription ?? null;
+  const subscriptionId =
+    typeof subRef === "string" ? subRef : subRef?.id ?? null;
+  const customerId = invoice.customer as string;
+
+  if (!subscriptionId) {
+    console.warn("[webhook] invoice.paid without subscription — skipping");
+    return;
+  }
+  void customerId;
+
+  const snapshot = await adminDb
+    .collection("workspaces")
+    .where("billing.subscriptionId", "==", subscriptionId)
+    .limit(1)
+    .get();
+
+  if (snapshot.empty) {
+    console.warn(`[webhook] invoice.paid: no workspace for sub ${subscriptionId}`);
+    return;
+  }
+
+  const workspaceId = snapshot.docs[0].id;
+  const { ownerEmail, workspaceName } = await getWorkspaceContext(workspaceId);
+  if (!ownerEmail) {
+    console.warn(`[webhook] invoice.paid: no owner email for workspace ${workspaceId}`);
+    return;
+  }
+
+  // Re-fetch subscription to get current seats, cycle, next billing
+  const provider = getPaymentProvider();
+  const subData = await provider.getSubscriptionData(subscriptionId);
+
+  const amountInMinorUnits = invoice.amount_paid as number;
+  const currency = (invoice.currency as string) ?? "usd";
+  const amount = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  }).format(amountInMinorUnits / 100);
+
+  await sendRenewalReceiptEmail({
+    to: ownerEmail,
+    workspaceName,
+    amount,
+    seatCount: subData.seatCount,
+    billingCycle: subData.billingCycle,
+    invoiceNumber: (invoice.number as string | null) ?? null,
+    invoiceDate: new Date((invoice.created as number) * 1000),
+    nextBillingDate: subData.currentPeriodEnd,
+    invoicePdfUrl: (invoice.invoice_pdf as string | null) ?? null,
+  });
+}
+
+async function handleInvoiceUpcoming(
+  event: Extract<WebhookEvent, { type: "unknown" }>
+) {
+  // Stripe sends this ~7 days before renewal (configured in Stripe Dashboard).
+  const stripeEvent = event.data.stripeEvent as {
+    data: { object: Record<string, unknown> };
+  };
+  const invoice = stripeEvent.data.object;
+
+  const parent = invoice.parent as
+    | { subscription_details?: { subscription?: string | { id: string } } }
+    | null
+    | undefined;
+  const subRef = parent?.subscription_details?.subscription ?? null;
+  const subscriptionId =
+    typeof subRef === "string" ? subRef : subRef?.id ?? null;
+
+  if (!subscriptionId) {
+    console.warn("[webhook] invoice.upcoming without subscription — skipping");
+    return;
+  }
+
+  const snapshot = await adminDb
+    .collection("workspaces")
+    .where("billing.subscriptionId", "==", subscriptionId)
+    .limit(1)
+    .get();
+
+  if (snapshot.empty) {
+    console.warn(`[webhook] invoice.upcoming: no workspace for sub ${subscriptionId}`);
+    return;
+  }
+
+  const workspaceId = snapshot.docs[0].id;
+  const ws = snapshot.docs[0].data() as
+    | { billing?: { paymentMethod?: { brand: string; last4: string } | null } }
+    | undefined;
+  const { ownerEmail, workspaceName } = await getWorkspaceContext(workspaceId);
+  if (!ownerEmail) return;
+
+  const provider = getPaymentProvider();
+  const subData = await provider.getSubscriptionData(subscriptionId);
+
+  const amountInMinorUnits = (invoice.amount_due as number) ?? 0;
+  const currency = (invoice.currency as string) ?? "usd";
+  const amount = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  }).format(amountInMinorUnits / 100);
+
+  await sendUpcomingRenewalReminderEmail({
+    to: ownerEmail,
+    workspaceName,
+    amount,
+    seatCount: subData.seatCount,
+    billingCycle: subData.billingCycle,
+    nextBillingDate: subData.currentPeriodEnd,
+    cardBrand: ws?.billing?.paymentMethod?.brand,
+    cardLast4: ws?.billing?.paymentMethod?.last4,
+  });
+}
+
+async function handlePaymentMethodEvent(
+  event: Extract<WebhookEvent, { type: "unknown" }>,
+  stripeEventType: string
+) {
+  const stripeEvent = event.data.stripeEvent as {
+    data: { object: Record<string, unknown> };
+  };
+  const obj = stripeEvent.data.object;
+
+  // Find workspace by customer ID
+  const customerId =
+    typeof obj.customer === "string"
+      ? obj.customer
+      : (obj.customer as { id?: string } | undefined)?.id;
+  if (!customerId) return;
+
+  const snapshot = await adminDb
+    .collection("workspaces")
+    .where("billing.customerId", "==", customerId)
+    .limit(1)
+    .get();
+
+  if (snapshot.empty) {
+    console.warn(`[webhook] ${stripeEventType}: no workspace for customer ${customerId}`);
+    return;
+  }
+
+  const workspaceId = snapshot.docs[0].id;
+  const { ownerEmail, workspaceName } = await getWorkspaceContext(workspaceId);
+  if (!ownerEmail) return;
+
+  if (stripeEventType === "customer.source.expiring") {
+    const card = obj as {
+      brand?: string;
+      last4?: string;
+      exp_month?: number;
+      exp_year?: number;
+    };
+    if (!card.brand || !card.last4 || !card.exp_month || !card.exp_year) return;
+    await sendCardExpiringEmail({
+      to: ownerEmail,
+      workspaceName,
+      cardBrand: card.brand,
+      cardLast4: card.last4,
+      expiryMonth: card.exp_month,
+      expiryYear: card.exp_year,
+    });
+  } else if (stripeEventType === "payment_method.attached") {
+    const pm = obj as { card?: { brand: string; last4: string } };
+    if (!pm.card) return;
+    await sendPaymentMethodUpdatedEmail({
+      to: ownerEmail,
+      workspaceName,
+      cardBrand: pm.card.brand,
+      cardLast4: pm.card.last4,
     });
   }
 }

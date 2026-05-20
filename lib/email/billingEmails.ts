@@ -12,6 +12,22 @@ import {
   paymentFailedEmailHtml,
   paymentFailedEmailText,
 } from "./templates/paymentFailed";
+import {
+  renewalReceiptEmailHtml,
+  renewalReceiptEmailText,
+} from "./templates/renewalReceipt";
+import {
+  upcomingRenewalReminderEmailHtml,
+  upcomingRenewalReminderEmailText,
+} from "./templates/upcomingRenewalReminder";
+import {
+  cardExpiringEmailHtml,
+  cardExpiringEmailText,
+} from "./templates/cardExpiring";
+import {
+  paymentMethodUpdatedEmailHtml,
+  paymentMethodUpdatedEmailText,
+} from "./templates/paymentMethodUpdated";
 import { getPlanCatalog } from "@/lib/billing/getPlanCatalog";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://annote.ai";
@@ -115,5 +131,126 @@ export async function sendPaymentFailedEmail(params: {
     });
   } catch (err) {
     console.error("[sendPaymentFailedEmail] failed", err);
+  }
+}
+
+export async function sendRenewalReceiptEmail(params: {
+  to: string;
+  workspaceName: string;
+  amount: string;
+  seatCount: number;
+  billingCycle: "monthly" | "annual";
+  invoiceNumber: string | null;
+  invoiceDate: Date;
+  nextBillingDate: Date;
+  invoicePdfUrl: string | null;
+}): Promise<void> {
+  try {
+    const props = {
+      workspaceName: params.workspaceName,
+      amount: params.amount,
+      seatCount: params.seatCount,
+      billingCycle: params.billingCycle,
+      invoiceNumber: params.invoiceNumber,
+      invoiceDate: params.invoiceDate,
+      nextBillingDate: params.nextBillingDate,
+      invoicePdfUrl: params.invoicePdfUrl,
+      settingsUrl: `${APP_URL}/settings?tab=billing`,
+    };
+    await sendEmailOrLog({
+      to: params.to,
+      subject: `Your Annote receipt — ${params.amount}`,
+      html: renewalReceiptEmailHtml(props),
+      text: renewalReceiptEmailText(props),
+      fromVariant: "founder",
+    });
+  } catch (err) {
+    console.error("[sendRenewalReceiptEmail] failed", err);
+  }
+}
+
+export async function sendUpcomingRenewalReminderEmail(params: {
+  to: string;
+  workspaceName: string;
+  amount: string;
+  seatCount: number;
+  billingCycle: "monthly" | "annual";
+  nextBillingDate: Date;
+  cardBrand?: string;
+  cardLast4?: string;
+}): Promise<void> {
+  try {
+    const props = {
+      workspaceName: params.workspaceName,
+      amount: params.amount,
+      seatCount: params.seatCount,
+      billingCycle: params.billingCycle,
+      nextBillingDate: params.nextBillingDate,
+      cardBrand: params.cardBrand,
+      cardLast4: params.cardLast4,
+      settingsUrl: `${APP_URL}/settings?tab=billing`,
+    };
+    await sendEmailOrLog({
+      to: params.to,
+      subject: "Heads up — your Annote subscription renews soon",
+      html: upcomingRenewalReminderEmailHtml(props),
+      text: upcomingRenewalReminderEmailText(props),
+      fromVariant: "founder",
+    });
+  } catch (err) {
+    console.error("[sendUpcomingRenewalReminderEmail] failed", err);
+  }
+}
+
+export async function sendCardExpiringEmail(params: {
+  to: string;
+  workspaceName: string;
+  cardBrand: string;
+  cardLast4: string;
+  expiryMonth: number;
+  expiryYear: number;
+}): Promise<void> {
+  try {
+    const props = {
+      workspaceName: params.workspaceName,
+      cardBrand: params.cardBrand,
+      cardLast4: params.cardLast4,
+      expiryMonth: params.expiryMonth,
+      expiryYear: params.expiryYear,
+      portalUrl: `${APP_URL}/settings?tab=billing`,
+    };
+    await sendEmailOrLog({
+      to: params.to,
+      subject: "Your card is expiring soon",
+      html: cardExpiringEmailHtml(props),
+      text: cardExpiringEmailText(props),
+      fromVariant: "founder",
+    });
+  } catch (err) {
+    console.error("[sendCardExpiringEmail] failed", err);
+  }
+}
+
+export async function sendPaymentMethodUpdatedEmail(params: {
+  to: string;
+  workspaceName: string;
+  cardBrand: string;
+  cardLast4: string;
+}): Promise<void> {
+  try {
+    const props = {
+      workspaceName: params.workspaceName,
+      cardBrand: params.cardBrand,
+      cardLast4: params.cardLast4,
+    };
+    await sendEmailOrLog({
+      to: params.to,
+      subject: "Payment method updated",
+      html: paymentMethodUpdatedEmailHtml(props),
+      text: paymentMethodUpdatedEmailText(props),
+      fromVariant: "founder",
+    });
+  } catch (err) {
+    console.error("[sendPaymentMethodUpdatedEmail] failed", err);
   }
 }

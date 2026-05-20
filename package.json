@@ -2,6 +2,9 @@
   "name": "annote",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "workspaces": [
     "annote-extension"
   ],
@@ -16,8 +19,6 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.63",
-    "@paddle/paddle-js": "^1.6.4",
-    "@paddle/paddle-node-sdk": "^3.8.0",
     "@tiptap/core": "^3.23.5",
     "@tiptap/extension-code-block": "3.23.5",
     "@tiptap/extension-color": "^3.23.1",
@@ -58,6 +59,7 @@
     "resend": "^6.12.0",
     "sharp": "^0.34.5",
     "sonner": "^2.0.7",
+    "stripe": "^22.1.1",
     "tiptap-markdown": "^0.9.0",
     "use-image": "^1.1.4"
   },

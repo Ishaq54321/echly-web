@@ -87,13 +87,7 @@ export async function POST(req: NextRequest) {
     });
 
     return apiSuccess({
-      priceId: result.priceId,
-      customData: result.customData,
-      customerEmail: result.customerEmail,
-      customerId: result.customerId ?? null,
-      // Propagate the workspace member count so Paddle.Checkout opens at the
-      // right seat quantity (prevents seat-count drift vs. reality).
-      seatCount,
+      url: result.url,
     });
   } catch (err) {
     console.error("POST /api/billing/checkout:", err);

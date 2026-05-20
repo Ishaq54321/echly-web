@@ -21,8 +21,7 @@ const SALES_MAILTO =
  * and an info banner explains why (you can only shrink by removing members
  * in Settings → Workspace). The effective seat count flows into checkout.
  *
- * Checkout itself stays in BillingTab (it owns the Paddle instance + event
- * wiring); this view just signals intent via `onUpgrade(cycle, seatCount)`.
+ * Checkout initiation stays in BillingTab — this component is presentational only.
  */
 export function PlansAndPricingView({
   starter,

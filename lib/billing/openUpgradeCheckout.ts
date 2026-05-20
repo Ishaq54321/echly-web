@@ -1,18 +1,8 @@
 "use client";
 
-import type { Paddle } from "@paddle/paddle-js";
 import { authFetch } from "@/lib/authFetch";
 
-export interface CheckoutResponse {
-  priceId: string;
-  customData: Record<string, string>;
-  customerEmail: string;
-  customerId: string | null;
-  seatCount: number;
-}
-
 export interface OpenCheckoutOptions {
-  paddle: Paddle;
   billingCycle: "monthly" | "annual";
   /**
    * Requested seat count. Optional — the server enforces the workspace
@@ -23,17 +13,21 @@ export interface OpenCheckoutOptions {
 }
 
 /**
- * Fetches checkout details from the API and opens the Paddle overlay.
+ * Initiates upgrade checkout via Stripe-hosted Checkout.
  *
- * Event handling (checkout.completed / closed / error) is NOT done here —
- * Paddle.js dispatches events through the global eventCallback wired in
- * usePaddle. Each calling surface subscribes via usePaddle({ onEvent }) and
- * reacts to the events it cares about. This helper only opens the overlay.
+ * Flow:
+ * 1. POST to /api/billing/checkout — server creates a Stripe Checkout Session
+ * 2. Server returns { url } pointing to checkout.stripe.com
+ * 3. We redirect the browser to that URL via window.location.assign
+ * 4. After payment, Stripe redirects back to /settings?tab=billing&upgraded=true
+ *
+ * On success: the function does not return — the page navigates away.
+ * On error (network/server/auth): throws an Error with a user-friendly message.
  */
 export async function openUpgradeCheckout(
   options: OpenCheckoutOptions
 ): Promise<void> {
-  const { paddle, billingCycle, seatCount } = options;
+  const { billingCycle, seatCount } = options;
 
   const res = await authFetch("/api/billing/checkout", {
     method: "POST",
@@ -48,32 +42,16 @@ export async function openUpgradeCheckout(
 
   const json = (await res.json().catch(() => null)) as {
     success?: boolean;
-    data?: CheckoutResponse;
+    data?: { url: string };
     error?: { message?: string };
   } | null;
 
-  if (!res.ok || !json?.success || !json.data) {
+  if (!res.ok || !json?.success || !json.data?.url) {
     throw new Error(
       json?.error?.message ?? "Failed to start checkout. Please try again."
     );
   }
 
-  const data = json.data;
-
-  paddle.Checkout.open({
-    items: [
-      {
-        priceId: data.priceId,
-        quantity: data.seatCount,
-      },
-    ],
-    customData: data.customData,
-    customer: data.customerId
-      ? { id: data.customerId }
-      : { email: data.customerEmail },
-    settings: {
-      variant: "one-page",
-      successUrl: `${window.location.origin}/settings?tab=billing&upgraded=true`,
-    },
-  });
+  // Redirect to Stripe-hosted Checkout. The browser leaves this page entirely.
+  window.location.assign(json.data.url);
 }

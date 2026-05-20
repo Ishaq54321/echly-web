@@ -6,11 +6,7 @@ import { Check, X, AlertCircle } from "lucide-react";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import { useWorkspaceUsageRealtime } from "@/lib/hooks/useWorkspaceUsageRealtime";
 import { usePlanCatalog } from "@/lib/hooks/usePlanCatalog";
-import { usePaddle } from "@/lib/hooks/usePaddle";
 import { openUpgradeCheckout } from "@/lib/billing/openUpgradeCheckout";
-import { fetchBillingUsage } from "@/lib/api/fetchBillingUsage";
-import { billingStore } from "@/lib/store/billingStore";
-import { CheckoutEventNames } from "@paddle/paddle-js";
 
 export interface UpgradeModalProps {
   open: boolean;
@@ -61,31 +57,6 @@ export function UpgradeModal({
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
-  const { paddle } = usePaddle({
-    onEvent: (event) => {
-      if (event.name === CheckoutEventNames.CHECKOUT_COMPLETED) {
-        setCheckoutError(null);
-        // Quick-fix for billingStore staleness: refresh on completion only.
-        // (Proper Firestore subscription is deferred to a polish phase.)
-        fetchBillingUsage()
-          .then((data) => billingStore.setBilling(data))
-          .catch(() => {
-            /* fail silently — useBillingUsage will catch up */
-          });
-        onClose();
-      } else if (
-        event.name === CheckoutEventNames.CHECKOUT_ERROR ||
-        event.name === CheckoutEventNames.CHECKOUT_PAYMENT_ERROR ||
-        event.name === CheckoutEventNames.CHECKOUT_FAILED
-      ) {
-        setCheckoutError("Checkout failed. Please try again.");
-        setCheckoutLoading(false);
-      } else if (event.name === CheckoutEventNames.CHECKOUT_CLOSED) {
-        setCheckoutLoading(false);
-      }
-    },
-  });
-
   // Escape-key dismissal (backdrop click + X button handled inline below).
   useEffect(() => {
     if (!open) return;
@@ -117,19 +88,14 @@ export function UpgradeModal({
 
   async function handleUpgradeClick() {
     if (!isWorkspaceOwner) return;
-    if (!paddle) {
-      setCheckoutError(
-        "Checkout is still loading. Please try again in a moment."
-      );
-      return;
-    }
     setCheckoutError(null);
     setCheckoutLoading(true);
     try {
-      await openUpgradeCheckout({ paddle, billingCycle, seatCount });
-      // Loading state is cleared by checkout.completed / closed / error events.
+      await openUpgradeCheckout({ billingCycle, seatCount });
+      // On success, the browser is redirecting to Stripe — no further state change needed.
+      // Loading state shows briefly during the XHR window.
     } catch (err) {
-      console.error("[upgrade] failed to open checkout:", err);
+      console.error("[upgrade] failed to start checkout:", err);
       setCheckoutError(
         err instanceof Error ? err.message : "Failed to start checkout. Try again."
       );
