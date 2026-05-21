@@ -262,6 +262,12 @@ function DashboardContent() {
               <SessionsListArchiveTabs
                 value={listArchiveTab}
                 onChange={setListArchiveTab}
+                mobileTrailing={
+                  <SessionsViewModeToggle
+                    value={sessionViewMode}
+                    onChange={setSessionViewMode}
+                  />
+                }
                 actions={
                   <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:gap-3">
                     <SessionsTimeRangeFilter
@@ -269,10 +275,12 @@ function DashboardContent() {
                       onChange={setSessionsTimeRange}
                     />
 
-                    <SessionsViewModeToggle
-                      value={sessionViewMode}
-                      onChange={setSessionViewMode}
-                    />
+                    <div className="hidden md:block">
+                      <SessionsViewModeToggle
+                        value={sessionViewMode}
+                        onChange={setSessionViewMode}
+                      />
+                    </div>
 
                     <button
                       type="button"

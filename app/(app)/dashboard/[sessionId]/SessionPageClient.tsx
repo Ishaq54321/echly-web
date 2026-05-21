@@ -3947,7 +3947,7 @@ export default function SessionPageClient({
         <div
           className="flex-1 min-h-0 overflow-hidden bg-[var(--surface-page)] flex flex-col md:grid"
           style={isMobile ? {
-            padding: '0px 0px 56px',
+            padding: '0px 0px calc(56px + env(safe-area-inset-bottom))',
           } : {
             gridTemplateColumns: isDesktopWide
               ? ((isActivityPanelOpen || activeThreadId != null) ? '346px 1fr 360px' : '346px 1fr')
@@ -4207,7 +4207,7 @@ export default function SessionPageClient({
           ariaLabelledBy="delete-ticket-title"
         >
           <div
-            className="bg-white rounded-2xl max-w-sm w-full p-6 border border-[var(--layer-2-border)] shadow-[var(--layer-2-shadow-hover)]"
+            className="bg-white rounded-none sm:rounded-2xl w-full sm:max-w-sm h-full sm:h-auto p-5 sm:p-6 border border-[var(--layer-2-border)] shadow-[var(--layer-2-shadow-hover)]"
           >
             <h2
               id="delete-ticket-title"

@@ -429,9 +429,11 @@ button[aria-disabled="true"],
   border-radius: var(--radius-md);
   transition: background 120ms ease, color 120ms ease;
 }
-.ticket-activity-close:hover {
-  background: var(--surface-hover);
-  color: var(--text-heading);
+@media (hover: hover) and (pointer: fine) {
+  .ticket-activity-close:hover {
+    background: var(--surface-hover);
+    color: var(--text-heading);
+  }
 }
 
 .ticket-activity-timeline {
@@ -460,8 +462,10 @@ button[aria-disabled="true"],
   animation: activity-feed-row-enter 160ms ease-out forwards;
 }
 
-.ticket-activity-row:hover {
-  background: var(--surface-hover);
+@media (hover: hover) and (pointer: fine) {
+  .ticket-activity-row:hover {
+    background: var(--surface-hover);
+  }
 }
 
 /* Subtle nudge so the avatar/icon aligns with the text baseline of the
@@ -664,8 +668,10 @@ button[aria-disabled="true"],
   min-width: 0;
 }
 
-.activity-row:hover {
-  background: rgba(0, 0, 0, 0.018);
+@media (hover: hover) and (pointer: fine) {
+  .activity-row:hover {
+    background: rgba(0, 0, 0, 0.018);
+  }
 }
 
 /* Vertical connector — threads through the x-center of the 32px badge
@@ -710,9 +716,11 @@ button[aria-disabled="true"],
 }
 
 /* Hover: badge + avatar scale together — subtle life, no layout shift. */
-.activity-row:hover > .badge-wrap,
-.activity-row:hover > .activity-row-avatar {
-  transform: scale(1.06);
+@media (hover: hover) and (pointer: fine) {
+  .activity-row:hover > .badge-wrap,
+  .activity-row:hover > .activity-row-avatar {
+    transform: scale(1.06);
+  }
 }
 
 /* Copy container — self-sufficient flex so it also lays out correctly
@@ -738,16 +746,20 @@ button[aria-disabled="true"],
   overflow: hidden;
 }
 
-/* Mobile: allow main row to wrap to 2 lines, ellipsis after that.
-   Single-line truncation eats too much content at 375px. */
+/* Mobile: allow main row to wrap to 2 lines using clean flex-wrap (not
+   webkit-box which ignores flex-wrap and forces clamping at flex-child
+   boundaries). */
 @media (max-width: 767px) {
   .activity-row-body .activity-copy {
+    display: flex;
     flex-wrap: wrap;
+    align-items: baseline;
     white-space: normal;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    gap: 4px;
+  }
+  .activity-row-body .activity-copy > * {
+    flex-shrink: 1;
+    min-width: 0;
   }
 }
 
@@ -794,8 +806,10 @@ button[aria-disabled="true"],
   min-width: 0;
   text-decoration: none;
 }
-.activity-pill:hover {
-  background: rgba(0, 0, 0, 0.07);
+@media (hover: hover) and (pointer: fine) {
+  .activity-pill:hover {
+    background: rgba(0, 0, 0, 0.07);
+  }
 }
 .activity-pill .activity-pill-label {
   overflow: hidden;
@@ -869,9 +883,11 @@ button[aria-disabled="true"],
   align-items: center;
   gap: 4px;
 }
-.activity-grouped-toggle:hover {
-  background: rgba(0, 0, 0, 0.04);
-  color: var(--text-heading);
+@media (hover: hover) and (pointer: fine) {
+  .activity-grouped-toggle:hover {
+    background: rgba(0, 0, 0, 0.04);
+    color: var(--text-heading);
+  }
 }
 
 /* ── Time + hover actions ── */
@@ -890,8 +906,10 @@ button[aria-disabled="true"],
    visibility:hidden fully removes it from paint while preserving its
    grid column (no layout shift). Scoped to the direct grid child so
    expanded sub-row times stay visible. */
-.activity-row:hover > .activity-row-time {
-  visibility: hidden;
+@media (hover: hover) and (pointer: fine) {
+  .activity-row:hover > .activity-row-time {
+    visibility: hidden;
+  }
 }
 
 .activity-row-actions {
@@ -914,9 +932,11 @@ button[aria-disabled="true"],
   padding-left: 24px;
   z-index: 2;
 }
-.activity-row:hover .activity-row-actions {
-  opacity: 1;
-  pointer-events: auto;
+@media (hover: hover) and (pointer: fine) {
+  .activity-row:hover .activity-row-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 .activity-row-actions button {
   padding: 6px 11px;
@@ -932,12 +952,36 @@ button[aria-disabled="true"],
   gap: 5px;
   transition: background 100ms ease;
 }
-.activity-row-actions button:hover {
-  background: rgba(0, 0, 0, 0.08);
-  color: var(--text-heading);
+@media (hover: hover) and (pointer: fine) {
+  .activity-row-actions button:hover {
+    background: rgba(0, 0, 0, 0.08);
+    color: var(--text-heading);
+  }
 }
 .activity-row-actions a {
   text-decoration: none;
+}
+
+/* Mobile: hover-only actions are useless on touch; rows are tap-to-navigate.
+   Also align rows from the top so avatars stay aligned with the first text
+   line when body wraps, drop the vertical connector for cleaner mobile
+   layout, and tighten pill widths to fit smaller viewports. */
+@media (max-width: 767px) {
+  .activity-row-actions {
+    display: none;
+  }
+  .activity-row {
+    align-items: flex-start;
+  }
+  .activity-row::after {
+    display: none;
+  }
+  .activity-pill-session {
+    max-width: min(180px, calc(100vw - 140px));
+  }
+  .activity-pill {
+    max-width: min(220px, calc(100vw - 120px));
+  }
 }
 
 /* ── Day section divider — separates "Yesterday" / "This week" / etc.
@@ -1029,8 +1073,10 @@ button[aria-disabled="true"],
   cursor: pointer;
   transition: color 100ms ease;
 }
-.activity-filter-tab:hover:not(.is-active) {
-  color: var(--text-heading);
+@media (hover: hover) and (pointer: fine) {
+  .activity-filter-tab:hover:not(.is-active) {
+    color: var(--text-heading);
+  }
 }
 .activity-filter-tab.is-active {
   color: var(--text-heading);
@@ -1197,8 +1243,10 @@ button[aria-disabled="true"],
   appearance: none;
 }
 
-.session-actions-dropdown .dropdown-item:hover {
-  background: rgba(0, 0, 0, 0.04);
+@media (hover: hover) and (pointer: fine) {
+  .session-actions-dropdown .dropdown-item:hover {
+    background: rgba(0, 0, 0, 0.04);
+  }
 }
 
 .session-actions-dropdown .dropdown-item svg {
@@ -1211,9 +1259,11 @@ button[aria-disabled="true"],
   color: var(--text-tertiary);
 }
 
-.session-actions-dropdown .dropdown-item.delete:hover {
-  background: #fef2f2;
-  color: #dc2626;
+@media (hover: hover) and (pointer: fine) {
+  .session-actions-dropdown .dropdown-item.delete:hover {
+    background: #fef2f2;
+    color: #dc2626;
+  }
 }
 
 .workspace-card-dropdown.session-actions-dropdown .dropdown-item {
@@ -1224,26 +1274,28 @@ button[aria-disabled="true"],
   color: var(--text-tertiary);
 }
 
-.workspace-card-dropdown.session-actions-dropdown .dropdown-item:hover {
-  background: rgba(0, 0, 0, 0.04);
-}
+@media (hover: hover) and (pointer: fine) {
+  .workspace-card-dropdown.session-actions-dropdown .dropdown-item:hover {
+    background: rgba(0, 0, 0, 0.04);
+  }
 
-.workspace-card-dropdown.session-actions-dropdown .dropdown-item.delete:hover {
-  background: #fef2f2;
-  color: #dc2626;
-}
+  .workspace-card-dropdown.session-actions-dropdown .dropdown-item.delete:hover {
+    background: #fef2f2;
+    color: #dc2626;
+  }
 
-html.dark .workspace-card-dropdown.session-actions-dropdown .dropdown-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  html.dark .workspace-card-dropdown.session-actions-dropdown .dropdown-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  html.dark .workspace-card-dropdown.session-actions-dropdown .dropdown-item.delete:hover {
+    background: rgba(220, 38, 38, 0.18);
+    color: #fca5a5;
+  }
 }
 
 html.dark .workspace-card-dropdown.session-actions-dropdown .dropdown-item.delete {
   color: rgba(156, 163, 175, 0.95);
-}
-
-html.dark .workspace-card-dropdown.session-actions-dropdown .dropdown-item.delete:hover {
-  background: rgba(220, 38, 38, 0.18);
-  color: #fca5a5;
 }
 
 /* Extension CTA tray: fade + slide up entrance */
@@ -1324,12 +1376,14 @@ html.dark .workspace-card-dropdown.session-actions-dropdown .dropdown-item.delet
   opacity: 0;
   transition: opacity 200ms var(--ease-premium);
 }
-.card-depth:hover {
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.04);
-  transform: translateY(-2px) scale(1.01);
-}
-.card-depth:hover::after {
-  opacity: 1;
+@media (hover: hover) and (pointer: fine) {
+  .card-depth:hover {
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.04);
+    transform: translateY(-2px) scale(1.01);
+  }
+  .card-depth:hover::after {
+    opacity: 1;
+  }
 }
 .card-depth:active {
   transform: translateY(-1px) scale(0.998);
@@ -1361,12 +1415,14 @@ html.dark .workspace-card-dropdown.session-actions-dropdown .dropdown-item.delet
   pointer-events: none;
   transition: opacity 200ms var(--ease-premium);
 }
-.btn-primary-glow:hover:not(:disabled)::after {
-  opacity: 1;
-}
-.btn-primary-glow:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(90, 73, 191, 0.35);
+@media (hover: hover) and (pointer: fine) {
+  .btn-primary-glow:hover:not(:disabled)::after {
+    opacity: 1;
+  }
+  .btn-primary-glow:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(90, 73, 191, 0.35);
+  }
 }
 .btn-primary-glow:active:not(:disabled) {
   transform: translateY(0);
@@ -1490,8 +1546,10 @@ textarea:focus-visible {
   flex-direction: column;
   height: 100%;
 }
-.billing-card:hover {
-  transform: translateY(-2px);
+@media (hover: hover) and (pointer: fine) {
+  .billing-card:hover {
+    transform: translateY(-2px);
+  }
 }
 
 .billing-card--business {
@@ -1516,11 +1574,13 @@ textarea:focus-visible {
   transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
 
-.insights-hero-card-wrapper:hover {
-  transform: translateY(-1px);
-  box-shadow:
-    0 16px 32px rgba(15, 23, 42, 0.08),
-    0 6px 18px rgba(15, 23, 42, 0.05);
+@media (hover: hover) and (pointer: fine) {
+  .insights-hero-card-wrapper:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      0 16px 32px rgba(15, 23, 42, 0.08),
+      0 6px 18px rgba(15, 23, 42, 0.05);
+  }
 }
 
 .insights-hero-card {
@@ -1536,8 +1596,10 @@ textarea:focus-visible {
   padding: 10px 16px;
   font-weight: 500;
 }
-.secondary-cta:hover {
-  background: #E4EDFF;
+@media (hover: hover) and (pointer: fine) {
+  .secondary-cta:hover {
+    background: #E4EDFF;
+  }
 }
 
 .price {
@@ -1965,8 +2027,10 @@ textarea:focus-visible {
   animation: captureFloatingEntry 120ms ease-out forwards,
              captureFloatingPresence 14s ease-in-out 120ms infinite;
 }
-.capture-floating-wrapper:hover {
-  animation-play-state: paused;
+@media (hover: hover) and (pointer: fine) {
+  .capture-floating-wrapper:hover {
+    animation-play-state: paused;
+  }
 }
 @keyframes captureFloatingEntry {
   from {
@@ -4457,8 +4521,10 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
   transition: background 0.15s ease;
 }
 
-.search-result-item:hover {
-  background: var(--surface-hover);
+@media (hover: hover) and (pointer: fine) {
+  .search-result-item:hover {
+    background: var(--surface-hover);
+  }
 }
 
 .search-result-item-left {
@@ -4527,6 +4593,16 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
   overflow: visible;
   width: min(500px, calc(100vw - 32px));
   max-width: min(500px, calc(100vw - 32px));
+}
+
+@media (max-width: 639px) {
+  .modal.share-modal {
+    width: 100%;
+    max-width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+  }
 }
 
 @keyframes scaleIn {
@@ -4704,8 +4780,10 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
   transition: background-color 120ms ease;
 }
 
-.share-member:hover {
-  background: #fafafa;
+@media (hover: hover) and (pointer: fine) {
+  .share-member:hover {
+    background: #fafafa;
+  }
 }
 
 .share-member:last-child {
@@ -4804,8 +4882,10 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
   transition: background-color 120ms ease;
 }
 
-.share-dropdown.share-dropdown--role-pill .role-pill:hover:not(:disabled) {
-  background: #e5e5e5;
+@media (hover: hover) and (pointer: fine) {
+  .share-dropdown.share-dropdown--role-pill .role-pill:hover:not(:disabled) {
+    background: #e5e5e5;
+  }
 }
 
 .share-dropdown.share-dropdown--role-pill .role-pill:disabled {
@@ -4985,8 +5065,10 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
   color: var(--text-heading);
 }
 
-.share-dropdown-option:hover {
-  background: rgba(0, 0, 0, 0.04);
+@media (hover: hover) and (pointer: fine) {
+  .share-dropdown-option:hover {
+    background: rgba(0, 0, 0, 0.04);
+  }
 }
 
 .share-input {
@@ -5023,9 +5105,11 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
   transition: all 0.15s ease;
 }
 
-.share-modal-actions .share-btn:not(.share-btn--primary):hover {
-  background: #fafafa;
-  border-color: #cbd5e1;
+@media (hover: hover) and (pointer: fine) {
+  .share-modal-actions .share-btn:not(.share-btn--primary):hover {
+    background: #fafafa;
+    border-color: #cbd5e1;
+  }
 }
 
 .share-btn:focus {
@@ -5049,8 +5133,10 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
   font-weight: 600;
 }
 
-.share-btn--primary:hover:not(:disabled) {
-  background: #2563eb;
+@media (hover: hover) and (pointer: fine) {
+  .share-btn--primary:hover:not(:disabled) {
+    background: #2563eb;
+  }
 }
 
 .share-modal-permissions {
@@ -5121,8 +5207,10 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
   transition: background-color 120ms ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.share-modal-permissions .share-dropdown-trigger:hover:not(:disabled) {
-  background: #fafafa;
+@media (hover: hover) and (pointer: fine) {
+  .share-modal-permissions .share-dropdown-trigger:hover:not(:disabled) {
+    background: #fafafa;
+  }
 }
 
 .share-modal-general-access-hint {
@@ -5220,8 +5308,10 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
   transition: background 0.12s;
 }
 
-.notif-mark-all:hover {
-  background: var(--brand-subtle);
+@media (hover: hover) and (pointer: fine) {
+  .notif-mark-all:hover {
+    background: var(--brand-subtle);
+  }
 }
 
 .notif-list {
@@ -5271,8 +5361,10 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
   font-family: var(--font-sans);
 }
 
-.notif-item:hover {
-  background: rgba(28, 25, 23, 0.04);
+@media (hover: hover) and (pointer: fine) {
+  .notif-item:hover {
+    background: rgba(28, 25, 23, 0.04);
+  }
 }
 
 .notif-item:focus {
@@ -5299,8 +5391,10 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
   background: rgba(90, 73, 191, 0.02);
 }
 
-.notif-item--unread:hover {
-  background: rgba(90, 73, 191, 0.04);
+@media (hover: hover) and (pointer: fine) {
+  .notif-item--unread:hover {
+    background: rgba(90, 73, 191, 0.04);
+  }
 }
 
 .notif-avatar {
@@ -5454,9 +5548,11 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
   transition: background 0.12s, color 0.12s;
 }
 
-.notif-load-more-btn:hover {
-  background: var(--surface-hover);
-  color: var(--text-heading);
+@media (hover: hover) and (pointer: fine) {
+  .notif-load-more-btn:hover {
+    background: var(--surface-hover);
+    color: var(--text-heading);
+  }
 }
 
 .notif-load-more-btn:disabled {
@@ -5539,8 +5635,10 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
   gap: 6px;
 }
 
-.notif-action-approve:hover:not(:disabled) {
-  filter: brightness(1.08);
+@media (hover: hover) and (pointer: fine) {
+  .notif-action-approve:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
 }
 
 .notif-action-approve:disabled {
@@ -5565,8 +5663,10 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
   gap: 6px;
 }
 
-.notif-action-deny:hover:not(:disabled) {
-  filter: brightness(1.08);
+@media (hover: hover) and (pointer: fine) {
+  .notif-action-deny:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
 }
 
 .notif-action-deny:disabled {
@@ -5607,8 +5707,10 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
   border: none;
 }
 
-.upgrade-btn:hover {
-  background-color: #0f4ed1;
+@media (hover: hover) and (pointer: fine) {
+  .upgrade-btn:hover {
+    background-color: #0f4ed1;
+  }
 }
 
 .notification-btn {
@@ -5642,13 +5744,15 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
   padding: 0;
 }
 
-.notification-btn:hover,
-.profile-avatar:hover {
-  background-color: var(--surface-hover);
-}
+@media (hover: hover) and (pointer: fine) {
+  .notification-btn:hover,
+  .profile-avatar:hover {
+    background-color: var(--surface-hover);
+  }
 
-.top-controls button:hover {
-  opacity: 1;
+  .top-controls button:hover {
+    opacity: 1;
+  }
 }
 
 /* Top bar gradient separator */
@@ -5703,8 +5807,10 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
   cursor: pointer;
 }
 
-.clear-icon:hover {
-  color: var(--text-secondary);
+@media (hover: hover) and (pointer: fine) {
+  .clear-icon:hover {
+    color: var(--text-secondary);
+  }
 }
 
 .search-input {

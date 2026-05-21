@@ -540,7 +540,7 @@ export function SessionFeedbackHeader({
                   that items-center aligns on the row baseline (Phase
                   26.8: fixes the trash icon sitting ~2px high). */}
               {onDelete ? (
-                <div className="flex items-center">
+                <div className="hidden md:flex items-center">
                   <Tooltip content="Delete">
                     <button
                       type="button"

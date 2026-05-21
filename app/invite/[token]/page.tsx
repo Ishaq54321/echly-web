@@ -14,6 +14,7 @@ import { auth } from "@/lib/firebase";
 import { clearAuthTokenCache } from "@/lib/authFetch";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import { Toast } from "@/components/ui/Toast";
+import { RootProviders } from "@/components/providers/RootProviders";
 import {
   ChevronLeft,
   Lock,
@@ -324,7 +325,7 @@ function PasswordInput({
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export default function InviteAcceptPage() {
+function InviteAcceptPageInner() {
   const { token } = useParams<{ token: string }>();
   const router = useRouter();
   const { refreshMemberships } = useWorkspace();
@@ -1363,5 +1364,15 @@ export default function InviteAcceptPage() {
       </div>
       <Toast message={toast.message} visible={toast.visible} onDismiss={dismissToast} />
     </>
+  );
+}
+
+export default function InviteAcceptPage() {
+  // RootProviders supplies WorkspaceProvider so the inner useWorkspace()
+  // call resolves. Previously inherited from the root layout.
+  return (
+    <RootProviders>
+      <InviteAcceptPageInner />
+    </RootProviders>
   );
 }

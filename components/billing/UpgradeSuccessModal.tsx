@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { CheckCircle2 } from "lucide-react";
-import { ModalPortal } from "@/components/ui/ModalPortal";
-import { MODAL_LAYER_Z_INDEX } from "@/lib/ui/zIndex";
+import { Modal } from "@/components/ui/Modal";
 import { useWorkspaceRealtimeStore } from "@/lib/realtime/workspaceStore";
 
 export interface UpgradeSuccessModalProps {
@@ -58,40 +57,23 @@ export function UpgradeSuccessModal({
     return () => clearTimeout(fallback);
   }, [isOpen, onClose]);
 
-  return (
-    <ModalPortal>
-      <AnimatePresence>
-        {isOpen && (
-          <div
-            className="fixed inset-0 flex items-center justify-center p-4"
-            style={{ zIndex: MODAL_LAYER_Z_INDEX }}
-          >
-            {/* Backdrop — fully blocks underlying UI; NOT click-to-dismiss. */}
-            <motion.div
-              className="absolute inset-0"
-              style={{ background: "var(--surface-overlay)" }}
-              aria-hidden
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-            />
+  // Non-dismissible: this modal blocks underlying UI and auto-dismisses once
+  // Firestore confirms or the fallback fires. Backdrop click/ESC are ignored.
+  const noop = () => {};
 
-            {/* Modal */}
-            <motion.div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="upgrade-success-title"
-              className="relative w-full max-w-md rounded-[var(--radius-lg)] p-10 text-center shadow-2xl"
-              style={{
-                background: "var(--surface)",
-                border: "1px solid var(--border)",
-              }}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-            >
+  return (
+    <Modal open={isOpen} onClose={noop} ariaLabelledBy="upgrade-success-title">
+      <motion.div
+        className="relative w-full sm:max-w-md h-full sm:h-auto rounded-none sm:rounded-[var(--radius-lg)] p-8 sm:p-10 text-center shadow-2xl"
+        style={{
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+        }}
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+      >
               {!isPlanConfirmed ? (
                 <>
                   {/* Bridge / loading state — Firestore hasn't caught up yet. */}
@@ -153,10 +135,7 @@ export function UpgradeSuccessModal({
                   </p>
                 </>
               )}
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-    </ModalPortal>
+      </motion.div>
+    </Modal>
   );
 }

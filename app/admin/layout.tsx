@@ -6,6 +6,7 @@ import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { authFetch } from "@/lib/authFetch";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { useWorkspace } from "@/lib/client/workspaceContext";
+import { RootProviders } from "@/components/providers/RootProviders";
 
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -89,5 +90,11 @@ export default function AdminRootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <AdminLayoutInner>{children}</AdminLayoutInner>;
+  // RootProviders supplies WorkspaceProvider so AdminLayoutInner's
+  // useWorkspace() call resolves. Previously inherited from the root layout.
+  return (
+    <RootProviders>
+      <AdminLayoutInner>{children}</AdminLayoutInner>
+    </RootProviders>
+  );
 }

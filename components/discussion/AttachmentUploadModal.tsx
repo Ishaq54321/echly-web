@@ -4,8 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { X, Upload, FileIcon } from "lucide-react";
 import type { CommentAttachment } from "@/lib/domain/comment";
 import { uploadAttachmentWithProgress } from "@/lib/uploadAttachment";
-import { ModalPortal } from "@/components/ui/ModalPortal";
-import { MODAL_LAYER_Z_INDEX } from "@/lib/ui/zIndex";
+import { Modal } from "@/components/ui/Modal";
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15 MB
 
@@ -145,15 +144,6 @@ export function AttachmentUploadModal({
   }, [open, resetState]);
 
   useEffect(() => {
-    if (!open) return;
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handleClose();
-    };
-    window.addEventListener("keydown", handleEsc);
-    return () => window.removeEventListener("keydown", handleEsc);
-  }, [open, handleClose]);
-
-  useEffect(() => {
     if (!selectedFile || !selectedFile.type.startsWith("image/")) {
       setImagePreviewUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
@@ -171,23 +161,10 @@ export function AttachmentUploadModal({
   const showPreview = selectedFile != null;
 
   return (
-    <ModalPortal>
+    <Modal open={open} onClose={handleClose} ariaLabelledBy="upload-attachment-title">
       <div
-        className="fixed inset-0 flex items-center justify-center p-4"
-        style={{ zIndex: MODAL_LAYER_Z_INDEX }}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="upload-attachment-title"
+        className="relative w-full sm:max-w-[520px] h-full sm:h-auto rounded-none sm:rounded-xl border border-[var(--border)] bg-white shadow-lg"
       >
-        <div
-          className="absolute inset-0 bg-black/50 transition-opacity"
-          onClick={handleClose}
-          aria-hidden
-        />
-        <div
-          className="relative w-full max-w-[520px] rounded-xl border border-[var(--border)] bg-white shadow-lg"
-          onClick={(e) => e.stopPropagation()}
-        >
           <div className="flex items-center justify-between px-6 pt-6 pb-2">
             <div>
               <h2
@@ -344,7 +321,6 @@ export function AttachmentUploadModal({
             </div>
           </div>
         </div>
-      </div>
-    </ModalPortal>
+      </Modal>
   );
 }

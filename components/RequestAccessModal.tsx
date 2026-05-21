@@ -32,7 +32,7 @@ export function RequestAccessModal({
         initial={{ opacity: 0, scale: 0.97, y: 6 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
-        className="card-depth bg-[var(--layer-1-bg)] rounded-[var(--radius-card)] shadow-[var(--shadow-level-5)] max-w-md w-full p-6 cursor-default"
+        className="card-depth bg-[var(--layer-1-bg)] rounded-none sm:rounded-[var(--radius-card)] shadow-[var(--shadow-level-5)] w-full sm:max-w-md h-full sm:h-auto p-5 sm:p-6 cursor-default"
       >
         <h2
           id={titleId}

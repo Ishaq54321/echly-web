@@ -2,8 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback } from "react";
 import { X } from "lucide-react";
-import { ModalPortal } from "@/components/ui/ModalPortal";
-import { MODAL_LAYER_Z_INDEX } from "@/lib/ui/zIndex";
+import { Modal } from "@/components/ui/Modal";
 
 export interface ImageCropModalProps {
   isOpen: boolean;
@@ -245,33 +244,15 @@ export function ImageCropModal({
   const circleSize = canvasSize * 0.72;
 
   return (
-    <ModalPortal>
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: MODAL_LAYER_Z_INDEX,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "rgba(0,0,0,0.6)",
-        backdropFilter: "blur(4px)",
-        WebkitBackdropFilter: "blur(4px)",
-      }}
-      onClick={onCancel}
-    >
+    <Modal open={isOpen} onClose={onCancel}>
       <div
+        className="image-crop-modal-card w-full h-full sm:h-auto sm:max-w-[480px] sm:rounded-[20px] sm:m-4"
         style={{
           background: "white",
-          borderRadius: 20,
-          maxWidth: 480,
-          width: "100%",
-          margin: 16,
           boxShadow: "0 24px 64px rgba(0,0,0,0.18)",
           animation: "cropModalIn 240ms ease",
           overflow: "hidden",
         }}
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div
@@ -433,7 +414,6 @@ export function ImageCropModal({
           to   { opacity: 1; transform: scale(1); }
         }
       `}</style>
-    </div>
-    </ModalPortal>
+    </Modal>
   );
 }

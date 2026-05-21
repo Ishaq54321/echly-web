@@ -50,8 +50,8 @@ export function LeaveSessionModal({
       ariaLabelledBy="leave-session-title"
       role="alertdialog"
     >
-      <div className="card-depth bg-[var(--layer-1-bg)] rounded-[var(--radius-card)] shadow-[var(--shadow-level-5)] max-w-md w-full cursor-default">
-        <div className="p-6">
+      <div className="card-depth bg-[var(--layer-1-bg)] rounded-none sm:rounded-[var(--radius-card)] shadow-[var(--shadow-level-5)] w-full sm:max-w-md h-full sm:h-auto cursor-default">
+        <div className="p-5 sm:p-6">
           <h2
             id="leave-session-title"
             className="text-[20px] font-semibold leading-[1.35] tracking-[-0.02em] text-[var(--text-primary-strong)]"

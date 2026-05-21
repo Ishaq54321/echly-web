@@ -32,6 +32,7 @@ import {
   assertIdentityResolved,
   useWorkspace,
 } from "@/lib/client/workspaceContext";
+import { useIsMobile } from "@/lib/hooks/useIsMobile";
 import { PORTAL_DROPDOWN_Z_INDEX } from "@/lib/ui/zIndex";
 import {
   getPortalDropdownFixedPosition,
@@ -101,6 +102,7 @@ export function SessionActionsDropdown({
   hideActions,
 }: SessionActionsDropdownProps) {
   const { isIdentityResolved } = useWorkspace();
+  const isMobile = useIsMobile();
   const [moreOpen, setMoreOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState<{
     top: number;
@@ -119,6 +121,7 @@ export function SessionActionsDropdown({
   const isArchived = (session.isArchived ?? session.archived) === true;
 
   const hidden = new Set(hideActions ?? []);
+  if (isMobile) hidden.add("addMoreTickets");
   const visibleMenuKeys = SESSION_ACTION_MENU_ORDER.filter((k) => !hidden.has(k));
   const showSeparatorBeforeDelete =
     visibleMenuKeys.includes("delete") && visibleMenuKeys.indexOf("delete") > 0;

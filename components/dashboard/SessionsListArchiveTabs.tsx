@@ -14,11 +14,14 @@ export function SessionsListArchiveTabs({
   value,
   onChange,
   actions,
+  mobileTrailing,
 }: {
   value: SessionsListArchiveTab;
   onChange: (next: SessionsListArchiveTab) => void;
   /** When set, tabs and actions share one row (tabs left, actions right). */
   actions?: ReactNode;
+  /** Rendered right-aligned next to the tabs on mobile only. */
+  mobileTrailing?: ReactNode;
 }) {
   const tabButtons = TABS.map(({ id, label }) => {
     const isActive = value === id;
@@ -51,11 +54,16 @@ export function SessionsListArchiveTabs({
       <div className="mb-6 w-full min-w-0">
         <div className="relative flex w-full min-w-0 flex-wrap items-end justify-between gap-x-4 gap-y-3 border-b border-[var(--border)]">
           <nav
-            className="flex min-w-0 items-center gap-6 md:gap-10"
+            className="flex min-w-0 flex-1 items-center gap-6 md:flex-none md:gap-10"
             role="tablist"
             aria-label="Sessions and archived"
           >
             {tabButtons}
+            {mobileTrailing != null ? (
+              <div className="ml-auto flex items-center pb-2 md:hidden">
+                {mobileTrailing}
+              </div>
+            ) : null}
           </nav>
           <div className="flex w-full md:w-auto md:shrink-0 items-center gap-2 md:gap-3 pb-3 overflow-x-auto md:overflow-visible">{actions}</div>
         </div>

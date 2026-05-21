@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, type ReactNode } from "react";
+import { motion } from "framer-motion";
 import { Check, X, AlertCircle } from "lucide-react";
+import { Modal } from "@/components/ui/Modal";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import { useWorkspaceUsageRealtime } from "@/lib/hooks/useWorkspaceUsageRealtime";
 import { usePlanCatalog } from "@/lib/hooks/usePlanCatalog";
@@ -57,16 +58,6 @@ export function UpgradeModal({
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
-  // Escape-key dismissal (backdrop click + X button handled inline below).
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
-
   // ── Pricing math ────────────────────────────────────────────────────
   // Prefer the caller-supplied seat count (e.g. from the Plans view), but
   // never below the member-count floor. Falls back to the floor when no
@@ -104,33 +95,15 @@ export function UpgradeModal({
   }
 
   return (
-    <AnimatePresence>
-      {open && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
-          {/* Overlay */}
-          <motion.div
-            className="absolute inset-0 bg-black/50"
-            aria-hidden
-            onClick={onClose}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-          />
-
-          {/* Modal */}
-          <motion.div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="upgrade-modal-title"
-            className="relative w-full max-w-md rounded-[var(--radius-lg)] p-8 shadow-2xl"
-            style={{ background: "var(--surface)" }}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-            onClick={(e) => e.stopPropagation()}
-          >
+    <Modal open={open} onClose={onClose} ariaLabelledBy="upgrade-modal-title">
+      <motion.div
+        className="relative w-full sm:max-w-md h-full sm:h-auto rounded-none sm:rounded-[var(--radius-lg)] p-6 sm:p-8 shadow-2xl"
+        style={{ background: "var(--surface)" }}
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+      >
             {/* Header */}
             <div className="flex items-start justify-between">
               <h2
@@ -363,10 +336,8 @@ export function UpgradeModal({
                 </button>
               </>
             )}
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
+      </motion.div>
+    </Modal>
   );
 }
 

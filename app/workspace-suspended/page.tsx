@@ -4,8 +4,9 @@ import { useState } from "react";
 import { useWorkspace } from "@/lib/client/workspaceContext";
 import { authFetch } from "@/lib/authFetch";
 import { CreditCard, AlertCircle } from "lucide-react";
+import { RootProviders } from "@/components/providers/RootProviders";
 
-export default function WorkspaceSuspendedPage() {
+function WorkspaceSuspendedInner() {
   const { isWorkspaceOwner } = useWorkspace();
   const [loading, setLoading] = useState(false);
 
@@ -86,5 +87,15 @@ export default function WorkspaceSuspendedPage() {
         </a>
       </div>
     </div>
+  );
+}
+
+export default function WorkspaceSuspendedPage() {
+  // RootProviders supplies WorkspaceProvider so the inner useWorkspace()
+  // call resolves. Previously inherited from the root layout.
+  return (
+    <RootProviders>
+      <WorkspaceSuspendedInner />
+    </RootProviders>
   );
 }

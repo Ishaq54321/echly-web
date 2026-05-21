@@ -7,6 +7,15 @@ import { WorkspaceIdentityGate } from "@/components/workspace/WorkspaceIdentityG
 import { BillingUsageCacheInitializer } from "@/components/billing/BillingUsageCacheInitializer";
 import { LazyGlobalSearch } from "@/components/search/LazyGlobalSearch";
 import { AppBootReadinessBridge } from "@/components/providers/AppBootGate";
+import { RootProviders } from "@/components/providers/RootProviders";
+
+// RootProviders is mounted here (was previously at the root layout). It
+// contains AppBootGate (boot-readiness chrome context) + WorkspaceProvider
+// (Firebase auth listener, workspace doc subscription, member fetches).
+// Marketing routes under app/(marketing)/ deliberately don't mount it so
+// logged-out visitors don't trigger Firebase init. The other authenticated
+// surfaces (admin, onboarding, (public), invite, workspace-suspended) each
+// mount RootProviders themselves so useWorkspace() works in those trees.
 
 export default function AppLayout({
   children,
@@ -14,12 +23,13 @@ export default function AppLayout({
   children: React.ReactNode;
 }) {
   return (
+    <RootProviders>
     <WorkspaceSuspendedGuard>
       <WorkspaceIdentityGate>
         <WorkspaceStoreProvider>
           <BillingUsageCacheInitializer />
           <AppBootReadinessBridge />
-          <div className="main-layout flex h-screen overflow-hidden md:p-[14px] md:gap-[10px]">
+          <div className="main-layout flex h-[100dvh] overflow-hidden md:p-[14px] md:gap-[10px]">
             {/* Responsive shell — renders desktop rail OR mobile drawer based
                 on viewport, so GlobalRailContent only mounts once in the tree. */}
             <AppMobileShell slot="rail" />
@@ -40,5 +50,6 @@ export default function AppLayout({
         </WorkspaceStoreProvider>
       </WorkspaceIdentityGate>
     </WorkspaceSuspendedGuard>
+    </RootProviders>
   );
 }
