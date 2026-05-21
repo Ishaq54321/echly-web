@@ -139,6 +139,7 @@ export function ExternalShareModal({
             <input
               readOnly
               value={url}
+              className="external-share-url-input"
               style={{
                 flex: 1,
                 height: 40,

@@ -78,7 +78,7 @@ export function DropdownMenuContent({
 }) {
   const { open, setOpen, triggerRef } = useCtx();
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const [rect, setRect] = useState<{ top: number; left: number; minWidth: number; clientWidth: number } | null>(null);
+  const [rect, setRect] = useState<{ top: number; left: number; minWidth: number; clientWidth: number; maxWidth: number } | null>(null);
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -87,13 +87,23 @@ export function DropdownMenuContent({
     const r = el.getBoundingClientRect();
     const dropdownHeight = 120;
     const viewportHeight = window.innerHeight;
+    const viewportWidth = document.documentElement.clientWidth;
+    const margin = 8;
     const fitsBelow = r.bottom + 4 + dropdownHeight <= viewportHeight;
 
+    // Clamp top to viewport
+    let top = fitsBelow ? r.bottom + 4 : r.top - 4 - dropdownHeight;
+    if (top < margin) top = margin;
+    if (top + dropdownHeight > viewportHeight - margin) {
+      top = Math.max(margin, viewportHeight - dropdownHeight - margin);
+    }
+
     setRect({
-      top: fitsBelow ? r.bottom + 4 : r.top - 4 - dropdownHeight,
+      top,
       left: align === "end" ? r.right : r.left,
       minWidth: r.width,
-      clientWidth: document.documentElement.clientWidth,
+      clientWidth: viewportWidth,
+      maxWidth: viewportWidth - margin * 2,
     });
   }, [open, triggerRef, align]);
 
@@ -119,9 +129,10 @@ export function DropdownMenuContent({
         zIndex: PORTAL_DROPDOWN_Z_INDEX,
         top: rect.top,
         ...(align === "end"
-          ? { right: `calc(${rect.clientWidth}px - ${rect.left}px)` }
-          : { left: rect.left }),
+          ? { right: `max(8px, calc(${rect.clientWidth}px - ${rect.left}px))` }
+          : { left: Math.max(8, Math.min(rect.left, rect.clientWidth - rect.minWidth - 8)) }),
         minWidth: rect.minWidth,
+        maxWidth: rect.maxWidth,
         backgroundColor: 'var(--color-background)',
       }}
     >

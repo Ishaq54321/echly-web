@@ -22,6 +22,7 @@ import {
   useDiscussionFeedback,
 } from "@/lib/realtime/discussionFeedbackStore";
 import { useUserAvatars } from "@/lib/hooks/useUserAvatars";
+import { useIsMobile } from "@/lib/hooks/useIsMobile";
 
 const FOLDER_LABEL: Record<FolderKey, string> = {
   inbox: "Inbox",
@@ -47,7 +48,12 @@ export default function DiscussionPage() {
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
-  const [mobileView, setMobileView] = useState<"list" | "detail">("list");
+  // Phase 4: drive the mobile two-pane swap off useIsMobile + selectedThreadId
+  // instead of an independent useState, so orientation/resize changes update
+  // the visible pane without going stale.
+  const isMobile = useIsMobile();
+  const mobileView: "list" | "detail" =
+    isMobile && selectedThreadId ? "detail" : "list";
 
   // Realtime workspace-scoped feedback listener (threads w/ comments).
   useEffect(() => {
@@ -213,11 +219,9 @@ export default function DiscussionPage() {
 
   const handleSelectThread = useCallback((id: string) => {
     setSelectedThreadId(id);
-    setMobileView("detail");
   }, []);
 
   const handleMobileBack = useCallback(() => {
-    setMobileView("list");
     setSelectedThreadId(null);
   }, []);
 

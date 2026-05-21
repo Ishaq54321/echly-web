@@ -284,6 +284,26 @@ button[aria-disabled="true"],
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
   font-family: "Plus Jakarta Sans", sans-serif;
   overflow: visible;
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100dvh - 2rem);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Below sm: modal becomes a full-screen sheet */
+@media (max-width: 639px) {
+  .echly-modal-overlay {
+    padding: 0;
+    align-items: stretch;
+    justify-content: stretch;
+  }
+  .echly-modal-panel {
+    border-radius: 0;
+    max-width: 100vw;
+    max-height: 100dvh;
+    width: 100%;
+    height: 100dvh;
+  }
 }
 
 /* Onboarding: Linear-style animated selection highlight */
@@ -357,6 +377,26 @@ button[aria-disabled="true"],
   display: flex;
   flex-direction: column;
   font-family: var(--font-sans);
+}
+
+@media (max-width: 767px) {
+  .ticket-activity-panel {
+    width: 100%;
+  }
+  .ticket-activity-row {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+  .ticket-activity-row::before {
+    left: 27px;
+  }
+  .ticket-activity-day-header {
+    padding: 14px 14px 8px;
+  }
+  .ticket-activity-icon-wrap {
+    width: 24px;
+    height: 24px;
+  }
 }
 
 .ticket-activity-header {
@@ -929,6 +969,9 @@ button[aria-disabled="true"],
   align-items: center;
   gap: 28px;
   border-bottom: 0.5px solid rgba(0, 0, 0, 0.08);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   /* No wrap: tabs on the left, scope dropdowns pinned to the right edge
      on the SAME line. If truly cramped, scroll horizontally rather than
      stack the dropdowns onto their own line.
@@ -939,8 +982,8 @@ button[aria-disabled="true"],
      them behind the feed below regardless of z-index. Horizontal scroll
      for the cramped-tab edge case is delegated to the inner tab strip. */
   flex-wrap: nowrap;
-  overflow: visible;
 }
+.activity-filter-bar::-webkit-scrollbar { display: none; }
 /* Scope dropdowns (All sessions · Members) ride the right edge of the
    same tab bar. margin-left:auto pushes them past the tabs; the bar's
    own align-items:center keeps the 34px pills centered against the

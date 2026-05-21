@@ -200,7 +200,7 @@ export function BillingManagementView({
 
       {/* ── Section 1: Current plan ──────────────────────────────────── */}
       <div
-        className="rounded-[var(--radius-lg)] p-8"
+        className="rounded-[var(--radius-lg)] p-5 md:p-8"
         style={{
           background: "var(--surface)",
           border: "1px solid var(--border)",
@@ -251,7 +251,7 @@ export function BillingManagementView({
       {/* ── Section 2: Payment method (hidden for comp'd) ────────────── */}
       {!isComped && (
         <div
-          className="rounded-[var(--radius-lg)] p-8"
+          className="rounded-[var(--radius-lg)] p-5 md:p-8"
           style={{
             background: "var(--surface)",
             border: "1px solid var(--border)",
@@ -306,7 +306,7 @@ export function BillingManagementView({
 
       {/* ── Section 3: Billing history ───────────────────────────────── */}
       <div
-        className="rounded-[var(--radius-lg)] p-8"
+        className="rounded-[var(--radius-lg)] p-5 md:p-8"
         style={{
           background: "var(--surface)",
           border: "1px solid var(--border)",

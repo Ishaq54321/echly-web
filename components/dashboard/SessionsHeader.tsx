@@ -71,7 +71,7 @@ export function SessionsHeader({ workspaceName, firstName }: SessionsHeaderProps
       <div className="text-[14px] font-medium text-[var(--text-secondary)] mb-1 min-h-[20px]">
         {workspaceName || " "}
       </div>
-      <h1 className="text-[28px] font-semibold text-[var(--text-heading)] tracking-[-0.02em] flex items-center gap-3">
+      <h1 className="text-[22px] md:text-[28px] font-semibold text-[var(--text-heading)] tracking-[-0.02em] flex items-center gap-3">
         <span
           className="inline-block animate-wave origin-[70%_70%]"
           role="img"

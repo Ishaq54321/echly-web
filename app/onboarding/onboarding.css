@@ -1148,3 +1148,28 @@
 @keyframes ob-spin {
   to { transform: rotate(360deg); }
 }
+
+/* ── Mobile (≤480px) — fixed-width visuals collapse to viewport ── */
+@media (max-width: 480px) {
+  .ob-preview-card,
+  .ob-ws-stack,
+  .ob-invite-vis,
+  .ob-browser {
+    width: 100%;
+    max-width: 100%;
+  }
+  .ob-role-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* iOS Safari auto-zooms on focus when input font-size < 16px. Force 16px
+   for all onboarding inputs below the mobile breakpoint. Desktop keeps
+   the designed 14px (or smaller inline). */
+@media (max-width: 767px) {
+  .ob-input,
+  input.ob-input,
+  textarea.ob-input {
+    font-size: 16px !important;
+  }
+}

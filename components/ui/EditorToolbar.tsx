@@ -300,7 +300,7 @@ export function EditorToolbar({
 
   if (activeTool === "crop") {
     return (
-      <div className="fixed bottom-[60px] left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 bg-[#15101F] rounded-2xl shadow-2xl border border-white/10">
+      <div className="fixed bottom-[60px] left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 bg-[#15101F] rounded-2xl shadow-2xl border border-white/10 max-w-[calc(100vw-16px)]">
         <button
           type="button"
           onClick={onApplyCrop}
@@ -356,7 +356,7 @@ export function EditorToolbar({
               <ChevronDown className="h-3 w-3" />
             </button>
             {fillPickerOpen && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-5 bg-[#54495F] border border-white/10 rounded-2xl p-5 shadow-2xl z-[60] w-[360px]">
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-5 bg-[#54495F] border border-white/10 rounded-2xl p-5 shadow-2xl z-[60] w-[min(100vw-1rem,360px)]">
                 <p className="text-white/50 text-[14px] font-semibold tracking-wider uppercase mb-2">Colors</p>
                 <button
                   onClick={() => { onFillColorChange("transparent"); setFillPickerOpen(false); }}
@@ -406,7 +406,7 @@ export function EditorToolbar({
               <ChevronDown className="h-3 w-3" />
             </button>
             {outlinePickerOpen && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-5 bg-[#54495F] border border-white/10 rounded-2xl p-5 shadow-2xl z-[60] w-[380px]">
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-5 bg-[#54495F] border border-white/10 rounded-2xl p-5 shadow-2xl z-[60] w-[min(100vw-1rem,380px)]">
                 <p className="text-white/50 text-[14px] font-semibold tracking-wider uppercase mb-2">Colors</p>
                 <button
                   onClick={() => { onOutlineColorChange("transparent"); setOutlinePickerOpen(false); }}
@@ -445,8 +445,11 @@ export function EditorToolbar({
         </div>
       )}
 
-      {/* Main toolbar pill */}
-      <div className="fixed bottom-[60px] left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 px-4 py-3.5 bg-[#15101F] rounded-2xl shadow-2xl border border-white/10">
+      {/* Main toolbar pill — horizontally scrollable on mobile to fit narrow viewports */}
+      <div
+        className="fixed bottom-[60px] left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 px-4 py-3.5 bg-[#15101F] rounded-2xl shadow-2xl border border-white/10 max-w-[calc(100vw-16px)] overflow-x-auto"
+        style={{ scrollbarWidth: "none" }}
+      >
         <ToolButton tool="select" activeTool={activeTool} setActiveTool={setActiveTool} label="Select" icon={<MousePointer2 {...iconProps} />} />
 
         {/* Pen tool with Draw popover on second click */}
@@ -466,7 +469,7 @@ export function EditorToolbar({
             icon={<Pencil {...iconProps} />}
           />
           {drawPopoverOpen && (
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-5 w-[400px] bg-[#54495F] rounded-2xl p-5 shadow-2xl border border-white/10 z-[60]">
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-5 w-[min(100vw-1rem,400px)] bg-[#54495F] rounded-2xl p-5 shadow-2xl border border-white/10 z-[60]">
               <p className="text-white/50 text-[14px] font-semibold tracking-wider uppercase mb-3">Colors</p>
               <div className="grid grid-cols-6 gap-2.5 mb-4">
                 {PALETTE_COLORS.map(c => (

@@ -9,13 +9,13 @@ const baseClass =
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    "h-[38px] px-4 rounded-[var(--radius-btn)] border-none bg-[var(--text-heading)] text-white text-[14px] hover:opacity-85",
+    "h-11 md:h-[38px] px-4 rounded-[var(--radius-btn)] border-none bg-[var(--text-heading)] text-white text-[14px] hover:opacity-85",
   secondary:
-    "h-[38px] px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[14px] hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)]",
+    "h-11 md:h-[38px] px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[14px] hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)]",
   ghost:
-    "h-[38px] px-4 rounded-[var(--radius-btn)] bg-transparent text-[var(--text-secondary)] text-[14px] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)]",
+    "h-11 md:h-[38px] px-4 rounded-[var(--radius-btn)] bg-transparent text-[var(--text-secondary)] text-[14px] hover:bg-[var(--surface-hover)] hover:text-[var(--text-heading)]",
   danger:
-    "h-[38px] px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[14px] hover:text-[var(--color-danger)] hover:border-[var(--color-danger)]/30 hover:bg-[var(--color-danger-bg)]",
+    "h-11 md:h-[38px] px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[14px] hover:text-[var(--color-danger)] hover:border-[var(--color-danger)]/30 hover:bg-[var(--color-danger-bg)]",
 };
 
 export interface ButtonProps

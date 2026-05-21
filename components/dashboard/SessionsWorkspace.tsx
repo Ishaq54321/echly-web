@@ -222,7 +222,7 @@ export const SessionWorkspaceRow = memo(function SessionWorkspaceRow({
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         className={[
-          "group relative flex w-full items-center justify-between rounded-lg px-4 py-4 transition-all duration-150 hover:bg-[var(--surface-hover)]",
+          "group relative flex w-full items-center justify-between gap-3 rounded-lg px-3 md:px-4 py-3 md:py-4 transition-all duration-150 hover:bg-[var(--surface-hover)]",
           isSelectionMode ? "hover:bg-[var(--surface-hover)] cursor-pointer" : "",
           isSelected ? "bg-[var(--brand-subtle)] hover:bg-[var(--brand-subtle)]" : "",
           openingId === session.id ? "bg-[var(--surface-subtle)]" : "",
@@ -324,7 +324,7 @@ export const SessionWorkspaceRow = memo(function SessionWorkspaceRow({
           </div>
         </div>
 
-        <div className="flex min-h-[36px] items-center shrink-0 gap-10 transition-[margin] duration-150 group-hover:mr-[86px]">
+        <div className="flex min-h-[36px] items-center shrink-0 gap-3 md:gap-10 transition-[margin] duration-150 group-hover:mr-[86px]">
           {(() => {
             const viewCount = session.viewCount ?? 0;
             const maxVisible = 4;
@@ -335,7 +335,7 @@ export const SessionWorkspaceRow = memo(function SessionWorkspaceRow({
 
             return (
               <div
-                className="flex items-center -space-x-1.5 group-hover:opacity-0"
+                className="hidden md:flex items-center -space-x-1.5 group-hover:opacity-0"
                 aria-label="Recent viewers"
               >
                 {visibleViewers.map((viewer, i) => (
@@ -382,7 +382,7 @@ export const SessionWorkspaceRow = memo(function SessionWorkspaceRow({
             )}
           </>
           {updatedShort ? (
-            <div className="inline-flex items-center gap-1.5 text-sm">
+            <div className="hidden md:inline-flex items-center gap-1.5 text-sm">
               <Calendar className="h-4 w-4 shrink-0 text-[var(--color-warning)]" strokeWidth={2.5} aria-hidden />
               <span className="whitespace-nowrap font-medium tracking-tight text-[var(--text-body)]">
                 {updatedShort}
@@ -764,7 +764,7 @@ export function SessionsWorkspace({
         >
           <div
             className={[
-              "flex items-center justify-between bg-[#15101F] text-white px-5 py-3 rounded-xl shadow-2xl backdrop-blur-sm min-w-[420px] max-w-[600px]",
+              "flex items-center justify-between bg-[#15101F] text-white px-4 md:px-5 py-3 rounded-xl shadow-2xl backdrop-blur-sm w-[min(100vw-2rem,600px)] md:min-w-[420px]",
               "select-none",
             ].join(" ")}
           >

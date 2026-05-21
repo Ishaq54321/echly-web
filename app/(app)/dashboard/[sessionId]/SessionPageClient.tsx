@@ -59,7 +59,10 @@ import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 import {
   TicketList,
   ExecutionView,
+  SessionMobileTabs,
+  type SessionMobileTabId,
 } from "@/components/layout/operating-system";
+import { useIsMobile, useMediaQuery } from "@/lib/hooks/useIsMobile";
 import { TicketActivityPanel } from "@/components/session/feedbackDetail/TicketActivityPanel";
 import { CanvasEmptyState } from "@/components/empty/CanvasEmptyState";
 import { NoTicketsIllu } from "@/components/empty/canvasIllustrations";
@@ -1478,6 +1481,9 @@ export default function SessionPageClient({
   const [navPanelOpen, setNavPanelOpen] = useState(false);
   const [isTicketNavigatorOpen, setIsTicketNavigatorOpen] = useState(false);
   const [isCommentMode, setIsCommentMode] = useState(false);
+  const isMobile = useIsMobile();
+  const isDesktopWide = useMediaQuery("(min-width: 1024px)");
+  const [mobileTab, setMobileTab] = useState<SessionMobileTabId>("session");
   // Right-rail panel. Phase 26.1: now the per-ticket Activity timeline
   // (was the CommentPanel). Comments live in the middle panel
   // (ExecutionView). The open-triggers below are kept as-is so existing
@@ -3939,16 +3945,29 @@ export default function SessionPageClient({
           />
         )}
         <div
-          className="grid flex-1 min-h-0 overflow-hidden bg-[var(--surface-page)]"
-          style={{
-            gridTemplateColumns: (isActivityPanelOpen || activeThreadId != null) ? '346px 1fr 360px' : '346px 1fr',
+          className="flex-1 min-h-0 overflow-hidden bg-[var(--surface-page)] flex flex-col md:grid"
+          style={isMobile ? {
+            padding: '0px 0px 56px',
+          } : {
+            gridTemplateColumns: isDesktopWide
+              ? ((isActivityPanelOpen || activeThreadId != null) ? '346px 1fr 360px' : '346px 1fr')
+              : ((isActivityPanelOpen || activeThreadId != null) ? '1fr 360px' : '1fr'),
             gap: '14px',
             padding: '0px 14px 14px',
             transition: 'grid-template-columns 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
-          {/* Left card: Ticket list */}
-          <aside className="hidden lg:flex flex-col bg-[var(--surface)] rounded-[14px] min-h-0 overflow-hidden" style={{ boxShadow: 'var(--shadow-panel)' }}>
+          {/* Left card: Ticket list (desktop side panel; mobile shows via mobileTab="captures") */}
+          <aside
+            className={`${
+              isMobile
+                ? mobileTab === "captures"
+                  ? "flex flex-1 min-h-0"
+                  : "hidden"
+                : "hidden lg:flex"
+            } flex-col bg-[var(--surface)] md:rounded-[14px] min-h-0 overflow-hidden`}
+            style={isMobile ? undefined : { boxShadow: 'var(--shadow-panel)' }}
+          >
           <TicketList
             counts={{
               total: isCountsSynced ? feedbackTotal : Math.max(0, sessionRestTotal),
@@ -3961,6 +3980,7 @@ export default function SessionPageClient({
             onSelect={(id: string) => {
               trySwitchToTicket(id, () => {
                 setSelectedId(id);
+                if (isMobile) setMobileTab("session");
                 const url = new URL(window.location.href);
                 if (url.searchParams.has("ticket")) {
                   url.searchParams.delete("ticket");
@@ -3996,13 +4016,22 @@ export default function SessionPageClient({
           </aside>
 
           {/* Center card: Main content */}
-          <section className="flex flex-col bg-[var(--surface)] rounded-[14px] min-h-0 overflow-hidden" style={{ boxShadow: 'var(--shadow-panel)' }}>
+          <section
+            className={`${
+              isMobile
+                ? mobileTab === "session"
+                  ? "flex flex-1 min-h-0"
+                  : "hidden"
+                : "flex"
+            } flex-col bg-[var(--surface)] md:rounded-[14px] min-h-0 overflow-hidden`}
+            style={isMobile ? undefined : { boxShadow: 'var(--shadow-panel)' }}
+          >
           {pendingResolveRequest && sessionAccess?.canResolve === false ? (
             <PendingAccessBanner />
           ) : null}
           <main className="flex-1 min-h-0 overflow-y-auto flex flex-col min-w-0">
             <div className="h-full flex flex-col min-w-0">
-              <div className="z-20 shrink-0 flex items-center gap-2 px-4 py-3 lg:hidden bg-[var(--surface)]">
+              <div className="hidden md:flex lg:hidden z-20 shrink-0 items-center gap-2 px-4 py-3 bg-[var(--surface)]">
                 <button
                   type="button"
                   onClick={() => setIsTicketNavigatorOpen(true)}
@@ -4012,7 +4041,7 @@ export default function SessionPageClient({
                 </button>
               </div>
               <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
-                <div className="max-w-[900px] mx-auto w-full px-8 pt-11 pb-20 flex-1 min-h-0 flex flex-col">
+                <div className="max-w-[900px] mx-auto w-full px-4 pt-6 pb-12 md:px-8 md:pt-11 md:pb-20 flex-1 min-h-0 flex flex-col">
                   {renderExecutionContent()}
                 </div>
               </div>
@@ -4022,16 +4051,24 @@ export default function SessionPageClient({
 
           {/* Right card: per-ticket Activity timeline (Phase 26.1).
               Replaces the old CommentPanel — comments now live in the
-              middle panel (ExecutionView). */}
-          {(isActivityPanelOpen || activeThreadId != null) &&
-            effectiveSelectedId &&
+              middle panel (ExecutionView). On mobile this becomes a
+              full-width pane reached via the Activity tab. */}
+          {effectiveSelectedId &&
             effectiveWorkspaceId &&
-            sessionAccess?.canResolve && (
+            sessionAccess?.canResolve &&
+            (isMobile
+              ? mobileTab === "activity"
+              : isActivityPanelOpen || activeThreadId != null) && (
               <aside
-                className="flex flex-col min-h-0 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300"
+                className={`${
+                  isMobile ? "flex flex-1 min-h-0" : "flex"
+                } flex-col min-h-0 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300`}
                 style={{ animationTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)' }}
               >
-                <div className="flex flex-col flex-1 min-h-0 bg-[var(--surface)] rounded-[14px] overflow-hidden" style={{ boxShadow: 'var(--shadow-panel)' }}>
+                <div
+                  className="flex flex-col flex-1 min-h-0 bg-[var(--surface)] md:rounded-[14px] overflow-hidden"
+                  style={isMobile ? undefined : { boxShadow: 'var(--shadow-panel)' }}
+                >
                   <TicketActivityPanel
                     workspaceId={effectiveWorkspaceId as string}
                     feedbackId={effectiveSelectedId}
@@ -4040,12 +4077,25 @@ export default function SessionPageClient({
                       setActiveThreadId(null);
                       setIsActivityPanelOpen(false);
                       setIsCommentMode(false);
+                      if (isMobile) setMobileTab("session");
                     }}
                   />
                 </div>
               </aside>
             )}
         </div>
+        {isMobile && (
+          <SessionMobileTabs
+            active={mobileTab}
+            onChange={(tab) => {
+              setMobileTab(tab);
+              if (tab === "activity") {
+                setIsActivityPanelOpen(true);
+              }
+            }}
+            showActivity={sessionAccess?.canResolve === true}
+          />
+        )}
       </div>
 
       {isTicketNavigatorOpen && (

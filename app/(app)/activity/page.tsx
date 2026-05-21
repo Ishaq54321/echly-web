@@ -820,7 +820,7 @@ function ActivityFeed() {
 
   if (!user?.uid && !authLoading) {
     return (
-      <div className="w-full px-6 py-8">
+      <div className="w-full px-4 md:px-6 py-6 md:py-8">
         <div className="mx-auto w-full max-w-[1280px]">
           <div className="flex items-center gap-2.5 mb-7">
             <Clock className="h-4 w-4 text-[var(--text-secondary)]" aria-hidden />
@@ -851,7 +851,7 @@ function ActivityFeed() {
   // ─── Main render ──────────────────────────────────────────────────────────
 
   return (
-    <div className="w-full px-6 py-8">
+    <div className="w-full px-4 md:px-6 py-6 md:py-8">
       <div className="mx-auto w-full max-w-[1280px]">
 
         {/* Page header */}
@@ -1015,7 +1015,7 @@ function ActivityFeed() {
 
                 {(selectedCategory === "member" && selectedMemberId === null) ||
                 memberDropdownOpen ? (
-                  <div className="absolute top-full right-0 mt-1 w-56 bg-[var(--surface-card)] border border-[var(--border)] rounded-[var(--radius-md)] shadow-none z-[200] py-1">
+                  <div className="absolute top-full right-0 mt-1 w-[min(100vw-2rem,224px)] bg-[var(--surface-card)] border border-[var(--border)] rounded-[var(--radius-md)] shadow-none z-[200] py-1">
                     <button
                       type="button"
                       onClick={() => {
@@ -1333,7 +1333,7 @@ export default function ActivityPage() {
   return (
     <Suspense
       fallback={
-        <div className="w-full px-6 py-8">
+        <div className="w-full px-4 md:px-6 py-6 md:py-8">
           <div className="mx-auto w-full max-w-[1280px]">
             <ActivitySkeletonStack count={4} />
           </div>

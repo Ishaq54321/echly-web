@@ -892,6 +892,18 @@ body {
   background: var(--surface-card);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-xl);
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100dvh - 2rem);
+}
+
+@media (max-width: 639px) {
+  .echly-modal-panel {
+    border-radius: 0;
+    max-width: 100vw;
+    max-height: 100dvh;
+    width: 100%;
+    height: 100dvh;
+  }
 }
 
 /* ─── Card ───────────────────────────────── */
@@ -947,6 +959,30 @@ body {
 }
 .echly-input--sm  { height: 30px; font-size: var(--text-xs); }
 .echly-input--lg  { height: 42px; font-size: var(--text-md); padding: 0 var(--sp-4); }
+
+/* Below the mobile breakpoint, bump inputs to 16px so iOS Safari does not
+   auto-zoom on focus. Desktop keeps the design's 14px. Applies to .echly-input
+   plus native text/email/password/search/url/tel/number inputs and textareas
+   that don't have their own larger font-size set inline. */
+@media (max-width: 767px) {
+  .echly-input, .echly-input--sm { font-size: 16px; }
+  input.echly-input, textarea.echly-input { font-size: 16px; }
+  input[type="text"]:not([style*="font-size"]),
+  input[type="email"]:not([style*="font-size"]),
+  input[type="password"]:not([style*="font-size"]),
+  input[type="search"]:not([style*="font-size"]),
+  input[type="url"]:not([style*="font-size"]),
+  input[type="tel"]:not([style*="font-size"]),
+  input[type="number"]:not([style*="font-size"]),
+  textarea:not([style*="font-size"]) {
+    font-size: 16px;
+  }
+  /* Inputs that hardcode font-size via inline styles still need the iOS
+     zoom-prevention bump on mobile. Targeted with explicit classes. */
+  input.external-share-url-input {
+    font-size: 16px !important;
+  }
+}
 
 /* ─── Divider ────────────────────────────── */
 .echly-divider {

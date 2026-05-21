@@ -19,3 +19,5 @@ export type { ActivitySlideOverProps } from "./ActivitySlideOver";
 export { CommentModeIndicator } from "./CommentModeIndicator";
 export { ContextIntelligenceColumn } from "./ContextIntelligenceColumn";
 export { TicketMetadata } from "./TicketMetadata";
+export { SessionMobileTabs } from "./SessionMobileTabs";
+export type { SessionMobileTabId } from "./SessionMobileTabs";

@@ -1,4 +1,4 @@
-import GlobalRail from "@/components/layout/GlobalRail";
+import { AppMobileShell } from "@/components/layout/AppMobileShell";
 import { FloatingUtilityActions } from "@/components/layout/FloatingUtilityActions";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { WorkspaceStoreProvider } from "@/lib/client/workspaceStore";
@@ -19,9 +19,14 @@ export default function AppLayout({
         <WorkspaceStoreProvider>
           <BillingUsageCacheInitializer />
           <AppBootReadinessBridge />
-          <div className="main-layout flex h-screen overflow-hidden p-[14px] gap-[10px]">
-            <GlobalRail />
+          <div className="main-layout flex h-screen overflow-hidden md:p-[14px] md:gap-[10px]">
+            {/* Responsive shell — renders desktop rail OR mobile drawer based
+                on viewport, so GlobalRailContent only mounts once in the tree. */}
+            <AppMobileShell slot="rail" />
+
             <main className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]">
+              <AppMobileShell slot="header" />
+
               <div className="content-card flex-1 min-h-0 overflow-y-auto">
                 <FloatingUtilityActions />
                 <ErrorBoundary>{children}</ErrorBoundary>

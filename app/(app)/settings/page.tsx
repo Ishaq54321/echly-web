@@ -28,6 +28,7 @@ import { ModalPortal } from "@/components/ui/ModalPortal";
 import { MODAL_LAYER_Z_INDEX } from "@/lib/ui/zIndex";
 import { useAuthGuard } from "@/lib/hooks/useAuthGuard";
 import { usePlanCatalog } from "@/lib/hooks/usePlanCatalog";
+import { useIsMobile } from "@/lib/hooks/useIsMobile";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { UserAvatar } from "@/components/ui/UserAvatar";
@@ -56,15 +57,15 @@ import { PLANS, type PlanId } from "@/lib/billing/plans";
 
 /* Premium workspace settings: wide layout, strong hierarchy */
 const SETTINGS_CARD =
-  "rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] p-[28px] transition-[border-color,box-shadow] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-md)]";
+  "rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] p-4 md:p-[28px] transition-[border-color,box-shadow] duration-200 ease-out hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-md)]";
 const CARD_GAP = "space-y-8"; /* 32px between section cards */
 const ROW_GAP = "space-y-5"; /* 20px between setting rows */
 const SECTION_TITLE = "text-lg font-semibold text-[var(--text-heading)]"; /* H2: section heading */
 const SECTION_SUBTITLE = "text-[16px] font-semibold text-[var(--text-heading)]"; /* H3 setting labels: 600 for hierarchy */
 const SECTION_DESC = "text-[14px] text-[var(--text-secondary)] mt-1"; /* body, darker grey */
 const SETTING_DESC = "text-[14px] text-[var(--text-secondary)] mt-0.5";
-const BTN_PRIMARY = "inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--text-heading)] text-white text-[14px] font-medium hover:opacity-85 transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
-const BTN_SECONDARY = "inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[14px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
+const BTN_PRIMARY = "inline-flex h-11 md:h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--text-heading)] text-white text-[14px] font-medium hover:opacity-85 transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
+const BTN_SECONDARY = "inline-flex h-11 md:h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[14px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
 
 function SectionHeader({
   title,
@@ -153,9 +154,9 @@ function SettingsPageInner() {
 
   return (
     <div className="flex flex-1 min-h-0 overflow-auto">
-      <div className="flex-1 min-w-0 max-w-[1280px] mx-auto px-6 py-10 w-full">
+      <div className="flex-1 min-w-0 max-w-[1280px] mx-auto px-4 md:px-6 py-6 md:py-10 w-full">
         {/* Page header */}
-        <header className="mb-8">
+        <header className="mb-6 md:mb-8">
           <h1 className="text-xl font-bold text-[var(--text-heading)] tracking-[-0.4px] mt-1 mb-0">
             Settings
           </h1>
@@ -165,34 +166,36 @@ function SettingsPageInner() {
         </header>
 
         {/* Tab navigation */}
-        <nav
-          className="flex items-center gap-10 border-b border-[var(--border-default)] mb-8"
-          aria-label="Settings sections"
-        >
-          {TABS.map(({ id, label }) => {
-            const isActive = activeTab === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setActiveTab(id)}
-                className={`
-                  relative pb-3 text-sm transition-colors duration-200
-                  ${isActive ? "text-[var(--text-heading)] font-semibold" : "font-medium text-[var(--text-secondary)] hover:text-[var(--text-heading)]"}
-                `}
-                aria-current={isActive ? "true" : undefined}
-              >
-                {label}
-                {isActive && (
-                  <span
-                    className="absolute left-0 right-0 bottom-0 h-[3px] bg-[var(--brand)] rounded-full"
-                    aria-hidden
-                  />
-                )}
-              </button>
-            );
-          })}
-        </nav>
+        <div className="border-b border-[var(--border-default)] mb-6 md:mb-8 -mx-4 md:mx-0 overflow-x-auto">
+          <nav
+            className="flex items-center gap-4 md:gap-10 px-4 md:px-0 whitespace-nowrap"
+            aria-label="Settings sections"
+          >
+            {TABS.map(({ id, label }) => {
+              const isActive = activeTab === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setActiveTab(id)}
+                  className={`
+                    relative pb-3 text-sm transition-colors duration-200 shrink-0
+                    ${isActive ? "text-[var(--text-heading)] font-semibold" : "font-medium text-[var(--text-secondary)] hover:text-[var(--text-heading)]"}
+                  `}
+                  aria-current={isActive ? "true" : undefined}
+                >
+                  {label}
+                  {isActive && (
+                    <span
+                      className="absolute left-0 right-0 bottom-0 h-[3px] bg-[var(--brand)] rounded-full"
+                      aria-hidden
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
 
         {/* Tab content */}
         <BillingUsageProvider>
@@ -301,7 +304,7 @@ function YourWorkspacesSection() {
   });
 
   return (
-    <div style={{ maxWidth: 900, width: "100%" }}>
+    <div style={{ maxWidth: "min(900px, 100%)", width: "100%" }}>
       <div style={{ marginBottom: 20 }}>
         <h2 className="text-lg font-semibold text-[var(--text-heading)] mb-1">Your workspaces</h2>
         <p style={{ fontSize: 14, color: "var(--text-secondary)", margin: 0 }}>
@@ -453,6 +456,7 @@ function WorkspaceTab({
   const [brandLogoUrl, setBrandLogoUrl] = useState<string | null>(null);
   const [uploadingBrandLogo, setUploadingBrandLogo] = useState(false);
   const [brandLogoUpgradeOpen, setBrandLogoUpgradeOpen] = useState(false);
+  const isMobile = useIsMobile();
   const brandLogoCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const brandLogoInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -680,7 +684,7 @@ function WorkspaceTab({
 
   if (loading) {
     return (
-      <div style={{ maxWidth: 900, width: "100%", padding: "32px 0" }} aria-busy="true" aria-live="polite">
+      <div style={{ maxWidth: "min(900px, 100%)", width: "100%", padding: "32px 0" }} aria-busy="true" aria-live="polite">
         <style>{`@keyframes shimmer { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } } .skeleton { animation: shimmer 1.5s ease infinite; }`}</style>
         <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid var(--surface-hover)" }}>
           <div className="skeleton" style={{ height: 22, width: 180, background: "var(--surface-hover)", borderRadius: 6, marginBottom: 8 }} />
@@ -716,7 +720,7 @@ function WorkspaceTab({
   }
 
   return (
-    <div style={{ maxWidth: 900, width: "100%", padding: "32px 0" }} className="ech-content-enter pb-16">
+    <div style={{ maxWidth: "min(900px, 100%)", width: "100%", padding: "32px 0" }} className="ech-content-enter pb-16">
       {toast && (
         <div
           style={{
@@ -755,12 +759,12 @@ function WorkspaceTab({
           background: "white",
           border: "1px solid var(--border)",
           borderRadius: 16,
-          padding: "28px 32px",
+          padding: isMobile ? "20px 16px" : "28px 32px",
           marginBottom: 16,
           position: "relative",
         }}
       >
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 24 }}>
+        <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "flex-start", gap: isMobile ? 16 : 24 }}>
           <div style={{ flex: 1 }}>
             <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-heading)", margin: 0 }}>Brand Logo</h3>
             <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "4px 0 0 0" }}>
@@ -872,19 +876,36 @@ function WorkspaceTab({
                   if (brandLogoCloseTimeoutRef.current) clearTimeout(brandLogoCloseTimeoutRef.current);
                   brandLogoCloseTimeoutRef.current = setTimeout(() => setBrandLogoUpgradeOpen(false), 200);
                 }}
-                style={{
-                  position: "absolute",
-                  zIndex: 50,
-                  right: "calc(100% + 12px)",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  width: 320,
-                  background: "white",
-                  borderRadius: 14,
-                  border: "1px solid var(--border)",
-                  boxShadow: "0 12px 32px rgba(0,0,0,0.12)",
-                  padding: 20,
-                }}
+                style={
+                  isMobile
+                    ? {
+                        position: "fixed",
+                        zIndex: 50,
+                        left: "50%",
+                        top: "50%",
+                        transform: "translate(-50%, -50%)",
+                        width: "calc(100vw - 32px)",
+                        maxWidth: 360,
+                        background: "white",
+                        borderRadius: 14,
+                        border: "1px solid var(--border)",
+                        boxShadow: "0 12px 32px rgba(0,0,0,0.18)",
+                        padding: 20,
+                      }
+                    : {
+                        position: "absolute",
+                        zIndex: 50,
+                        right: "calc(100% + 12px)",
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        width: 320,
+                        background: "white",
+                        borderRadius: 14,
+                        border: "1px solid var(--border)",
+                        boxShadow: "0 12px 32px rgba(0,0,0,0.12)",
+                        padding: 20,
+                      }
+                }
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                   <Gem size={16} color="var(--brand)" aria-hidden />
@@ -957,9 +978,10 @@ function WorkspaceTab({
       <div
         style={{
           display: "flex",
-          alignItems: "flex-start",
-          gap: 24,
-          padding: "28px 32px",
+          flexDirection: isMobile ? "column" : "row",
+          alignItems: isMobile ? "center" : "flex-start",
+          gap: isMobile ? 16 : 24,
+          padding: isMobile ? "20px 16px" : "28px 32px",
           borderBottom: "1px solid var(--surface-hover)",
         }}
       >
@@ -1399,6 +1421,7 @@ function DeleteAccountModal({ onClose }: { onClose: () => void }) {
 function MyAccountTab() {
   const { authPhotoUrl, firstName, lastName, authEmail, authReady, updateAvatarUrl } = useWorkspace();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isMobile = useIsMobile();
 
   const [localAvatarUrl, setLocalAvatarUrl] = useState<string | null>(authPhotoUrl);
   const [firstNameDraft, setFirstNameDraft] = useState(firstName);
@@ -1576,7 +1599,9 @@ function MyAccountTab() {
     border: "1.5px solid var(--border)",
     background: "var(--surface-input)",
     padding: "0 12px",
-    fontSize: 15,
+    // 16px on mobile prevents iOS Safari auto-zoom on focus; 15px on desktop
+    // preserves the original design weight.
+    fontSize: isMobile ? 16 : 15,
     color: "var(--text-heading)",
     width: "100%",
     outline: "none",
@@ -1585,7 +1610,7 @@ function MyAccountTab() {
   };
 
   const sectionStyle: React.CSSProperties = {
-    padding: "28px 32px",
+    padding: isMobile ? "20px 16px" : "28px 32px",
     borderBottom: "1px solid var(--surface-hover)",
   };
 
@@ -1606,7 +1631,7 @@ function MyAccountTab() {
 
   if (isLoading) {
     return (
-      <div style={{ maxWidth: 900, width: "100%", padding: "32px 0" }}>
+      <div style={{ maxWidth: "min(900px, 100%)", width: "100%", padding: "32px 0" }}>
         <style>{`@keyframes shimmer { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } } .skeleton { animation: shimmer 1.5s ease infinite; }`}</style>
         <div style={{ marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid var(--surface-hover)" }}>
           <div className="skeleton" style={{ height: 22, width: 160, background: "var(--surface-hover)", borderRadius: 6, marginBottom: 8 }} />
@@ -1634,7 +1659,7 @@ function MyAccountTab() {
   }
 
   return (
-    <div style={{ maxWidth: 900, width: "100%", padding: "32px 0" }} className="ech-content-enter pb-16">
+    <div style={{ maxWidth: "min(900px, 100%)", width: "100%", padding: "32px 0" }} className="ech-content-enter pb-16">
       {toast && (
         <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 50, padding: "10px 18px", borderRadius: 10, background: "var(--text-heading)", color: "white", fontSize: 14, fontWeight: 500, pointerEvents: "none", whiteSpace: "nowrap" }}>
           {toast}
@@ -1659,7 +1684,7 @@ function MyAccountTab() {
           <p style={sectionTitleStyle}>Name and photo</p>
           <p style={sectionSubtitleStyle}>Update your display name and profile photo</p>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+          <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "center", gap: isMobile ? 16 : 24 }}>
             {/* Avatar */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
               <div
@@ -1702,7 +1727,7 @@ function MyAccountTab() {
 
             {/* Name fields */}
             <div style={{ flex: 1 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
                 <div>
                   <label style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)", display: "block", marginBottom: 6 }}>First name</label>
                   <input

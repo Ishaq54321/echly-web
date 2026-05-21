@@ -1419,3 +1419,65 @@
     padding: 0 32px;
   }
 }
+
+/* iOS Safari auto-zooms on focus when input font-size < 16px. Force 16px
+   on all auth text inputs below the mobile breakpoint. Desktop keeps the
+   designed 14px. */
+@media (max-width: 767px) {
+  .input-wrap input {
+    font-size: 16px;
+  }
+}
+
+/* Cozy spacing on small phones. Below 480px we tighten padding, scale
+   down the hero heading, and ensure CTAs feel comfortable. */
+@media (max-width: 480px) {
+  .auth-body {
+    padding: 0 20px;
+  }
+  .auth-head {
+    padding: 20px 20px 0;
+  }
+  .auth-foot {
+    padding: 16px 20px;
+  }
+  .auth-h {
+    font-size: 26px;
+    letter-spacing: -0.024em;
+  }
+  .auth-sub {
+    font-size: 14px;
+    margin: 0 0 22px;
+  }
+  .auth-eyebrow {
+    margin-bottom: 10px;
+  }
+  .input-wrap input {
+    height: 48px;
+  }
+  .input-wrap .toggle-vis {
+    height: 48px;
+  }
+  .btn {
+    height: 48px;
+  }
+  .auth-divider {
+    margin: 18px 0;
+  }
+  .auth-switch {
+    margin-top: 18px;
+  }
+  .auth-terms {
+    font-size: 11.5px;
+  }
+  /* Lock / mailbox / reset success illustrations get a bit cozier */
+  .lock-stage,
+  .mailbox,
+  .reset-success {
+    padding: 18px;
+  }
+  .mb-body,
+  .mb-head {
+    padding: 14px 16px;
+  }
+}

@@ -24,7 +24,7 @@ export default function EmptySessionsCard() {
 
         {/* Left column — text + CTAs */}
         <div className="flex-1 min-w-0 max-w-md">
-          <h1 className="text-[44px] font-bold leading-[1.08] tracking-[-0.03em] text-[var(--text-heading)]">
+          <h1 className="text-[32px] md:text-[44px] font-bold leading-[1.08] tracking-[-0.03em] text-[var(--text-heading)]">
             Capture feedback,<br />directly on your site.
           </h1>
           <p className="mt-7 text-[17px] leading-[1.7] font-medium text-[var(--text-body-strong)]">

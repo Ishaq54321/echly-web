@@ -46,7 +46,7 @@ export function EmptyState({
 
   const titleClassName =
     emphasis === "prominent"
-      ? "text-3xl font-semibold text-[var(--text-heading)] whitespace-nowrap"
+      ? "text-3xl font-semibold text-[var(--text-heading)] md:whitespace-nowrap"
       : "text-2xl font-medium text-[var(--text-heading)]";
 
   const isCompact = density === "compact";

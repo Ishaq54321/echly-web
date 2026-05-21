@@ -18,7 +18,7 @@ export function CommandCenterHeader({
   onNewSession,
 }: CommandCenterHeaderProps) {
   return (
-    <div className="flex items-start justify-between gap-8">
+    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 md:gap-8">
       <div>
         <h1 className="text-[20px] font-semibold leading-[1.25] tracking-[-0.02em] text-[var(--text-primary-strong)]">
           Command Center
@@ -27,7 +27,7 @@ export function CommandCenterHeader({
           High-signal overview across all sessions.
         </p>
       </div>
-      <div className="flex items-center gap-4 flex-shrink-0">
+      <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 md:flex-shrink-0">
         <div
           className="flex rounded-lg border border-[var(--layer-2-border)] bg-[var(--layer-1-bg)] p-0.5"
           role="tablist"
@@ -73,7 +73,7 @@ export function CommandCenterHeader({
           placeholder="Search sessions"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="h-9 px-3.5 min-w-[160px] rounded-lg bg-[var(--layer-1-bg)] border border-[var(--layer-2-border)] text-[14px] text-[var(--text-primary-strong)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-150 ease-out"
+          className="h-11 md:h-9 px-3.5 w-full md:min-w-[160px] md:w-auto rounded-lg bg-[var(--layer-1-bg)] border border-[var(--layer-2-border)] text-[14px] text-[var(--text-primary-strong)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-ring)] transition-all duration-150 ease-out"
           aria-label="Search sessions"
         />
       </div>

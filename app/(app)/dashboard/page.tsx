@@ -250,7 +250,7 @@ function DashboardContent() {
 
   return (
     <div className="relative flex min-h-0 w-full flex-1 flex-col">
-      <div className="mx-auto w-full max-w-[1280px] px-6 pb-10 pt-10">
+      <div className="mx-auto w-full max-w-[1280px] px-4 pb-10 pt-6 md:px-6 md:pt-10">
         <SessionsHeader
           workspaceName={workspaceName ?? undefined}
           firstName={firstName || undefined}
@@ -263,10 +263,15 @@ function DashboardContent() {
                 value={listArchiveTab}
                 onChange={setListArchiveTab}
                 actions={
-                  <div className="flex items-center gap-3">
+                  <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:gap-3">
                     <SessionsTimeRangeFilter
                       value={sessionsTimeRange}
                       onChange={setSessionsTimeRange}
+                    />
+
+                    <SessionsViewModeToggle
+                      value={sessionViewMode}
+                      onChange={setSessionViewMode}
                     />
 
                     <button
@@ -274,15 +279,10 @@ function DashboardContent() {
                       onClick={triggerCta}
                       disabled={startingRecorder || !isIdentityResolved}
                       aria-busy={startingRecorder}
-                      className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+                      className="ml-auto inline-flex h-11 md:h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
                     >
                       New Session
                     </button>
-
-                    <SessionsViewModeToggle
-                      value={sessionViewMode}
-                      onChange={setSessionViewMode}
-                    />
                   </div>
                 }
               />

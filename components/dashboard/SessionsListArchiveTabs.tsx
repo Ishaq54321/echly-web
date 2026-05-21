@@ -51,13 +51,13 @@ export function SessionsListArchiveTabs({
       <div className="mb-6 w-full min-w-0">
         <div className="relative flex w-full min-w-0 flex-wrap items-end justify-between gap-x-4 gap-y-3 border-b border-[var(--border)]">
           <nav
-            className="flex min-w-0 items-center gap-10"
+            className="flex min-w-0 items-center gap-6 md:gap-10"
             role="tablist"
             aria-label="Sessions and archived"
           >
             {tabButtons}
           </nav>
-          <div className="flex shrink-0 items-center gap-3 pb-3">{actions}</div>
+          <div className="flex w-full md:w-auto md:shrink-0 items-center gap-2 md:gap-3 pb-3 overflow-x-auto md:overflow-visible">{actions}</div>
         </div>
       </div>
     );

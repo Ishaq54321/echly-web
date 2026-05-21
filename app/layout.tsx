@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { DM_Sans } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
@@ -13,6 +13,12 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "Annote",
   description: "Structured AI-powered feedback workspace",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
