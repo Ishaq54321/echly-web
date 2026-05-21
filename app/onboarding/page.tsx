@@ -109,7 +109,21 @@ export default function OnboardingPage() {
             : 0;
         if (saved >= 2) {
           // Saved step is 1-indexed; clamp to the available steps for this user.
-          const clamped = Math.min(saved - 1, steps.length - 1);
+          let clamped = Math.min(saved - 1, steps.length - 1);
+          // Invariant: the user cannot be past WorkspaceStep without a
+          // workspaceName, because ReadyStep's completion POST omits the
+          // field when empty and the API correctly rejects. If a prior
+          // session persisted onboardingStep past "workspace" but the
+          // workspace doc no longer hydrates a name (abandoned flow,
+          // expired cookie, etc.), force them back to WorkspaceStep.
+          const workspaceStepIndex = steps.indexOf("workspace");
+          if (
+            workspaceStepIndex >= 0 &&
+            !workspaceName.trim() &&
+            clamped > workspaceStepIndex
+          ) {
+            clamped = workspaceStepIndex;
+          }
           setStepIndex(Math.max(clamped, 0));
         }
       } catch {

@@ -1,61 +1,42 @@
 import Link from "next/link";
+import { AnnoteLogo } from "./AnnoteLogo";
 
-// Marketing header — intentionally NOT a reuse of components/layout/GlobalHeader.
-// GlobalHeader fires authFetch("/api/workspace/member-count") and subscribes
-// to billing/notifications stores on mount; none of that is safe (or useful)
-// for logged-out visitors. This is a clean, dependency-free header.
-
-const NAV_LINKS: ReadonlyArray<{ label: string; href: string }> = [
-  { label: "Product", href: "#product" },
+const NAV_LINKS: ReadonlyArray<{ label: string; href: string; caret?: boolean }> = [
+  { label: "Product", href: "#product", caret: true },
+  { label: "Agencies", href: "#agencies" },
+  { label: "Teams", href: "#teams" },
   { label: "Pricing", href: "#pricing" },
-  { label: "Changelog", href: "#changelog" },
 ];
 
 export function MarketingHeader() {
   return (
-    <header
-      className="sticky top-0 z-40 w-full border-b"
-      style={{
-        background: "var(--surface-page)",
-        borderColor: "transparent",
-      }}
-    >
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
-        <Link
-          href="/"
-          className="text-lg font-semibold tracking-tight"
-          style={{ color: "var(--text-heading)" }}
-        >
-          Annote
+    <header className="mk-nav">
+      <div className="mk-nav-inner">
+        <Link href="/" className="mk-logo" aria-label="Annote">
+          <span className="mk-logo-mark">
+            <AnnoteLogo width={22} height={28} />
+          </span>
+          <span className="mk-logo-word">Annote</span>
         </Link>
 
-        <nav className="hidden items-center gap-8 md:flex">
+        <nav className="mk-nav-links" aria-label="Primary">
           {NAV_LINKS.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              className="text-sm transition-colors hover:opacity-100"
-              style={{ color: "var(--text-body)" }}
-            >
+            <a key={link.href} href={link.href}>
               {link.label}
+              {link.caret ? <span className="caret-d">▾</span> : null}
             </a>
           ))}
         </nav>
 
-        <div className="flex items-center gap-3">
-          <Link
-            href="/login"
-            className="text-sm transition-colors"
-            style={{ color: "var(--text-body)" }}
-          >
+        <div className="mk-nav-cta">
+          <a className="mk-nav-link-quiet" href="#contact">
+            Contact sales
+          </a>
+          <Link className="mk-nav-link-quiet" href="/login">
             Sign in
           </Link>
-          <Link
-            href="/signup"
-            className="inline-flex h-9 items-center rounded-full px-4 text-sm font-medium text-white transition-opacity hover:opacity-90"
-            style={{ background: "var(--brand)" }}
-          >
-            Get started — it&apos;s free
+          <Link className="btn-primary" href="/signup">
+            Get Annote
           </Link>
         </div>
       </div>

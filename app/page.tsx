@@ -1,7 +1,27 @@
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { verifySessionToken, SESSION_COOKIE_NAME } from "@/lib/server/session";
 import { MarketingHome } from "./(marketing)/_components/MarketingHome";
+
+export const metadata: Metadata = {
+  title: "Annote — Feedback at the speed of seeing it.",
+  description:
+    "Click. Speak. Send the link. AI turns rough notes into polished tickets your team can ship.",
+  openGraph: {
+    title: "Annote — Feedback at the speed of seeing it.",
+    description:
+      "Click. Speak. Send the link. AI turns rough notes into polished tickets your team can ship.",
+    url: "/",
+    siteName: "Annote",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Annote — Feedback at the speed of seeing it.",
+    description: "Click. Speak. Send the link.",
+  },
+};
 
 export default async function Home() {
   const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;

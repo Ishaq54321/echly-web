@@ -1,6 +1,4 @@
-// Placeholder footer. Phase 2 will replace the placeholder columns and
-// bottom-bar copy with real navigation. Structure is here so Phase 2 is a
-// content/design fill-in.
+import { AnnoteLogo } from "./AnnoteLogo";
 
 type FooterColumn = {
   heading: string;
@@ -11,109 +9,77 @@ const COLUMNS: ReadonlyArray<FooterColumn> = [
   {
     heading: "Product",
     links: [
-      { label: "Overview", href: "#" },
-      { label: "Pricing", href: "#" },
+      { label: "Annote Capture", href: "#" },
+      { label: "Annote Voice", href: "#" },
+      { label: "Sessions", href: "#" },
+      { label: "Integrations", href: "#" },
       { label: "Changelog", href: "#" },
-      { label: "Roadmap", href: "#" },
-      { label: "Status", href: "#" },
-    ],
-  },
-  {
-    heading: "Solutions",
-    links: [
-      { label: "Webflow agencies", href: "#" },
-      { label: "Framer agencies", href: "#" },
-      { label: "Product teams", href: "#" },
-      { label: "Freelancers", href: "#" },
-      { label: "Marketing teams", href: "#" },
-    ],
-  },
-  {
-    heading: "Resources",
-    links: [
-      { label: "Documentation", href: "#" },
-      { label: "Help center", href: "#" },
-      { label: "Blog", href: "#" },
-      { label: "Templates", href: "#" },
-      { label: "Browser extension", href: "#" },
     ],
   },
   {
     heading: "Company",
     links: [
+      { label: "Contact us", href: "#" },
       { label: "About", href: "#" },
-      { label: "Customers", href: "#" },
       { label: "Careers", href: "#" },
-      { label: "Press", href: "#" },
-      { label: "Contact", href: "#" },
+      { label: "Help center", href: "#" },
+      { label: "Partners", href: "#" },
     ],
   },
   {
     heading: "Legal",
     links: [
-      { label: "Privacy", href: "#" },
       { label: "Terms", href: "#" },
-      { label: "Security", href: "#" },
+      { label: "Privacy policy", href: "#" },
+      { label: "Trust", href: "#" },
       { label: "DPA", href: "#" },
-      { label: "Subprocessors", href: "#" },
+      { label: "Your privacy choices", href: "#" },
+    ],
+  },
+  {
+    heading: "Connect",
+    links: [
+      { label: "LinkedIn", href: "#" },
+      { label: "X", href: "#" },
+      { label: "Instagram", href: "#" },
+      { label: "YouTube", href: "#" },
+      { label: "Threads", href: "#" },
     ],
   },
 ];
 
 export function MarketingFooter() {
-  const year = new Date().getFullYear();
   return (
-    <footer
-      className="border-t"
-      style={{
-        background: "var(--surface-page)",
-        borderColor: "var(--border)",
-      }}
-    >
-      <div className="mx-auto max-w-7xl px-6 py-16">
-        <div className="grid grid-cols-2 gap-10 md:grid-cols-5">
-          {COLUMNS.map((col) => (
-            <div key={col.heading}>
-              <h3
-                className="mb-4 text-sm font-semibold"
-                style={{ color: "var(--text-heading)" }}
-              >
-                {col.heading}
-              </h3>
-              <ul className="space-y-3">
-                {col.links.map((link) => (
-                  <li key={link.label}>
-                    <a
-                      href={link.href}
-                      className="text-sm transition-opacity hover:opacity-70"
-                      style={{ color: "var(--text-body)" }}
-                    >
-                      {link.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-
-        <div
-          className="mt-12 flex flex-col items-start justify-between gap-4 border-t pt-8 md:flex-row md:items-center"
-          style={{ borderColor: "var(--border)" }}
-        >
-          <div
-            className="text-sm"
-            style={{ color: "var(--text-tertiary)" }}
-          >
-            © {year} Annote — Feedback at the speed of seeing it.
+    <footer className="mk-footer">
+      <div className="foot-inner">
+        <div className="foot-brand">
+          <div className="foot-brand-row">
+            <span className="mk-logo-mark">
+              <AnnoteLogo width={22} height={28} />
+            </span>
+            <span className="mk-logo-word">Annote</span>
           </div>
-          <div
-            className="text-sm"
-            style={{ color: "var(--text-tertiary)" }}
-          >
-            Made for teams who care about the small stuff.
-          </div>
+          <p className="foot-tag">
+            Built for the people
+            <br />
+            who care about the details.
+          </p>
         </div>
+        {COLUMNS.map((col) => (
+          <div className="foot-col" key={col.heading}>
+            <h6>{col.heading}</h6>
+            <ul>
+              {col.links.map((link) => (
+                <li key={link.label}>
+                  <a href={link.href}>{link.label}</a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+      <div className="foot-wordmark" aria-hidden="true">
+        ANNOTE
       </div>
     </footer>
   );
