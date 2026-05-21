@@ -32,7 +32,7 @@ export function SessionsTimeRangeFilter({
   const label = FILTER_LABELS[value];
 
   return (
-    <div className="relative shrink-0" ref={ref}>
+    <div className="relative shrink-0 hidden md:block" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}

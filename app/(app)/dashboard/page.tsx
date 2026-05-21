@@ -279,7 +279,7 @@ function DashboardContent() {
                       onClick={triggerCta}
                       disabled={startingRecorder || !isIdentityResolved}
                       aria-busy={startingRecorder}
-                      className="ml-auto inline-flex h-11 md:h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+                      className="ml-auto hidden md:inline-flex h-11 md:h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--brand)] text-white text-[14px] font-medium hover:bg-[var(--brand-hover)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
                     >
                       New Session
                     </button>

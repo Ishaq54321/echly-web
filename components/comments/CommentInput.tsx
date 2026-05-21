@@ -17,7 +17,7 @@ export default function CommentInput({ onSend }: Props) {
   };
 
   return (
-    <div className="px-6 py-8 bg-[var(--surface-1)] border-b">
+    <div className="px-6 pt-8 pb-[calc(2rem+env(safe-area-inset-bottom))] bg-[var(--surface-1)] border-b">
       <div className="flex items-center gap-3">
         <input
           type="text"

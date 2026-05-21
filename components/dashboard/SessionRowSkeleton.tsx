@@ -26,13 +26,13 @@ export function SessionRowSkeleton({ count = 2 }: { count?: number }) {
             </div>
             <div className="flex flex-col gap-2 min-w-0">
               {/* Title — matches the 15px font-medium heading line */}
-              <div className="session-row-skeleton__bar h-[15px] w-[240px] rounded" />
+              <div className="session-row-skeleton__bar h-[15px] w-[240px] max-w-full rounded" />
               {/* Subtitle — matches the 13px secondary "Created by · N comments" line */}
-              <div className="session-row-skeleton__bar h-[13px] w-[150px] rounded" />
+              <div className="session-row-skeleton__bar h-[13px] w-[150px] max-w-full rounded" />
             </div>
           </div>
           {/* Right metadata cluster — open / resolved / date, gap-10 like the real row */}
-          <div className="flex min-h-[36px] items-center shrink-0 gap-10">
+          <div className="flex min-h-[36px] items-center shrink-0 gap-2 md:gap-10">
             <div className="session-row-skeleton__bar h-[14px] w-[64px] rounded" />
             <div className="session-row-skeleton__bar h-[14px] w-[78px] rounded" />
             <div className="session-row-skeleton__bar h-[14px] w-[70px] rounded" />

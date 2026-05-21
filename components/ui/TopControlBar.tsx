@@ -205,7 +205,7 @@ export function TopControlBar({
         </div>
 
         {/* Center: Search */}
-        <div className="w-full max-w-[420px] relative" style={{ visibility: sessionLoaded ? "visible" : "hidden" }}>
+        <div className="w-full max-w-[420px] relative hidden md:block" style={{ visibility: sessionLoaded ? "visible" : "hidden" }}>
           <div className="h-[34px] bg-white/70 border border-[var(--hair)] rounded-[9px] flex items-center gap-2.5 px-3 cursor-text hover:bg-white hover:border-[var(--hair-strong)] transition-all">
             <Search size={16} strokeWidth={2} className="shrink-0 text-[var(--text-body)]" />
             <input

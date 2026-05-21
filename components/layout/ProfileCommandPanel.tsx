@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import { useIsMobile } from "@/lib/hooks/useIsMobile";
 import {
   ArrowRight,
   Bug,
@@ -202,6 +203,7 @@ export function ProfileCommandPanel({
 }: ProfileCommandPanelProps) {
   const router = useRouter();
   const panelRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
   const [position, setPosition] = useState<{ top: number; left: number } | null>(() => {
     if (!anchorRef?.current) return null;
     const rect = anchorRef.current.getBoundingClientRect();
@@ -216,22 +218,33 @@ export function ProfileCommandPanel({
     isLoaded: isBillingLoaded,
   } = useBillingStore();
 
+  const updatePosition = useCallback(() => {
+    if (!anchorRef?.current) return;
+    const rect = anchorRef.current.getBoundingClientRect();
+    setPosition({
+      top: rect.bottom + 6,
+      left: Math.max(8, rect.right - PANEL_WIDTH),
+    });
+  }, [anchorRef]);
+
   useEffect(() => {
     if (!open || !anchorRef?.current) {
       setPosition(null);
       setMounted(false);
       return;
     }
-    const rect = anchorRef.current.getBoundingClientRect();
-    setPosition({
-      top: rect.bottom + 6,
-      left: Math.max(8, rect.right - PANEL_WIDTH),
-    });
+    updatePosition();
     const t = requestAnimationFrame(() => {
       setMounted(true);
     });
-    return () => cancelAnimationFrame(t);
-  }, [open, anchorRef]);
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      cancelAnimationFrame(t);
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open, anchorRef, updatePosition]);
 
   useEffect(() => {
     if (!open) return;
@@ -312,16 +325,30 @@ export function ProfileCommandPanel({
           aria-label="Profile"
           className="fixed z-[1101]"
           style={{
-            width: PANEL_WIDTH,
-            top: position.top,
-            left: position.left,
+            width: isMobile ? "calc(100vw - 32px)" : PANEL_WIDTH,
+            maxWidth: PANEL_WIDTH,
+            ...(isMobile
+              ? {
+                  top: "50%",
+                  left: "50%",
+                  transform: mounted
+                    ? "translate(-50%, -50%) scale(1)"
+                    : "translate(-50%, -50%) scale(0.98)",
+                }
+              : {
+                  top: position.top,
+                  left: position.left,
+                  transform: mounted
+                    ? "translateY(0) scale(1)"
+                    : "translateY(-6px) scale(0.98)",
+                }),
+            maxHeight: "calc(100dvh - 20px)",
+            overflowY: "auto",
             background: "var(--surface-card)",
             borderRadius: "var(--radius-lg)",
             border: "1px solid var(--border)",
             boxShadow: "var(--shadow-lg)",
-            overflow: "hidden",
             opacity: mounted ? 1 : 0,
-            transform: mounted ? "translateY(0) scale(1)" : "translateY(-6px) scale(0.98)",
             transition: `opacity var(--duration-fast) var(--ease), transform var(--duration-fast) var(--ease)`,
           }}
           onClick={(e) => e.stopPropagation()}

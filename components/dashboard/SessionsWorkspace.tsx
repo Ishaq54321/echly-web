@@ -222,7 +222,7 @@ export const SessionWorkspaceRow = memo(function SessionWorkspaceRow({
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         className={[
-          "group relative flex w-full items-center justify-between gap-3 rounded-lg px-3 md:px-4 py-3 md:py-4 transition-all duration-150 hover:bg-[var(--surface-hover)]",
+          "group relative flex w-full flex-col items-start gap-2 md:flex-row md:items-center md:justify-between md:gap-3 rounded-lg px-3 md:px-4 py-3 md:py-4 transition-all duration-150 hover:bg-[var(--surface-hover)]",
           isSelectionMode ? "hover:bg-[var(--surface-hover)] cursor-pointer" : "",
           isSelected ? "bg-[var(--brand-subtle)] hover:bg-[var(--brand-subtle)]" : "",
           openingId === session.id ? "bg-[var(--surface-subtle)]" : "",
@@ -231,7 +231,7 @@ export const SessionWorkspaceRow = memo(function SessionWorkspaceRow({
           .join(" ")}
         data-session-id={session.id}
       >
-        <div className="flex items-center gap-4 min-w-0">
+        <div className="flex w-full md:w-auto items-center gap-4 min-w-0">
           <button
             type="button"
             aria-label={isSelected ? "Deselect session" : "Select session"}
@@ -324,7 +324,7 @@ export const SessionWorkspaceRow = memo(function SessionWorkspaceRow({
           </div>
         </div>
 
-        <div className="flex min-h-[36px] items-center shrink-0 gap-3 md:gap-10 transition-[margin] duration-150 group-hover:mr-[86px]">
+        <div className="flex min-h-[36px] items-center shrink-0 gap-3 md:gap-10 pl-[54px] md:pl-0 transition-[margin] duration-150 md:group-hover:mr-[86px]">
           {(() => {
             const viewCount = session.viewCount ?? 0;
             const maxVisible = 4;
