@@ -67,10 +67,14 @@ type Phase =
   | "hold";
 
 const PHASE_DURATIONS: Record<Phase, number> = {
-  listening: 1000,
+  // Short lead-in so typing begins promptly.
+  listening: 400,
   typing: ROUGH_TRANSCRIPT.length * 20 + 200,
-  ready: 500,
-  pressing: 280,
+  // After typing completes, hold the finished transcript for 1.5s before the
+  // polish + transition kick in.
+  ready: 1500,
+  // The "Polishing…" beat — long enough to read during the self-press.
+  pressing: 650,
   polished: 1800,
   hold: 600,
 };
@@ -125,6 +129,20 @@ export function VoiceTicketDemo() {
   const reduced = usePrefersReducedMotion();
   const { ref, inView } = useInViewport<HTMLDivElement>();
 
+  // Reset the typewriter counter *during render* the moment the phase becomes
+  // `typing`, so the stale full-length value from the previous loop is never
+  // committed — without this, one frame paints the whole sentence before the
+  // interval starts (the "flash"). This is React's sanctioned pattern for
+  // adjusting state on a transition: the setter triggers an immediate re-render
+  // and the discarded render is never shown.
+  const prevPhaseRef = useRef<Phase>(state.phase);
+  if (prevPhaseRef.current !== state.phase) {
+    prevPhaseRef.current = state.phase;
+    if (state.phase === "typing" || state.phase === "listening") {
+      setTypedChars(0);
+    }
+  }
+
   // Phase clock
   useEffect(() => {
     if (reduced || !inView) return;
@@ -133,9 +151,9 @@ export function VoiceTicketDemo() {
     return () => window.clearTimeout(id);
   }, [state.phase, reduced, inView]);
 
-  // Typewriter for the rough transcript. Only the interval body mutates state;
-  // the JSX derives the visible substring from state.phase, so no synchronous
-  // reset is needed here.
+  // Typewriter for the rough transcript — adds a character per interval tick.
+  // The counter is already 0 here (reset during render above), so typing always
+  // starts from empty.
   useEffect(() => {
     if (reduced) return;
     if (state.phase !== "typing") return;
@@ -149,6 +167,8 @@ export function VoiceTicketDemo() {
   }, [state.phase, reduced]);
 
   const showPolished = state.phase === "polished" || state.phase === "hold";
+  // "Polishing…" shows during the self-press (`pressing`); `ready` is the 1.5s
+  // pause on the finished transcript, where the button still reads "Polish".
   const pressing = state.phase === "pressing";
 
   // visibleChars derives from state.phase so we don't need a synchronous
@@ -188,7 +208,11 @@ export function VoiceTicketDemo() {
             />
           </div>
         </div>
-        <div className="vtdemo-foot">
+        {/* Once the polished ticket (with its own Send button) is shown, the
+            Polish control has done its job — collapse the footer so the spinning
+            spark doesn't linger behind the result. Kept in the DOM and animated
+            out (rather than unmounted) so the card height doesn't snap on loop. */}
+        <div className={`vtdemo-foot${showPolished ? " is-done" : ""}`}>
           <span className="vtdemo-time">0:11</span>
           <button
             type="button"
@@ -196,7 +220,7 @@ export function VoiceTicketDemo() {
             aria-hidden="true"
             tabIndex={-1}
           >
-            Polish <span className="vtdemo-polish-spark" />
+            Polishing <span className="vtdemo-polish-spark" />
           </button>
         </div>
       </div>

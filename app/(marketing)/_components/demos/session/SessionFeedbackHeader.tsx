@@ -5,11 +5,15 @@
  * - Stripped useWorkspace/useFeedbackDetailController/useRouter (the source had
  *   none directly; data arrives via props). Replaced the heavy prop API with a
  *   small one fed from static mock data.
- * - Removed AssignDropdown / PriorityDropdown imports + their JSX branches: those
- *   only render when assigneeId/priority are set, which the demo never sets.
+ * - INTERACTIVITY PASS: re-introduced the Assign + Priority chips (forklifted as
+ *   DemoAssignDropdown / DemoPriorityDropdown) into the authed action row, in the
+ *   real product's position — right after Resolve, before Activity
+ *   (FeedbackHeader.tsx:466-518). Unlike production these are always the
+ *   editable, label-visible (non-iconOnly) variant, fed local-state callbacks.
  * - Removed the shareGating / readOnly / accessResolve branches (never hit with
  *   static authed data). Kept ONLY the default authed action row verbatim:
- *   Resolve/Reopen + Activity + Delete (Delete + Activity are no-ops here).
+ *   Resolve/Reopen + Assign + Priority + Activity + Delete (Delete + Activity
+ *   are no-ops here).
  * - onResolvedChange flips local state in the parent (no API).
  * - No meta row under the title (a marketing-only page/browser/OS row was tried
  *   then removed per request) — capture metadata appears only in the screenshot
@@ -31,6 +35,9 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { DemoAssignDropdown, type DemoMember } from "./DemoAssignDropdown";
+import { DemoPriorityDropdown, type DemoPriority } from "./DemoPriorityDropdown";
+import type { DemoAssignment } from "./useStaticFeedbackController";
 
 const actionBtn =
   "inline-flex h-[34px] items-center gap-2 px-3.5 rounded-[7px] border border-[var(--border)] bg-transparent text-[var(--text-heading)] text-[13px] font-medium hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none";
@@ -81,6 +88,11 @@ export interface SessionFeedbackHeaderProps {
   onToggleActivity?: () => void;
   isActivityPanelOpen?: boolean;
   onDelete?: () => void;
+  /** Demo-local assignment/priority for the selected ticket + their setters. */
+  members?: DemoMember[];
+  assignment?: DemoAssignment;
+  onAssigned?: (assigneeId: string | null, assigneeName: string | null, assigneeAvatarUrl: string | null) => void;
+  onPriorityChanged?: (priority: DemoPriority | null) => void;
 }
 
 export function SessionFeedbackHeader({
@@ -90,6 +102,10 @@ export function SessionFeedbackHeader({
   onToggleActivity,
   isActivityPanelOpen = false,
   onDelete,
+  members,
+  assignment,
+  onAssigned,
+  onPriorityChanged,
 }: SessionFeedbackHeaderProps) {
   const [resolveFlash, setResolveFlash] = useState(false);
   useEffect(() => {
@@ -154,6 +170,23 @@ export function SessionFeedbackHeader({
               Resolve
             </button>
           )}
+          {/* Assign — editable demo dropdown (real product: FeedbackHeader.tsx:466) */}
+          {members && assignment && onAssigned ? (
+            <DemoAssignDropdown
+              members={members}
+              currentAssigneeId={assignment.assignee?.id ?? null}
+              currentAssigneeName={assignment.assignee?.name ?? null}
+              currentAssigneeAvatarUrl={assignment.assignee?.avatarUrl ?? null}
+              onAssigned={onAssigned}
+            />
+          ) : null}
+          {/* Priority — editable demo dropdown (real product: FeedbackHeader.tsx:496) */}
+          {assignment && onPriorityChanged ? (
+            <DemoPriorityDropdown
+              currentPriority={assignment.priority ?? null}
+              onPriorityChanged={onPriorityChanged}
+            />
+          ) : null}
           {/* Activity — toggle (no-op panel in the marketing demo) */}
           {onToggleActivity ? (
             <button

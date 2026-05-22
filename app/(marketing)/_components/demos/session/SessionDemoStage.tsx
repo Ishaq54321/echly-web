@@ -23,6 +23,20 @@ import { FeedbackContent } from "./FeedbackContent";
 import { SessionTopBar } from "./SessionTopBar";
 import { ShareModal } from "./ShareModal";
 import { useStaticFeedbackController } from "./useStaticFeedbackController";
+import type { DemoMember } from "./DemoAssignDropdown";
+
+/**
+ * Assignable people for the demo. The four named collaborators on this session
+ * (the MOCK_SESSION viewers) — Maya, Daniel, Sarah, Alex. Their uids match the
+ * comment authors' userId seeds so avatar colors stay consistent across the
+ * thread and the assignee chip.
+ */
+const DEMO_MEMBERS: DemoMember[] = [
+  { uid: "u-maya", displayName: "Maya Anand", email: "maya@studionorthwind.com", avatarUrl: "/marketing/people/maya-anand.jpg" },
+  { uid: "u-daniel", displayName: "Daniel Torres", email: "daniel@studionorthwind.com", avatarUrl: "/marketing/people/daniel-torres.jpg" },
+  { uid: "u-sarah", displayName: "Sarah Kim", email: "sarah@studionorthwind.com", avatarUrl: "/marketing/people/sarah-kim.jpg" },
+  { uid: "u-alex", displayName: "Alex Nguyen", email: "alex@studionorthwind.com", avatarUrl: "/marketing/people/alex-nguyen.jpg" },
+];
 
 export function SessionDemoStage() {
   const [selectedTicketId, setSelectedTicketId] = useState(MOCK_TICKETS[0].id);
@@ -120,6 +134,12 @@ export function SessionDemoStage() {
               onToggleActivity={() => setActivityOpen((v) => !v)}
               isActivityPanelOpen={activityOpen}
               onDelete={() => { /* no-op in the marketing demo */ }}
+              members={DEMO_MEMBERS}
+              assignment={controller.assignment}
+              onAssigned={(id, name, avatarUrl) =>
+                controller.assignTo(id && name ? { id, name, avatarUrl: avatarUrl ?? "" } : null)
+              }
+              onPriorityChanged={controller.setPriority}
             />
             <FeedbackContent ticket={selectedTicket} controller={controller} />
           </main>

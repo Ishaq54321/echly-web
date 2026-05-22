@@ -40,7 +40,6 @@ import Link from "next/link";
 import { AnimatePresence } from "framer-motion";
 import { ArrowIcon, DownloadIcon } from "../icons";
 import { CapturePill } from "./annote/CapturePill";
-import { SessionControlPanel } from "./annote/SessionControlPanel";
 import { ExtensionTray } from "./annote/ExtensionTray";
 import { ElementHighlighter } from "./annote/ElementHighlighter";
 import { SpeechCaption } from "./annote/SpeechCaption";
@@ -516,14 +515,6 @@ export function HeroCaptureDemo() {
             )}
           </div>
         )}
-
-        <div className="hcd-sc-anchor">
-          <SessionControlPanel
-            sessionPaused={false}
-            pausePending={false}
-            endPending={false}
-          />
-        </div>
 
         <div className="hcd-tray-anchor">
           <ExtensionTray

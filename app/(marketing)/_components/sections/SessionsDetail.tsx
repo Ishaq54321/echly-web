@@ -13,7 +13,6 @@ export function SessionsDetail() {
   return (
     <section id="teams" className="sessions-detail">
       <div className="sd-head">
-        <span className="section-eyebrow">The workflow it replaces</span>
         <h2 className="sd-h">
           Stop chasing feedback across
           <br />

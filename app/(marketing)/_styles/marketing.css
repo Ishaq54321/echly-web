@@ -1,11 +1,11 @@
-/* ============================================================
-   ANNOTE Marketing — V7 styles, scoped to .marketing-root
+﻿/* ============================================================
+   ANNOTE Marketing â€” V7 styles, scoped to .marketing-root
    Tokens, animations, and layouts are isolated from the app.
    ============================================================ */
 
 .marketing-root {
   /* page foundation */
-  --bg-0: #FAFAFA;
+  --bg-0: #F9F9F9;
   --bg-1: #F2F2F2;
   --bg-2: #EAEAEA;
 
@@ -58,30 +58,9 @@
 
   --mk-font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
 
-  /* Light corporate foundation (Shadcnspace register).
-     The hero region — announcement bar, navbar, hero copy/demo — now sits on a
-     soft warm off-white that deepens slightly toward a warm cream at the bottom
-     of the band. Two faint lavender/blue washes give the off-white subtle
-     dimension without reading as a "gradient hero". Below the band the page
-     falls back to the base off-white. The navbar (transparent) reads over the
-     warm cream instead of over the old navy. */
-  /* Atmospheric depth (Shadcnspace register): three stacked layers — a warm
-     cream radial wash anchored to the right, a cool blue-tint radial wash on the
-     left, both fading to transparent ~60% so they blend softly into a warm
-     off-white base in the middle of the page. Reads as "carefully crafted
-     background", not flat color. background-attachment:fixed keeps the
-     atmosphere stable as the page scrolls past the hero band. */
-  background:
-    /* Layer 1: warm cream wash on the right — fully opaque core, deeper amber
-       tint, holds its color further (solid to 25%) and reaches well past center
-       so the warmth dominates the right half. */
-    radial-gradient(ellipse 100% 95% at 100% 50%, rgba(255, 230, 188, 1) 0%, rgba(255, 230, 188, 0.7) 25%, rgba(255, 230, 188, 0) 80%),
-    /* Layer 2: cool blue tint on the left — fully opaque core, deeper blue,
-       holds further and reaches well past center so the cool side reads strongly. */
-    radial-gradient(ellipse 95% 90% at 0% 40%, rgba(188, 212, 250, 1) 0%, rgba(188, 212, 250, 0.7) 25%, rgba(188, 212, 250, 0) 80%),
-    /* Layer 3: base warm off-white */
-    linear-gradient(180deg, #FAFAF8 0%, #F5F2EC 100%);
-  background-attachment: fixed;
+  /* Soft off-white page foundation (#F9F9F9) â€” matches the sections above so
+     the whole light area reads as one continuous canvas. */
+  background: #F9F9F9;
   color: var(--ink-1);
   font-weight: 400;
   line-height: 1.55;
@@ -224,18 +203,15 @@
   color: var(--ink-1);
 }
 
-/* ── Hero navbar (over the light warm-cream foundation) ──
+/* â”€â”€ Hero navbar (over the light warm-cream foundation) â”€â”€
    Transparent header, dark-ink wordmark + links, hairline dark divider, and a
-   solid dark "signup" pill on the right (Option A — the Shadcnspace register).
+   solid dark "signup" pill on the right (Option A â€” the Shadcnspace register).
    The brand violet lives elsewhere (CTA arrow circle, accents), not here. */
 .marketing-root .mk-nav--hero {
-  /* v21: subtle frosted-glass backdrop. On the lighter atmospheric foundation a
-     fully-transparent nav started to blend into the hero copy; a faint blur +
-     saturation lifts the nav off the gradient without hiding the atmosphere
-     behind it. */
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(12px) saturate(160%);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  /* Pure white navbar â€” opaque white covers the page-level cream/blue gradient
+     so the nav reads continuous with the white hero band below it. (Previous
+     frosted translucent backdrop let the gradient show through.) */
+  background: #ffffff;
   border-bottom-color: rgba(21, 16, 31, 0.06);
 }
 .marketing-root .mk-nav--hero .mk-logo-word {
@@ -253,7 +229,7 @@
 .marketing-root .mk-nav--hero .mk-nav-link-quiet:hover {
   color: var(--ink-1);
 }
-/* Solid dark pill signup CTA — dark ink fill, white label. Overrides the
+/* Solid dark pill signup CTA â€” dark ink fill, white label. Overrides the
    .btn-primary violet it also carries. */
 .marketing-root .mk-nav-signup {
   background: #15101F;
@@ -301,7 +277,7 @@
   font-size: 15px;
 }
 
-/* ── Hero CTA (pill) ──
+/* â”€â”€ Hero CTA (pill) â”€â”€
    Reverted from the rectangular split-panel version: that read too "buttony"
    and the separated violet arrow panel didn't fit the aesthetic. Back to a
    fully-rounded dark pill with the label on the left and a small brand-violet
@@ -312,7 +288,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  /* v21: 56px (was 52px) — more presence to match the bolder headline above,
+  /* v21: 56px (was 52px) â€” more presence to match the bolder headline above,
      and a slightly stronger shadow for definition on the lighter atmosphere. */
   height: 56px;
   padding: 0 8px 0 24px;
@@ -402,15 +378,13 @@
 .marketing-root .hero {
   position: relative;
   overflow: hidden;
-  /* The deep-blue base band lives on .marketing-root so it spans the navbar
-     too; the hero is transparent and the animated .hero-aurora blobs drift
-     over it. */
-  background: transparent;
+  /* Hero band matches the page foundation (#F9F9F9) for one continuous canvas. */
+  background: #F9F9F9;
 }
 
-/* ── Animated aurora background ─────────────────────────────────────────────
+/* â”€â”€ Animated aurora background â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    Soft, large color blobs that slowly drift, scale and breathe over the deep
-   navy base — echoing the reference: blue + teal/green at the bottom-centre and
+   navy base â€” echoing the reference: blue + teal/green at the bottom-centre and
    a magenta glow toward the lower-left. Decorative only; pinned behind all hero
    content (z-index 0) and frozen for prefers-reduced-motion. */
 .marketing-root .hero-aurora {
@@ -425,16 +399,19 @@
 /* Light-theme aurora: the same drifting blobs, but recalibrated as faint warm
    color washes on the off-white. `screen` blend is gone (it vanishes on light);
    these are very-low-opacity tints in normal blend that add the barest hint of
-   lavender/blue/rose dimension to the cream — never a "colored hero". */
+   lavender/blue/rose dimension to the cream â€” never a "colored hero". */
 .marketing-root .hero-aurora-blob {
   position: absolute;
   display: block;
   border-radius: 50%;
-  opacity: 0.5;
+  /* Hidden: hero is plain white now (colored aurora washes removed per request).
+     animation:none stops the keyframes from animating opacity back up. */
+  opacity: 0;
+  animation: none !important;
   will-change: transform, opacity;
   mix-blend-mode: normal;
 }
-/* a — soft lavender, upper-left */
+/* a â€” soft lavender, upper-left */
 .marketing-root .hero-aurora-blob--a {
   width: 60vw;
   height: 60vw;
@@ -443,7 +420,7 @@
   background: radial-gradient(circle at 50% 50%, rgba(90, 73, 191, 0.10) 0%, rgba(90, 73, 191, 0) 68%);
   animation: hero-aurora-a 22s ease-in-out infinite;
 }
-/* b — pale sky blue, lower-centre */
+/* b â€” pale sky blue, lower-centre */
 .marketing-root .hero-aurora-blob--b {
   width: 55vw;
   height: 55vw;
@@ -452,7 +429,7 @@
   background: radial-gradient(circle at 50% 50%, rgba(58, 110, 200, 0.08) 0%, rgba(58, 110, 200, 0) 66%);
   animation: hero-aurora-b 26s ease-in-out infinite;
 }
-/* c — faint rose, lower-left */
+/* c â€” faint rose, lower-left */
 .marketing-root .hero-aurora-blob--c {
   width: 46vw;
   height: 46vw;
@@ -461,7 +438,7 @@
   background: radial-gradient(circle at 50% 50%, rgba(197, 26, 104, 0.05) 0%, rgba(197, 26, 104, 0) 64%);
   animation: hero-aurora-c 30s ease-in-out infinite;
 }
-/* d — pale indigo, upper-right */
+/* d â€” pale indigo, upper-right */
 .marketing-root .hero-aurora-blob--d {
   width: 52vw;
   height: 52vw;
@@ -877,8 +854,8 @@
 /* ============ FROM CLICK TO TICKET ============
    Replaces the former tabbed Suite section. Parent heading frames three
    scroll-revealed subsections (Capture / Voice / Sessions). Mockups compose
-   real product styling — browser chrome, capture pill + recording orb, session
-   sidebar, status pills, comment threads — at marketing scale, with embedded
+   real product styling â€” browser chrome, capture pill + recording orb, session
+   sidebar, status pills, comment threads â€” at marketing scale, with embedded
    photography (placeholders under /public/marketing/people/). */
 .marketing-root .ctt-root {
   display: flex;
@@ -935,7 +912,7 @@
   transform: translateY(0);
 }
 
-/* Decorative diagonal side stripes — structural texture */
+/* Decorative diagonal side stripes â€” structural texture */
 .marketing-root .ctt-card::before,
 .marketing-root .ctt-card::after {
   content: "";
@@ -974,9 +951,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
   background: #F0ECFB;
   color: #5A49BF;
 }
@@ -1098,6 +1075,58 @@
     ),
     linear-gradient(135deg, #F5EEF8 0%, #F8E8E8 50%, #FFF4E8 100%);
 }
+
+/* ---- Floating context chips (Voice column) ----
+   While you talk, Annote silently attaches the page, element, browser, OS and
+   brand tokens. These chips render that hidden context as glassy pills
+   scattered in the atmosphere around the voice card â€” the visual replacement
+   for the former "Why this is different" section. They fade + rise in one by
+   one once the parent .ctt-card enters view (stagger via per-chip --d). */
+.marketing-root .ctt-ctx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+.marketing-root .ctt-ctx-chip {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-family: var(--mk-font-mono);
+  color: var(--ink-2);
+  letter-spacing: -0.003em;
+  white-space: nowrap;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.05),
+    0 8px 20px -6px rgba(15, 23, 42, 0.16);
+  /* Hidden until the card is seen; transition handles the reveal. */
+  opacity: 0;
+  transform: translateY(10px) scale(0.96);
+  transition:
+    opacity 460ms cubic-bezier(0.16, 1, 0.3, 1) var(--d, 0ms),
+    transform 460ms cubic-bezier(0.16, 1, 0.3, 1) var(--d, 0ms);
+}
+.marketing-root .ctt-card.ctt-in-view .ctt-ctx-chip {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+/* Scatter â€” anchored to the column edges, deliberately uneven so it reads as
+   floating context rather than a caption row. Each chip overlaps the card's
+   atmosphere without clipping against the column's overflow:hidden. */
+.marketing-root .ctt-ctx-chip--tl { top: 30px; left: 24px; }
+.marketing-root .ctt-ctx-chip--tr { top: 36px; right: 20px; }
+.marketing-root .ctt-ctx-chip--ml { top: 48%; left: 14px; }
+.marketing-root .ctt-ctx-chip--br { bottom: 44px; right: 22px; }
+.marketing-root .ctt-ctx-chip--bl { bottom: 34px; left: 30px; }
+
 .marketing-root .ctt-card-visual--sessions {
   background:
     radial-gradient(
@@ -1208,21 +1237,26 @@
   color: rgba(15, 23, 42, 0.5);
   flex-shrink: 0;
 }
-/* Annote element highlight — wraps the featured (middle) tier. */
+/* Annote element highlight â€” wraps the featured (middle) tier.
+   Geometry mirrors the tier box model so the stroke sits exactly on the tier's
+   edges: page padding-top 32px + header 14px + header margin 32px below the
+   44px chrome puts the tier top at 122px; the middle column starts one gap +
+   one column-width in from the 24px page padding. The 1px outward offsets
+   center the 2px border on the tier border. */
 .marketing-root .capture-mock-highlight {
   position: absolute;
-  top: 90px;
-  left: calc(33% + 12px);
-  width: calc(33% - 28px);
-  height: 130px;
+  top: 113px;
+  left: calc(24px + (100% - 48px - 24px) / 3 + 12px - 1px);
+  width: calc((100% - 48px - 24px) / 3 + 2px);
+  height: 122px;
   border: 2px solid #5A49BF;
-  border-radius: 14px;
+  border-radius: 13px;
   background: rgba(90, 73, 191, 0.08);
   pointer-events: none;
   outline: 7px solid rgba(90, 73, 191, 0.08);
   outline-offset: -1px;
 }
-/* Capture pill — anchors the real extension <CapturePill> (voice mode, reused
+/* Capture pill â€” anchors the real extension <CapturePill> (voice mode, reused
    from the hero) at the bottom-center of the browser mockup. The pill carries
    its own glass styling; here we only place + scale it to fit the surface. */
 .marketing-root .capture-mock-pill-anchor {
@@ -1257,7 +1291,7 @@
   align-items: center;
   justify-content: center;
 }
-/* The reused VoiceTicketDemo card floats on the atmospheric backdrop — stronger
+/* The reused VoiceTicketDemo card floats on the atmospheric backdrop â€” stronger
    elevation so it reads off the colored column rather than the white page. */
 .marketing-root .voice-mock-demo .vtdemo {
   width: 100%;
@@ -1369,7 +1403,7 @@
   object-fit: cover;
   flex-shrink: 0;
 }
-/* Icon tile — mirrors the dashboard ticket-list tile (TicketItem):
+/* Icon tile â€” mirrors the dashboard ticket-list tile (TicketItem):
    rounded square, neutral surface, secondary icon; brand fill on active row. */
 .marketing-root .sessions-mock-ticket-icon {
   display: grid;
@@ -1483,37 +1517,38 @@
   justify-content: center;
   box-shadow: 0 4px 10px rgba(90, 73, 191, 0.4);
 }
-/* Comments */
-.marketing-root .sessions-mock-comments {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+/* Description + Tags */
+.marketing-root .sessions-mock-section {
+  margin-top: 14px;
 }
-.marketing-root .sessions-mock-comment {
-  display: flex;
-  gap: 9px;
-}
-.marketing-root .sessions-mock-comment-avatar {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-.marketing-root .sessions-mock-comment-body {
-  min-width: 0;
-}
-.marketing-root .sessions-mock-comment-name {
+.marketing-root .sessions-mock-section-label {
   font-size: 12px;
   font-weight: 600;
   color: #15101F;
   letter-spacing: -0.006em;
+  margin-bottom: 6px;
 }
-.marketing-root .sessions-mock-comment-text {
+.marketing-root .sessions-mock-description {
   font-size: 12px;
   color: rgba(15, 23, 42, 0.65);
-  line-height: 1.45;
-  margin-top: 1px;
+  line-height: 1.5;
+  margin: 0;
+}
+.marketing-root .sessions-mock-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.marketing-root .sessions-mock-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--hair);
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(15, 23, 42, 0.65);
+  background: #fff;
 }
 
 /* ============ DARK EDITORIAL ============ */
@@ -1785,24 +1820,39 @@
 /* ============ SESSIONS DETAIL ============ */
 .marketing-root .sessions-detail {
   position: relative;
-  padding: 100px 32px 120px;
+  /* Inset rounded panel (ClickUp-style): max-width + auto margins center the
+     panel and let the light page show at the sides; rounded corners + clipped
+     overflow shape the black field. The vertical padding is the panel's
+     internal spacing. */
+  margin: 0 auto;
+  max-width: 1360px;
+  padding: 56px 32px 64px;
+  border-radius: 28px;
   overflow: hidden;
-  /* Solid deep maroon — matches the "Becoming Annote" editorial field. */
-  background: #3A1622;
+  /* Near-black base: a subtle linear gradient adds depth; the rich color
+     gradient still lives behind the demo stage. */
+  background: linear-gradient(180deg, #0F0F0F 0%, #191919 100%);
+}
+@media (max-width: 720px) {
+  .marketing-root .sessions-detail {
+    margin: 0 12px;
+    border-radius: 20px;
+    padding: 40px 18px 44px;
+  }
 }
 .marketing-root .sd-head {
   position: relative;
   z-index: 1;
   max-width: 980px;
-  margin: 0 auto 50px;
+  margin: 0 auto 32px;
   text-align: center;
 }
 .marketing-root .sd-head .section-eyebrow {
   justify-content: center;
-  color: #C9A8AE;
+  color: #FFFFFF;
 }
 .marketing-root .sd-head .section-eyebrow::before {
-  background: #C9A8AE;
+  background: #FFFFFF;
 }
 .marketing-root .sd-h {
   font-size: clamp(28px, 3.4vw, 44px);
@@ -1810,11 +1860,12 @@
   letter-spacing: -0.024em;
   line-height: 1.1;
   margin: 0 0 18px;
-  color: #F4E8E2;
+  color: #FFFFFF;
 }
 .marketing-root .sd-p {
   font-size: 16px;
-  color: #C9A8AE;
+  color: #FFFFFF;
+  font-weight: 450;
   max-width: 58ch;
   margin: 0 auto;
   line-height: 1.6;
@@ -1822,13 +1873,68 @@
 }
 .marketing-root .sd-p b {
   color: #FFFFFF;
-  font-weight: 600;
+  font-weight: inherit;
 }
 .marketing-root .sd-stage {
   position: relative;
   z-index: 1;
   max-width: 1180px;
   margin: 0 auto;
+}
+/* Background glow behind the demo window: ONE large conic gradient sweeping
+   through orange â†’ pink â†’ magenta â†’ violet â†’ blue â†’ cyan, masked with a
+   radial fade so it bleeds softly into the black field at the edges. Sits
+   above the section's black bg (z-index 0) but below the window
+   (.session-demo-stage, z-index 1). */
+.marketing-root .sd-stage::before {
+  content: "";
+  position: absolute;
+  inset: -420px -380px;
+  z-index: 0;
+  pointer-events: none;
+  background: conic-gradient(
+    from 210deg at 50% 50%,
+    #ff8a3d,
+    #f15ba2,
+    #d23ce0,
+    #8a4fff,
+    #4664e6,
+    #3ad0ff,
+    #8a4fff,
+    #d23ce0,
+    #ff8a3d
+  );
+  filter: blur(120px);
+  opacity: 0.1;
+  -webkit-mask-image: radial-gradient(closest-side at 50% 50%, #000 35%, transparent 100%);
+  mask-image: radial-gradient(closest-side at 50% 50%, #000 35%, transparent 100%);
+}
+/* Corner-hugging glow: a conic-filled rounded rectangle sized slightly larger
+   than the demo window and blurred, so colored light bleeds evenly past ALL
+   four edges AND the rounded corners. The window (z-index 1, opaque bg) covers
+   the centre, leaving only the glow that rings the rounded-rect outline â€” this
+   is what fills in the corners the radial ::before glow misses. */
+.marketing-root .sd-stage::after {
+  content: "";
+  position: absolute;
+  inset: -26px;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 28px;
+  background: conic-gradient(
+    from 210deg at 50% 50%,
+    #ff8a3d,
+    #f15ba2,
+    #d23ce0,
+    #8a4fff,
+    #4664e6,
+    #3ad0ff,
+    #8a4fff,
+    #d23ce0,
+    #ff8a3d
+  );
+  filter: blur(34px);
+  opacity: 0.1;
 }
 .marketing-root .sd-window {
   display: grid;
@@ -2218,385 +2324,573 @@
 .marketing-root .cc-dot.t { background: var(--violet); opacity: 0.5; }
 
 /* ============ AGENCIES flow ============ */
-.marketing-root .agencies {
-  position: relative;
-  padding: 110px 32px 120px;
-  overflow: hidden;
-  background: var(--bg-0);
-}
-.marketing-root .ag-head {
-  position: relative;
-  z-index: 1;
-  max-width: 980px;
-  margin: 0 auto 56px;
-  text-align: center;
-}
-.marketing-root .ag-head .section-eyebrow {
-  justify-content: center;
-}
-.marketing-root .ag-h {
-  font-size: clamp(28px, 3.4vw, 44px);
-  font-weight: 500;
-  letter-spacing: -0.024em;
-  line-height: 1.1;
-  margin: 0 0 18px;
-  color: var(--ink-1);
-}
-.marketing-root .ag-p {
-  font-size: 16px;
-  color: var(--ink-2);
-  max-width: 58ch;
-  margin: 0 auto;
-  line-height: 1.6;
-  letter-spacing: -0.003em;
-}
-.marketing-root .ag-flow {
-  position: relative;
-  z-index: 1;
-  max-width: 1320px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
-  align-items: stretch;
-  gap: 10px;
-}
-.marketing-root .ag-step {
+/* ============ BUILT FOR AGENCIES ============ */
+/* Full-bleed opaque background so the page's cream/blue atmosphere does not
+   show through the side gutters; inner content stays width-constrained. */
+.marketing-root .agency-section {
+  width: 100%;
+  padding: 96px 32px 80px;
   background: #FFFFFF;
-  border: 1px solid var(--line-1);
-  border-radius: var(--mk-radius-lg);
-  padding: 24px 22px 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  box-shadow: var(--mk-sh-md);
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
-.marketing-root .ag-step:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--mk-sh-lg);
+.marketing-root .agency-inner {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
 }
-.marketing-root .ag-num {
-  font-size: 11px;
-  font-weight: 500;
+.marketing-root .agency-section-header {
+  text-align: center;
+  max-width: 760px;
+  margin: 0 auto 64px;
+}
+.marketing-root .agency-eyebrow {
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink-3);
+  margin-bottom: 20px;
 }
-.marketing-root .ag-tit {
-  font-size: 17px;
+.marketing-root .agency-eyebrow::before {
+  content: "â€” ";
+  color: var(--line-1);
+}
+.marketing-root .agency-headline {
+  font-size: clamp(28px, 3.2vw, 42px);
   font-weight: 500;
-  letter-spacing: -0.014em;
-  line-height: 1.3;
-  margin: 4px 0 0;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  margin: 0 0 18px;
   color: var(--ink-1);
 }
-.marketing-root .ag-sub {
-  font-size: 13.5px;
-  color: var(--ink-2);
-  letter-spacing: -0.003em;
+.marketing-root .agency-subheading {
+  font-size: clamp(15px, 1.1vw, 17px);
   line-height: 1.55;
-  margin: 0 0 8px;
-}
-.marketing-root .ag-viz {
-  margin-top: auto;
-  padding-top: 14px;
-  border-top: 1px solid var(--line-1);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.marketing-root .ag-row {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font-size: 12px;
   color: var(--ink-2);
+  margin: 0 auto;
+  max-width: 620px;
   letter-spacing: -0.003em;
-}
-.marketing-root .ag-av {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--violet);
-  color: #FFFFFE;
-  font-size: 9.5px;
-  font-weight: 500;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.marketing-root .ag-av.b { background: var(--violet-2); opacity: 0.9; }
-.marketing-root .ag-av.c { background: var(--ink-2); }
-.marketing-root .ag-av.d { background: var(--ink-1); }
-.marketing-root .ag-url {
-  font-family: var(--mk-font-mono);
-  font-size: 12px;
-  padding: 7px 10px;
-  background: var(--bg-1);
-  border: 1px solid var(--line-1);
-  border-radius: 6px;
-  color: var(--ink-1);
-  letter-spacing: -0.003em;
-}
-.marketing-root .ag-quote {
-  font-size: 12.5px;
-  color: var(--ink-2);
-  font-style: italic;
-  line-height: 1.5;
-  padding: 8px 10px;
-  background: var(--bg-1);
-  border-radius: 8px;
-  border-left: 2px solid var(--violet-3);
-}
-.marketing-root .ag-mini {
-  padding: 10px 12px;
-  background: var(--bg-1);
-  border: 1px solid var(--line-1);
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.marketing-root .ag-mini-tit {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ink-1);
-  letter-spacing: -0.012em;
-  line-height: 1.35;
-}
-.marketing-root .ag-mini-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 10.5px;
-  color: var(--ink-3);
-  font-family: var(--mk-font-mono);
-}
-.marketing-root .ag-sev {
-  color: var(--violet);
-  font-weight: 500;
-}
-.marketing-root .ag-arrow {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--ink-3);
-  padding: 0 2px;
-  align-self: center;
 }
 
-/* ============ PERSONAS ============ */
-.marketing-root .personas {
-  background: var(--bg-0);
-  padding: 110px 32px 110px;
-}
-.marketing-root .pers-head {
-  max-width: 980px;
-  margin: 0 auto 32px;
-  text-align: center;
-}
-.marketing-root .pers-head .section-eyebrow {
-  justify-content: center;
-}
-.marketing-root .pers-h {
-  font-size: clamp(28px, 3.4vw, 44px);
-  font-weight: 500;
-  letter-spacing: -0.024em;
-  line-height: 1.1;
-  margin: 0 0 16px;
-  color: var(--ink-1);
-}
-.marketing-root .pers-p {
-  font-size: 16px;
-  color: var(--ink-2);
-  letter-spacing: -0.003em;
-  margin: 0;
-}
-.marketing-root .pers-tabs {
-  max-width: 720px;
-  margin: 0 auto 22px;
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-  justify-content: center;
-  padding: 5px;
-  background: #FFFFFF;
-  border: 1px solid var(--line-1);
-  border-radius: 999px;
-  box-shadow: var(--mk-sh-xs);
-}
-.marketing-root .pers-tab {
-  padding: 9px 18px;
-  border-radius: 999px;
-  font-size: 13.5px;
-  font-weight: 500;
-  color: var(--ink-2);
-  letter-spacing: -0.003em;
-  transition: background 0.2s ease, color 0.2s ease;
-  cursor: pointer;
-}
-.marketing-root .pers-tab:hover { color: var(--ink-1); }
-.marketing-root .pers-tab.is-on {
-  background: var(--ink-1);
-  color: #FFFFFE;
-}
-.marketing-root .pers-stage {
-  max-width: 1180px;
-  margin: 0 auto;
-  background: #FFFFFF;
-  border: 1px solid var(--line-1);
-  border-radius: var(--mk-radius-xl);
-  overflow: hidden;
-  box-shadow: var(--mk-sh-lg);
-  transition: background 0.35s ease;
-  position: relative;
-}
-.marketing-root .pers-grid {
+/* --- Cards row --- */
+.marketing-root .agency-cards-row {
   display: grid;
-  grid-template-columns: 1fr 1.05fr;
-  min-height: 460px;
+  grid-template-columns: 1fr 40px 1fr 40px 1fr 40px 1fr;
+  gap: 0;
+  align-items: stretch;
 }
-.marketing-root .pers-copy {
-  padding: 48px 44px 40px;
+.marketing-root .agency-card {
+  background: #FFFFFF;
+  border: 1px solid var(--line-1);
+  border-radius: var(--mk-radius-lg);
+  padding: 28px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
-}
-.marketing-root .pers-tagline {
-  font-size: clamp(20px, 2vw, 28px);
-  font-weight: 500;
-  letter-spacing: -0.020em;
-  line-height: 1.2;
-  margin: 0;
-  color: var(--ink-1);
-  transition: opacity 0.25s ease, transform 0.25s ease;
-}
-.marketing-root .pers-tagline.is-out {
+  min-height: 360px;
+  box-shadow:
+    0 1px 2px rgba(20, 16, 30, 0.03),
+    0 8px 24px -12px rgba(20, 16, 30, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
   opacity: 0;
-  transform: translateY(6px);
+  transform: translateY(20px);
+  transition:
+    opacity 0.6s ease-out,
+    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.marketing-root .pers-bullets {
+.marketing-root .agency-card.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+.marketing-root .agency-card:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 2px 4px rgba(20, 16, 30, 0.04),
+    0 16px 32px -12px rgba(20, 16, 30, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+/* --- Arrow connectors --- */
+.marketing-root .agency-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-3);
+}
+
+/* --- Card internal anatomy --- */
+.marketing-root .agency-card-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 16px;
+}
+.marketing-root .agency-card-title {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  color: var(--ink-1);
+  margin: 0 0 12px;
+}
+.marketing-root .agency-card-body {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  margin: 0 0 20px;
+}
+.marketing-root .agency-card-divider {
+  height: 1px;
+  background: var(--line-1);
+  margin: 0 0 20px;
+}
+.marketing-root .agency-card-visual {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+/* --- Avatar rows (cards 1 & 2) --- */
+.marketing-root .agency-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+}
+.marketing-root .agency-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--line-1);
+  flex-shrink: 0;
+}
+.marketing-root .agency-avatar-label {
+  font-size: 13px;
+  color: var(--ink-2);
+  letter-spacing: -0.003em;
+}
+
+/* --- Share URL + brand chip (card 3) --- */
+.marketing-root .agency-share-url {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: transparent;
+  border: 1px solid var(--line-1);
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+.marketing-root .agency-share-url svg {
+  width: 14px;
+  height: 14px;
+  color: var(--ink-3);
+  flex-shrink: 0;
+}
+.marketing-root .agency-share-url-text {
+  font-family: var(--mk-font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-1);
+  letter-spacing: -0.01em;
+}
+.marketing-root .agency-brand-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(90, 73, 191, 0.06);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--violet);
+  font-weight: 500;
+  align-self: flex-start;
+}
+.marketing-root .agency-brand-chip svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* --- Ticket cards (card 4) --- */
+.marketing-root .agency-ticket-card {
+  background: transparent;
+  border: 1px solid var(--line-1);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+.marketing-root .agency-ticket-card:last-child {
+  margin-bottom: 0;
+}
+.marketing-root .agency-ticket-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-1);
+  margin-bottom: 8px;
+  line-height: 1.3;
+}
+.marketing-root .agency-ticket-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.marketing-root .agency-ticket-priority {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.marketing-root .agency-ticket-priority--high {
+  background: rgba(247, 126, 44, 0.12);
+  color: #C8531B;
+}
+.marketing-root .agency-ticket-priority--medium {
+  background: rgba(245, 158, 11, 0.12);
+  color: #B45309;
+}
+.marketing-root .agency-ticket-assignee {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--ink-2);
+}
+.marketing-root .agency-ticket-assignee img {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* --- Responsive --- */
+@media (max-width: 1199px) {
+  .marketing-root .agency-cards-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  .marketing-root .agency-arrow {
+    display: none;
+  }
+}
+@media (max-width: 767px) {
+  .marketing-root .agency-cards-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketing-root .agency-card {
+    opacity: 1;
+    transform: none;
+    transition: box-shadow 0.25s ease;
+  }
+}
+
+/* ============ WHO IT'S FOR ============ */
+/* === SECTION CONTAINER === */
+/* Full-bleed opaque white background so the page's cream/blue atmosphere does
+   not show through the side gutters; inner content stays width-constrained
+   (mirrors .agency-section). */
+.marketing-root .who-its-for-section {
+  width: 100%;
+  padding: 96px 32px 80px 32px;
+  background: #FFFFFF;
+}
+
+/* === SECTION HEADER === */
+.marketing-root .who-its-for-header {
+  text-align: center;
+  max-width: 820px;
+  margin: 0 auto 48px auto;
+}
+
+.marketing-root .who-its-for-eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 20px;
+}
+
+/* Headline matches .agency-headline (BuiltForAgencies) exactly: same
+   clamp size, 500 weight, solid --ink-1 — no gradient text fill. */
+.marketing-root .who-its-for-headline {
+  font-size: clamp(28px, 3.2vw, 42px);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  color: var(--ink-1);
+  margin: 0 0 18px 0;
+}
+
+.marketing-root .who-its-for-subheading {
+  font-size: clamp(15px, 1.1vw, 17px);
+  line-height: 1.55;
+  color: var(--ink-2);
+  margin: 0 auto 32px auto;
+  max-width: 620px;
+  letter-spacing: -0.003em;
+}
+
+/* === TAB NAVIGATION === */
+.marketing-root .who-its-for-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  background: #FFFFFF;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 999px;
+
+  /* Subtle elevation */
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.03),
+    0 8px 24px -12px rgba(15, 23, 42, 0.06);
+}
+
+.marketing-root .who-its-for-tab {
+  display: inline-flex;
+  align-items: center;
+  height: 38px;
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(15, 23, 42, 0.65);
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  letter-spacing: -0.005em;
+}
+
+.marketing-root .who-its-for-tab:hover {
+  color: #15101F;
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.marketing-root .who-its-for-tab.is-active {
+  background: #15101F;
+  color: #FFFFFF;
+  font-weight: 600;
+
+  /* Subtle inset highlight */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 1px 2px rgba(15, 23, 42, 0.20);
+}
+
+.marketing-root .who-its-for-tab.is-active:hover {
+  background: #1F1A2A;
+  color: #FFFFFF;
+}
+
+/* === CONTENT CARD === */
+.marketing-root .who-its-for-content-card {
+  max-width: 1070px;
+  margin: 0 auto;
+  background: #FFFFFF;
+  border-radius: 24px;
+  padding: 40px 56px;
+  border: 1px solid var(--line-1);
+
+  box-shadow: var(--mk-sh-lg);
+}
+
+.marketing-root .who-its-for-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.0fr;
+  gap: 52px;
+  align-items: center;
+  min-height: 300px;
+}
+
+/* === COPY COLUMN === */
+.marketing-root .who-its-for-copy-column {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.marketing-root .who-its-for-tab-title {
+  font-size: clamp(28px, 2.8vw, 40px);
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: -0.022em;
+  color: #15101F;
+  margin: 0 0 20px 0;
+  max-width: 440px;
+}
+
+/* Second clause of each tab title: plain grey, no gradient fill. */
+.marketing-root .who-its-for-tab-title-gradient {
+  color: var(--ink-2);
+}
+
+.marketing-root .who-its-for-tab-body {
+  font-size: 16px;
+  line-height: 1.6;
+  color: rgba(15, 23, 42, 0.70);
+  margin: 0 0 28px 0;
+  max-width: 460px;
+}
+
+.marketing-root .who-its-for-bullets {
   list-style: none;
   padding: 0;
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  transition: opacity 0.25s ease, transform 0.25s ease;
+  gap: 12px;
 }
-.marketing-root .pers-bullets.is-out {
-  opacity: 0;
-  transform: translateY(6px);
-}
-.marketing-root .pers-bullet {
-  display: grid;
-  grid-template-columns: 28px 1fr;
+
+.marketing-root .who-its-for-bullets li {
+  display: flex;
+  align-items: flex-start;
   gap: 12px;
   font-size: 14.5px;
-  color: var(--ink-2);
-  letter-spacing: -0.003em;
-  line-height: 1.55;
-}
-.marketing-root .pers-bullet .num {
-  font-family: var(--mk-font-mono);
-  font-size: 11px;
-  color: var(--ink-3);
-  padding-top: 3px;
-}
-.marketing-root .pers-viz {
+  line-height: 1.5;
+  color: rgba(15, 23, 42, 0.75);
+  padding-left: 24px;
   position: relative;
-  padding: 28px;
-  background: linear-gradient(160deg, var(--wash-soft-a) 0%, var(--wash-soft-b) 100%);
+}
+
+/* Checkmark bullets â€” matches ClickUp reference */
+.marketing-root .who-its-for-bullets li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  width: 14px;
+  height: 14px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14' fill='none'%3E%3Cpath d='M2 7l3 3 7-7' stroke='%2315101F' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-size: 14px 14px;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+/* === FEATURES COLUMN === */
+.marketing-root .who-its-for-features-column {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  transition: background 0.45s ease;
-}
-.marketing-root .pers-viz-h {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
-}
-.marketing-root .pers-viz-tit {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink-1);
-  letter-spacing: -0.012em;
-}
-.marketing-root .pers-viz-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: rgba(27, 22, 38, 0.30);
-}
-.marketing-root .pers-viz-body {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 12px;
-  transition: opacity 0.25s ease;
 }
-.marketing-root .pers-viz-body.is-out { opacity: 0; }
-.marketing-root .pv-card {
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 10px;
-  padding: 12px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  box-shadow: var(--mk-sh-xs);
-}
-.marketing-root .pv-card-h {
-  font-size: 9.5px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--ink-3);
-}
-.marketing-root .pv-card-v {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink-1);
-  letter-spacing: -0.012em;
-}
-.marketing-root .pv-line {
-  height: 4px;
-  border-radius: 3px;
-  background: rgba(27, 22, 38, 0.08);
-  width: 100%;
-}
-.marketing-root .pv-line.fill {
-  background: var(--violet);
-  width: 60%;
-  opacity: 0.85;
-}
-.marketing-root .pv-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.marketing-root .pv-row {
+
+.marketing-root .who-its-for-feature-card {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 11.5px;
-  color: var(--ink-2);
-  letter-spacing: -0.003em;
+  gap: 14px;
+  padding: 16px 20px;
+  background: #FFFFFF;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: 14px;
+
+  /* Subtle elevation */
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.03),
+    0 4px 12px -4px rgba(15, 23, 42, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.marketing-root .pv-row .ico {
-  width: 6px;
-  height: 6px;
+
+.marketing-root .who-its-for-feature-card:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 2px 4px rgba(15, 23, 42, 0.04),
+    0 8px 20px -6px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+.marketing-root .who-its-for-feature-avatar {
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: var(--ink-4);
+  object-fit: cover;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  flex-shrink: 0;
 }
-.marketing-root .pv-row .ico.ok { background: var(--violet); opacity: 0.7; }
-.marketing-root .pv-row .ico.warn { background: var(--ink-2); }
-.marketing-root .pv-row .ico.err { background: var(--violet); }
+
+.marketing-root .who-its-for-feature-text {
+  flex: 1;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: #15101F;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+/* === TAB CONTENT TRANSITION === */
+.marketing-root .who-its-for-copy-column,
+.marketing-root .who-its-for-features-column {
+  animation: who-its-for-fade-in 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes who-its-for-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* === WHO IT'S FOR — RESPONSIVE === */
+@media (max-width: 1099px) {
+  .marketing-root .who-its-for-grid {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+
+  .marketing-root .who-its-for-content-card {
+    padding: 40px 32px;
+  }
+}
+
+@media (max-width: 767px) {
+  .marketing-root .who-its-for-section {
+    padding: 64px 16px 56px 16px;
+  }
+
+  .marketing-root .who-its-for-tabs {
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+    border-radius: 16px;
+  }
+
+  .marketing-root .who-its-for-tab {
+    height: 34px;
+    padding: 0 14px;
+    font-size: 13px;
+  }
+
+  .marketing-root .who-its-for-content-card {
+    padding: 32px 20px;
+    border-radius: 16px;
+  }
+
+  .marketing-root .who-its-for-tab-title {
+    font-size: 26px;
+  }
+
+  .marketing-root .who-its-for-feature-card {
+    padding: 14px 16px;
+  }
+
+  .marketing-root .who-its-for-feature-text {
+    font-size: 13.5px;
+  }
+}
 
 /* ============ PRICING ============ */
 .marketing-root .pricing {
@@ -2848,8 +3142,8 @@
 }
 
 /* =================================================================
-   PHASE 2B — PIXEL-FAITHFUL DEMOS
-   TicketCardMock · VoiceTicketDemo · HeroCaptureDemo (v3)
+   PHASE 2B â€” PIXEL-FAITHFUL DEMOS
+   TicketCardMock Â· VoiceTicketDemo Â· HeroCaptureDemo (v3)
    Plus session-detail polish refinements (live dot, tween, copy btn).
    ================================================================= */
 
@@ -2874,10 +3168,31 @@
   box-shadow: var(--mk-sh-md);
 }
 .marketing-root .tcm--compact {
-  padding: 12px 14px;
-  gap: 9px;
+  padding: 9px 11px;
+  gap: 6px;
   width: 100%;
   box-shadow: var(--mk-sh-sm);
+}
+/* Compact card runs inside the size-fixed VoiceTicketDemo stage, so keep it
+   tight â€” smaller title, denser meta, smaller Send â€” so the whole card reads
+   small. Scoped to --compact so the floating/detail mockups are untouched. */
+.marketing-root .tcm--compact .tcm-title {
+  font-size: 12.5px;
+  line-height: 1.28;
+}
+.marketing-root .tcm--compact .tcm-meta {
+  gap: 3px;
+  padding: 7px 10px;
+}
+.marketing-root .tcm--compact .tcm-meta-row {
+  font-size: 9.5px;
+}
+.marketing-root .tcm--compact .tcm-meta-row span {
+  width: 48px;
+}
+.marketing-root .tcm--compact .tcm-send {
+  padding: 5px 11px;
+  font-size: 10.5px;
 }
 .marketing-root .tcm--list {
   display: grid;
@@ -3022,10 +3337,10 @@
   width: 100%;
 }
 .marketing-root .vtdemo-card {
-  padding: 22px 22px 18px;
+  padding: 15px 16px 12px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 9px;
 }
 .marketing-root .vtdemo-eyebrow {
   font-size: 11px;
@@ -3038,7 +3353,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 64px;
+  height: 40px;
   justify-content: center;
 }
 .marketing-root .vtdemo-wave i {
@@ -3069,18 +3384,28 @@
 .marketing-root .vtdemo-wave i:nth-child(17) { animation-delay: 0.80s; }
 .marketing-root .vtdemo-wave i:nth-child(18) { animation-delay: 0.85s; }
 
+/* Fixed height for the whole loop â€” sized to hold the tallest state (the full
+   polished compact card: head + title + meta + Send). The card stays one
+   consistent size from listening through polished; only the contents
+   cross-fade, nothing resizes. */
 .marketing-root .vtdemo-stage {
   position: relative;
-  min-height: 92px;
+  min-height: 164px;
+  display: flex;
+  /* Anchor the transcript to the top so it stays put when the line wraps â€”
+     centering would shift the whole block up as a second line appears (the
+     jump). The absolute .vtdemo-polished layer keeps its own centering. */
+  align-items: flex-start;
+  justify-content: center;
 }
 .marketing-root .vtdemo-rough {
-  font-size: 13.5px;
+  font-size: 14.5px;
   color: var(--ink-2);
   text-align: center;
   font-style: italic;
   line-height: 1.5;
   letter-spacing: -0.003em;
-  padding: 6px 4px;
+  padding: 34px 4px 6px;
   transition:
     opacity 260ms cubic-bezier(0.16, 1, 0.3, 1),
     transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -3088,7 +3413,7 @@
 .marketing-root .vtdemo-caret {
   display: inline-block;
   width: 1px;
-  height: 14px;
+  height: 15px;
   background: var(--ink-2);
   margin-left: 2px;
   vertical-align: middle;
@@ -3126,6 +3451,22 @@
   justify-content: space-between;
   padding-top: 10px;
   border-top: 1px solid var(--line-1);
+  opacity: 1;
+  transition:
+    opacity 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 200ms linear;
+}
+/* Polishing done â†’ the polished ticket (with Send) takes over; fade the Polish
+   footer and its spinning spark out. The footer's box stays in place (height,
+   padding, slot reserved) so the card never changes size across the loop â€”
+   only the contents cross-fade. */
+.marketing-root .vtdemo-foot.is-done {
+  opacity: 0;
+  border-top-color: transparent;
+  pointer-events: none;
+}
+.marketing-root .vtdemo-foot.is-done .vtdemo-polish-spark {
+  animation: none;
 }
 .marketing-root .vtdemo-time {
   font-family: var(--mk-font-mono);
@@ -3224,6 +3565,12 @@
     transform: none !important;
     transition: none !important;
   }
+  /* Context chips: present at rest, no stagger. */
+  .marketing-root .ctt-ctx-chip {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
   .marketing-root .capture-mock-pill-orb {
     animation: none !important;
   }
@@ -3250,7 +3597,6 @@
     gap: 14px;
   }
   .marketing-root .ag-arrow { display: none; }
-  .marketing-root .pers-grid { grid-template-columns: 1fr; }
   .marketing-root .pr-row { grid-template-columns: 1fr; max-width: 480px; }
   .marketing-root .faq-inner { grid-template-columns: 1fr; gap: 36px; }
   .marketing-root .faq-left { position: static; }
@@ -3302,16 +3648,20 @@
     overflow: auto;
   }
   .marketing-root .ag-flow { grid-template-columns: 1fr; }
-  .marketing-root .pers-tabs {
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    justify-content: flex-start;
+  /* Voice context chips: on phones the column is too tight for floating
+     chips on every edge. Keep the two top corners (page + environment â€” the
+     most telling context) and drop the bottom pair to avoid colliding with
+     the card. */
+  .marketing-root .ctt-ctx-chip--br,
+  .marketing-root .ctt-ctx-chip--bl {
+    display: none;
   }
-  .marketing-root .pers-copy { padding: 32px 24px; }
+  .marketing-root .ctt-ctx-chip--tl { top: 16px; left: 12px; }
+  .marketing-root .ctt-ctx-chip--tr { top: 40px; right: 12px; }
 }
 
 /* =================================================================
-   PHASE 2B v4 — Forklifted from app/globals.css
+   PHASE 2B v4 â€” Forklifted from app/globals.css
    Real-production extension CSS scoped under .marketing-root so the
    HeroCaptureDemo (built from forklifted React components) renders
    with byte-faithful visual treatment to the live extension.
@@ -3718,7 +4068,7 @@
 }
 
 /* =================================================================
-   PHASE 2B v5 — Real extension-mode tray (.pill.pill-tickets / tl-*)
+   PHASE 2B v5 â€” Real extension-mode tray (.pill.pill-tickets / tl-*)
    Forklifted from app/globals.css under .echly-v2:
      - .pill / .pill::before / .pill-mark(-logo) / .pill-icon-btn / .pill-rule : L6553-6660
      - .ai-dot                                                                 : L6834
@@ -3897,26 +4247,26 @@
 .marketing-root .echly-v2 .tl-foot-home:hover { color: var(--ink); }
 
 /* =================================================================
-   PHASE 2B v5 — Edit modal (.editor-overlay*)
+   PHASE 2B v5 â€” Edit modal (.editor-overlay*)
    Forklifted from app/globals.css under .echly-v2, L9453-9928.
    Two marketing-only additions documented inline:
      - .editor-screenshot-placeholder  (CSS gradient stand-in for a frame)
      - .editor-static-desc             (static read-only description text)
    ================================================================= */
 /* Fix 3c (v8): frosted-glass scrim. v10: the white-only wash (rgba 255 @ .5)
-   read flat — washing the page toward white removes the figure/ground gap, so
+   read flat â€” washing the page toward white removes the figure/ground gap, so
    the modal floated without clearly sitting "in front." We keep the frosted
    softness but layer a faint cool-INK tint over it (slate #0F172A @ low alpha):
    just enough darkening to push the background down a plane and let the crisp
    modal/pill/tray surfaces read as foreground. Still recognizable behind the
-   glass — depth through a touch of shade + blur, not a heavy "dim the room"
+   glass â€” depth through a touch of shade + blur, not a heavy "dim the room"
    dark sheet. */
 .marketing-root .echly-v2 .editor-overlay-backdrop {
   position: absolute;
   inset: 0;
   /* v15: backdrop dim/wash removed. The unified hero IS the capture surface, so
      dimming it when the modal opens fought the "the page is the demo" feel. The
-     modal carries focus through its own multi-layer shadow (.editor-overlay) —
+     modal carries focus through its own multi-layer shadow (.editor-overlay) â€”
      no scrim needed. The backdrop stays present (transparent) only to catch the
      click-to-dismiss. */
   background: transparent;
@@ -3934,7 +4284,7 @@
   pointer-events: auto;
   width: min(440px, calc(100% - 48px));
   max-height: 86%;
-  /* Most solid surface in the scene — viewers READ the modal (title, desc,
+  /* Most solid surface in the scene â€” viewers READ the modal (title, desc,
      tags). 0.98 feels solid but lets the backdrop-filter engage for edge
      character. */
   background: linear-gradient(
@@ -3946,9 +4296,9 @@
   -webkit-backdrop-filter: blur(28px) saturate(160%);
   border-radius: 23px;
   border: 1px solid rgba(255, 255, 255, 0.7);
-  /* Glass refinement Fix 2: full multi-layer elevation — ambient close shadow,
+  /* Glass refinement Fix 2: full multi-layer elevation â€” ambient close shadow,
      mid falloff, far cast, plus the inner-top white highlight catching light on
-     the leading edge. Modal needs stronger elevation than the tray — it's the
+     the leading edge. Modal needs stronger elevation than the tray â€” it's the
      focal overlay. Reads as "premium glass catching light." */
   box-shadow:
     0 2px 4px rgba(15, 23, 42, 0.06),
@@ -4075,7 +4425,7 @@
   max-height: 400px;
 }
 /* v6: the gradient placeholder was replaced by per-ticket mock SVG screenshots
-   (.editor-screenshot-mock — defined in the hcd block). */
+   (.editor-screenshot-mock â€” defined in the hcd block). */
 .marketing-root .echly-v2 .editor-screenshot-info {
   position: absolute;
   top: 9px;
@@ -4233,7 +4583,7 @@
 .marketing-root .echly-v2 .editor-overlay-foot .editor-save-btn:hover { background: #4A3BA0; }
 
 /* =================================================================
-   PHASE 2B v7 — SpeechCaption (marketing-only, NOT a forklift)
+   PHASE 2B v7 â€” SpeechCaption (marketing-only, NOT a forklift)
    Fix 4: single transcript row, no header/red-dot. Glass container kept,
    padding tightened, blinking caret while typing, fade-in on appear.
    ================================================================= */
@@ -4264,7 +4614,7 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.85),
     0 0 0 1px rgba(15, 23, 42, 0.04);
   font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
-  /* The caption never responds to hover — it's just being watched (Fix 5). */
+  /* The caption never responds to hover â€” it's just being watched (Fix 5). */
   pointer-events: none;
   opacity: 0;
   animation: speech-caption-fade-in 200ms ease-out forwards;
@@ -4278,7 +4628,7 @@
   line-height: 1.5;
   color: #15101F;
   letter-spacing: -0.008em;
-  /* Fix 3 (v9): no min-height — the box auto-sizes to its content (just the
+  /* Fix 3 (v9): no min-height â€” the box auto-sizes to its content (just the
      cursor when empty, growing as words land). */
 }
 .marketing-root .speech-caption-word {
@@ -4327,7 +4677,7 @@
   display: inline-flex;
   align-items: center;
   gap: 16px;
-  /* v21: centered ambient shadow instead of a downward drop — Y-offset 0 so the
+  /* v21: centered ambient shadow instead of a downward drop â€” Y-offset 0 so the
      glow sits evenly around the panel (a soft halo, not a cast below it), plus
      the top-edge inner highlight (the glass tell). */
   box-shadow:
@@ -4593,7 +4943,7 @@
   font-family: inherit;
 }
 /* The voice pill no longer widens on hover: the demo dropped the hover-revealed
-   mic/text-mode buttons (watched pill, not interactive), so the 360px→440px
+   mic/text-mode buttons (watched pill, not interactive), so the 360pxâ†’440px
    grow that made room for them would just be empty space. Hover does nothing. */
 .marketing-root .echly-pill-content--text { width: auto; }
 .marketing-root .echly-pill-content--shake {
@@ -4763,7 +5113,7 @@
   justify-content: stretch;
   /* v18: the base .hero-stage caps width at 1280px and centers (margin: auto).
      The demo stage must span the FULL VIEWPORT so the tray/control panel can
-     anchor to the real viewport edges — clear the inherited cap + centering. */
+     anchor to the real viewport edges â€” clear the inherited cap + centering. */
   max-width: none;
   width: 100%;
   margin-left: 0;
@@ -4775,7 +5125,7 @@
      the tray and control panel can anchor to the real viewport edges instead of
      competing with the centered copy for the same 1280px column. The marketing
      copy stays centered via its own max-width (see .hcd-hero-copy children).
-     Everything — stageRef coords, pill anchor, highlight rect — now shares one
+     Everything â€” stageRef coords, pill anchor, highlight rect â€” now shares one
      viewport-wide coordinate system. */
   width: 100%;
   /* v22: the demo fills the visible viewport below the announcement bar + nav so
@@ -4783,7 +5133,7 @@
   height: calc(100vh - 180px);
   margin: 0 auto;
   overflow: hidden;
-  /* v14 (Annote-as-hero): the demo container is fully TRANSPARENT — no white
+  /* v14 (Annote-as-hero): the demo container is fully TRANSPARENT â€” no white
      card, no FauxSite, no glass material. The section's natural background
      flows straight through and the Annote elements float directly on it. */
   border: none;
@@ -4817,7 +5167,7 @@
   padding: 0 32px;
   z-index: 2;
   text-align: center;
-  /* The block itself shouldn't intercept clicks in its padding gutters — only
+  /* The block itself shouldn't intercept clicks in its padding gutters â€” only
      the real text/CTA elements should. */
   pointer-events: none;
   /* v17: scale the whole composition with the viewport, not a fixed column.
@@ -4835,9 +5185,9 @@
   pointer-events: auto;
 }
 .marketing-root .hcd-hero-h1 {
-  /* v21: scaled up from the v16 restrained 40–64px/500 (which read washed-out on
-     the lighter bg), then dialed back per feedback — smaller and lighter than
-     the full Shadcnspace display register. ~48–76px, semibold (600) not bold,
+  /* v21: scaled up from the v16 restrained 40â€“64px/500 (which read washed-out on
+     the lighter bg), then dialed back per feedback â€” smaller and lighter than
+     the full Shadcnspace display register. ~48â€“76px, semibold (600) not bold,
      with tight line-height + tracking for a confident-but-not-shouting feel. */
   font-size: clamp(48px, 5.5vw, 76px);
   font-weight: 600;
@@ -4848,7 +5198,7 @@
   /* Wider column to let the bigger type breathe across two balanced lines. */
   max-width: clamp(720px, 75vw, 1100px);
 }
-/* Gradient accent on the payoff phrase ("seeing it.") — brand violet → blue →
+/* Gradient accent on the payoff phrase ("seeing it.") â€” brand violet â†’ blue â†’
    magenta sweep matching the logo, clipped to the text. The rest of the
    headline stays ink (#15101F) so the eye lands on this word. */
 .marketing-root .hcd-hero-accent {
@@ -4877,7 +5227,7 @@
   /* One hierarchy step below the headline: a touch larger and slightly more
      present (65% ink vs the old washed-out 70% translucency) so it reads as
      clear supporting context against the bigger headline, not a competing line.
-     The 32px gap opens up the headline → sub hierarchy step. */
+     The 32px gap opens up the headline â†’ sub hierarchy step. */
   font-size: clamp(18px, 1.5vw, 22px);
   font-weight: 400;
   color: rgba(21, 16, 31, 0.65);
@@ -4899,7 +5249,7 @@
   position: relative;
   z-index: 3;
   /* Generous space above so the CTAs sit clearly below the sub, not crowding
-     it — completes the headline → sub → CTA hierarchy step. Bumped to 48px to
+     it â€” completes the headline â†’ sub â†’ CTA hierarchy step. Bumped to 48px to
      balance the larger headline above. */
   margin-top: 48px;
 }
@@ -4913,7 +5263,7 @@
   /* Spacing is now owned by .hcd-cta-group. */
   margin-top: 0;
 }
-/* Secondary CTA — "Install Chrome Extension". Same height + pill shape as the
+/* Secondary CTA â€” "Install Chrome Extension". Same height + pill shape as the
    primary for visual harmony. On the light foundation it reads as a near-white
    surface card with a subtle dark-tinted border + soft inner highlight, so it
    has definition without competing with the solid-dark primary. */
@@ -4967,7 +5317,7 @@
 .marketing-root .hcd-annote-layer {
   position: absolute;
   inset: 0;
-  /* z:3 — the Annote elements float directly on the section background. */
+  /* z:3 â€” the Annote elements float directly on the section background. */
   z-index: 3;
   pointer-events: none;
 }
@@ -4975,7 +5325,7 @@
   pointer-events: auto;
 }
 
-/* Tray anchor — visible from frame 0 (session already in progress).
+/* Tray anchor â€” visible from frame 0 (session already in progress).
    v16: the stage is now viewport-wide, so right:48px pins the tray to the real
    VIEWPORT right edge (was competing with the centered copy inside the 1280px
    box). bottom:96px lifts it clear of the pink gradient transition near the
@@ -4996,13 +5346,13 @@
   max-width: 100%;
   max-height: 420px;
 }
-/* Glass refinement Fix 2: multi-layer elevation. Ambient close shadow → mid
-   falloff → far cast (floating feel), plus an inner-top white highlight that
+/* Glass refinement Fix 2: multi-layer elevation. Ambient close shadow â†’ mid
+   falloff â†’ far cast (floating feel), plus an inner-top white highlight that
    catches light on the leading edge (the detail that reads as real glass, not
    frost) and a hairline edge. Scoped to the demo so the shared
    --glass-shadow-stack token is untouched. */
 .marketing-root .hcd-tray-anchor .echly-v2 .pill-tickets {
-  /* v21: centered ambient shadow instead of a downward drop — Y-offset 0 so the
+  /* v21: centered ambient shadow instead of a downward drop â€” Y-offset 0 so the
      glow sits evenly around the card (a soft halo, not a cast below it), plus
      the top-edge highlight (glass tell) and the hairline edge. */
   box-shadow:
@@ -5010,19 +5360,19 @@
     0 0 8px rgba(15, 23, 42, 0.08),
     /* Soft diffuse halo */
     0 0 40px rgba(15, 23, 42, 0.14),
-    /* Top-edge inner highlight — the critical glass tell */
+    /* Top-edge inner highlight â€” the critical glass tell */
     inset 0 1px 0 rgba(255, 255, 255, 1),
-    /* Hairline edge — defines the card on the light bg */
+    /* Hairline edge â€” defines the card on the light bg */
     0 0 0 1px rgba(15, 23, 42, 0.05);
 }
 /* Glass refinement Fix 3 (light surface): gradient surface (more opaque at top
-   where light catches → more transparent at bottom) and a white-tinted border
+   where light catches â†’ more transparent at bottom) and a white-tinted border
    replacing the dark --glass-border. Scoped to the demo tray so the shared
    forklifted --glass-surface / --glass-border tokens are untouched. The
    backdrop saturate(140%) is already on the --glass-blur token, and the
    top-edge light highlight is already on .pill::before. */
 .marketing-root .hcd-tray-anchor .echly-v2 .pill {
-  /* Near-solid surface (was 0.85 → 0.65 — too transparent, background bled
+  /* Near-solid surface (was 0.85 â†’ 0.65 â€” too transparent, background bled
      through the row text). Keeps a faint gradient + backdrop refraction so the
      edges still read as glass. */
   background: linear-gradient(
@@ -5043,7 +5393,7 @@
   transform: translateX(-50%);
 }
 
-/* Pill anchor — positioned by the orchestrator (Fix 4), fades in. */
+/* Pill anchor â€” positioned by the orchestrator (Fix 4), fades in. */
 .marketing-root .hcd-pill-anchor {
   position: absolute;
   opacity: 0;
@@ -5061,7 +5411,7 @@
    hairline + multi-layer elevation with the inset top-edge highlight (the
    critical glass tell). Scoped to the demo so the forklifted --glass-surface /
    --shadow-depth-recording tokens stay untouched. Slightly less opacity than the
-   modal — the pill is smaller and doesn't need to be as solid for readability. */
+   modal â€” the pill is smaller and doesn't need to be as solid for readability. */
 .marketing-root .hcd-pill-anchor .echly-pill-content {
   background: linear-gradient(
     180deg,
@@ -5079,7 +5429,7 @@
     0 0 0 1px rgba(15, 23, 42, 0.05);
 }
 
-/* Edit modal anchor — full-stage layer above tray + SC, below nothing. */
+/* Edit modal anchor â€” full-stage layer above tray + SC, below nothing. */
 .marketing-root .hcd-modal-anchor {
   position: absolute;
   inset: 0;
@@ -5087,7 +5437,7 @@
   pointer-events: auto;
 }
 
-/* ── Custom comment cursor + tooltip (Fix 1) ──
+/* â”€â”€ Custom comment cursor + tooltip (Fix 1) â”€â”€
    Sourced from SessionOverlay.createCommentCursor (SVG) + .echly-capture-tooltip
    (the dark glass pill). Both are click-through (pointer-events: none). */
 .marketing-root .hcd-cursor {
@@ -5150,7 +5500,8 @@
   .marketing-root .echly-v2 .tl-eyebrow .live-dot,
   .marketing-root .echly-v2 .ai-dot,
   .marketing-root .speech-caption-cursor,
-  .marketing-root .speech-caption-word {
+  .marketing-root .speech-caption-word,
+  .marketing-root .session-demo-stage .demo-comment-enter {
     animation: none !important;
   }
   /* Caption still appears, just without the fade keyframe. */
@@ -5166,7 +5517,7 @@
 }
 
 /* =====================================================================
-   PHASE 2C — Session view forklift (real production session components)
+   PHASE 2C â€” Session view forklift (real production session components)
    Tokens + layout + scoped utility classes for the forklifted session
    demo. All design tokens copied verbatim from styles/tokens.css with
    citations; comment/text utilities mirror app/globals.css. Scoped to
@@ -5200,8 +5551,13 @@
   --color-success-border: #A7F3D0;  /* tokens.css:72 */
   --color-danger: #E5484D;          /* tokens.css:75 */
   --color-danger-bg: #FEF2F2;       /* tokens.css:76 */
-  --color-warning: #F77E2C;         /* tokens.css:79 — presence ring */
-  --orange: #F77E2C;                /* tokens.css:356 → 79 — Activity accent */
+  --color-danger-border: #FECACA;   /* tokens.css:77 â€” priority High chip border */
+  --color-warning: #F77E2C;         /* tokens.css:79 â€” presence ring */
+  --color-warning-bg: #FFEDD5;      /* tokens.css:80 â€” priority Medium chip bg */
+  --color-warning-border: #FED7AA;  /* tokens.css:81 â€” priority Medium chip border */
+  --surface-input: #FAFAFA;         /* tokens.css:61 â€” assignee search box */
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06); /* tokens.css:129 â€” Assign/Priority popovers */
+  --orange: #F77E2C;                /* tokens.css:356 â†’ 79 â€” Activity accent */
   --avatar-neutral-grey: #E5E5E5;   /* tokens.css:101 */
   --avatar-warm-orange: #F2994A;
   --avatar-blue: #2D9CDB;
@@ -5225,10 +5581,12 @@
 
 /* ---- Layout (mirrors SessionPageClient.tsx:3947-4086, two columns) ---- */
 .marketing-root .session-demo-stage {
+  position: relative;
+  z-index: 1;
   font-family: "DM Sans", var(--echly-font);
   color: var(--text-heading);
   background: var(--surface-page);
-  border-radius: var(--mk-radius-xl, 22px);
+  border-radius: 10px;
   border: 1px solid var(--line-1, #E7E5E4);
   box-shadow: var(--mk-sh-xl, 0 30px 80px rgba(28,25,23,0.10));
   overflow: hidden;
@@ -5310,7 +5668,7 @@
   background: rgba(0, 0, 0, 0.2);
 }
 
-/* ---- Comment/text utilities (mirror app/globals.css + spec §4.6) ---- */
+/* ---- Comment/text utilities (mirror app/globals.css + spec Â§4.6) ---- */
 .marketing-root .session-demo-stage .text-discussion-title { color: var(--text-heading); }
 .marketing-root .session-demo-stage .text-discussion-body { color: var(--text-heading); } /* globals.css:98 */
 .marketing-root .session-demo-stage .text-meta { color: var(--text-tertiary); }
@@ -5328,6 +5686,14 @@
   scroll-margin-bottom: 80px;
   transition: background 200ms ease-out;
 }
+/* Interactivity pass â€” a comment the viewer just posted fades + slides in. */
+.marketing-root .session-demo-stage .demo-comment-enter {
+  animation: demo-comment-enter 260ms ease-out;
+}
+@keyframes demo-comment-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 /* tl-vrow in production sets content-visibility:auto for virtualization
    (globals.css:10037). Not needed for 6 static rows; reset so rows never
    collapse to their contain-intrinsic-size placeholder mid-paint. */
@@ -5335,7 +5701,7 @@
   content-visibility: visible;
 }
 
-/* Sidebar "Invite Team" — black fill (the bg-[var(--text-heading)] arbitrary
+/* Sidebar "Invite Team" â€” black fill (the bg-[var(--text-heading)] arbitrary
    class wasn't applying in this scope; force it explicitly). */
 .marketing-root .session-demo-invite-btn {
   background: var(--text-heading);
@@ -5344,7 +5710,7 @@
   background: #000000;
 }
 
-/* New-ticket highlight — brand-purple recipe (tokens.css:1083-1089), per
+/* New-ticket highlight â€” brand-purple recipe (tokens.css:1083-1089), per
    binding decision #6 (NOT the buggy blue echlyTicketHighlight). */
 .marketing-root .session-demo-stage .echly-new-ticket-highlight {
   animation: echly-new-ticket-pulse 600ms ease-out;
@@ -5362,7 +5728,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Light frosted-glass backdrop (Fix 4g) — not dark dimming. */
+  /* Light frosted-glass backdrop (Fix 4g) â€” not dark dimming. */
   background: rgba(250, 249, 247, 0.55);
   backdrop-filter: blur(6px);
   padding: 20px;

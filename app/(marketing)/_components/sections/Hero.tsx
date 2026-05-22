@@ -7,15 +7,8 @@ export function Hero() {
   // the only non-capturing element is the real "Get Annote" CTA.
   return (
     <section id="top" className="hero hero-unified">
-      {/* Animated aurora background — deep-blue base with soft drifting
-          blue/teal/green/magenta blobs. Purely decorative, sits behind the
-          demo, and is frozen by prefers-reduced-motion (see marketing.css). */}
-      <div className="hero-aurora" aria-hidden="true">
-        <span className="hero-aurora-blob hero-aurora-blob--a" />
-        <span className="hero-aurora-blob hero-aurora-blob--b" />
-        <span className="hero-aurora-blob hero-aurora-blob--c" />
-        <span className="hero-aurora-blob hero-aurora-blob--d" />
-      </div>
+      {/* Background is near-white with a very faint static gradient wash (see
+          .hero in marketing.css). The animated aurora blobs were removed. */}
       <div className="hero-stage hero-stage--demo">
         <HeroCaptureDemo />
       </div>

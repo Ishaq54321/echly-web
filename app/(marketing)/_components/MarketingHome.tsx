@@ -7,9 +7,8 @@ import { Hero } from "./sections/Hero";
 import { TrustStrip } from "./sections/TrustStrip";
 import { ClickToTicket } from "./sections/ClickToTicket";
 import { SessionsDetail } from "./sections/SessionsDetail";
-import { Context } from "./sections/Context";
-import { Agencies } from "./sections/Agencies";
-import { Personas } from "./sections/Personas";
+import { BuiltForAgencies } from "./sections/BuiltForAgencies";
+import { WhoItsFor } from "./sections/WhoItsFor";
 import { Pricing } from "./sections/Pricing";
 import { FAQ } from "./sections/FAQ";
 import { Editorial } from "./sections/Editorial";
@@ -25,9 +24,8 @@ export function MarketingHome() {
         <TrustStrip />
         <ClickToTicket />
         <SessionsDetail />
-        <Context />
-        <Agencies />
-        <Personas />
+        <BuiltForAgencies />
+        <WhoItsFor />
         <Pricing />
         <FAQ />
         <Editorial />

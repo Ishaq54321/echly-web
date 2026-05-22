@@ -70,7 +70,11 @@ export function FeedbackContent({
         </section>
       )}
 
-      <CommentsSection threads={controller.threads} currentUserInitial="Y" />
+      <CommentsSection
+        threads={controller.threads}
+        currentUserInitial="AN"
+        onSendComment={controller.sendComment}
+      />
     </div>
   );
 }

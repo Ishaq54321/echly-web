@@ -33,7 +33,13 @@ import { useEffect, useMemo } from "react";
 import { VoiceTicketDemo } from "../demos";
 import { CapturePill } from "../demos/annote/CapturePill";
 import { getTicketIconFromTags } from "@/lib/utils/getTicketIconFromTags";
-import { Link as LinkIcon, UserPlus } from "lucide-react";
+import {
+  Link as LinkIcon,
+  UserPlus,
+  MousePointerClick,
+  AudioLines,
+  Share,
+} from "lucide-react";
 
 /** Photography placeholders — swap files in /public/marketing/people/. */
 const PHOTO = {
@@ -53,52 +59,6 @@ const SESSION_TICKETS = [
 ] as const;
 
 /* ---------------- Icons ---------------- */
-
-function CrosshairIcon({ size = 14 }: { size?: number }) {
-  return (
-    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
-      <circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" strokeWidth="1.6" />
-      <path
-        d="M12 2v4M12 18v4M2 12h4M18 12h4"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function MicIcon({ size = 14 }: { size?: number }) {
-  return (
-    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
-      <rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" strokeWidth="1.6" />
-      <path
-        d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function ShareIcon({ size = 14 }: { size?: number }) {
-  return (
-    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
-      <path
-        d="M18 8a3 3 0 1 0-2.83-4M18 8a3 3 0 0 1-2.83-2M18 8 8.7 12.7M6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm0 0 9.3 4.7M18 22a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 function ArrowRightIcon({ size = 14 }: { size?: number }) {
   return (
@@ -186,7 +146,7 @@ export function ClickToTicket() {
 
       {/* Section 1: Capture (copy left / visual right) */}
       <div className="ctt-card">
-        <CardHeader icon={<CrosshairIcon />} label="Capture" />
+        <CardHeader icon={<MousePointerClick size={17} strokeWidth={2} />} label="Capture" />
         <div className="ctt-card-body">
           <CardCopy
             title="Capture anything in one click."
@@ -207,10 +167,11 @@ export function ClickToTicket() {
 
       {/* Section 2: Voice (visual left / copy right) */}
       <div className="ctt-card">
-        <CardHeader icon={<MicIcon />} label="Voice" />
+        <CardHeader icon={<AudioLines size={17} strokeWidth={2} />} label="Voice" />
         <div className="ctt-card-body ctt-card-body--visual-left">
           <div className="ctt-card-visual ctt-card-visual--voice">
             <VoiceMockup />
+            <ContextChips />
           </div>
           <CardCopy
             title="Talk through it. Send a ticket."
@@ -228,7 +189,7 @@ export function ClickToTicket() {
 
       {/* Section 3: Sessions (copy left / visual right) */}
       <div className="ctt-card">
-        <CardHeader icon={<ShareIcon />} label="Sessions" />
+        <CardHeader icon={<Share size={17} strokeWidth={2} />} label="Sessions" />
         <div className="ctt-card-body">
           <CardCopy
             title="Auto-grouped. Share the whole session."
@@ -274,16 +235,8 @@ function CaptureMockup() {
           </div>
 
           <div className="capture-mock-testimonial">
-            <img
-              src={PHOTO.maya}
-              alt=""
-              className="capture-mock-testimonial-avatar"
-            />
             <div className="capture-mock-testimonial-quote">
-              &ldquo;Cut our review cycle in half.&rdquo;
-            </div>
-            <div className="capture-mock-testimonial-name">
-              Maya Anand · Northwind Studio
+              This section looks too crowded compared to the rest of the page near the sidebar.
             </div>
           </div>
         </div>
@@ -338,6 +291,42 @@ function VoiceMockup() {
       <div className="voice-mock-demo">
         <VoiceTicketDemo />
       </div>
+    </div>
+  );
+}
+
+/**
+ * Floating context chips scattered around the voice card. While you talk, this
+ * is the silent context Annote attaches to the ticket — page, element, browser,
+ * OS, brand tokens. They're absolutely positioned around the card's edges (not
+ * a tidy row) and fade in one by one once the card scrolls into view: the
+ * stagger is driven off the parent `.ctt-card.ctt-in-view` class via per-chip
+ * --d delays, so nothing animates until the section is seen, and reduced-motion
+ * shows them all at rest.
+ *
+ * Position keys map to corner/edge anchors defined in marketing.css; dot color
+ * classes mirror the former Context section's palette (v/b/m/a/t).
+ */
+const CONTEXT_CHIPS = [
+  { pos: "tl", dot: "v", label: "aurora.com/dashboard" },
+  { pos: "tr", dot: "m", label: "1440×900 · Chrome 124" },
+  { pos: "br", dot: "a", label: "macOS Sequoia" },
+  { pos: "bl", dot: "t", label: "Aurora brand tokens" },
+] as const;
+
+function ContextChips() {
+  return (
+    <div className="ctt-ctx" aria-hidden="true">
+      {CONTEXT_CHIPS.map((chip, i) => (
+        <span
+          key={chip.label}
+          className={`ctt-ctx-chip ctt-ctx-chip--${chip.pos}`}
+          style={{ "--d": `${i * 140}ms` } as React.CSSProperties}
+        >
+          <i className={`cc-dot ${chip.dot}`} />
+          {chip.label}
+        </span>
+      ))}
     </div>
   );
 }
@@ -412,35 +401,21 @@ function SessionsMockup() {
             <div className="sessions-mock-screenshot-pin">1</div>
           </div>
 
-          <div className="sessions-mock-comments">
-            <div className="sessions-mock-comment">
-              <img
-                src={PHOTO.maya}
-                alt=""
-                className="sessions-mock-comment-avatar"
-              />
-              <div className="sessions-mock-comment-body">
-                <div className="sessions-mock-comment-name">Maya Anand</div>
-                <div className="sessions-mock-comment-text">
-                  Found this in the Northcap audit — back-button skips users
-                  forward to step 5.
-                </div>
-              </div>
-            </div>
+          <div className="sessions-mock-section">
+            <div className="sessions-mock-section-label">Description</div>
+            <p className="sessions-mock-description">
+              On the back arrow, the onboarding flow skips ahead to step 5
+              instead of returning to the previous step. The router push is
+              overwriting history.replaceState.
+            </p>
+          </div>
 
-            <div className="sessions-mock-comment">
-              <img
-                src={PHOTO.daniel}
-                alt=""
-                className="sessions-mock-comment-avatar"
-              />
-              <div className="sessions-mock-comment-body">
-                <div className="sessions-mock-comment-name">Daniel Torres</div>
-                <div className="sessions-mock-comment-text">
-                  Picking this up — the router push is overwriting
-                  history.replaceState. 30-min fix.
-                </div>
-              </div>
+          <div className="sessions-mock-section">
+            <div className="sessions-mock-section-label">Tags</div>
+            <div className="sessions-mock-tags">
+              <span className="sessions-mock-tag">onboarding</span>
+              <span className="sessions-mock-tag">navigation</span>
+              <span className="sessions-mock-tag">bug</span>
             </div>
           </div>
         </div>
