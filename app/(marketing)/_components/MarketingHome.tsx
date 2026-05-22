@@ -5,13 +5,11 @@ import { MarketingHeader } from "./MarketingHeader";
 import { MarketingFooter } from "./MarketingFooter";
 import { Hero } from "./sections/Hero";
 import { TrustStrip } from "./sections/TrustStrip";
-import { Suite } from "./sections/Suite";
-import { Workflow } from "./sections/Workflow";
+import { ClickToTicket } from "./sections/ClickToTicket";
 import { SessionsDetail } from "./sections/SessionsDetail";
 import { Context } from "./sections/Context";
 import { Agencies } from "./sections/Agencies";
 import { Personas } from "./sections/Personas";
-import { Integrations } from "./sections/Integrations";
 import { Pricing } from "./sections/Pricing";
 import { FAQ } from "./sections/FAQ";
 import { Editorial } from "./sections/Editorial";
@@ -25,13 +23,11 @@ export function MarketingHome() {
       <main>
         <Hero />
         <TrustStrip />
-        <Suite />
-        <Workflow />
+        <ClickToTicket />
         <SessionsDetail />
         <Context />
         <Agencies />
         <Personas />
-        <Integrations />
         <Pricing />
         <FAQ />
         <Editorial />

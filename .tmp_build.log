@@ -1,0 +1,145 @@
+ WARN  The "workspaces" field in package.json is not supported by pnpm. Create a "pnpm-workspace.yaml" file instead.
+
+> annote@0.1.0 build C:\Users\user\Desktop\echly
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+✓ Compiled successfully in 6.7s
+  Running TypeScript ...
+  Collecting page data using 19 workers ...
+⚠ Using edge runtime on a page currently disables static generation for that page
+  Generating static pages using 19 workers (0/53) ...
+  Generating static pages using 19 workers (13/53) 
+  Generating static pages using 19 workers (26/53) 
+  Generating static pages using 19 workers (39/53) 
+✓ Generating static pages using 19 workers (53/53) in 443.5ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ○ /activity
+├ ○ /admin
+├ ○ /admin/customers
+├ ○ /admin/plans
+├ ○ /admin/usage
+├ ƒ /api/activity-feed
+├ ƒ /api/activity-group-members
+├ ƒ /api/admin/me
+├ ƒ /api/admin/plans
+├ ƒ /api/admin/usage
+├ ƒ /api/admin/workspaces
+├ ƒ /api/admin/workspaces/actions
+├ ƒ /api/ai/improve
+├ ƒ /api/auth/check-email
+├ ƒ /api/auth/forgot-password
+├ ƒ /api/auth/google-contacts/authorize
+├ ƒ /api/auth/google-contacts/callback
+├ ƒ /api/auth/logout
+├ ƒ /api/auth/mark-verified
+├ ƒ /api/auth/send-verification
+├ ƒ /api/auth/session
+├ ƒ /api/billing/checkout
+├ ƒ /api/billing/history
+├ ƒ /api/billing/invoice/[id]
+├ ƒ /api/billing/portal
+├ ƒ /api/billing/usage
+├ ƒ /api/billing/webhook
+├ ƒ /api/comments
+├ ƒ /api/comments/[sessionId]
+├ ƒ /api/comments/react
+├ ƒ /api/cron/cleanup-temp-screenshots
+├ ƒ /api/cron/workspace-invite-reminders
+├ ƒ /api/cron/workspace-purge
+├ ƒ /api/extension/session
+├ ƒ /api/feedback
+├ ƒ /api/feedback/batch-resolve
+├ ƒ /api/feedback/search
+├ ƒ /api/insights
+├ ƒ /api/internal/admin-test
+├ ƒ /api/internal/insights-health
+├ ƒ /api/internal/process-insights-events
+├ ƒ /api/invite/activate
+├ ƒ /api/notifications
+├ ƒ /api/notifications/action
+├ ƒ /api/notifications/read-all
+├ ƒ /api/onboarding
+├ ƒ /api/plans/catalog
+├ ƒ /api/session-page-bundle
+├ ƒ /api/sessions
+├ ƒ /api/sessions/[sessionId]
+├ ƒ /api/sessions/[sessionId]/access-requests
+├ ƒ /api/sessions/[sessionId]/invite
+├ ƒ /api/sessions/[sessionId]/members
+├ ƒ /api/sessions/[sessionId]/overview
+├ ƒ /api/sessions/[sessionId]/participants
+├ ƒ /api/sessions/[sessionId]/request-access
+├ ƒ /api/sessions/[sessionId]/share-settings
+├ ƒ /api/sessions/[sessionId]/view
+├ ƒ /api/sessions/shared
+├ ƒ /api/sessions/shared/[sessionId]
+├ ƒ /api/structure-feedback
+├ ƒ /api/tickets/[id]
+├ ƒ /api/transcribe-audio
+├ ƒ /api/upload-attachment
+├ ƒ /api/upload-screenshot
+├ ƒ /api/users
+├ ƒ /api/users/avatar
+├ ƒ /api/users/change-email
+├ ƒ /api/users/confirm-email-change
+├ ƒ /api/users/send-password-reset
+├ ƒ /api/users/workspace
+├ ƒ /api/workspace
+├ ƒ /api/workspace/brand-logo
+├ ƒ /api/workspace/invitations/accept/[token]
+├ ƒ /api/workspace/leave
+├ ƒ /api/workspace/logo
+├ ƒ /api/workspace/member-count
+├ ƒ /api/workspace/members
+├ ƒ /api/workspace/members/[uid]
+├ ƒ /api/workspace/members/all
+├ ƒ /api/workspace/members/invitations
+├ ƒ /api/workspace/members/invitations/[token]
+├ ƒ /api/workspace/members/invitations/[token]/resend
+├ ƒ /api/workspace/members/invite
+├ ƒ /api/workspace/members/invite-batch
+├ ƒ /api/workspace/memberships
+├ ƒ /api/workspace/ownership
+├ ƒ /api/workspaces
+├ ƒ /api/workspaces/check-slug
+├ ○ /auth/action
+├ ○ /check-email
+├ ○ /dashboard
+├ ƒ /dashboard/[sessionId]
+├ ƒ /dashboard/[sessionId]/overview
+├ ƒ /dev/email-preview/[template]
+├ ○ /discussion
+├ ○ /docs
+├ ○ /extension-auth
+├ ○ /forgot-password
+├ ƒ /invite/[token]
+├ ○ /login
+├ ○ /no-workspace
+├ ○ /onboarding
+├ ƒ /opengraph-image
+├ ○ /reset-password
+├ ○ /robots.txt
+├ ƒ /session/[sessionId]
+├ ○ /settings
+├ ○ /shared
+├ ○ /signup
+├ ○ /sitemap.xml
+├ ƒ /unsubscribe
+└ ○ /workspace-suspended
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+BUILD_EXIT=0

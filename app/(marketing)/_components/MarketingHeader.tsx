@@ -10,11 +10,11 @@ const NAV_LINKS: ReadonlyArray<{ label: string; href: string; caret?: boolean }>
 
 export function MarketingHeader() {
   return (
-    <header className="mk-nav">
+    <header className="mk-nav mk-nav--hero">
       <div className="mk-nav-inner">
         <Link href="/" className="mk-logo" aria-label="Annote">
           <span className="mk-logo-mark">
-            <AnnoteLogo width={22} height={28} />
+            <AnnoteLogo width={22} height={28} variant="gradient" />
           </span>
           <span className="mk-logo-word">Annote</span>
         </Link>
@@ -35,7 +35,7 @@ export function MarketingHeader() {
           <Link className="mk-nav-link-quiet" href="/login">
             Sign in
           </Link>
-          <Link className="btn-primary" href="/signup">
+          <Link className="btn-primary mk-nav-signup" href="/signup">
             Get Annote
           </Link>
         </div>

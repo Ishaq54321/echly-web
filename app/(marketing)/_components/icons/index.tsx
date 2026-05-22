@@ -19,6 +19,27 @@ export function ArrowIcon({ size = 12 }: { size?: number }) {
   );
 }
 
+export function DownloadIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      aria-hidden="true"
+      style={{ display: "inline-block" }}
+    >
+      <path
+        d="M12 4 V14 M8 11 L12 15 L16 11 M5 18 H19"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function PlayIcon({ size = 14 }: { size?: number }) {
   return (
     <svg

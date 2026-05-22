@@ -5,9 +5,9 @@
 
 .marketing-root {
   /* page foundation */
-  --bg-0: #F2F0EB;
-  --bg-1: #ECE9E2;
-  --bg-2: #E4DFD4;
+  --bg-0: #FAFAFA;
+  --bg-1: #F2F2F2;
+  --bg-2: #EAEAEA;
 
   /* ink */
   --ink-1: #1B1626;
@@ -58,8 +58,30 @@
 
   --mk-font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
 
-  /* Reset to V7 page foundation inside the marketing tree */
-  background: var(--bg-0);
+  /* Light corporate foundation (Shadcnspace register).
+     The hero region — announcement bar, navbar, hero copy/demo — now sits on a
+     soft warm off-white that deepens slightly toward a warm cream at the bottom
+     of the band. Two faint lavender/blue washes give the off-white subtle
+     dimension without reading as a "gradient hero". Below the band the page
+     falls back to the base off-white. The navbar (transparent) reads over the
+     warm cream instead of over the old navy. */
+  /* Atmospheric depth (Shadcnspace register): three stacked layers — a warm
+     cream radial wash anchored to the right, a cool blue-tint radial wash on the
+     left, both fading to transparent ~60% so they blend softly into a warm
+     off-white base in the middle of the page. Reads as "carefully crafted
+     background", not flat color. background-attachment:fixed keeps the
+     atmosphere stable as the page scrolls past the hero band. */
+  background:
+    /* Layer 1: warm cream wash on the right — fully opaque core, deeper amber
+       tint, holds its color further (solid to 25%) and reaches well past center
+       so the warmth dominates the right half. */
+    radial-gradient(ellipse 100% 95% at 100% 50%, rgba(255, 230, 188, 1) 0%, rgba(255, 230, 188, 0.7) 25%, rgba(255, 230, 188, 0) 80%),
+    /* Layer 2: cool blue tint on the left — fully opaque core, deeper blue,
+       holds further and reaches well past center so the cool side reads strongly. */
+    radial-gradient(ellipse 95% 90% at 0% 40%, rgba(188, 212, 250, 1) 0%, rgba(188, 212, 250, 0.7) 25%, rgba(188, 212, 250, 0) 80%),
+    /* Layer 3: base warm off-white */
+    linear-gradient(180deg, #FAFAF8 0%, #F5F2EC 100%);
+  background-attachment: fixed;
   color: var(--ink-1);
   font-weight: 400;
   line-height: 1.55;
@@ -133,6 +155,7 @@
   z-index: 50;
   background: transparent;
   padding: 16px 0;
+  border-bottom: 1px solid rgba(20, 16, 30, 0.08);
 }
 .marketing-root .mk-nav-inner {
   max-width: 1320px;
@@ -201,6 +224,54 @@
   color: var(--ink-1);
 }
 
+/* ── Hero navbar (over the light warm-cream foundation) ──
+   Transparent header, dark-ink wordmark + links, hairline dark divider, and a
+   solid dark "signup" pill on the right (Option A — the Shadcnspace register).
+   The brand violet lives elsewhere (CTA arrow circle, accents), not here. */
+.marketing-root .mk-nav--hero {
+  /* v21: subtle frosted-glass backdrop. On the lighter atmospheric foundation a
+     fully-transparent nav started to blend into the hero copy; a faint blur +
+     saturation lifts the nav off the gradient without hiding the atmosphere
+     behind it. */
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border-bottom-color: rgba(21, 16, 31, 0.06);
+}
+.marketing-root .mk-nav--hero .mk-logo-word {
+  color: var(--ink-1);
+}
+.marketing-root .mk-nav--hero .mk-nav-links a {
+  color: var(--ink-2);
+}
+.marketing-root .mk-nav--hero .mk-nav-links a:hover {
+  color: var(--ink-1);
+}
+.marketing-root .mk-nav--hero .mk-nav-link-quiet {
+  color: var(--ink-2);
+}
+.marketing-root .mk-nav--hero .mk-nav-link-quiet:hover {
+  color: var(--ink-1);
+}
+/* Solid dark pill signup CTA — dark ink fill, white label. Overrides the
+   .btn-primary violet it also carries. */
+.marketing-root .mk-nav-signup {
+  background: #15101F;
+  color: #FFFFFF;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.08),
+    0 4px 12px rgba(15, 23, 42, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.marketing-root .mk-nav-signup:hover {
+  background: #1F1A2A;
+  color: #FFFFFF;
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.10),
+    0 6px 16px rgba(15, 23, 42, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
+}
+
 /* ============ BUTTONS ============ */
 .marketing-root .btn-primary {
   display: inline-flex;
@@ -228,6 +299,62 @@
   height: 46px;
   padding: 0 22px;
   font-size: 15px;
+}
+
+/* ── Hero CTA (pill) ──
+   Reverted from the rectangular split-panel version: that read too "buttony"
+   and the separated violet arrow panel didn't fit the aesthetic. Back to a
+   fully-rounded dark pill with the label on the left and a small brand-violet
+   circle holding the arrow on the right, contained within the pill's padding.
+   Asymmetric padding (more on the label side) keeps the circle hugging the
+   right edge. */
+.marketing-root .mk-hero-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  /* v21: 56px (was 52px) — more presence to match the bolder headline above,
+     and a slightly stronger shadow for definition on the lighter atmosphere. */
+  height: 56px;
+  padding: 0 8px 0 24px;
+  border-radius: 999px;
+  background: #15101F;
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.12),
+    0 12px 28px rgba(15, 23, 42, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out, background 0.15s ease;
+}
+.marketing-root .mk-hero-cta:hover {
+  transform: translateY(-1px);
+  background: #1C1729;
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.10),
+    0 12px 24px rgba(15, 23, 42, 0.20),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
+}
+.marketing-root .mk-hero-cta-label {
+  display: inline-flex;
+  align-items: center;
+  color: #FFFFFF;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  line-height: 1;
+}
+.marketing-root .mk-hero-cta-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #5A49BF;
+  color: #FFFFFF;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+.marketing-root .mk-hero-cta:hover .mk-hero-cta-arrow {
+  transform: translateX(2px);
 }
 
 .marketing-root .btn-white {
@@ -275,8 +402,99 @@
 .marketing-root .hero {
   position: relative;
   overflow: hidden;
-  padding-bottom: 80px;
-  background: var(--bg-0);
+  /* The deep-blue base band lives on .marketing-root so it spans the navbar
+     too; the hero is transparent and the animated .hero-aurora blobs drift
+     over it. */
+  background: transparent;
+}
+
+/* ── Animated aurora background ─────────────────────────────────────────────
+   Soft, large color blobs that slowly drift, scale and breathe over the deep
+   navy base — echoing the reference: blue + teal/green at the bottom-centre and
+   a magenta glow toward the lower-left. Decorative only; pinned behind all hero
+   content (z-index 0) and frozen for prefers-reduced-motion. */
+.marketing-root .hero-aurora {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  /* The blobs blur into one another for a smooth gradient field. */
+  filter: blur(40px);
+}
+/* Light-theme aurora: the same drifting blobs, but recalibrated as faint warm
+   color washes on the off-white. `screen` blend is gone (it vanishes on light);
+   these are very-low-opacity tints in normal blend that add the barest hint of
+   lavender/blue/rose dimension to the cream — never a "colored hero". */
+.marketing-root .hero-aurora-blob {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  opacity: 0.5;
+  will-change: transform, opacity;
+  mix-blend-mode: normal;
+}
+/* a — soft lavender, upper-left */
+.marketing-root .hero-aurora-blob--a {
+  width: 60vw;
+  height: 60vw;
+  top: -18%;
+  left: -12%;
+  background: radial-gradient(circle at 50% 50%, rgba(90, 73, 191, 0.10) 0%, rgba(90, 73, 191, 0) 68%);
+  animation: hero-aurora-a 22s ease-in-out infinite;
+}
+/* b — pale sky blue, lower-centre */
+.marketing-root .hero-aurora-blob--b {
+  width: 55vw;
+  height: 55vw;
+  bottom: -24%;
+  left: 30%;
+  background: radial-gradient(circle at 50% 50%, rgba(58, 110, 200, 0.08) 0%, rgba(58, 110, 200, 0) 66%);
+  animation: hero-aurora-b 26s ease-in-out infinite;
+}
+/* c — faint rose, lower-left */
+.marketing-root .hero-aurora-blob--c {
+  width: 46vw;
+  height: 46vw;
+  bottom: -20%;
+  left: 4%;
+  background: radial-gradient(circle at 50% 50%, rgba(197, 26, 104, 0.05) 0%, rgba(197, 26, 104, 0) 64%);
+  animation: hero-aurora-c 30s ease-in-out infinite;
+}
+/* d — pale indigo, upper-right */
+.marketing-root .hero-aurora-blob--d {
+  width: 52vw;
+  height: 52vw;
+  top: -16%;
+  right: -16%;
+  background: radial-gradient(circle at 50% 50%, rgba(74, 90, 196, 0.07) 0%, rgba(74, 90, 196, 0) 66%);
+  animation: hero-aurora-d 24s ease-in-out infinite;
+}
+
+@keyframes hero-aurora-a {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.85; }
+  33%      { transform: translate3d(8vw, 6vh, 0) scale(1.15); opacity: 0.95; }
+  66%      { transform: translate3d(4vw, -4vh, 0) scale(0.95); opacity: 0.75; }
+}
+@keyframes hero-aurora-b {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.7; }
+  40%      { transform: translate3d(-10vw, -6vh, 0) scale(1.2); opacity: 0.85; }
+  70%      { transform: translate3d(6vw, 3vh, 0) scale(0.9); opacity: 0.6; }
+}
+@keyframes hero-aurora-c {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.55; }
+  50%      { transform: translate3d(7vw, -5vh, 0) scale(1.25); opacity: 0.7; }
+}
+@keyframes hero-aurora-d {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.7; }
+  45%      { transform: translate3d(-6vw, 5vh, 0) scale(1.12); opacity: 0.8; }
+  75%      { transform: translate3d(-2vw, -3vh, 0) scale(0.96); opacity: 0.6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketing-root .hero-aurora-blob {
+    animation: none !important;
+  }
 }
 
 .marketing-root .hero-copy {
@@ -288,21 +506,22 @@
   text-align: center;
 }
 .marketing-root .hero-h1 {
-  font-size: clamp(36px, 4.4vw, 56px);
-  font-weight: 500;
-  line-height: 1.08;
-  letter-spacing: -0.028em;
-  margin: 0 auto 18px;
-  color: var(--ink-1);
+  font-size: clamp(44px, 5.4vw, 68px);
+  font-weight: 600;
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  margin: 0 auto 20px;
+  color: #FFFFFF;
   max-width: 16ch;
 }
 .marketing-root .hero-sub {
-  font-size: 16px;
-  color: var(--ink-2);
-  margin: 0 auto 28px;
-  max-width: 54ch;
+  font-size: clamp(18px, 1.5vw, 21px);
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.85);
+  margin: 0 auto 30px;
+  max-width: 38ch;
   letter-spacing: -0.003em;
-  line-height: 1.55;
+  line-height: 1.5;
 }
 
 .marketing-root .hero-stage {
@@ -655,507 +874,646 @@
   font-weight: 400;
 }
 
-/* ============ SUITE TABS ============ */
-.marketing-root .suite {
-  background: var(--bg-0);
-  padding: 24px 0 100px;
-}
-.marketing-root .suite-head {
-  max-width: 1320px;
-  margin: 0 auto;
-  padding: 0 32px;
+/* ============ FROM CLICK TO TICKET ============
+   Replaces the former tabbed Suite section. Parent heading frames three
+   scroll-revealed subsections (Capture / Voice / Sessions). Mockups compose
+   real product styling — browser chrome, capture pill + recording orb, session
+   sidebar, status pills, comment threads — at marketing scale, with embedded
+   photography (placeholders under /public/marketing/people/). */
+.marketing-root .ctt-root {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-bottom: 22px;
+  flex-direction: column;
+  padding: 96px 24px 64px;
+  width: 100%;
+  max-width: none;
+  background: var(--bg-0);
 }
-.marketing-root .suite-h {
-  font-size: clamp(26px, 2.8vw, 36px);
+
+.marketing-root .ctt-headline {
+  font-size: clamp(40px, 5vw, 64px);
   font-weight: 500;
-  letter-spacing: -0.022em;
-  margin: 0;
-  color: var(--ink-1);
+  line-height: 1;
+  letter-spacing: -0.025em;
+  text-align: center;
+  margin: 0 auto 64px;
+  max-width: 800px;
+  background: linear-gradient(90deg, #15101F 0%, #54495F 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: #15101F;
 }
-.marketing-root .suite-tabs {
-  max-width: 1320px;
-  margin: 0 auto 14px;
-  padding: 0 32px;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
+
+/* ---- Contained card (Superhuman pattern) ---- */
+.marketing-root .ctt-card {
+  position: relative;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto 40px;
+
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: 20px;
+  overflow: hidden;
+
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 8px 24px -8px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+
+  /* Scroll-reveal fade + rise */
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.7s ease-out,
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.marketing-root .suite-tab {
+.marketing-root .ctt-card:last-child {
+  margin-bottom: 0;
+}
+.marketing-root .ctt-card.ctt-in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Decorative diagonal side stripes — structural texture */
+.marketing-root .ctt-card::before,
+.marketing-root .ctt-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent 0,
+    transparent 2px,
+    rgba(15, 23, 42, 0.04) 2px,
+    rgba(15, 23, 42, 0.04) 3px
+  );
+  pointer-events: none;
+  z-index: 2;
+}
+.marketing-root .ctt-card::before { left: 0; }
+.marketing-root .ctt-card::after { right: 0; }
+
+/* ---- Card header bar ---- */
+.marketing-root .ctt-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 32px;
+  border-bottom: 1px dashed rgba(15, 23, 42, 0.08);
+  background: rgba(15, 23, 42, 0.015);
+}
+.marketing-root .ctt-card-header-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.marketing-root .ctt-card-header-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 16px 18px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid var(--line-1);
-  border-radius: 12px;
-  font-size: 14.5px;
-  font-weight: 500;
-  color: var(--ink-2);
-  letter-spacing: -0.003em;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: #F0ECFB;
+  color: #5A49BF;
 }
-.marketing-root .suite-tab:hover {
-  color: var(--ink-1);
-  background: rgba(255, 255, 255, 0.85);
-}
-.marketing-root .suite-tab.is-on {
-  background: #FFFFFF;
-  color: var(--ink-1);
-  border-color: var(--line-2);
-  box-shadow: var(--mk-sh-sm);
-}
-.marketing-root .st-ico {
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-  display: inline-block;
-}
-.marketing-root .st-cap {
-  background: linear-gradient(135deg, var(--violet), var(--violet-3));
-  box-shadow: 0 2px 6px rgba(90, 73, 191, 0.30);
-}
-.marketing-root .st-voi {
-  background: linear-gradient(135deg, #1F8A4C, #6FBF8C);
-  box-shadow: 0 2px 6px rgba(31, 138, 76, 0.30);
-}
-.marketing-root .st-ses {
-  background: linear-gradient(135deg, #E08A5A, #C97A1F);
-  box-shadow: 0 2px 6px rgba(224, 138, 90, 0.30);
-}
-.marketing-root .st-int {
-  background: linear-gradient(135deg, #3F6FB8, #6BA4E2);
-  box-shadow: 0 2px 6px rgba(63, 111, 184, 0.30);
+.marketing-root .ctt-card-header-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #15101F;
+  letter-spacing: -0.005em;
 }
 
-/* PANEL */
-.marketing-root .panel {
-  max-width: 1320px;
-  margin: 14px auto 0;
-  padding: 0 32px;
-  display: none;
-}
-.marketing-root .panel.is-on {
-  display: block;
-}
-.marketing-root .panel-h {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 14px;
-  font-weight: 500;
-  padding: 18px 24px 14px;
-  color: var(--ink-2);
-  letter-spacing: -0.003em;
-}
-.marketing-root .panel-h-ico {
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-}
-.marketing-root .panel-body {
+/* ---- Two-column body ---- */
+.marketing-root .ctt-card-body {
   display: grid;
-  grid-template-columns: 1fr 1.15fr;
-  gap: 0;
-  background: #FFFFFF;
-  border-radius: var(--mk-radius-xl);
-  border: 1px solid var(--line-1);
-  overflow: hidden;
-  min-height: 540px;
-  box-shadow: var(--mk-sh-lg);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  min-height: 480px;
 }
-.marketing-root .panel-copy {
-  padding: 48px 48px 40px;
+.marketing-root .ctt-card-body--visual-left {
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+}
+.marketing-root .ctt-card-body--visual-left .ctt-card-visual { order: 1; }
+.marketing-root .ctt-card-body--visual-left .ctt-card-copy { order: 2; }
+
+/* ---- Copy column ---- */
+.marketing-root .ctt-card-copy {
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  padding: 48px 56px;
 }
-.marketing-root .panel-title {
-  font-size: clamp(24px, 2.4vw, 32px);
+.marketing-root .ctt-card-title {
+  font-size: clamp(28px, 2.5vw, 36px);
   font-weight: 500;
-  letter-spacing: -0.022em;
-  line-height: 1.12;
-  margin: 0 0 18px;
-  color: var(--ink-1);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: #15101F;
+  margin: 0 0 12px;
+  max-width: 380px;
 }
-.marketing-root .panel-sub {
-  font-size: 15.5px;
-  color: var(--ink-2);
-  line-height: 1.5;
-  margin: 0 0 22px;
-  letter-spacing: -0.003em;
-  max-width: 38ch;
+.marketing-root .ctt-card-sub {
+  font-size: 16px;
+  line-height: 1.55;
+  color: rgba(15, 23, 42, 0.65);
+  margin: 0 0 28px;
+  max-width: 420px;
 }
-.marketing-root .panel-link {
+.marketing-root .ctt-card-learn-more {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--violet);
-  font-weight: 500;
-  font-size: 14.5px;
-  border-bottom: 1px solid var(--violet);
-  align-self: flex-start;
-  padding-bottom: 2px;
-  letter-spacing: -0.003em;
+  font-size: 14px;
+  font-weight: 600;
+  color: #5A49BF;
+  text-decoration: none;
+  margin: 0 0 32px;
+  transition: gap 0.2s ease-out;
 }
-.marketing-root .panel-link:hover {
-  opacity: 0.8;
+.marketing-root .ctt-card-learn-more:hover {
+  gap: 10px;
 }
-.marketing-root .panel-bullets {
+.marketing-root .ctt-card-learn-more svg {
+  width: 14px;
+  height: 14px;
+}
+.marketing-root .ctt-card-bullets {
   list-style: none;
   padding: 0;
-  margin: 36px 0 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  border-top: 1px solid var(--line-1);
-  padding-top: 22px;
-}
-.marketing-root .panel-bullets li {
-  font-size: 14.5px;
-  color: var(--ink-2);
-  letter-spacing: -0.003em;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  position: relative;
-  padding-left: 20px;
-}
-.marketing-root .panel-bullets li::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 8px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  border: 1.4px solid var(--ink-3);
-}
-
-.marketing-root .panel-viz {
-  position: relative;
-  overflow: hidden;
-  min-height: 540px;
-}
-.marketing-root .viz-sky,
-.marketing-root .viz-meadow,
-.marketing-root .viz-dawn,
-.marketing-root .viz-emerald {
-  position: absolute;
-  inset: 0;
-}
-.marketing-root .viz-sky {
-  background: linear-gradient(160deg, var(--wash-soft-a) 0%, var(--wash-soft-b) 100%);
-}
-.marketing-root .viz-meadow {
-  background: linear-gradient(160deg, #E2E8F0 0%, var(--wash-soft-b) 100%);
-}
-.marketing-root .viz-dawn {
-  background: linear-gradient(160deg, var(--wash-soft-a) 0%, var(--wash-soft-c) 100%);
-}
-.marketing-root .viz-emerald {
-  background: linear-gradient(160deg, #E6EAF0 0%, var(--wash-soft-b) 100%);
-}
-.marketing-root .viz-card {
-  position: absolute;
-  background: #FFFFFF;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  box-shadow: var(--mk-sh-xl);
-}
-
-/* viz: capture */
-.marketing-root .viz-browser {
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 78%;
-  padding: 0;
-  overflow: hidden;
-}
-.marketing-root .vb-chrome {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 11px 14px;
-  background: #FAF7F2;
-  border-bottom: 1px solid var(--line-1);
-}
-.marketing-root .vb-chrome i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-.marketing-root .vb-chrome i:nth-child(1) { background: #FF6259; }
-.marketing-root .vb-chrome i:nth-child(2) { background: #FFBE2E; }
-.marketing-root .vb-chrome i:nth-child(3) { background: #28C940; }
-.marketing-root .vb-url {
-  margin-left: 8px;
-  font-family: var(--mk-font-mono);
-  font-size: 10.5px;
-  color: var(--ink-2);
-  padding: 3px 9px;
-  border-radius: 5px;
-  background: rgba(27, 23, 38, 0.04);
-  flex: 1;
-  max-width: 240px;
-}
-.marketing-root .vb-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 10px;
-  padding: 18px;
-}
-.marketing-root .vb-grid > span {
-  display: block;
-  height: 88px;
-  border-radius: 8px;
-  background: var(--bg-1);
-  border: 1px solid var(--line-1);
-}
-.marketing-root .vb-grid > span.vb-target {
-  background: linear-gradient(180deg, rgba(90, 73, 191, 0.10), rgba(90, 73, 191, 0.04));
-  border-color: rgba(90, 73, 191, 0.30);
-  box-shadow: 0 0 0 1px rgba(90, 73, 191, 0.20) inset;
-  position: relative;
-}
-.marketing-root .vb-select {
-  position: absolute;
-  top: 64px;
-  left: calc(50% - 100px);
-  width: 200px;
-  height: 100px;
-  border: 2px solid var(--violet);
-  border-radius: 8px;
-  pointer-events: none;
-  filter: drop-shadow(0 0 6px rgba(90, 73, 191, 0.5));
-}
-.marketing-root .vb-tag {
-  position: absolute;
-  top: 48px;
-  left: calc(50% - 96px);
-  padding: 3px 9px;
-  font-size: 10px;
-  font-family: var(--mk-font-mono);
-  background: var(--violet);
-  color: #FFFFFE;
-  border-radius: 4px;
-  box-shadow: 0 4px 10px rgba(90, 73, 191, 0.35);
-}
-
-/* viz: voice */
-.marketing-root .viz-mic {
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 78%;
-  padding: 22px 22px 18px;
+  margin: 0;
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
-.marketing-root .vm-head {
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  font-weight: 600;
-  color: var(--ink-3);
+.marketing-root .ctt-card-bullets li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 14.5px;
+  color: rgba(15, 23, 42, 0.75);
+  padding-left: 18px;
+  position: relative;
 }
-.marketing-root .vm-wave {
+/* Open-circle bullet markers (border only, no fill) */
+.marketing-root .ctt-card-bullets li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(15, 23, 42, 0.35);
+  background: transparent;
+}
+
+/* ---- Visual column with atmospheric backdrop ---- */
+.marketing-root .ctt-card-visual {
+  position: relative;
+  overflow: hidden;
   display: flex;
   align-items: center;
-  gap: 4px;
-  height: 64px;
   justify-content: center;
+  padding: 48px;
+  min-height: 480px;
 }
-.marketing-root .vm-wave i {
-  width: 4px;
-  border-radius: 3px;
-  background: linear-gradient(180deg, var(--violet-2), var(--violet));
-  animation: mk-aiwv 1.2s ease-in-out infinite;
+.marketing-root .ctt-card-visual--capture {
+  background:
+    radial-gradient(
+      ellipse 80% 60% at 50% 0%,
+      rgba(220, 232, 250, 0.7) 0%,
+      rgba(220, 232, 250, 0) 70%
+    ),
+    linear-gradient(135deg, #F0F4FA 0%, #E8EEF7 50%, #F4F0E8 100%);
 }
-.marketing-root .vm-wave i:nth-child(3n) {
-  background: linear-gradient(180deg, #C51A68, #A23A5A);
+.marketing-root .ctt-card-visual--voice {
+  background:
+    radial-gradient(
+      ellipse 70% 50% at 30% 30%,
+      rgba(240, 220, 250, 0.6) 0%,
+      rgba(240, 220, 250, 0) 70%
+    ),
+    linear-gradient(135deg, #F5EEF8 0%, #F8E8E8 50%, #FFF4E8 100%);
 }
-.marketing-root .vm-wave i:nth-child(1) { animation-delay: 0s; }
-.marketing-root .vm-wave i:nth-child(2) { animation-delay: 0.05s; }
-.marketing-root .vm-wave i:nth-child(3) { animation-delay: 0.10s; }
-.marketing-root .vm-wave i:nth-child(4) { animation-delay: 0.15s; }
-.marketing-root .vm-wave i:nth-child(5) { animation-delay: 0.20s; }
-.marketing-root .vm-wave i:nth-child(6) { animation-delay: 0.25s; }
-.marketing-root .vm-wave i:nth-child(7) { animation-delay: 0.30s; }
-.marketing-root .vm-wave i:nth-child(8) { animation-delay: 0.35s; }
-.marketing-root .vm-wave i:nth-child(9) { animation-delay: 0.40s; }
-.marketing-root .vm-wave i:nth-child(10) { animation-delay: 0.45s; }
-.marketing-root .vm-wave i:nth-child(11) { animation-delay: 0.50s; }
-.marketing-root .vm-wave i:nth-child(12) { animation-delay: 0.55s; }
-.marketing-root .vm-wave i:nth-child(13) { animation-delay: 0.60s; }
-.marketing-root .vm-wave i:nth-child(14) { animation-delay: 0.65s; }
-.marketing-root .vm-wave i:nth-child(15) { animation-delay: 0.70s; }
-.marketing-root .vm-wave i:nth-child(16) { animation-delay: 0.75s; }
-.marketing-root .vm-wave i:nth-child(17) { animation-delay: 0.80s; }
-.marketing-root .vm-wave i:nth-child(18) { animation-delay: 0.85s; }
-.marketing-root .vm-trans {
-  font-size: 13px;
-  color: var(--ink-2);
-  text-align: center;
-  font-style: italic;
-  line-height: 1.5;
-  letter-spacing: -0.003em;
-}
-.marketing-root .vm-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-top: 10px;
-  border-top: 1px solid var(--line-1);
-}
-.marketing-root .vm-time {
-  font-family: var(--mk-font-mono);
-  font-size: 11px;
-  color: var(--ink-3);
-}
-.marketing-root .vm-polish {
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: var(--violet);
-  color: #FFFFFE;
-  font-size: 11px;
-  font-weight: 500;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  box-shadow: 0 3px 8px rgba(90, 73, 191, 0.30);
+.marketing-root .ctt-card-visual--sessions {
+  background:
+    radial-gradient(
+      ellipse 75% 55% at 70% 40%,
+      rgba(220, 240, 245, 0.7) 0%,
+      rgba(220, 240, 245, 0) 70%
+    ),
+    linear-gradient(135deg, #E8F0F4 0%, #F0EBF6 50%, #E8F4F0 100%);
 }
 
-/* viz: sessions */
-.marketing-root .viz-session {
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 80%;
-  padding: 18px 18px 16px;
+/* ============ Capture mockup ============ */
+.marketing-root .capture-mock {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  height: 420px;
+  margin: 0 auto;
+}
+.marketing-root .capture-mock-browser {
+  position: absolute;
+  inset: 0;
+  background: white;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow:
+    0 2px 6px rgba(15, 23, 42, 0.06),
+    0 16px 32px rgba(15, 23, 42, 0.12),
+    0 40px 80px -20px rgba(15, 23, 42, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 0 0 1px rgba(15, 23, 42, 0.04);
+}
+.marketing-root .capture-mock-chrome {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.marketing-root .vs-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--line-1);
-}
-.marketing-root .vs-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink-1);
-  letter-spacing: -0.012em;
-}
-.marketing-root .vs-count {
-  font-size: 10.5px;
-  color: var(--ink-3);
-  font-family: var(--mk-font-mono);
-}
-.marketing-root .vs-row {
-  display: grid;
-  grid-template-columns: 26px 1fr auto;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
-  border-radius: 8px;
-  background: var(--bg-1);
-  border: 1px solid var(--line-1);
-  font-size: 12px;
-  color: var(--ink-1);
-  letter-spacing: -0.003em;
-}
-.marketing-root .vs-row.is-on {
-  background: rgba(90, 73, 191, 0.08);
-  border-color: rgba(90, 73, 191, 0.20);
-}
-.marketing-root .vs-num {
-  font-family: var(--mk-font-mono);
-  font-size: 10.5px;
-  color: var(--ink-3);
-}
-.marketing-root .vs-pill {
-  font-size: 9.5px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: rgba(90, 73, 191, 0.12);
-  color: var(--violet);
-  border: 1px solid rgba(90, 73, 191, 0.20);
-  font-weight: 500;
-  letter-spacing: 0.02em;
-}
-.marketing-root .vs-pill.pill-p {
-  background: rgba(201, 122, 31, 0.12);
-  color: #B36A18;
-  border-color: rgba(201, 122, 31, 0.25);
-}
-.marketing-root .vs-pill.pill-r {
-  background: rgba(63, 111, 184, 0.12);
-  color: #2C5F9F;
-  border-color: rgba(63, 111, 184, 0.25);
-}
-.marketing-root .vs-pill.pill-d {
-  background: rgba(31, 138, 76, 0.12);
-  color: #1A7440;
-  border-color: rgba(31, 138, 76, 0.25);
-}
-
-/* viz: integrations */
-.marketing-root .viz-stack {
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 72%;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.marketing-root .vi-head {
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  font-weight: 600;
-  color: var(--ink-3);
-  padding-bottom: 6px;
-}
-.marketing-root .vi-tool {
-  display: grid;
-  grid-template-columns: 26px 1fr auto;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--bg-1);
-  border: 1px solid var(--line-1);
-  font-size: 12.5px;
-  color: var(--ink-1);
-  letter-spacing: -0.003em;
+  padding: 12px 16px;
+  background: #F7F7F5;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
 }
-.marketing-root .vi-tool-sq {
-  width: 22px;
+.marketing-root .capture-mock-chrome-dots {
+  display: flex;
+  gap: 6px;
+}
+.marketing-root .capture-mock-chrome-dots span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.12);
+}
+.marketing-root .capture-mock-chrome-url {
+  flex: 1;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(15, 23, 42, 0.55);
+}
+.marketing-root .capture-mock-page {
+  padding: 32px 24px;
+  height: calc(100% - 44px);
+}
+.marketing-root .capture-mock-page-header {
+  width: 60%;
+  height: 14px;
+  background: rgba(15, 23, 42, 0.08);
+  border-radius: 4px;
+  margin: 0 auto 32px;
+}
+.marketing-root .capture-mock-page-tiers {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 32px;
+}
+.marketing-root .capture-mock-tier {
+  height: 120px;
+  background: #FAFAF8;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: 12px;
+}
+.marketing-root .capture-mock-tier--featured {
+  background: white;
+  border-color: rgba(15, 23, 42, 0.1);
+}
+.marketing-root .capture-mock-testimonial {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #FAFAF8;
+  border-radius: 12px;
+  margin-top: 32px;
+}
+.marketing-root .capture-mock-testimonial-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.marketing-root .capture-mock-testimonial-quote {
+  flex: 1;
+  font-size: 14px;
+  color: rgba(15, 23, 42, 0.75);
+  font-style: italic;
+}
+.marketing-root .capture-mock-testimonial-name {
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.5);
+  flex-shrink: 0;
+}
+/* Annote element highlight — wraps the featured (middle) tier. */
+.marketing-root .capture-mock-highlight {
+  position: absolute;
+  top: 90px;
+  left: calc(33% + 12px);
+  width: calc(33% - 28px);
+  height: 130px;
+  border: 2px solid #5A49BF;
+  border-radius: 14px;
+  background: rgba(90, 73, 191, 0.08);
+  pointer-events: none;
+  outline: 7px solid rgba(90, 73, 191, 0.08);
+  outline-offset: -1px;
+}
+/* Capture pill — anchors the real extension <CapturePill> (voice mode, reused
+   from the hero) at the bottom-center of the browser mockup. The pill carries
+   its own glass styling; here we only place + scale it to fit the surface. */
+.marketing-root .capture-mock-pill-anchor {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%) scale(0.82);
+  transform-origin: bottom center;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 6;
+}
+/* The pill renders its hint pill above the content; suppress it in the static
+   mockup so only the recording pill itself shows. */
+.marketing-root .capture-mock-pill-anchor .echly-pill-hint {
+  display: none;
+}
+/* ============ Voice mockup ============ */
+.marketing-root .voice-mock {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.marketing-root .voice-mock-demo {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* The reused VoiceTicketDemo card floats on the atmospheric backdrop — stronger
+   elevation so it reads off the colored column rather than the white page. */
+.marketing-root .voice-mock-demo .vtdemo {
+  width: 100%;
+  max-width: 420px;
+  background: #FFFFFF;
+  border-radius: 14px;
+  border: 1px solid var(--line-1);
+  box-shadow:
+    0 2px 6px rgba(15, 23, 42, 0.06),
+    0 16px 32px rgba(15, 23, 42, 0.12),
+    0 40px 80px -20px rgba(15, 23, 42, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 0 0 1px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+
+/* ============ Sessions mockup ============ */
+.marketing-root .sessions-mock {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.98) 0%,
+    rgba(255, 255, 255, 0.95) 100%
+  );
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow:
+    0 2px 6px rgba(15, 23, 42, 0.06),
+    0 16px 32px rgba(15, 23, 42, 0.12),
+    0 40px 80px -20px rgba(15, 23, 42, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 0 0 1px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+.marketing-root .sessions-mock-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  background: #F7F7F5;
+}
+.marketing-root .sessions-mock-avatars {
+  display: flex;
+}
+.marketing-root .sessions-mock-avatars img {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #fff;
+  margin-left: -8px;
+}
+.marketing-root .sessions-mock-avatars img:first-child {
+  margin-left: 0;
+}
+.marketing-root .sessions-mock-body {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  min-height: 380px;
+}
+/* Sidebar */
+.marketing-root .sessions-mock-sidebar {
+  border-right: 1px solid rgba(15, 23, 42, 0.06);
+  padding: 14px 10px;
+  background: #FCFBF9;
+}
+.marketing-root .sessions-mock-session-header {
+  padding: 0 6px 12px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  margin-bottom: 10px;
+}
+.marketing-root .sessions-mock-session-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #15101F;
+  letter-spacing: -0.012em;
+}
+.marketing-root .sessions-mock-session-meta {
+  font-size: 11px;
+  color: rgba(15, 23, 42, 0.5);
+  margin-top: 3px;
+  font-family: var(--mk-font-mono);
+}
+.marketing-root .sessions-mock-ticket-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.marketing-root .sessions-mock-ticket {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+}
+.marketing-root .sessions-mock-ticket--active {
+  background: rgba(90, 73, 191, 0.08);
+  border-color: rgba(90, 73, 191, 0.2);
+}
+.marketing-root .sessions-mock-ticket-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+/* Icon tile — mirrors the dashboard ticket-list tile (TicketItem):
+   rounded square, neutral surface, secondary icon; brand fill on active row. */
+.marketing-root .sessions-mock-ticket-icon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  flex-shrink: 0;
+  background: rgba(15, 16, 31, 0.06);
+  color: #54495F;
+}
+.marketing-root .sessions-mock-ticket--active .sessions-mock-ticket-icon {
+  background: #5A49BF;
+  color: #fff;
+}
+.marketing-root .sessions-mock-ticket-text {
+  min-width: 0;
+}
+.marketing-root .sessions-mock-ticket-title {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #15101F;
+  line-height: 1.3;
+  letter-spacing: -0.006em;
+}
+.marketing-root .sessions-mock-ticket-meta {
+  font-size: 10px;
+  color: rgba(15, 23, 42, 0.45);
+  margin-top: 2px;
+}
+/* Detail */
+.marketing-root .sessions-mock-detail {
+  position: relative;
+  z-index: 1;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: #fff;
+}
+.marketing-root .sessions-mock-ticket-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.marketing-root .sessions-mock-status {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #14B8A6;
+  color: #fff;
+  flex-shrink: 0;
+}
+.marketing-root .sessions-mock-detail-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #15101F;
+  line-height: 1.3;
+  letter-spacing: -0.012em;
+  margin: 0;
+}
+/* Screenshot mock */
+.marketing-root .sessions-mock-screenshot {
+  position: relative;
+  height: 130px;
+  border-radius: 10px;
+  background: linear-gradient(160deg, #ECE7F4 0%, #DDD4EC 100%);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.marketing-root .sessions-mock-screenshot-phone {
+  position: relative;
+  width: 72px;
+  height: 108px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  box-shadow: 0 6px 16px -4px rgba(15, 23, 42, 0.18);
+  padding: 10px 8px;
+}
+.marketing-root .sessions-mock-screenshot-ui {
+  height: 56px;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.06);
+  margin-bottom: 8px;
+}
+.marketing-root .sessions-mock-screenshot-cta {
   height: 22px;
   border-radius: 6px;
-  background: linear-gradient(135deg, #5E6AD2, #3D4BB8);
+  background: linear-gradient(135deg, #5A49BF, #6557CC);
 }
-.marketing-root .vi-tool-sq.c2 {
-  background: linear-gradient(135deg, #1B1626, #3A3245);
+.marketing-root .sessions-mock-screenshot-pin {
+  position: absolute;
+  top: 22px;
+  left: calc(50% + 24px);
+  width: 24px;
+  height: 24px;
+  border-radius: 50% 50% 50% 2px;
+  background: #5A49BF;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(90, 73, 191, 0.4);
 }
-.marketing-root .vi-tool-sq.c3 {
-  background: linear-gradient(135deg, #4A154B, #6B2173);
+/* Comments */
+.marketing-root .sessions-mock-comments {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
-.marketing-root .vi-go {
-  color: var(--violet);
-  font-size: 14px;
+.marketing-root .sessions-mock-comment {
+  display: flex;
+  gap: 9px;
+}
+.marketing-root .sessions-mock-comment-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.marketing-root .sessions-mock-comment-body {
+  min-width: 0;
+}
+.marketing-root .sessions-mock-comment-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #15101F;
+  letter-spacing: -0.006em;
+}
+.marketing-root .sessions-mock-comment-text {
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.65);
+  line-height: 1.45;
+  margin-top: 1px;
 }
 
 /* ============ DARK EDITORIAL ============ */
@@ -1429,7 +1787,8 @@
   position: relative;
   padding: 100px 32px 120px;
   overflow: hidden;
-  background: var(--bg-0);
+  /* Solid deep maroon — matches the "Becoming Annote" editorial field. */
+  background: #3A1622;
 }
 .marketing-root .sd-head {
   position: relative;
@@ -1440,6 +1799,10 @@
 }
 .marketing-root .sd-head .section-eyebrow {
   justify-content: center;
+  color: #C9A8AE;
+}
+.marketing-root .sd-head .section-eyebrow::before {
+  background: #C9A8AE;
 }
 .marketing-root .sd-h {
   font-size: clamp(28px, 3.4vw, 44px);
@@ -1447,15 +1810,19 @@
   letter-spacing: -0.024em;
   line-height: 1.1;
   margin: 0 0 18px;
-  color: var(--ink-1);
+  color: #F4E8E2;
 }
 .marketing-root .sd-p {
   font-size: 16px;
-  color: var(--ink-2);
+  color: #C9A8AE;
   max-width: 58ch;
   margin: 0 auto;
   line-height: 1.6;
   letter-spacing: -0.003em;
+}
+.marketing-root .sd-p b {
+  color: #FFFFFF;
+  font-weight: 600;
 }
 .marketing-root .sd-stage {
   position: relative;
@@ -2231,92 +2598,6 @@
 .marketing-root .pv-row .ico.warn { background: var(--ink-2); }
 .marketing-root .pv-row .ico.err { background: var(--violet); }
 
-/* ============ INTEGRATIONS GRID ============ */
-.marketing-root .integ {
-  background: var(--bg-0);
-  padding: 100px 32px;
-  border-top: 1px solid var(--line-1);
-}
-.marketing-root .integ-head {
-  max-width: 980px;
-  margin: 0 auto 44px;
-  text-align: center;
-}
-.marketing-root .integ-head .section-eyebrow {
-  justify-content: center;
-}
-.marketing-root .integ-h {
-  font-size: clamp(28px, 3.4vw, 44px);
-  font-weight: 500;
-  letter-spacing: -0.024em;
-  line-height: 1.1;
-  margin: 0 0 16px;
-  color: var(--ink-1);
-}
-.marketing-root .integ-p {
-  font-size: 16px;
-  color: var(--ink-2);
-  letter-spacing: -0.003em;
-  margin: 0;
-}
-.marketing-root .integ-grid {
-  max-width: 1180px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
-}
-.marketing-root .integ-cell {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 32px 14px;
-  background: #FFFFFF;
-  border: 1px solid var(--line-1);
-  border-radius: var(--mk-radius-card);
-  box-shadow: var(--mk-sh-xs);
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
-}
-.marketing-root .integ-cell:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--mk-sh-md);
-}
-.marketing-root .integ-cell-mark {
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, var(--violet), var(--violet-3));
-  opacity: 0.85;
-}
-.marketing-root .integ-cell .nm {
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--ink-2);
-  letter-spacing: -0.003em;
-}
-.marketing-root .integ-foot {
-  max-width: 1180px;
-  margin: 28px auto 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 24px;
-  font-size: 13.5px;
-  color: var(--ink-3);
-  letter-spacing: -0.003em;
-}
-.marketing-root .integ-foot-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--violet);
-  font-weight: 500;
-  border-bottom: 1px solid var(--violet);
-  padding-bottom: 2px;
-}
-
 /* ============ PRICING ============ */
 .marketing-root .pricing {
   background: var(--bg-0);
@@ -2566,11 +2847,393 @@
   border-bottom: 1px solid var(--violet);
 }
 
+/* =================================================================
+   PHASE 2B — PIXEL-FAITHFUL DEMOS
+   TicketCardMock · VoiceTicketDemo · HeroCaptureDemo (v3)
+   Plus session-detail polish refinements (live dot, tween, copy btn).
+   ================================================================= */
+
+/* ---------- TicketCardMock ---------- */
+.marketing-root .tcm {
+  background: #FFFFFF;
+  border: 1px solid var(--line-1);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  font-feature-settings: "ss01" on, "cv01" on;
+}
+.marketing-root .tcm--floating {
+  padding: 16px;
+  width: 290px;
+  box-shadow: var(--mk-sh-lg);
+}
+.marketing-root .tcm--detail {
+  padding: 18px;
+  width: 100%;
+  box-shadow: var(--mk-sh-md);
+}
+.marketing-root .tcm--compact {
+  padding: 12px 14px;
+  gap: 9px;
+  width: 100%;
+  box-shadow: var(--mk-sh-sm);
+}
+.marketing-root .tcm--list {
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: #FFFFFF;
+  border: 1px solid var(--line-1);
+  border-radius: 8px;
+  box-shadow: var(--mk-sh-xs);
+}
+.marketing-root .tcm-list-ico {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: var(--bg-0);
+  color: var(--ink-2);
+}
+.marketing-root .tcm-list-title {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-1);
+  letter-spacing: -0.003em;
+  line-height: 1.4;
+}
+
+.marketing-root .tcm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.marketing-root .tcm-ai {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 600;
+}
+.marketing-root .tcm-ai-spark {
+  width: 11px;
+  height: 11px;
+  background: conic-gradient(from 0deg, var(--violet), #C51A68, var(--violet-2), var(--violet));
+  border-radius: 3px;
+  animation: mk-spin 4s linear infinite;
+}
+.marketing-root .tcm-sev {
+  font-size: 9px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.marketing-root .tcm-sev--high {
+  background: rgba(197, 26, 104, 0.12);
+  color: #C51A68;
+  border: 1px solid rgba(197, 26, 104, 0.25);
+}
+.marketing-root .tcm-sev--medium {
+  background: rgba(201, 122, 31, 0.12);
+  color: #B36A18;
+  border: 1px solid rgba(201, 122, 31, 0.25);
+}
+.marketing-root .tcm-sev--low {
+  background: rgba(27, 22, 38, 0.06);
+  color: var(--ink-2);
+  border: 1px solid var(--line-2);
+}
+.marketing-root .tcm-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink-1);
+  letter-spacing: -0.012em;
+  line-height: 1.32;
+}
+.marketing-root .tcm--detail .tcm-title {
+  font-size: 16px;
+}
+.marketing-root .tcm-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--bg-0);
+  border: 1px solid var(--line-1);
+  border-radius: 8px;
+}
+.marketing-root .tcm-meta-row {
+  display: flex;
+  gap: 10px;
+  font-size: 10.5px;
+  font-family: var(--mk-font-mono);
+}
+.marketing-root .tcm-meta-row span {
+  color: var(--ink-3);
+  width: 56px;
+  flex-shrink: 0;
+}
+.marketing-root .tcm-meta-row b {
+  color: var(--ink-1);
+  font-weight: 500;
+}
+.marketing-root .tcm-tags {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.marketing-root .tcm-tags span {
+  font-size: 9.5px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--bg-0);
+  color: var(--ink-2);
+  border: 1px solid var(--line-1);
+  letter-spacing: 0.02em;
+}
+.marketing-root .tcm-send {
+  margin-left: auto;
+  align-self: flex-end;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--violet);
+  color: #FFFFFE;
+  font-size: 11px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  box-shadow: 0 3px 10px -2px rgba(90, 73, 191, 0.30);
+  cursor: default;
+}
+
+/* ---------- VoiceTicketDemo ---------- */
+.marketing-root .vtdemo {
+  width: 100%;
+}
+.marketing-root .vtdemo-card {
+  padding: 22px 22px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.marketing-root .vtdemo-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+.marketing-root .vtdemo-wave {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 64px;
+  justify-content: center;
+}
+.marketing-root .vtdemo-wave i {
+  width: 4px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--violet-2), var(--violet));
+  animation: mk-aiwv 1.2s ease-in-out infinite;
+}
+.marketing-root .vtdemo-wave i:nth-child(3n) {
+  background: linear-gradient(180deg, #C51A68, #A23A5A);
+}
+.marketing-root .vtdemo-wave i:nth-child(1) { animation-delay: 0s; }
+.marketing-root .vtdemo-wave i:nth-child(2) { animation-delay: 0.05s; }
+.marketing-root .vtdemo-wave i:nth-child(3) { animation-delay: 0.10s; }
+.marketing-root .vtdemo-wave i:nth-child(4) { animation-delay: 0.15s; }
+.marketing-root .vtdemo-wave i:nth-child(5) { animation-delay: 0.20s; }
+.marketing-root .vtdemo-wave i:nth-child(6) { animation-delay: 0.25s; }
+.marketing-root .vtdemo-wave i:nth-child(7) { animation-delay: 0.30s; }
+.marketing-root .vtdemo-wave i:nth-child(8) { animation-delay: 0.35s; }
+.marketing-root .vtdemo-wave i:nth-child(9) { animation-delay: 0.40s; }
+.marketing-root .vtdemo-wave i:nth-child(10) { animation-delay: 0.45s; }
+.marketing-root .vtdemo-wave i:nth-child(11) { animation-delay: 0.50s; }
+.marketing-root .vtdemo-wave i:nth-child(12) { animation-delay: 0.55s; }
+.marketing-root .vtdemo-wave i:nth-child(13) { animation-delay: 0.60s; }
+.marketing-root .vtdemo-wave i:nth-child(14) { animation-delay: 0.65s; }
+.marketing-root .vtdemo-wave i:nth-child(15) { animation-delay: 0.70s; }
+.marketing-root .vtdemo-wave i:nth-child(16) { animation-delay: 0.75s; }
+.marketing-root .vtdemo-wave i:nth-child(17) { animation-delay: 0.80s; }
+.marketing-root .vtdemo-wave i:nth-child(18) { animation-delay: 0.85s; }
+
+.marketing-root .vtdemo-stage {
+  position: relative;
+  min-height: 92px;
+}
+.marketing-root .vtdemo-rough {
+  font-size: 13.5px;
+  color: var(--ink-2);
+  text-align: center;
+  font-style: italic;
+  line-height: 1.5;
+  letter-spacing: -0.003em;
+  padding: 6px 4px;
+  transition:
+    opacity 260ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.marketing-root .vtdemo-caret {
+  display: inline-block;
+  width: 1px;
+  height: 14px;
+  background: var(--ink-2);
+  margin-left: 2px;
+  vertical-align: middle;
+  animation: vtdemo-caret-blink 0.9s steps(2) infinite;
+}
+@keyframes vtdemo-caret-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
+.marketing-root .vtdemo-polished {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity 280ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+.marketing-root .vtdemo-stage.is-polished .vtdemo-rough {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+.marketing-root .vtdemo-stage.is-polished .vtdemo-polished {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.marketing-root .vtdemo-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-1);
+}
+.marketing-root .vtdemo-time {
+  font-family: var(--mk-font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.marketing-root .vtdemo-polish {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--violet);
+  color: #FFFFFE;
+  font-size: 11px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  box-shadow: 0 3px 8px rgba(90, 73, 191, 0.30);
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.marketing-root .vtdemo-polish.is-pressing {
+  transform: scale(0.96);
+}
+.marketing-root .vtdemo-polish-spark {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  background: conic-gradient(from 0deg, #FFFFFE, #F0ECFB, #FFFFFE);
+  border-radius: 2px;
+  animation: mk-spin 4s linear infinite;
+}
+
+/* ---------- SessionsDetail Phase 2B polish ---------- */
+.marketing-root .sd-live-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #34C29A;
+  margin-right: 6px;
+  box-shadow: 0 0 6px rgba(52, 194, 154, 0.45);
+  animation: sd-live-pulse 1.6s ease-in-out infinite;
+  vertical-align: middle;
+}
+@keyframes sd-live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.85); }
+}
+.marketing-root .sd-detail-tit.is-tween-out,
+.marketing-root .sd-detail-meta.is-tween-out,
+.marketing-root .sd-thumb.is-tween-out,
+.marketing-root .sd-comments.is-tween-out {
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.marketing-root .sd-detail-tit,
+.marketing-root .sd-detail-meta,
+.marketing-root .sd-thumb,
+.marketing-root .sd-comments {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.marketing-root .sd-share-copy {
+  cursor: pointer;
+  border: 0;
+}
+.marketing-root .sd-share-copy:hover {
+  background: #2A2240;
+  box-shadow: 0 4px 12px -2px rgba(20, 16, 30, 0.18);
+}
+.marketing-root .sd-share-copy:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* ---------- Reduced motion: freeze all auto-loops on a polished frame ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .marketing-root .vtdemo-wave i,
+  .marketing-root .vtdemo-caret,
+  .marketing-root .vtdemo-polish,
+  .marketing-root .sd-live-dot,
+  .marketing-root .tcm-ai-spark,
+  .marketing-root .hp-ai-spark,
+  .marketing-root .vtdemo-polish-spark {
+    animation: none !important;
+  }
+  .marketing-root .vtdemo-polished {
+    transition: none !important;
+  }
+  /* Show from-click-to-ticket content immediately; skip fade + rise. */
+  .marketing-root .ctt-card {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .marketing-root .capture-mock-pill-orb {
+    animation: none !important;
+  }
+}
+
 /* ============ RESPONSIVE ============ */
 @media (max-width: 1100px) {
   .marketing-root .mk-nav-links { display: none; }
-  .marketing-root .panel-body { grid-template-columns: 1fr; }
-  .marketing-root .panel-viz { min-height: 380px; }
+  /* From-click-to-ticket: card body collapses to single column, copy first,
+     visual second. (Detailed card rules live in the 1099px block below.) */
   .marketing-root .editorial {
     grid-template-columns: 1fr;
     gap: 60px;
@@ -2579,7 +3242,6 @@
   .marketing-root .ed-photo { padding-left: 0; padding-right: 0; }
   .marketing-root .ed-copy { padding: 0; }
   .marketing-root .hero-portrait { width: 70%; }
-  .marketing-root .suite-tabs { grid-template-columns: 1fr 1fr; }
   .marketing-root .trust-row { grid-template-columns: repeat(3, 1fr); gap: 18px; }
   .marketing-root .foot-inner { grid-template-columns: 1fr 1fr; }
   .marketing-root .sd-window { grid-template-columns: 280px 1fr; }
@@ -2589,17 +3251,43 @@
   }
   .marketing-root .ag-arrow { display: none; }
   .marketing-root .pers-grid { grid-template-columns: 1fr; }
-  .marketing-root .integ-grid { grid-template-columns: repeat(4, 1fr); }
   .marketing-root .pr-row { grid-template-columns: 1fr; max-width: 480px; }
   .marketing-root .faq-inner { grid-template-columns: 1fr; gap: 36px; }
   .marketing-root .faq-left { position: static; }
 }
 
+/* From-click-to-ticket cards: collapse to single column (copy on top, visual
+   below), tighten padding, hide the decorative side stripes. */
+@media (max-width: 1099px) {
+  .marketing-root .ctt-card-body,
+  .marketing-root .ctt-card-body--visual-left {
+    grid-template-columns: 1fr;
+  }
+  .marketing-root .ctt-card-body--visual-left .ctt-card-visual {
+    order: 2;
+  }
+  .marketing-root .ctt-card-body--visual-left .ctt-card-copy {
+    order: 1;
+  }
+  .marketing-root .ctt-card-copy {
+    padding: 32px 28px;
+  }
+  .marketing-root .ctt-card-visual {
+    padding: 32px;
+    min-height: 400px;
+  }
+  .marketing-root .ctt-card-header {
+    padding: 16px 24px;
+  }
+  .marketing-root .ctt-card::before,
+  .marketing-root .ctt-card::after {
+    display: none;
+  }
+}
+
 @media (max-width: 640px) {
   .marketing-root .hero-card { display: none; }
   .marketing-root .hero-portrait { width: 90%; }
-  .marketing-root .suite-tabs { grid-template-columns: 1fr; }
-  .marketing-root .panel-copy { padding: 32px 28px; }
   .marketing-root .trust-row { grid-template-columns: 1fr 1fr; }
   .marketing-root .foot-inner { grid-template-columns: 1fr; gap: 36px; }
   .marketing-root .annc-text { display: none; }
@@ -2614,11 +3302,2193 @@
     overflow: auto;
   }
   .marketing-root .ag-flow { grid-template-columns: 1fr; }
-  .marketing-root .integ-grid { grid-template-columns: repeat(2, 1fr); }
   .marketing-root .pers-tabs {
     overflow-x: auto;
     flex-wrap: nowrap;
     justify-content: flex-start;
   }
   .marketing-root .pers-copy { padding: 32px 24px; }
+}
+
+/* =================================================================
+   PHASE 2B v4 — Forklifted from app/globals.css
+   Real-production extension CSS scoped under .marketing-root so the
+   HeroCaptureDemo (built from forklifted React components) renders
+   with byte-faithful visual treatment to the live extension.
+
+   Source ranges in globals.css (verified by grep):
+     - Design tokens                              :2096-2165, 2127-2135
+     - Extension tray (.echly-sidebar-*)          :2214-2412, 2453-2471, 2536-2625
+     - Feedback list states                       :2560-2611
+     - V2 design tokens (.echly-v2)               :6485-6522
+     - V2 ticket row (.ticket / .ticket-*)        :8533-8728
+     - Session control panel (.echly-sc-*)        :9093-9261
+     - Pill subsystem (.echly-pill-*)             :10730-11170
+     - .echly-selected-overlay                    :10768-10805
+     - Generic helpers (.echly-spinner, .echly-shake) :1875-1885, 3360-3367
+   ================================================================= */
+
+/* Design tokens added to .marketing-root for the forklifted classes */
+.marketing-root {
+  --glass-surface: rgba(252, 251, 249, 0.86);
+  --glass-surface-elevated: rgba(254, 253, 251, 0.92);
+  --glass-border: rgba(28, 25, 23, 0.08);
+  --glass-border-strong: rgba(28, 25, 23, 0.12);
+  --glass-edge-highlight: rgba(255, 255, 255, 0.4);
+  --glass-shadow-stack:
+    0 5px 15px rgba(28, 25, 23, 0.05),
+    0 1px 4px rgba(28, 25, 23, 0.035);
+  --glass-blur: blur(28px) saturate(140%);
+  --glass-blur-strong: blur(24px) saturate(140%);
+  --glass-icon-hover-bg: rgba(28, 25, 23, 0.05);
+  --glass-highlight: rgba(255, 255, 255, 0.6);
+  --glass-shimmer-base: rgba(245, 243, 240, 0.45);
+  --glass-shimmer-highlight: rgba(255, 255, 255, 0.85);
+  --text-primary: #15101F;
+  --text-heading: #15101F;
+  --text-secondary: #54495F;
+  --text-tertiary: #8A8096;
+  --text-on-dark: #F3F4F6;
+  --bg-surface-hover: rgba(0, 0, 0, 0.04);
+  --icon-color: #54495F;
+  --icon-hover: #15101F;
+  --transition-fast: 120ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  --echly-font: "Plus Jakarta Sans", "SF Pro Display", Inter, system-ui, sans-serif;
+  --shadow-depth: 0 10px 30px rgba(0, 0, 0, 0.08);
+  --shadow-depth-recording: 0 0 0 1px rgba(0, 0, 0, 0.06),
+    0 10px 30px rgba(0, 0, 0, 0.08);
+  --brand-hover: #4A3BA0;
+}
+
+/* Generic helpers */
+.marketing-root .echly-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #5b7cff;
+  border-radius: 50%;
+  animation: echly-spin 0.7s linear infinite;
+}
+@keyframes echly-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes echly-shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+  20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+.marketing-root .echly-shake {
+  animation: echly-shake 0.5s ease-in-out;
+}
+
+/* Extension tray */
+.marketing-root .echly-sidebar-container {
+  width: 440px;
+  max-width: min(440px, calc(100vw - 32px));
+  min-height: 460px;
+  max-height: 520px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  transition: opacity 140ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    transform 140ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.marketing-root .echly-sidebar-surface {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  max-height: 100%;
+  border-radius: 28px;
+  padding: 24px 20px;
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-blur-strong);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-stack);
+  overflow: visible;
+  font-family: var(--echly-font);
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+.marketing-root .echly-sidebar-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at 30% 20%, var(--glass-highlight), transparent 60%);
+  z-index: -1;
+  pointer-events: none;
+}
+.marketing-root .echly-sidebar-surface:has(.echly-v2) {
+  padding: 0;
+  background: transparent;
+  backdrop-filter: none;
+}
+.marketing-root .echly-sidebar-surface:has(.echly-v2)::before { display: none; }
+
+.marketing-root .echly-sidebar-header {
+  position: relative;
+  padding: 0;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+.marketing-root .echly-sidebar-header-left {
+  min-width: 0;
+  flex: 1;
+}
+.marketing-root .echly-sidebar-title {
+  display: block;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+.marketing-root .echly-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.marketing-root .echly-header-mode-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--icon-color);
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+.marketing-root .echly-header-mode-toggle:hover {
+  background: var(--bg-surface-hover);
+  color: var(--icon-hover);
+}
+.marketing-root .echly-header-icon {
+  width: 16px;
+  height: 16px;
+}
+.marketing-root .echly-sidebar-ticket-count {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+.marketing-root .echly-session-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.marketing-root .echly-session-title-wrapper {
+  flex: 1;
+  margin-right: 12px;
+  min-width: 0;
+}
+.marketing-root .echly-session-title-text {
+  cursor: pointer;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.marketing-root .echly-sidebar-surface .echly-session-title-text {
+  color: var(--text-heading);
+}
+.marketing-root .echly-session-icons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.marketing-root .echly-sidebar-close {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--icon-color);
+  cursor: pointer;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+.marketing-root .echly-sidebar-close:hover,
+.marketing-root .echly-sidebar-close:focus {
+  color: var(--icon-hover);
+  background: var(--bg-surface-hover);
+}
+.marketing-root .echly-sidebar-body {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  flex: 1;
+  min-height: 0;
+  max-height: 360px;
+  overflow-y: auto;
+  pointer-events: auto;
+}
+.marketing-root .echly-sidebar-body::-webkit-scrollbar { width: 6px; }
+.marketing-root .echly-sidebar-body::-webkit-scrollbar-track { background: transparent; }
+.marketing-root .echly-sidebar-body::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 9999px;
+}
+.marketing-root .echly-sidebar-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.14);
+}
+.marketing-root .echly-feedback-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.marketing-root .echly-feedback-processing {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  background: rgba(0, 0, 0, 0.04);
+}
+.marketing-root .echly-feedback-processing .echly-processing-text {
+  color: rgba(0, 0, 0, 0.72);
+}
+.marketing-root .echly-feedback-processing .echly-spinner {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  border: 2px solid rgba(0, 0, 0, 0.15);
+  border-top-color: #3B82F6;
+  border-radius: 50%;
+  animation: echly-spin 0.8s linear infinite;
+}
+.marketing-root .echly-empty-session-state {
+  padding: 16px 0;
+}
+.marketing-root .echly-empty-session-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* V2 tokens + ticket rows */
+.marketing-root .echly-v2 {
+  --brand: #5A49BF;
+  --brand-soft: #F0ECFB;
+  --brand-ink: #3D2F73;
+  --ink: #15101F;
+  --body: #54495F;
+  --muted: #54495F;
+  --soft: #8A8096;
+  --hair: #E5E7EB;
+  --surface: #FFFFFF;
+  --surface-subtle: #F8F8F8;
+  --surface-hover: #FAFAF7;
+  --danger: #E5484D;
+  --good: #18794E;
+  --sp-xs: 5px;
+  --sp-sm: 10px;
+  --sp-md: 14px;
+  --sp-lg: 20px;
+  --sp-xl: 28px;
+  --sp-2xl: 36px;
+  --sp-3xl: 44px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
+.marketing-root .echly-v2 button {
+  font-family: inherit;
+  border: 0;
+}
+.marketing-root .echly-v2 .ticket {
+  display: grid;
+  grid-template-columns: 51px 1fr auto;
+  gap: var(--sp-sm);
+  padding: var(--sp-md);
+  border-radius: var(--r-md);
+  align-items: center;
+  cursor: pointer;
+  transition: background .12s;
+  position: relative;
+  overflow: hidden;
+}
+.marketing-root .echly-v2 .ticket + .ticket { margin-top: var(--sp-xs); }
+.marketing-root .echly-v2 .ticket:hover { background: rgba(28, 25, 23, 0.04); }
+.marketing-root .echly-v2 .ticket-thumb {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-sm);
+  background: var(--surface-subtle);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--muted);
+  transition: background .12s, color .12s;
+}
+.marketing-root .echly-v2 .ticket-thumb--highlighted {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.marketing-root .echly-v2 .ticket-main { min-width: 0; }
+.marketing-root .echly-v2 .ticket-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.008em;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.marketing-root .echly-v2 .ticket-meta {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 1.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  letter-spacing: -0.003em;
+}
+.marketing-root .echly-v2 .ticket-meta b { color: var(--ink); font-weight: 600; }
+.marketing-root .echly-v2 .ticket-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  align-self: center;
+  opacity: 0;
+  transition: opacity .15s;
+}
+.marketing-root .echly-v2 .ticket:hover .ticket-actions {
+  opacity: 1;
+}
+.marketing-root .echly-v2 .ticket-action-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  color: var(--soft);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.marketing-root .echly-v2 .ticket-action-btn:hover {
+  background: var(--glass-icon-hover-bg);
+  color: var(--ink);
+}
+.marketing-root .echly-v2 .ticket-action-btn--danger:hover {
+  background: rgba(229, 72, 77, 0.08);
+  color: var(--danger);
+}
+.marketing-root .echly-v2 .ticket.success-flash {
+  animation: echly-v2-succ-glow 2.4s ease-out forwards;
+}
+@keyframes echly-v2-succ-glow {
+  0%   { background: rgba(24,121,78,0.16); box-shadow: inset 0 0 0 1.7px rgba(24,121,78,0.32); }
+  70%  { background: rgba(24,121,78,0.06); box-shadow: inset 0 0 0 1.15px rgba(24,121,78,0.14); }
+  100% { background: transparent; box-shadow: none; }
+}
+
+/* =================================================================
+   PHASE 2B v5 — Real extension-mode tray (.pill.pill-tickets / tl-*)
+   Forklifted from app/globals.css under .echly-v2:
+     - .pill / .pill::before / .pill-mark(-logo) / .pill-icon-btn / .pill-rule : L6553-6660
+     - .ai-dot                                                                 : L6834
+     - .pill-tickets / .tl-head / .tl-eyebrow / .tl-title / .tl-list           : L8458-8530
+     - .tl-foot / .tl-foot-left / .tl-foot-home                                : L8862-8891
+     - .tl-title-hover-row / .tl-edit-icon                                     : L10465-10492
+     - @keyframes v2-pulse-soft                                                : L7513
+   ================================================================= */
+@keyframes v2-pulse-soft {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(90,73,191,0.10); }
+  50% { box-shadow: 0 0 0 5px rgba(90,73,191,0.22); }
+}
+
+.marketing-root .echly-v2 .pill {
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-radius: var(--r-xl);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-stack);
+  position: relative;
+  isolation: isolate;
+  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--body);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.marketing-root .echly-v2 .pill::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 1px;
+  right: 1px;
+  height: 50%;
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  background: linear-gradient(to bottom, var(--glass-edge-highlight), transparent);
+  z-index: -1;
+  pointer-events: none;
+}
+.marketing-root .echly-v2 .pill-tickets {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.marketing-root .echly-v2 .pill-mark {
+  width: 30px; height: 30px;
+  border-radius: var(--r-sm);
+  background: var(--ink);
+  color: #fff;
+  display: grid; place-items: center;
+  font-size: 13px; font-weight: 700;
+  letter-spacing: -0.04em;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.18) inset;
+  position: relative;
+}
+.marketing-root .echly-v2 .pill-mark.pill-mark-logo {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+  overflow: visible;
+}
+.marketing-root .echly-v2 .pill-icon-btn {
+  position: relative;
+  width: 30px; height: 30px;
+  border-radius: var(--r-sm);
+  display: grid; place-items: center;
+  color: var(--soft);
+  background: none;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.marketing-root .echly-v2 .pill-icon-btn:hover { background: var(--glass-icon-hover-bg); color: var(--ink); }
+.marketing-root .echly-v2 .pill-icon-btn svg { width: 15px; height: 15px; }
+.marketing-root .echly-v2 .pill-rule { height: 1px; background: var(--hair); margin: 0; }
+
+.marketing-root .echly-v2 .tl-head {
+  display: grid;
+  grid-template-columns: 25px 1fr auto;
+  align-items: center;
+  gap: var(--sp-md);
+  padding: var(--sp-lg) var(--sp-md) var(--sp-md) var(--sp-lg);
+}
+.marketing-root .echly-v2 .tl-head .pill-mark { align-self: center; }
+.marketing-root .echly-v2 .tl-icon-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.marketing-root .echly-v2 .tl-title-block { min-width: 0; }
+.marketing-root .echly-v2 .tl-eyebrow {
+  font-size: 11.5px;
+  color: var(--brand);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.marketing-root .echly-v2 .tl-eyebrow .live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #34C29A;
+  box-shadow: 0 0 0 3.5px rgba(52,194,154,0.18);
+  animation: v2-pulse-soft 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.marketing-root .echly-v2 .tl-title-hover-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-width: 0;
+}
+.marketing-root .echly-v2 .tl-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.012em;
+  line-height: 1.25;
+  margin-top: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.marketing-root .echly-v2 .tl-list {
+  padding: var(--sp-xs) var(--sp-sm) var(--sp-sm);
+  max-height: 320px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--hair) transparent;
+  flex: 1;
+}
+.marketing-root .echly-v2 .tl-list::-webkit-scrollbar { width: 6px; }
+.marketing-root .echly-v2 .tl-list::-webkit-scrollbar-thumb {
+  background: var(--hair);
+  border-radius: 999px;
+}
+.marketing-root .echly-v2 .ai-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--brand);
+  box-shadow: 0 0 0 4px rgba(90,73,191,0.12);
+  flex-shrink: 0;
+  animation: v2-pulse-soft 2.4s ease-in-out infinite;
+}
+.marketing-root .echly-v2 .tl-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-sm) var(--sp-lg) var(--sp-md);
+  border-top: 1px solid var(--hair);
+  font-size: 13px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.marketing-root .echly-v2 .tl-foot-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.marketing-root .echly-v2 .tl-foot-home {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--soft);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+  letter-spacing: -0.005em;
+  transition: color 0.15s;
+}
+.marketing-root .echly-v2 .tl-foot-home:hover { color: var(--ink); }
+
+/* =================================================================
+   PHASE 2B v5 — Edit modal (.editor-overlay*)
+   Forklifted from app/globals.css under .echly-v2, L9453-9928.
+   Two marketing-only additions documented inline:
+     - .editor-screenshot-placeholder  (CSS gradient stand-in for a frame)
+     - .editor-static-desc             (static read-only description text)
+   ================================================================= */
+/* Fix 3c (v8): frosted-glass scrim. v10: the white-only wash (rgba 255 @ .5)
+   read flat — washing the page toward white removes the figure/ground gap, so
+   the modal floated without clearly sitting "in front." We keep the frosted
+   softness but layer a faint cool-INK tint over it (slate #0F172A @ low alpha):
+   just enough darkening to push the background down a plane and let the crisp
+   modal/pill/tray surfaces read as foreground. Still recognizable behind the
+   glass — depth through a touch of shade + blur, not a heavy "dim the room"
+   dark sheet. */
+.marketing-root .echly-v2 .editor-overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  /* v15: backdrop dim/wash removed. The unified hero IS the capture surface, so
+     dimming it when the modal opens fought the "the page is the demo" feel. The
+     modal carries focus through its own multi-layer shadow (.editor-overlay) —
+     no scrim needed. The backdrop stays present (transparent) only to catch the
+     click-to-dismiss. */
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  z-index: 20;
+  pointer-events: auto;
+}
+.marketing-root .echly-v2 .editor-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 21;
+  pointer-events: auto;
+  width: min(440px, calc(100% - 48px));
+  max-height: 86%;
+  /* Most solid surface in the scene — viewers READ the modal (title, desc,
+     tags). 0.98 feels solid but lets the backdrop-filter engage for edge
+     character. */
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.99) 0%,
+    rgba(255, 255, 255, 0.97) 100%
+  );
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border-radius: 23px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  /* Glass refinement Fix 2: full multi-layer elevation — ambient close shadow,
+     mid falloff, far cast, plus the inner-top white highlight catching light on
+     the leading edge. Modal needs stronger elevation than the tray — it's the
+     focal overlay. Reads as "premium glass catching light." */
+  box-shadow:
+    0 2px 4px rgba(15, 23, 42, 0.06),
+    0 12px 24px rgba(15, 23, 42, 0.10),
+    0 32px 64px -16px rgba(15, 23, 42, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 0 0 1px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+.marketing-root .echly-v2 .editor-overlay-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px 0 18px;
+  flex-shrink: 0;
+}
+.marketing-root .echly-v2 .editor-overlay-head-left {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.marketing-root .echly-v2 .editor-overlay-icon {
+  width: 35px;
+  height: 35px;
+  border-radius: 9px;
+  background: var(--brand-soft);
+  display: grid;
+  place-items: center;
+  color: var(--brand);
+  flex-shrink: 0;
+}
+.marketing-root .echly-v2 .editor-overlay-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--soft);
+}
+.marketing-root .echly-v2 .editor-close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: var(--soft);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.marketing-root .echly-v2 .editor-close-btn:hover {
+  background: var(--glass-icon-hover-bg);
+  color: var(--ink);
+}
+.marketing-root .echly-v2 .editor-overlay-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 18px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.marketing-root .echly-v2 .editor-overlay-body::-webkit-scrollbar { width: 5px; }
+.marketing-root .echly-v2 .editor-overlay-body::-webkit-scrollbar-thumb {
+  background: rgba(28,25,23,0.10);
+  border-radius: 5px;
+}
+.marketing-root .echly-v2 .editor-overlay-body .editor-title-input {
+  width: 100%;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.015em;
+  line-height: 1.35;
+  border: none;
+  outline: none;
+  background: none;
+  padding: 9px 0;
+  font-family: inherit;
+  border-bottom: 1.5px solid transparent;
+  transition: border-color .15s;
+}
+.marketing-root .echly-v2 .editor-overlay-body .editor-title-input:focus {
+  border-bottom-color: var(--brand);
+}
+.marketing-root .echly-v2 .editor-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 100%;
+  transition: gap 0.15s ease;
+}
+.marketing-root .echly-v2 .editor-title-row:hover { gap: 12px; }
+.marketing-root .echly-v2 .editor-title-row .editor-title-input { flex: 1; min-width: 0; }
+.marketing-root .echly-v2 .editor-title-row .editor-title-pencil {
+  opacity: 0;
+  color: var(--brand);
+  flex-shrink: 0;
+  width: 0;
+  overflow: hidden;
+  transition: opacity 0.15s ease, width 0.15s ease;
+  pointer-events: none;
+}
+.marketing-root .echly-v2 .editor-title-row:hover .editor-title-pencil { opacity: 1; width: 16px; }
+.marketing-root .echly-v2 .editor-title-row:hover .editor-title-input { color: var(--brand); }
+.marketing-root .echly-v2 .editor-title-row .editor-title-input:focus { color: var(--ink); }
+
+.marketing-root .echly-v2 .editor-screenshot {
+  position: relative;
+  margin: 12px 0 14px 0;
+  border-radius: 14px;
+  background: var(--surface-subtle);
+  overflow: hidden;
+  border: 1px solid var(--hair);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  min-height: 120px;
+  max-height: 400px;
+}
+/* v6: the gradient placeholder was replaced by per-ticket mock SVG screenshots
+   (.editor-screenshot-mock — defined in the hcd block). */
+.marketing-root .echly-v2 .editor-screenshot-info {
+  position: absolute;
+  top: 9px;
+  left: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(28, 25, 23, 0.65);
+  color: #fff;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  cursor: help;
+  z-index: 5;
+  border: none;
+  outline: none;
+}
+.marketing-root .echly-v2 .editor-screenshot-info .echly-tooltip {
+  bottom: auto;
+  top: calc(100% + 6px);
+  left: 0;
+  transform: none;
+}
+.marketing-root .echly-v2 .editor-screenshot-info:hover .echly-tooltip,
+.marketing-root .echly-v2 .editor-screenshot-info:focus-visible .echly-tooltip {
+  opacity: 1;
+}
+.marketing-root .echly-v2 .echly-tooltip.echly-tooltip--multiline {
+  white-space: pre-line;
+  width: 240px;
+  max-width: 240px;
+  text-align: left;
+  line-height: 1.4;
+  font-weight: 500;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  padding: 10px 12px;
+}
+
+.marketing-root .echly-v2 .editor-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 16px;
+}
+.marketing-root .echly-v2 .editor-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--hair);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.003em;
+  cursor: default;
+  position: relative;
+  transition: background .12s;
+}
+.marketing-root .echly-v2 .editor-tag:hover { background: var(--surface-hover); }
+.marketing-root .echly-v2 .editor-tag-remove {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--danger);
+  color: #fff;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  border: 1.5px solid var(--surface);
+  cursor: pointer;
+}
+.marketing-root .echly-v2 .editor-tag:hover .editor-tag-remove { display: flex; }
+.marketing-root .echly-v2 .editor-tag-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: none;
+  border: 1px dashed var(--hair);
+  color: var(--soft);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.marketing-root .echly-v2 .editor-tag-add:hover {
+  background: var(--surface-subtle);
+  color: var(--muted);
+  border-color: var(--muted);
+}
+.marketing-root .echly-v2 .editor-tag-add svg { width: 14px; height: 14px; }
+
+.marketing-root .echly-v2 .editor-overlay-body .editor-divider {
+  height: 1px;
+  background: var(--glass-border);
+  margin: 0 0 14px 0;
+}
+.marketing-root .echly-v2 .editor-overlay-body .editor-steps { margin-bottom: 14px; }
+.marketing-root .echly-v2 .editor-overlay-body .editor-steps-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--soft);
+  margin-bottom: 9px;
+}
+/* Marketing-only: static read-only description (replaces the heavy editor). */
+.marketing-root .echly-v2 .editor-static-desc {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+  line-height: 1.55;
+  margin: 0;
+  padding: 5px 0;
+}
+.marketing-root .echly-v2 .editor-overlay-foot {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 12px 18px 16px 18px;
+  border-top: 1px solid var(--hair);
+  flex-shrink: 0;
+}
+.marketing-root .echly-v2 .editor-overlay-foot .editor-save-btn {
+  height: 39px;
+  padding: 0 21px;
+  border-radius: 10px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background .12s;
+  letter-spacing: -0.005em;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.marketing-root .echly-v2 .editor-overlay-foot .editor-save-btn:hover { background: #4A3BA0; }
+
+/* =================================================================
+   PHASE 2B v7 — SpeechCaption (marketing-only, NOT a forklift)
+   Fix 4: single transcript row, no header/red-dot. Glass container kept,
+   padding tightened, blinking caret while typing, fade-in on appear.
+   ================================================================= */
+.marketing-root .speech-caption {
+  margin-top: 8px;
+  max-width: 380px;
+  /* Glass refinement Fix 3: gradient surface (more opaque at top where light
+     catches, more transparent at bottom), backdrop saturation for refracted
+     light, and a white-tinted border (light on the glass edge) instead of dark
+     (which reads as a PNG with a shadow). */
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.97) 0%,
+    rgba(255, 255, 255, 0.95) 100%
+  );
+  /* near-solid; keeps just enough translucency for the backdrop-filter to engage
+     at the edges (matches the capture pill's glass treatment). */
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  padding: 14px 18px;
+  /* Glass refinement Fix 2: multi-layer cast + inset top-edge highlight + hairline. */
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.05),
+    0 4px 12px rgba(15, 23, 42, 0.08),
+    0 16px 32px -8px rgba(15, 23, 42, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 0 0 1px rgba(15, 23, 42, 0.04);
+  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  /* The caption never responds to hover — it's just being watched (Fix 5). */
+  pointer-events: none;
+  opacity: 0;
+  animation: speech-caption-fade-in 200ms ease-out forwards;
+}
+@keyframes speech-caption-fade-in {
+  to { opacity: 1; }
+}
+.marketing-root .speech-caption-text {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: #15101F;
+  letter-spacing: -0.008em;
+  /* Fix 3 (v9): no min-height — the box auto-sizes to its content (just the
+     cursor when empty, growing as words land). */
+}
+.marketing-root .speech-caption-word {
+  display: inline;
+  /* Each word is mounted already-shown (Fix 3, v9) and fades up on entry. */
+  animation: speech-caption-word-in 220ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+@keyframes speech-caption-word-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.marketing-root .speech-caption-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: #5A49BF;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: speech-caption-cursor-blink 1s infinite;
+}
+@keyframes speech-caption-cursor-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* Session control panel */
+.marketing-root .echly-sc-root {
+  position: absolute;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 14;
+  pointer-events: none;
+  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.marketing-root .echly-sc-root .sc-bar {
+  pointer-events: auto;
+  /* Glass refinement Fix 4: stronger blur + saturation for "real glass" dark
+     surface. */
+  background: rgba(20,22,28,0.82);
+  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+  border-radius: 999px;
+  padding: 8px 8px 8px 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  /* v21: centered ambient shadow instead of a downward drop — Y-offset 0 so the
+     glow sits evenly around the panel (a soft halo, not a cast below it), plus
+     the top-edge inner highlight (the glass tell). */
+  box-shadow:
+    /* Tight even halo */
+    0 0 8px rgba(0, 0, 0, 0.20),
+    /* Soft diffuse halo */
+    0 0 32px rgba(0, 0, 0, 0.24),
+    /* Top inner highlight on dark surface */
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  color: #fff;
+  white-space: nowrap;
+}
+.marketing-root .echly-sc-root .sc-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: rgba(255,255,255,0.95);
+}
+.marketing-root .echly-sc-root .sc-status .live {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #34C29A;
+  box-shadow: 0 0 0 3px rgba(52,194,154,0.20);
+  animation: echly-v2-sc-live 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.marketing-root .echly-sc-root .sc-status .paused {
+  width: 9px;
+  height: 9px;
+  background: transparent;
+  border: 1.5px solid #FBBF24;
+  border-radius: 50%;
+  position: relative;
+  flex-shrink: 0;
+}
+.marketing-root .echly-sc-root .sc-status .paused::before,
+.marketing-root .echly-sc-root .sc-status .paused::after {
+  content: "";
+  position: absolute;
+  width: 1.5px;
+  height: 5px;
+  background: #FBBF24;
+  top: 1px;
+}
+.marketing-root .echly-sc-root .sc-status .paused::before { left: 1px; }
+.marketing-root .echly-sc-root .sc-status .paused::after  { right: 1px; }
+.marketing-root .echly-sc-root .sc-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(255,255,255,0.12);
+  flex-shrink: 0;
+}
+.marketing-root .echly-sc-root .sc-btn {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: background .12s;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: none;
+}
+.marketing-root .echly-sc-root .sc-btn svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+.marketing-root .echly-sc-root .sc-btn.ghost {
+  color: rgba(255,255,255,0.85);
+  background: rgba(255,255,255,0.06);
+}
+.marketing-root .echly-sc-root .sc-btn.ghost:hover {
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+}
+.marketing-root .echly-sc-root .sc-btn.brand {
+  background: #5A49BF;
+  color: #fff;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.10) inset;
+}
+.marketing-root .echly-sc-root .sc-btn.brand:hover { background: var(--brand-hover, #4A3BA0); }
+.marketing-root .echly-sc-root .sc-btn.danger {
+  background: #E5484D;
+  color: #fff;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.10) inset;
+}
+.marketing-root .echly-sc-root .sc-btn.danger:hover { background: #EF5359; }
+.marketing-root .echly-sc-root .sc-btn.disabled,
+.marketing-root .echly-sc-root .sc-btn:disabled {
+  background: rgba(255,255,255,0.06) !important;
+  color: rgba(255,255,255,0.35) !important;
+  box-shadow: none !important;
+  pointer-events: none;
+  cursor: default;
+}
+.marketing-root .echly-sc-root .sc-stop-sq {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: #fff;
+  flex-shrink: 0;
+}
+.marketing-root .echly-sc-root .sc-spinner {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid rgba(255,255,255,0.20);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: echly-v2-sc-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes echly-v2-sc-live {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(52,194,154,0.10); }
+  50%       { box-shadow: 0 0 0 4px rgba(52,194,154,0.22); }
+}
+@keyframes echly-v2-sc-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Capture pill */
+.marketing-root .echly-pill-root {
+  --pill-brand: #5A49BF;
+  --pill-brand-soft: #F0ECFB;
+  --pill-brand-ink: #3D2F73;
+  --pill-ink: #15101F;
+  --pill-body: #54495F;
+  --pill-soft: #8A8096;
+  --pill-hair: #E5E7EB;
+  --pill-surface: #FFFFFF;
+  --pill-surface-hover: #FAFAF7;
+  --pill-danger: #E5484D;
+  --pill-waveform: rgba(90, 73, 191, 0.85);
+  position: absolute;
+  z-index: 13;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  pointer-events: none;
+}
+.marketing-root .echly-pill-root > * {
+  pointer-events: auto;
+  animation: echly-pill-enter 240ms cubic-bezier(0.2, 0, 0, 1);
+}
+@keyframes echly-pill-enter {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+.marketing-root .echly-selected-overlay {
+  position: absolute;
+  z-index: 12;
+  pointer-events: none;
+  border: 2px solid var(--pill-brand, #5A49BF);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--pill-brand, #5A49BF) 6%, transparent);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--pill-brand, #5A49BF) 12%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--pill-brand, #5A49BF) 30%, transparent);
+  transition:
+    top 80ms ease-out,
+    left 80ms ease-out,
+    width 80ms ease-out,
+    height 80ms ease-out;
+  animation: echly-selected-appear 400ms ease-out;
+}
+@keyframes echly-selected-appear {
+  0% {
+    opacity: 0;
+    box-shadow:
+      0 0 0 0 color-mix(in srgb, var(--pill-brand, #5A49BF) 12%, transparent),
+      inset 0 0 0 1px color-mix(in srgb, var(--pill-brand, #5A49BF) 30%, transparent);
+  }
+  50% {
+    opacity: 1;
+    box-shadow:
+      0 0 0 8px color-mix(in srgb, var(--pill-brand, #5A49BF) 8%, transparent),
+      inset 0 0 0 1px color-mix(in srgb, var(--pill-brand, #5A49BF) 30%, transparent);
+  }
+  100% {
+    opacity: 1;
+    box-shadow:
+      0 0 0 4px color-mix(in srgb, var(--pill-brand, #5A49BF) 12%, transparent),
+      inset 0 0 0 1px color-mix(in srgb, var(--pill-brand, #5A49BF) 30%, transparent);
+  }
+}
+.marketing-root .echly-pill-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  animation: echly-pill-hint-fade-in 200ms ease-out;
+}
+.marketing-root .echly-pill-hint--dark {
+  background: rgba(21, 16, 31, 0.92);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  color: rgba(255, 255, 255, 0.96);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow-depth);
+}
+.marketing-root .echly-pill-hint--dismissing {
+  animation: echly-pill-hint-fade-out 280ms ease-out forwards;
+}
+.marketing-root .echly-pill-hint-pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #FF6B6B;
+  animation: echly-pill-heartbeat 1.4s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.marketing-root .echly-pill-hint--dark .echly-pill-hint-secondary {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.62);
+  font-weight: 400;
+}
+.marketing-root .echly-pill-hint--error .echly-pill-hint-primary {
+  color: #FF8A8E;
+}
+@keyframes echly-pill-hint-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes echly-pill-hint-fade-out {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-2px); }
+}
+@keyframes echly-pill-heartbeat {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.8); }
+}
+.marketing-root .echly-pill-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-radius: 999px;
+  padding: 8px 8px 8px 12px;
+  gap: 12px;
+  box-shadow: var(--shadow-depth-recording);
+  height: 52px;
+  width: 360px;
+  box-sizing: border-box;
+  transition: width 220ms cubic-bezier(0.2, 0, 0, 1), transform 200ms cubic-bezier(0.2, 0, 0, 1);
+  font-family: inherit;
+}
+/* The voice pill no longer widens on hover: the demo dropped the hover-revealed
+   mic/text-mode buttons (watched pill, not interactive), so the 360px→440px
+   grow that made room for them would just be empty space. Hover does nothing. */
+.marketing-root .echly-pill-content--text { width: auto; }
+.marketing-root .echly-pill-content--shake {
+  animation: echly-pill-shake 0.5s ease-in-out;
+}
+@keyframes echly-pill-shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+.marketing-root .echly-pill-icon-btn {
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  width: 26px;
+  height: 26px;
+  color: var(--pill-soft);
+  transition: color 140ms ease, transform 140ms ease;
+  flex-shrink: 0;
+  font-family: inherit;
+}
+.marketing-root .echly-pill-icon-btn:hover { background: var(--glass-icon-hover-bg); color: var(--pill-ink); border-radius: 6px; }
+.marketing-root .echly-pill-icon-btn:active { transform: scale(0.9); }
+.marketing-root .echly-pill-icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.marketing-root .echly-pill-action {
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  width: 26px;
+  height: 26px;
+  color: var(--pill-soft);
+  opacity: 0;
+  max-width: 0;
+  margin: 0 -6px;
+  overflow: hidden;
+  transition: opacity 200ms ease-out, max-width 200ms ease-out, margin 200ms ease-out, color 140ms ease;
+  flex-shrink: 0;
+  font-family: inherit;
+  vertical-align: middle;
+}
+.marketing-root .echly-pill-action:hover { color: var(--pill-ink); }
+.marketing-root .echly-pill-content--voice:hover .echly-pill-action,
+.marketing-root .echly-pill-content--voice:focus-within .echly-pill-action {
+  opacity: 1;
+  max-width: 26px;
+  margin: 0;
+}
+.marketing-root .echly-pill-content--text:hover .echly-pill-action {
+  opacity: 1;
+  max-width: 26px;
+  margin: 0;
+}
+.marketing-root .echly-pill-divider {
+  width: 1px;
+  height: 24px;
+  background: rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+  align-self: center;
+  opacity: 0;
+  max-width: 0;
+  margin: 0 -6px;
+  overflow: hidden;
+  transition: opacity 200ms ease-out, max-width 200ms ease-out, margin 200ms ease-out;
+}
+.marketing-root .echly-pill-content--voice:hover .echly-pill-divider,
+.marketing-root .echly-pill-content--voice:focus-within .echly-pill-divider {
+  opacity: 1;
+  max-width: 1px;
+  margin: 0 4px;
+}
+.marketing-root .echly-pill-content--text:hover .echly-pill-divider {
+  opacity: 1;
+  max-width: 1px;
+  margin: 0 4px;
+}
+.marketing-root .echly-pill-rec-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--pill-danger);
+  flex-shrink: 0;
+  animation: echly-pill-heartbeat 1.4s ease-in-out infinite;
+}
+.marketing-root .echly-pill-timer {
+  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
+  font-size: 13px;
+  color: var(--pill-ink);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  min-width: 30px;
+  flex-shrink: 0;
+}
+.marketing-root .echly-pill-waveform {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  width: 140px;
+  flex-shrink: 0;
+  overflow: hidden;
+  padding: 0 4px;
+}
+.marketing-root .echly-pill-wave-bar {
+  width: 2px;
+  background: var(--pill-waveform, rgba(90, 73, 191, 0.85));
+  border-radius: 1px;
+  flex-shrink: 0;
+  transition: height 80ms ease-out;
+}
+.marketing-root .echly-pill-send-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--pill-brand);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  cursor: pointer;
+  flex-shrink: 0;
+  border: none;
+  outline: none;
+  padding: 0;
+  margin-left: 2px;
+  transition: background 120ms ease, transform 120ms cubic-bezier(0.2, 0, 0, 1.2);
+  box-shadow: 0 2px 6px rgba(90, 73, 191, 0.25);
+  font-family: inherit;
+}
+.marketing-root .echly-pill-send-btn:hover { background: var(--pill-brand-ink); }
+.marketing-root .echly-pill-send-btn:active { transform: scale(0.94); }
+.marketing-root .echly-pill-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--pill-soft);
+  box-shadow: none;
+}
+.marketing-root .echly-pill-send-btn.is-loading {
+  background: var(--pill-brand);
+  color: #fff;
+  cursor: progress;
+  pointer-events: none;
+  box-shadow: 0 2px 6px rgba(90, 73, 191, 0.25);
+}
+.marketing-root .echly-pill-send-btn.is-loading .echly-mic-permission-spinner {
+  animation: echly-spin 0.9s linear infinite;
+}
+
+/* Hero capture demo (v4) layout */
+.marketing-root .hero-stage--demo {
+  height: auto;
+  padding: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  /* v18: the base .hero-stage caps width at 1280px and centers (margin: auto).
+     The demo stage must span the FULL VIEWPORT so the tray/control panel can
+     anchor to the real viewport edges — clear the inherited cap + centering. */
+  max-width: none;
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+}
+.marketing-root .hcd {
+  position: relative;
+  /* v16: the stage spans the FULL VIEWPORT WIDTH (not the 1280px section box) so
+     the tray and control panel can anchor to the real viewport edges instead of
+     competing with the centered copy for the same 1280px column. The marketing
+     copy stays centered via its own max-width (see .hcd-hero-copy children).
+     Everything — stageRef coords, pill anchor, highlight rect — now shares one
+     viewport-wide coordinate system. */
+  width: 100%;
+  /* v22: the demo fills the visible viewport below the announcement bar + nav so
+     it matches the screen it sits against without overflowing it. */
+  height: calc(100vh - 180px);
+  margin: 0 auto;
+  overflow: hidden;
+  /* v14 (Annote-as-hero): the demo container is fully TRANSPARENT — no white
+     card, no FauxSite, no glass material. The section's natural background
+     flows straight through and the Annote elements float directly on it. */
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  isolation: isolate;
+  font-family: var(--echly-font);
+}
+@media (max-width: 1099px) {
+  .marketing-root .hcd {
+    height: 100vh;
+  }
+}
+
+/* v15: marketing copy as part of the capture surface. Centered, upper-middle,
+   inside the stage. The block is click-through except its real children (the
+   text the click handler frames, and the CTA which carves itself out). */
+.marketing-root .hcd-hero-copy {
+  position: absolute;
+  /* v19: vertically center the copy block in the stage instead of pinning it to
+     the top with a fixed margin. The block fills the stage (inset 0) and uses
+     flex to center its children; translateY pulls them above true center so the
+     headline/sub/CTAs sit in the upper portion, leaving negative space + the
+     tray below. */
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  transform: translateY(-4%);
+  padding: 0 32px;
+  z-index: 2;
+  text-align: center;
+  /* The block itself shouldn't intercept clicks in its padding gutters — only
+     the real text/CTA elements should. */
+  pointer-events: none;
+  /* v17: scale the whole composition with the viewport, not a fixed column.
+     Floor 680px (small viewports), 75vw mid-range, 1280px ceiling so it never
+     gets cartoonishly wide on ultra-wide monitors. The block is centered, so
+     left/right at 0 plus auto margins keep it pinned to viewport center. */
+  width: auto;
+  max-width: clamp(680px, 75vw, 1280px);
+  margin-left: auto;
+  margin-right: auto;
+}
+.marketing-root .hcd-hero-copy h1,
+.marketing-root .hcd-hero-copy p {
+  /* The headline + sub ARE click targets (handler frames their bounds). */
+  pointer-events: auto;
+}
+.marketing-root .hcd-hero-h1 {
+  /* v21: scaled up from the v16 restrained 40–64px/500 (which read washed-out on
+     the lighter bg), then dialed back per feedback — smaller and lighter than
+     the full Shadcnspace display register. ~48–76px, semibold (600) not bold,
+     with tight line-height + tracking for a confident-but-not-shouting feel. */
+  font-size: clamp(48px, 5.5vw, 76px);
+  font-weight: 600;
+  line-height: 1.0;
+  letter-spacing: -0.028em;
+  margin: 0 auto;
+  color: #15101F;
+  /* Wider column to let the bigger type breathe across two balanced lines. */
+  max-width: clamp(720px, 75vw, 1100px);
+}
+/* Gradient accent on the payoff phrase ("seeing it.") — brand violet → blue →
+   magenta sweep matching the logo, clipped to the text. The rest of the
+   headline stays ink (#15101F) so the eye lands on this word. */
+.marketing-root .hcd-hero-accent {
+  background: linear-gradient(
+    100deg,
+    #6E3FB0 0%,
+    #5A49BF 32%,
+    #5E6AD2 56%,
+    #C51A68 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  letter-spacing: inherit;
+}
+/* Fallback for browsers that can't render clipped-text gradients: solid brand
+   violet so the word never disappears. */
+@supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+  .marketing-root .hcd-hero-accent {
+    color: var(--violet);
+    -webkit-text-fill-color: var(--violet);
+  }
+}
+.marketing-root .hcd-hero-sub {
+  /* One hierarchy step below the headline: a touch larger and slightly more
+     present (65% ink vs the old washed-out 70% translucency) so it reads as
+     clear supporting context against the bigger headline, not a competing line.
+     The 32px gap opens up the headline → sub hierarchy step. */
+  font-size: clamp(18px, 1.5vw, 22px);
+  font-weight: 400;
+  color: rgba(21, 16, 31, 0.65);
+  margin: 32px auto 0;
+  max-width: clamp(440px, 34vw, 620px);
+  letter-spacing: -0.003em;
+  line-height: 1.5;
+}
+/* v20: the two CTAs sit side by side in a flex group. The group owns the
+   spacing below the sub and wraps gracefully on narrow viewports. It's the
+   group that carves itself out of the click-through copy block. */
+.marketing-root .hcd-cta-group {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 3;
+  /* Generous space above so the CTAs sit clearly below the sub, not crowding
+     it — completes the headline → sub → CTA hierarchy step. Bumped to 48px to
+     balance the larger headline above. */
+  margin-top: 48px;
+}
+/* The real CTA: pointer-events + its own pointer cursor so it overrides the
+   stage's `cursor: none`, and it sits above the copy block in z-order. */
+.marketing-root .hcd-hero-cta {
+  pointer-events: auto;
+  cursor: pointer;
+  position: relative;
+  z-index: 3;
+  /* Spacing is now owned by .hcd-cta-group. */
+  margin-top: 0;
+}
+/* Secondary CTA — "Install Chrome Extension". Same height + pill shape as the
+   primary for visual harmony. On the light foundation it reads as a near-white
+   surface card with a subtle dark-tinted border + soft inner highlight, so it
+   has definition without competing with the solid-dark primary. */
+.marketing-root .hcd-hero-cta-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  /* v21: matched to the primary's new 56px so the pair reads as one substantial
+     CTA group under the larger headline. */
+  height: 56px;
+  padding: 0 24px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--ink-1);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  text-decoration: none;
+  white-space: nowrap;
+  border: 1px solid rgba(21, 16, 31, 0.10);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 4px 12px rgba(15, 23, 42, 0.06);
+  transition: background 0.15s ease-out, border-color 0.15s ease-out;
+}
+.marketing-root .hcd-hero-cta-secondary:hover {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(21, 16, 31, 0.20);
+}
+.marketing-root .hcd-hero-cta-secondary svg {
+  width: 18px;
+  height: 18px;
+  color: var(--ink-1);
+  flex-shrink: 0;
+}
+@media (max-width: 1099px) {
+  /* v17: the headline scales to ~60vw here; pull the tray in toward the edge so
+     it keeps clear of the now-wider copy on tighter viewports. */
+  .marketing-root .hcd-tray-anchor {
+    right: 32px;
+    bottom: 80px;
+  }
+}
+/* When the comment cursor is active, hide the native cursor over the stage. */
+.marketing-root .hcd.is-demo-zone {
+  cursor: none;
+}
+
+/* Annote layer */
+.marketing-root .hcd-annote-layer {
+  position: absolute;
+  inset: 0;
+  /* z:3 — the Annote elements float directly on the section background. */
+  z-index: 3;
+  pointer-events: none;
+}
+.marketing-root .hcd-annote-layer > * {
+  pointer-events: auto;
+}
+
+/* Tray anchor — visible from frame 0 (session already in progress).
+   v16: the stage is now viewport-wide, so right:48px pins the tray to the real
+   VIEWPORT right edge (was competing with the centered copy inside the 1280px
+   box). bottom:96px lifts it clear of the pink gradient transition near the
+   stage floor where it lost contrast. */
+.marketing-root .hcd-tray-anchor {
+  position: absolute;
+  bottom: 40px;
+  right: 48px;
+  width: 360px;
+  max-width: calc(100% - 44px);
+}
+.marketing-root .hcd-tray-anchor .echly-v2 {
+  flex: initial;
+  display: block;
+}
+.marketing-root .hcd-tray-anchor .pill-tickets {
+  width: 100%;
+  max-width: 100%;
+  max-height: 420px;
+}
+/* Glass refinement Fix 2: multi-layer elevation. Ambient close shadow → mid
+   falloff → far cast (floating feel), plus an inner-top white highlight that
+   catches light on the leading edge (the detail that reads as real glass, not
+   frost) and a hairline edge. Scoped to the demo so the shared
+   --glass-shadow-stack token is untouched. */
+.marketing-root .hcd-tray-anchor .echly-v2 .pill-tickets {
+  /* v21: centered ambient shadow instead of a downward drop — Y-offset 0 so the
+     glow sits evenly around the card (a soft halo, not a cast below it), plus
+     the top-edge highlight (glass tell) and the hairline edge. */
+  box-shadow:
+    /* Tight even halo */
+    0 0 8px rgba(15, 23, 42, 0.08),
+    /* Soft diffuse halo */
+    0 0 40px rgba(15, 23, 42, 0.14),
+    /* Top-edge inner highlight — the critical glass tell */
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    /* Hairline edge — defines the card on the light bg */
+    0 0 0 1px rgba(15, 23, 42, 0.05);
+}
+/* Glass refinement Fix 3 (light surface): gradient surface (more opaque at top
+   where light catches → more transparent at bottom) and a white-tinted border
+   replacing the dark --glass-border. Scoped to the demo tray so the shared
+   forklifted --glass-surface / --glass-border tokens are untouched. The
+   backdrop saturate(140%) is already on the --glass-blur token, and the
+   top-edge light highlight is already on .pill::before. */
+.marketing-root .hcd-tray-anchor .echly-v2 .pill {
+  /* Near-solid surface (was 0.85 → 0.65 — too transparent, background bled
+     through the row text). Keeps a faint gradient + backdrop refraction so the
+     edges still read as glass. */
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.98) 0%,
+    rgba(255, 255, 255, 0.96) 100%
+  );
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+/* SC anchor */
+.marketing-root .hcd-sc-anchor .echly-sc-root {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Pill anchor — positioned by the orchestrator (Fix 4), fades in. */
+.marketing-root .hcd-pill-anchor {
+  position: absolute;
+  opacity: 0;
+  transition: opacity 200ms ease;
+  pointer-events: auto;
+}
+.marketing-root .hcd-pill-anchor.is-visible {
+  opacity: 1;
+}
+.marketing-root .hcd-pill-anchor .echly-pill-root {
+  position: relative;
+  z-index: auto;
+}
+/* Premium solid glass: gradient surface + backdrop refraction + white-tinted
+   hairline + multi-layer elevation with the inset top-edge highlight (the
+   critical glass tell). Scoped to the demo so the forklifted --glass-surface /
+   --shadow-depth-recording tokens stay untouched. Slightly less opacity than the
+   modal — the pill is smaller and doesn't need to be as solid for readability. */
+.marketing-root .hcd-pill-anchor .echly-pill-content {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.97) 0%,
+    rgba(255, 255, 255, 0.95) 100%
+  );
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow:
+    0 2px 4px rgba(15, 23, 42, 0.06),
+    0 6px 16px rgba(15, 23, 42, 0.10),
+    0 20px 40px -10px rgba(15, 23, 42, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 0 0 1px rgba(15, 23, 42, 0.05);
+}
+
+/* Edit modal anchor — full-stage layer above tray + SC, below nothing. */
+.marketing-root .hcd-modal-anchor {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: auto;
+}
+
+/* ── Custom comment cursor + tooltip (Fix 1) ──
+   Sourced from SessionOverlay.createCommentCursor (SVG) + .echly-capture-tooltip
+   (the dark glass pill). Both are click-through (pointer-events: none). */
+.marketing-root .hcd-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 40;
+  pointer-events: none;
+  width: 28px;
+  height: 28px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+  will-change: transform;
+}
+.marketing-root .hcd-cursor svg {
+  display: block;
+}
+.marketing-root .hcd-cursor-tooltip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 40;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--echly-font);
+  white-space: nowrap;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  will-change: transform;
+}
+
+/* Per-ticket mock screenshot inside the EditModal (Fix 5). */
+.marketing-root .echly-v2 .editor-screenshot-mock {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  overflow: hidden;
+  display: block;
+}
+.marketing-root .echly-v2 .editor-screenshot-mock svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .marketing-root .echly-pill-rec-dot,
+  .marketing-root .echly-pill-hint-pulse,
+  .marketing-root .echly-sc-root .sc-status .live,
+  .marketing-root .echly-pill-root > *,
+  .marketing-root .echly-selected-overlay,
+  .marketing-root .echly-pill-hint,
+  .marketing-root .echly-pill-content--shake,
+  .marketing-root .echly-v2 .tl-eyebrow .live-dot,
+  .marketing-root .echly-v2 .ai-dot,
+  .marketing-root .speech-caption-cursor,
+  .marketing-root .speech-caption-word {
+    animation: none !important;
+  }
+  /* Caption still appears, just without the fade keyframe. */
+  .marketing-root .speech-caption {
+    animation: none !important;
+    opacity: 1;
+  }
+  .marketing-root .hcd-tray-anchor,
+  .marketing-root .hcd-sc-anchor,
+  .marketing-root .hcd-pill-anchor {
+    transition: none !important;
+  }
+}
+
+/* =====================================================================
+   PHASE 2C — Session view forklift (real production session components)
+   Tokens + layout + scoped utility classes for the forklifted session
+   demo. All design tokens copied verbatim from styles/tokens.css with
+   citations; comment/text utilities mirror app/globals.css. Scoped to
+   .session-demo-stage / .session-share-overlay so they never leak.
+   ===================================================================== */
+
+/* ---- Design tokens (styles/tokens.css line citations) ---- */
+.marketing-root .session-demo-stage,
+.marketing-root .session-share-overlay {
+  --brand: #5A49BF;                 /* tokens.css:9 */
+  --brand-hover: #4A3BA0;           /* tokens.css:11 */
+  --brand-subtle: #F0ECFB;          /* tokens.css:12 */
+  --brand-muted: #DCD5F0;           /* tokens.css:13 */
+  --surface: #FFFFFF;               /* tokens.css:55 */
+  --surface-page: #FAF9F7;          /* tokens.css:56 */
+  --surface-card: #FAFAFA;          /* tokens.css:57 */
+  --surface-subtle: #F5F5F5;        /* tokens.css:58 */
+  --surface-hover: #FAFAF7;         /* tokens.css:59 */
+  --text-heading: #15101F;          /* tokens.css:46 */
+  --text-body: #54495F;             /* tokens.css:47 */
+  --text-secondary: #54495F;        /* tokens.css:48 */
+  --text-tertiary: #8A8096;         /* tokens.css:50 */
+  --text-placeholder: #B5AEBE;      /* tokens.css:51 */
+  --text-primary-strong: #15101F;   /* used by screenshot corner buttons */
+  --border: #E5E7EB;                /* tokens.css:65 */
+  --border-strong: #D5D5D5;         /* tokens.css:66 */
+  --hair: #E7E5E4;                  /* tokens.css:138 */
+  --hair-strong: #D6D3D1;           /* tokens.css:139 */
+  --color-success: #18794E;         /* tokens.css:70 */
+  --color-success-bg: #E9F9EE;      /* tokens.css:71 */
+  --color-success-border: #A7F3D0;  /* tokens.css:72 */
+  --color-danger: #E5484D;          /* tokens.css:75 */
+  --color-danger-bg: #FEF2F2;       /* tokens.css:76 */
+  --color-warning: #F77E2C;         /* tokens.css:79 — presence ring */
+  --orange: #F77E2C;                /* tokens.css:356 → 79 — Activity accent */
+  --avatar-neutral-grey: #E5E5E5;   /* tokens.css:101 */
+  --avatar-warm-orange: #F2994A;
+  --avatar-blue: #2D9CDB;
+  --avatar-purple: #9B51E0;
+  --avatar-green: #27AE60;
+  --avatar-pink: #EB5757;
+  --avatar-gold: #E2B93B;
+  --avatar-teal: #2BB6A3;
+  --radius-sm: 9px;                 /* tokens.css:105 */
+  --radius-md: 12px;                /* tokens.css:106 */
+  --radius-xl: 22px;                /* tokens.css:108 */
+  --radius-btn: 20px;               /* tokens.css:110 */
+  --shadow-panel: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03); /* tokens.css:135 */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);     /* tokens.css:125 */
+  --shadow-level-1: 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-level-2: 0 4px 12px rgba(0,0,0,0.10);
+  --shadow-level-3: 0 8px 24px rgba(0,0,0,0.14);
+  --color-primary-ring: rgba(90,73,191,0.18); /* tokens.css:179 */
+  --layer-2-bg: #F4F2F8;            /* screenshot frame backdrop */
+}
+
+/* ---- Layout (mirrors SessionPageClient.tsx:3947-4086, two columns) ---- */
+.marketing-root .session-demo-stage {
+  font-family: "DM Sans", var(--echly-font);
+  color: var(--text-heading);
+  background: var(--surface-page);
+  border-radius: var(--mk-radius-xl, 22px);
+  border: 1px solid var(--line-1, #E7E5E4);
+  box-shadow: var(--mk-sh-xl, 0 30px 80px rgba(28,25,23,0.10));
+  overflow: hidden;
+  padding: 14px;
+  /* Bounded height so the section reads as a discrete component (Fix 2). */
+  height: 720px;
+  display: flex;
+  flex-direction: column;
+}
+.marketing-root .session-demo-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 4px 14px;
+}
+.marketing-root .session-demo-topbar-left {
+  display: flex;
+  align-items: center;
+  /* Drop the logo's bottom padding so its center aligns with the 34px controls. */
+  padding-bottom: 14px;
+}
+.marketing-root .session-demo-topbar-right {
+  display: flex;
+  align-items: center;
+}
+/* Contained section: fixed height with internal scroll (Phase 2C v2 Fix 2).
+   The stage is 720px tall on desktop; the detail panel scrolls internally so
+   comments live "behind the fold" without growing the marketing page. */
+.marketing-root .session-demo-grid {
+  display: grid;
+  grid-template-columns: 346px 1fr;
+  gap: 14px;
+  align-items: stretch;
+  /* Fill the remaining stage height below the topbar. */
+  flex: 1;
+  min-height: 0;
+}
+.marketing-root .session-demo-sidebar {
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+  min-height: 0;
+}
+.marketing-root .session-demo-detail {
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.marketing-root .session-demo-detail-main {
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 28px 32px 56px;
+}
+.marketing-root .session-demo-detail-scroll-area {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scroll-padding-bottom: 24px;
+}
+.marketing-root .session-demo-detail-scroll-area::-webkit-scrollbar {
+  width: 6px;
+}
+.marketing-root .session-demo-detail-scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+.marketing-root .session-demo-detail-scroll-area::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 999px;
+}
+.marketing-root .session-demo-detail-scroll-area::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* ---- Comment/text utilities (mirror app/globals.css + spec §4.6) ---- */
+.marketing-root .session-demo-stage .text-discussion-title { color: var(--text-heading); }
+.marketing-root .session-demo-stage .text-discussion-body { color: var(--text-heading); } /* globals.css:98 */
+.marketing-root .session-demo-stage .text-meta { color: var(--text-tertiary); }
+.marketing-root .session-demo-stage .mention-chip {       /* globals.css:5921-5929 */
+  background: var(--brand-subtle);
+  color: var(--brand);
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.marketing-root .session-demo-stage .comment-row {        /* globals.css:6446-6450 */
+  scroll-margin-top: 80px;
+  scroll-margin-bottom: 80px;
+  transition: background 200ms ease-out;
+}
+/* tl-vrow in production sets content-visibility:auto for virtualization
+   (globals.css:10037). Not needed for 6 static rows; reset so rows never
+   collapse to their contain-intrinsic-size placeholder mid-paint. */
+.marketing-root .session-demo-stage .tl-vrow {
+  content-visibility: visible;
+}
+
+/* Sidebar "Invite Team" — black fill (the bg-[var(--text-heading)] arbitrary
+   class wasn't applying in this scope; force it explicitly). */
+.marketing-root .session-demo-invite-btn {
+  background: var(--text-heading);
+}
+.marketing-root .session-demo-invite-btn:hover {
+  background: #000000;
+}
+
+/* New-ticket highlight — brand-purple recipe (tokens.css:1083-1089), per
+   binding decision #6 (NOT the buggy blue echlyTicketHighlight). */
+.marketing-root .session-demo-stage .echly-new-ticket-highlight {
+  animation: echly-new-ticket-pulse 600ms ease-out;
+}
+@keyframes echly-new-ticket-pulse {
+  0%, 100% { background: var(--brand-subtle); }
+  50%      { background: var(--brand-muted); }
+}
+
+/* ---- Share modal (self-contained overlay/panel; see ShareModal.tsx) ---- */
+.marketing-root .session-share-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Light frosted-glass backdrop (Fix 4g) — not dark dimming. */
+  background: rgba(250, 249, 247, 0.55);
+  backdrop-filter: blur(6px);
+  padding: 20px;
+  font-family: "DM Sans", var(--echly-font);
+}
+.marketing-root .session-share-panel {
+  width: 100%;
+  max-width: 500px;
+  max-height: min(90vh, 760px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  color: var(--text-heading);
+  border-radius: 16px;
+  box-shadow: 0 24px 48px -16px rgba(15, 23, 42, 0.18),
+              0 8px 16px -4px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+.marketing-root .session-share-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+}
+.marketing-root .session-share-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-heading);
+}
+.marketing-root .session-share-icon-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.marketing-root .session-share-icon-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text-heading);
+}
+.marketing-root .session-share-body {
+  padding: 0 24px;
+  overflow-y: auto;
+}
+/* Each logical section is separated by a hairline + breathing room (Fix 4a). */
+.marketing-root .session-share-section {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--border);
+}
+.marketing-root .session-share-section--last {
+  border-bottom: 0;
+}
+.marketing-root .session-share-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-heading);
+  margin: 0 0 12px;
+}
+.marketing-root .session-share-section-sub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: -6px 0 12px;
+}
+.marketing-root .session-share-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brand-subtle);
+  color: var(--brand);
+  font-weight: 600;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.marketing-root .session-share-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px;
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
+/* ---- Responsive: shorter contained stage on mid widths ---- */
+@media (max-width: 1099px) and (min-width: 901px) {
+  .marketing-root .session-demo-stage {
+    height: 640px;
+  }
+}
+
+/* ---- Responsive: collapse to a single column on narrow viewports ---- */
+@media (max-width: 900px) {
+  /* Drop the fixed height so a stacked sidebar + detail can flow naturally. */
+  .marketing-root .session-demo-stage {
+    height: auto;
+    display: block;
+  }
+  .marketing-root .session-demo-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: 0;
+  }
+  .marketing-root .session-demo-sidebar {
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  /* On mobile the detail flows with the page (no internal scroll trap). */
+  .marketing-root .session-demo-detail {
+    display: block;
+    max-height: 560px;
+  }
+  .marketing-root .session-demo-detail-scroll-area {
+    overflow-y: auto;
+  }
+  .marketing-root .session-demo-detail-main {
+    padding: 20px 18px 40px;
+  }
 }
