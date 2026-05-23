@@ -40,12 +40,23 @@ function labelFromMinutes(mins: number): string {
   return `${days}d ago`;
 }
 
+/* Maps each commenter (by userId) to a real-photo avatar so the session
+   demo doesn't render initials placeholders. Photos match each persona's
+   gender; falls back to color+initials if a userId isn't listed here. */
+const COMMENTER_AVATARS: Record<string, string> = {
+  "u-maya": "/marketing/people/maya-anand.jpg",
+  "u-daniel": "/marketing/people/daniel-torres.jpg",
+  "u-sarah": "/marketing/people/sarah-kim.jpg",
+  "u-alex": "/marketing/people/alex-nguyen.jpg",
+};
+
 function toDemoComment(c: MockComment): DemoComment {
   return {
     id: c.id,
     userName: c.authorName,
     userId: c.userId,
     avatarColor: c.avatarColor,
+    avatarUrl: c.avatarUrl ?? COMMENTER_AVATARS[c.userId],
     message: c.body,
     timestampLabel: labelFromMinutes(c.minutesAgo),
     reactions: c.reactions,

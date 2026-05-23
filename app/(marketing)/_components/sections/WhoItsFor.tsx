@@ -283,7 +283,9 @@ export function WhoItsFor() {
   return (
     <section id="personas" className="who-its-for-section">
       <header className="who-its-for-header">
-        <div className="who-its-for-eyebrow">— WHO IT&apos;S FOR</div>
+        <div className="who-its-for-eyebrow">
+          <span className="who-its-for-eyebrow-star">✦</span> WHO IT&apos;S FOR
+        </div>
         <h2 className="who-its-for-headline">
           Built for the teams who own the work.
         </h2>

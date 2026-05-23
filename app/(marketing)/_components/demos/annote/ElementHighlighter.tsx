@@ -60,8 +60,8 @@ export function ElementHighlighter({ rect, visible = true }: ElementHighlighterP
         height: rect.height + HIGHLIGHT_OUTSET * 2,
         boxSizing: "border-box",
         borderRadius: 4,
-        outline: "2px solid #5A49BF",
-        background: "rgba(37,99,235,0.1)",
+        border: "2px dashed #5A49BF",
+        background: "rgba(90, 73, 191, 0.08)",
         pointerEvents: "none",
       }}
     />

@@ -876,13 +876,21 @@
   line-height: 1;
   letter-spacing: -0.025em;
   text-align: center;
-  margin: 0 auto 64px;
+  margin: 0 auto 20px;
   max-width: 800px;
   background: linear-gradient(90deg, #15101F 0%, #54495F 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
   color: #15101F;
+}
+.marketing-root .ctt-sub {
+  font-size: clamp(17px, 1.35vw, 21px);
+  line-height: 1.55;
+  color: rgba(15, 23, 42, 0.65);
+  text-align: center;
+  margin: 0 auto 64px;
+  max-width: 640px;
 }
 
 /* ---- Contained card (Superhuman pattern) ---- */
@@ -1054,15 +1062,26 @@
 /* ---- Visual column with atmospheric backdrop ---- */
 .marketing-root .ctt-card-visual {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 48px;
   min-height: 480px;
 }
+/* The visual column allows overflow so the bigger mockups can bleed past
+   the panel edges; the parent .ctt-card still clips to its rounded corners. */
+/* Card-level gradient backdrops — these sit BEHIND the inner mockup.
+   To swap a gradient for your own image, drop the file at the path noted
+   on each rule and the `url(...)` layer will take precedence over the
+   default gradient. Files are optional: missing files just render the
+   gradient as-is (no broken-image icon, because url() simply fails). */
+
 .marketing-root .ctt-card-visual--capture {
+  /* Replace with your own art at: public/marketing/backdrops/capture-bg.jpg
+     (recommended ~1200×900, will be cover-cropped) */
   background:
+    url("/marketing/backdrops/capture-bg.jpg") center/cover no-repeat,
     radial-gradient(
       ellipse 80% 60% at 50% 0%,
       rgba(220, 232, 250, 0.7) 0%,
@@ -1071,7 +1090,9 @@
     linear-gradient(135deg, #F0F4FA 0%, #E8EEF7 50%, #F4F0E8 100%);
 }
 .marketing-root .ctt-card-visual--voice {
+  /* Replace with your own art at: public/marketing/backdrops/voice-bg.jpg */
   background:
+    url("/marketing/backdrops/voice-bg.jpg") center/cover no-repeat,
     radial-gradient(
       ellipse 70% 50% at 30% 30%,
       rgba(240, 220, 250, 0.6) 0%,
@@ -1079,60 +1100,10 @@
     ),
     linear-gradient(135deg, #F5EEF8 0%, #F8E8E8 50%, #FFF4E8 100%);
 }
-
-/* ---- Floating context chips (Voice column) ----
-   While you talk, Annote silently attaches the page, element, browser, OS and
-   brand tokens. These chips render that hidden context as glassy pills
-   scattered in the atmosphere around the voice card â€” the visual replacement
-   for the former "Why this is different" section. They fade + rise in one by
-   one once the parent .ctt-card enters view (stagger via per-chip --d). */
-.marketing-root .ctt-ctx {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 4;
-}
-.marketing-root .ctt-ctx-chip {
-  position: absolute;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 12px;
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 999px;
-  font-size: 11.5px;
-  font-family: var(--mk-font-mono);
-  color: var(--ink-2);
-  letter-spacing: -0.003em;
-  white-space: nowrap;
-  box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.05),
-    0 8px 20px -6px rgba(15, 23, 42, 0.16);
-  /* Hidden until the card is seen; transition handles the reveal. */
-  opacity: 0;
-  transform: translateY(10px) scale(0.96);
-  transition:
-    opacity 460ms cubic-bezier(0.16, 1, 0.3, 1) var(--d, 0ms),
-    transform 460ms cubic-bezier(0.16, 1, 0.3, 1) var(--d, 0ms);
-}
-.marketing-root .ctt-card.ctt-in-view .ctt-ctx-chip {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-}
-/* Scatter â€” anchored to the column edges, deliberately uneven so it reads as
-   floating context rather than a caption row. Each chip overlaps the card's
-   atmosphere without clipping against the column's overflow:hidden. */
-.marketing-root .ctt-ctx-chip--tl { top: 30px; left: 24px; }
-.marketing-root .ctt-ctx-chip--tr { top: 36px; right: 20px; }
-.marketing-root .ctt-ctx-chip--ml { top: 48%; left: 14px; }
-.marketing-root .ctt-ctx-chip--br { bottom: 44px; right: 22px; }
-.marketing-root .ctt-ctx-chip--bl { bottom: 34px; left: 30px; }
-
 .marketing-root .ctt-card-visual--sessions {
+  /* Replace with your own art at: public/marketing/backdrops/sessions-bg.jpg */
   background:
+    url("/marketing/backdrops/sessions-bg.jpg") center/cover no-repeat,
     radial-gradient(
       ellipse 75% 55% at 70% 40%,
       rgba(220, 240, 245, 0.7) 0%,
@@ -1141,587 +1112,1262 @@
     linear-gradient(135deg, #E8F0F4 0%, #F0EBF6 50%, #E8F4F0 100%);
 }
 
-/* ============ Capture mockup ============ */
-.marketing-root .capture-mock {
-  position: relative;
-  width: 100%;
-  max-width: 480px;
-  height: 420px;
-  margin: 0 auto;
-}
-.marketing-root .capture-mock-browser {
-  position: absolute;
-  inset: 0;
-  background: white;
-  border-radius: 14px;
-  overflow: hidden;
-  box-shadow:
-    0 2px 6px rgba(15, 23, 42, 0.06),
-    0 16px 32px rgba(15, 23, 42, 0.12),
-    0 40px 80px -20px rgba(15, 23, 42, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 0 0 1px rgba(15, 23, 42, 0.04);
-}
-.marketing-root .capture-mock-chrome {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  background: #F7F7F5;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
-}
-.marketing-root .capture-mock-chrome-dots {
-  display: flex;
-  gap: 6px;
-}
-.marketing-root .capture-mock-chrome-dots span {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: rgba(15, 23, 42, 0.12);
-}
-.marketing-root .capture-mock-chrome-url {
-  flex: 1;
-  text-align: center;
-  font-size: 13px;
-  font-weight: 500;
-  color: rgba(15, 23, 42, 0.55);
-}
-.marketing-root .capture-mock-page {
-  padding: 32px 24px;
-  height: calc(100% - 44px);
-}
-.marketing-root .capture-mock-page-header {
-  width: 60%;
-  height: 14px;
-  background: rgba(15, 23, 42, 0.08);
-  border-radius: 4px;
-  margin: 0 auto 32px;
-}
-.marketing-root .capture-mock-page-tiers {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 32px;
-}
-.marketing-root .capture-mock-tier {
-  height: 120px;
-  background: #FAFAF8;
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  border-radius: 12px;
-}
-.marketing-root .capture-mock-tier--featured {
-  background: white;
-  border-color: rgba(15, 23, 42, 0.1);
-}
-.marketing-root .capture-mock-testimonial {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
-  background: #FAFAF8;
-  border-radius: 12px;
-  margin-top: 32px;
-}
-.marketing-root .capture-mock-testimonial-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-.marketing-root .capture-mock-testimonial-quote {
-  flex: 1;
-  font-size: 14px;
-  color: rgba(15, 23, 42, 0.75);
-  font-style: italic;
-}
-.marketing-root .capture-mock-testimonial-name {
-  font-size: 12px;
-  color: rgba(15, 23, 42, 0.5);
-  flex-shrink: 0;
-}
-/* Annote element highlight â€” wraps the featured (middle) tier.
-   Geometry mirrors the tier box model so the stroke sits exactly on the tier's
-   edges: page padding-top 32px + header 14px + header margin 32px below the
-   44px chrome puts the tier top at 122px; the middle column starts one gap +
-   one column-width in from the 24px page padding. The 1px outward offsets
-   center the 2px border on the tier border. */
-.marketing-root .capture-mock-highlight {
-  position: absolute;
-  top: 113px;
-  left: calc(24px + (100% - 48px - 24px) / 3 + 12px - 1px);
-  width: calc((100% - 48px - 24px) / 3 + 2px);
-  height: 122px;
-  border: 2px solid #5A49BF;
-  border-radius: 13px;
-  background: rgba(90, 73, 191, 0.08);
-  pointer-events: none;
-  outline: 7px solid rgba(90, 73, 191, 0.08);
-  outline-offset: -1px;
-}
-/* Capture pill â€” anchors the real extension <CapturePill> (voice mode, reused
-   from the hero) at the bottom-center of the browser mockup. The pill carries
-   its own glass styling; here we only place + scale it to fit the surface. */
-.marketing-root .capture-mock-pill-anchor {
-  position: absolute;
-  bottom: 22px;
-  left: 50%;
-  transform: translateX(-50%) scale(0.82);
-  transform-origin: bottom center;
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
-  z-index: 6;
-}
-/* The pill renders its hint pill above the content; suppress it in the static
-   mockup so only the recording pill itself shows. */
-.marketing-root .capture-mock-pill-anchor .echly-pill-hint {
-  display: none;
-}
-/* ============ Voice mockup ============ */
-.marketing-root .voice-mock {
-  position: relative;
-  width: 100%;
-  max-width: 420px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.marketing-root .voice-mock-demo {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-/* The reused VoiceTicketDemo card floats on the atmospheric backdrop â€” stronger
-   elevation so it reads off the colored column rather than the white page. */
-.marketing-root .voice-mock-demo .vtdemo {
-  width: 100%;
-  max-width: 420px;
-  background: #FFFFFF;
-  border-radius: 14px;
-  border: 1px solid var(--line-1);
-  box-shadow:
-    0 2px 6px rgba(15, 23, 42, 0.06),
-    0 16px 32px rgba(15, 23, 42, 0.12),
-    0 40px 80px -20px rgba(15, 23, 42, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 0 0 1px rgba(15, 23, 42, 0.04);
-  overflow: hidden;
-}
-
-/* ============ Sessions mockup ============ */
-.marketing-root .sessions-mock {
-  position: relative;
-  width: 100%;
-  max-width: 480px;
-  margin: 0 auto;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.98) 0%,
-    rgba(255, 255, 255, 0.95) 100%
-  );
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow:
-    0 2px 6px rgba(15, 23, 42, 0.06),
-    0 16px 32px rgba(15, 23, 42, 0.12),
-    0 40px 80px -20px rgba(15, 23, 42, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 0 0 1px rgba(15, 23, 42, 0.04);
-  overflow: hidden;
-}
-.marketing-root .sessions-mock-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
-  background: #F7F7F5;
-}
-.marketing-root .sessions-mock-avatars {
-  display: flex;
-}
-.marketing-root .sessions-mock-avatars img {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid #fff;
-  margin-left: -8px;
-}
-.marketing-root .sessions-mock-avatars img:first-child {
-  margin-left: 0;
-}
-.marketing-root .sessions-mock-body {
-  display: grid;
-  grid-template-columns: 200px 1fr;
-  min-height: 380px;
-}
-/* Sidebar */
-.marketing-root .sessions-mock-sidebar {
-  border-right: 1px solid rgba(15, 23, 42, 0.06);
-  padding: 14px 10px;
-  background: #FCFBF9;
-}
-.marketing-root .sessions-mock-session-header {
-  padding: 0 6px 12px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
-  margin-bottom: 10px;
-}
-.marketing-root .sessions-mock-session-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #15101F;
-  letter-spacing: -0.012em;
-}
-.marketing-root .sessions-mock-session-meta {
-  font-size: 11px;
-  color: rgba(15, 23, 42, 0.5);
-  margin-top: 3px;
-  font-family: var(--mk-font-mono);
-}
-.marketing-root .sessions-mock-ticket-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.marketing-root .sessions-mock-ticket {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 8px;
-  border-radius: 9px;
-  border: 1px solid transparent;
-}
-.marketing-root .sessions-mock-ticket--active {
-  background: rgba(90, 73, 191, 0.08);
-  border-color: rgba(90, 73, 191, 0.2);
-}
-.marketing-root .sessions-mock-ticket-avatar {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-/* Icon tile â€” mirrors the dashboard ticket-list tile (TicketItem):
-   rounded square, neutral surface, secondary icon; brand fill on active row. */
-.marketing-root .sessions-mock-ticket-icon {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 7px;
-  flex-shrink: 0;
-  background: rgba(15, 16, 31, 0.06);
-  color: #54495F;
-}
-.marketing-root .sessions-mock-ticket--active .sessions-mock-ticket-icon {
-  background: #5A49BF;
-  color: #fff;
-}
-.marketing-root .sessions-mock-ticket-text {
-  min-width: 0;
-}
-.marketing-root .sessions-mock-ticket-title {
-  font-size: 11.5px;
-  font-weight: 500;
-  color: #15101F;
-  line-height: 1.3;
-  letter-spacing: -0.006em;
-}
-.marketing-root .sessions-mock-ticket-meta {
-  font-size: 10px;
-  color: rgba(15, 23, 42, 0.45);
-  margin-top: 2px;
-}
-/* Detail */
-.marketing-root .sessions-mock-detail {
-  position: relative;
-  z-index: 1;
-  padding: 16px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  background: #fff;
-}
-.marketing-root .sessions-mock-ticket-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.marketing-root .sessions-mock-status {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 4px 9px;
-  border-radius: 999px;
-  background: #14B8A6;
-  color: #fff;
-  flex-shrink: 0;
-}
-.marketing-root .sessions-mock-detail-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #15101F;
-  line-height: 1.3;
-  letter-spacing: -0.012em;
-  margin: 0;
-}
-/* Screenshot mock */
-.marketing-root .sessions-mock-screenshot {
-  position: relative;
-  height: 130px;
-  border-radius: 10px;
-  background: linear-gradient(160deg, #ECE7F4 0%, #DDD4EC 100%);
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-.marketing-root .sessions-mock-screenshot-phone {
-  position: relative;
-  width: 72px;
-  height: 108px;
-  border-radius: 12px;
-  background: #fff;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  box-shadow: 0 6px 16px -4px rgba(15, 23, 42, 0.18);
-  padding: 10px 8px;
-}
-.marketing-root .sessions-mock-screenshot-ui {
-  height: 56px;
-  border-radius: 6px;
-  background: rgba(15, 23, 42, 0.06);
-  margin-bottom: 8px;
-}
-.marketing-root .sessions-mock-screenshot-cta {
-  height: 22px;
-  border-radius: 6px;
-  background: linear-gradient(135deg, #5A49BF, #6557CC);
-}
-.marketing-root .sessions-mock-screenshot-pin {
-  position: absolute;
-  top: 22px;
-  left: calc(50% + 24px);
-  width: 24px;
-  height: 24px;
-  border-radius: 50% 50% 50% 2px;
-  background: #5A49BF;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 10px rgba(90, 73, 191, 0.4);
-}
-/* Description + Tags */
-.marketing-root .sessions-mock-section {
-  margin-top: 14px;
-}
-.marketing-root .sessions-mock-section-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #15101F;
-  letter-spacing: -0.006em;
-  margin-bottom: 6px;
-}
-.marketing-root .sessions-mock-description {
-  font-size: 12px;
-  color: rgba(15, 23, 42, 0.65);
-  line-height: 1.5;
-  margin: 0;
-}
-.marketing-root .sessions-mock-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.marketing-root .sessions-mock-tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 9px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--hair);
-  font-size: 11px;
-  font-weight: 500;
-  color: rgba(15, 23, 42, 0.65);
-  background: #fff;
-}
-
-/* ============ Sessions teaser card (reduced from full mockup) ============
-   The signature session view is now its own section above; this card in the
-   ClickToTicket grid is a small reminder, not a competing demo. */
-.marketing-root .sessions-mock-teaser {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-}
-.marketing-root .sessions-mock-teaser-card {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 20px 24px;
-  background: #FFFFFF;
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  border-radius: 14px;
-  box-shadow:
-    0 2px 4px rgba(15, 23, 42, 0.04),
-    0 12px 32px -8px rgba(15, 23, 42, 0.10),
-    inset 0 1px 0 rgba(255, 255, 255, 1);
-  max-width: 380px;
-}
-.marketing-root .sessions-mock-teaser-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: #F0ECFB;
-  color: #5A49BF;
-  flex-shrink: 0;
-}
-.marketing-root .sessions-mock-teaser-text {
-  flex: 1;
-  min-width: 0;
-}
-.marketing-root .sessions-mock-teaser-title {
-  font-size: 14.5px;
-  font-weight: 600;
-  color: #15101F;
-  margin-bottom: 2px;
-  letter-spacing: -0.005em;
-}
-.marketing-root .sessions-mock-teaser-sub {
-  font-size: 13px;
-  color: rgba(15, 23, 42, 0.60);
-}
-.marketing-root .sessions-mock-teaser-avatars {
-  display: flex;
-  flex-direction: row;
-  flex-shrink: 0;
-}
-.marketing-root .sessions-mock-teaser-avatars img {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 2px solid white;
-  margin-left: -8px;
-  object-fit: cover;
-}
-.marketing-root .sessions-mock-teaser-avatars img:first-child {
-  margin-left: 0;
-}
-
 /* ============================================================
-   FOUNDER NOTE â€” replaces the placeholder "Becoming Annote" editorial.
-   Centered, narrow column with portrait + paragraphs + signature.
+   ClickToTicket inner mockups — V8 (From Click to Ticket design)
+   Photo placeholder + product mockup + floating accent, per card.
+   Class names are all ctt-prefixed so they don't collide with the
+   real extension styles forklifted further down in this file.
+   The outer gradient wrappers (.ctt-card-visual--*) above stay as-is.
    ============================================================ */
-.marketing-root .founder-note-section {
+
+/* freeze animations until the parent card scrolls into view */
+.marketing-root .ctt-card:not(.ctt-in-view) .ctt-voice-note-live i,
+.marketing-root .ctt-card:not(.ctt-in-view) .ctt-voice-wave i,
+.marketing-root .ctt-card:not(.ctt-in-view) .ctt-voice-draft-tag i,
+.marketing-root .ctt-card:not(.ctt-in-view) .ctt-sess-url-live i,
+.marketing-root .ctt-card:not(.ctt-in-view) .ctt-sess-av.live-now {
+  animation-play-state: paused;
+}
+
+/* =====================================================
+   CARD 1 — CAPTURE
+   ===================================================== */
+.marketing-root .ctt-cap {
+  position: relative;
   width: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 96px 32px 80px;
-}
-.marketing-root .founder-note-container {
-  max-width: 920px;
+  max-width: 620px;
+  height: 440px;
   margin: 0 auto;
 }
-.marketing-root .founder-note-eyebrow {
-  color: rgba(15, 23, 42, 0.50);
-  margin-bottom: 8px;
-}
-.marketing-root .founder-note-grid {
-  display: grid;
-  grid-template-columns: 160px 1fr;
-  gap: 40px;
-  align-items: start;
-  margin-top: 32px;
-}
-.marketing-root .founder-note-photo {
-  width: 160px;
-  height: 160px;
-  border-radius: 50%;
+/* HERO: browser frame — large, dead-center, upright (no tilt) so the
+   pills around it read as deliberate annotated callouts rather than
+   scattered post-its. */
+.marketing-root .ctt-cap-browser {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 520px;
+  background: #fff;
+  border: 1px solid #E8E2D4;
+  border-radius: 16px;
   overflow: hidden;
-  border: 4px solid white;
   box-shadow:
-    0 2px 4px rgba(15, 23, 42, 0.06),
-    0 8px 24px -8px rgba(15, 23, 42, 0.12);
+    0 1px 0 rgba(255, 255, 255, 0.6),
+    0 40px 80px -24px rgba(26, 20, 36, 0.32),
+    0 14px 28px -14px rgba(26, 20, 36, 0.16);
+  z-index: 2;
 }
-.marketing-root .founder-note-photo img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.marketing-root .founder-note-content {
-  display: flex;
-  flex-direction: column;
-}
-.marketing-root .founder-note-paragraph {
-  font-size: 17px;
-  line-height: 1.65;
-  color: rgba(15, 23, 42, 0.75);
-  margin: 0 0 16px;
-}
-.marketing-root .founder-note-paragraph:last-of-type {
-  margin-bottom: 24px;
-}
-.marketing-root .founder-note-signature {
-  margin-top: 16px;
-  padding-top: 24px;
-  border-top: 1px solid rgba(15, 23, 42, 0.08);
-}
-.marketing-root .founder-note-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: #15101F;
-  margin-bottom: 6px;
-}
-.marketing-root .founder-note-handles {
+.marketing-root .ctt-cap-bar {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  padding: 11px 14px;
+  border-bottom: 1px solid #F0EDE3;
+  background: linear-gradient(180deg, #FBF9F4, #F6F2EA);
 }
-.marketing-root .founder-note-handles a {
-  color: #5A49BF;
-  text-decoration: none;
-  transition: color 0.15s ease;
+.marketing-root .ctt-cap-dots {
+  display: flex;
+  gap: 6px;
 }
-.marketing-root .founder-note-handles a:hover {
-  color: #15101F;
-  text-decoration: underline;
+.marketing-root .ctt-cap-dots i {
+  width: 10px;
+  height: 10px;
+  border-radius: 99px;
+  background: #E2DCCB;
 }
-.marketing-root .founder-note-handle-divider {
-  color: rgba(15, 23, 42, 0.30);
+.marketing-root .ctt-cap-url {
+  margin-left: 10px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  background: #fff;
+  border: 1px solid #E8E2D4;
+  border-radius: 8px;
+  font-family: var(--mk-font-mono);
+  font-size: 11.5px;
+  color: #8A8298;
 }
-@media (max-width: 767px) {
-  .marketing-root .founder-note-grid {
-    grid-template-columns: 1fr;
-    gap: 24px;
-    text-align: center;
+.marketing-root .ctt-cap-url b {
+  color: #1A1424;
+  font-weight: 500;
+}
+.marketing-root .ctt-cap-url-dim {
+  opacity: 0.5;
+}
+.marketing-root .ctt-cap-lock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: #1F8A4C;
+  color: #fff;
+}
+.marketing-root .ctt-cap-lock svg {
+  width: 8px;
+  height: 8px;
+}
+.marketing-root .ctt-cap-body {
+  position: relative;
+  padding: 18px 18px 22px;
+  background: #fff;
+  min-height: 240px;
+}
+/* Purple "click to capture" selection box — styled to match the hero
+   demo's .echly-selected-overlay: purple border, soft brand-tinted fill,
+   and an outer halo ring. Default form wraps content with margin centering;
+   the --inline modifier collapses padding for tight inline use (around a CTA). */
+/* Purple selection box — invisible by default. Appears (with a small
+   "pop" + the ongoing pulse) only after the cursor lands the click. */
+.marketing-root .ctt-cap-select {
+  border: 2px solid #5A49BF;
+  border-radius: 6px;
+  background: color-mix(in srgb, #5A49BF 6%, transparent);
+  box-shadow:
+    0 0 0 0 color-mix(in srgb, #5A49BF 12%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, #5A49BF 30%, transparent);
+  opacity: 0;
+  transform: scale(0.94);
+  transform-origin: center;
+}
+.marketing-root .ctt-card.ctt-in-view .ctt-cap-select {
+  animation:
+    ctt-cap-select-in 0.45s cubic-bezier(0.22, 1.2, 0.36, 1) 1.25s forwards,
+    ctt-cap-select-pulse 2.6s ease-in-out 1.7s infinite;
+}
+@keyframes ctt-cap-select-in {
+  0%   { opacity: 0; transform: scale(0.94);
+         box-shadow: 0 0 0 0 color-mix(in srgb, #5A49BF 12%, transparent),
+                     inset 0 0 0 1px color-mix(in srgb, #5A49BF 30%, transparent); }
+  100% { opacity: 1; transform: scale(1);
+         box-shadow: 0 0 0 4px color-mix(in srgb, #5A49BF 12%, transparent),
+                     inset 0 0 0 1px color-mix(in srgb, #5A49BF 30%, transparent); }
+}
+@keyframes ctt-cap-select-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 4px color-mix(in srgb, #5A49BF 12%, transparent),
+      inset 0 0 0 1px color-mix(in srgb, #5A49BF 30%, transparent);
   }
-  .marketing-root .founder-note-photo {
-    margin: 0 auto;
-    width: 120px;
-    height: 120px;
-  }
-  .marketing-root .founder-note-signature {
-    text-align: center;
-  }
-  .marketing-root .founder-note-handles {
-    justify-content: center;
+  50% {
+    box-shadow:
+      0 0 0 9px color-mix(in srgb, #5A49BF 8%, transparent),
+      inset 0 0 0 1px color-mix(in srgb, #5A49BF 30%, transparent);
   }
 }
+
+/* Hand-pointer cursor — slides in from off-canvas (lower-right), presses
+   on the CTA, and stays put. Anchored over the purple selection box that
+   wraps the form's CTA inside the browser body. The "click" is a brief
+   scale-down at the moment the purple selection box appears. */
+.marketing-root .ctt-cap-cursor {
+  position: absolute;
+  /* Resting anchor — sits over the CTA inside the browser body
+     (browser is centered in .ctt-cap, CTA is in the lower-right of its
+     form, slightly inset). These offsets place the cursor's tip right
+     on the purple selection box. */
+  left: 58%;
+  top: 70%;
+  width: 56px;
+  height: 56px;
+  pointer-events: none;
+  z-index: 6;
+  opacity: 0;
+  transform: translate(140px, 90px) scale(1);
+  filter: drop-shadow(0 8px 18px rgba(15, 16, 31, 0.4));
+}
+.marketing-root .ctt-cap-cursor svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.marketing-root .ctt-card.ctt-in-view .ctt-cap-cursor {
+  animation: ctt-cap-cursor-in 1.4s cubic-bezier(0.22, 0.61, 0.36, 1) 0.1s forwards;
+}
+@keyframes ctt-cap-cursor-in {
+  /* Off-canvas (lower-right) */
+  0%   { opacity: 0; transform: translate(140px, 90px) scale(1); }
+  15%  { opacity: 1; }
+  /* Travel into place — settles right over the purple selection box. */
+  75%  { opacity: 1; transform: translate(0, 0) scale(1); }
+  /* Click press */
+  82%  { transform: translate(0, 3px) scale(0.85); }
+  /* Recoil + hold */
+  90%  { transform: translate(0, 0) scale(1); }
+  100% { opacity: 1; transform: translate(0, 0) scale(1); }
+}
+
+/* Pill entrance — each chip / toast fades up into its resting rotation
+   one after another, after the click + selection box have appeared. */
+@keyframes ctt-cap-pill-in {
+  0%   { opacity: 0; transform: translateY(8px) rotate(var(--rest-rotate)) scale(0.94); }
+  100% { opacity: 1; transform: translateY(0)   rotate(var(--rest-rotate)) scale(1); }
+}
+.marketing-root .ctt-card.ctt-in-view .ctt-cap-toast:not(.ctt-cap-toast--share) {
+  animation: ctt-cap-pill-in 0.5s cubic-bezier(0.22, 1.2, 0.36, 1) 1.85s forwards;
+}
+.marketing-root .ctt-card.ctt-in-view .ctt-cap-chip--sel {
+  animation: ctt-cap-pill-in 0.5s cubic-bezier(0.22, 1.2, 0.36, 1) 2.1s forwards;
+}
+.marketing-root .ctt-card.ctt-in-view .ctt-cap-chip--meta {
+  animation: ctt-cap-pill-in 0.5s cubic-bezier(0.22, 1.2, 0.36, 1) 2.35s forwards;
+}
+.marketing-root .ctt-card.ctt-in-view .ctt-cap-toast--share {
+  animation: ctt-cap-pill-in 0.5s cubic-bezier(0.22, 1.2, 0.36, 1) 2.6s forwards;
+}
+.marketing-root .ctt-cap-select--inline {
+  flex: 1;
+  padding: 3px;
+  border-radius: 8px;
+}
+
+/* ---- Form-style page skeleton inside the browser body ---- */
+.marketing-root .ctt-cap-form {
+  padding: 6px 4px;
+  --skel: rgba(26, 20, 36, 0.10);
+  --skel-soft: rgba(26, 20, 36, 0.06);
+  --skel-field: rgba(26, 20, 36, 0.05);
+  --skel-field-line: rgba(26, 20, 36, 0.12);
+}
+.marketing-root .ctt-cap-form-headlines {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 14px;
+}
+.marketing-root .ctt-cap-form-h1 {
+  display: block;
+  height: 8px;
+  width: 52%;
+  border-radius: 99px;
+  background: var(--skel);
+}
+.marketing-root .ctt-cap-form-h2 {
+  display: block;
+  height: 8px;
+  width: 30%;
+  border-radius: 99px;
+  background: var(--skel-soft);
+}
+.marketing-root .ctt-cap-form-squares {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.marketing-root .ctt-cap-form-squares i {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--skel);
+}
+.marketing-root .ctt-cap-form-divider {
+  height: 1px;
+  background: rgba(26, 20, 36, 0.08);
+  margin-bottom: 14px;
+}
+.marketing-root .ctt-cap-form-label {
+  display: block;
+  height: 7px;
+  width: 18%;
+  border-radius: 99px;
+  background: var(--skel);
+  margin-bottom: 10px;
+}
+.marketing-root .ctt-cap-form-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.marketing-root .ctt-cap-form-input {
+  flex: 1;
+  height: 28px;
+  border: 1px solid var(--skel-field-line);
+  background: var(--skel-field);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.marketing-root .ctt-cap-form-input span {
+  width: 38px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--skel);
+}
+.marketing-root .ctt-cap-form-select {
+  height: 28px;
+  border: 1px solid var(--skel-field-line);
+  background: var(--skel-field);
+  border-radius: 6px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  color: rgba(26, 20, 36, 0.35);
+}
+.marketing-root .ctt-cap-form-select span {
+  display: block;
+  width: 44px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--skel);
+}
+.marketing-root .ctt-cap-form-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.marketing-root .ctt-cap-form-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 30px;
+  border: 1px solid var(--skel-field-line);
+  background: var(--skel-field);
+  border-radius: 7px;
+  padding: 0 4px;
+}
+.marketing-root .ctt-cap-form-step-btn {
+  width: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(26, 20, 36, 0.45);
+  line-height: 1;
+}
+.marketing-root .ctt-cap-form-step-val {
+  width: 30px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--skel);
+  margin: 0 6px;
+}
+.marketing-root .ctt-cap-form-cta {
+  height: 30px;
+  background: var(--skel-field);
+  border: 1px solid var(--skel-field-line);
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Skeleton line inside the CTA so it reads as a button label, matching
+   the lozenge inside the input/select fields above. */
+.marketing-root .ctt-cap-form-cta::before {
+  content: "";
+  display: block;
+  width: 44px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--skel);
+}
+.marketing-root .ctt-cap-form-foot {
+  display: block;
+  height: 6px;
+  width: 16%;
+  border-radius: 99px;
+  background: var(--skel-soft);
+}
+/* Capture toast — top-LEFT callout, pulled outward, upright. */
+.marketing-root .ctt-cap-toast {
+  --rest-rotate: 0deg;
+  position: absolute;
+  left: -34px;
+  top: -28px;
+  background: #fff;
+  border: 1px solid #E8E2D4;
+  border-radius: 12px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6),
+    0 24px 44px -18px rgba(26, 20, 36, 0.3),
+    0 8px 16px -10px rgba(26, 20, 36, 0.16);
+  padding: 11px 15px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  transform: rotate(var(--rest-rotate));
+  opacity: 0;
+  z-index: 3;
+}
+.marketing-root .ctt-cap-toast-ic {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--violet-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--violet);
+}
+.marketing-root .ctt-cap-toast-txt {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.marketing-root .ctt-cap-toast-t1 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1A1424;
+  letter-spacing: -0.005em;
+}
+.marketing-root .ctt-cap-toast-t2 {
+  font-size: 11.5px;
+  color: #8A8298;
+  font-family: var(--mk-font-mono);
+  letter-spacing: 0.04em;
+}
+
+/* Share-flavored toast variant — bottom-RIGHT callout, upright. */
+.marketing-root .ctt-cap-toast--share {
+  --rest-rotate: 0deg;
+  left: auto;
+  right: -34px;
+  top: auto;
+  bottom: -28px;
+  transform: rotate(var(--rest-rotate));
+}
+.marketing-root .ctt-cap-toast-ic--share {
+  background: #E2EFEB;
+  color: #2F7A6E;
+}
+
+/* Floating mono chips — single-line metadata pills that orbit the browser
+   mockup. Reuse the toast surface (white card, hairline, soft shadow) but
+   collapse to one mono line. */
+.marketing-root .ctt-cap-chip {
+  --rest-rotate: 0deg;
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  background: #fff;
+  border: 1px solid #E8E2D4;
+  border-radius: 8px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6),
+    0 20px 36px -18px rgba(26, 20, 36, 0.28),
+    0 6px 14px -8px rgba(26, 20, 36, 0.14);
+  font-family: var(--mk-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: #5C5468;
+  white-space: nowrap;
+  opacity: 0;
+  z-index: 3;
+}
+.marketing-root .ctt-cap-chip b {
+  color: #1A1424;
+  font-weight: 600;
+}
+.marketing-root .ctt-cap-chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 99px;
+  background: var(--violet);
+  flex-shrink: 0;
+}
+/* DOM-selector chip — top-RIGHT callout, upright. */
+.marketing-root .ctt-cap-chip--sel {
+  --rest-rotate: 0deg;
+  right: -34px;
+  top: -28px;
+  transform: rotate(var(--rest-rotate));
+}
+/* Capture-metadata chip — bottom-LEFT callout, upright. */
+.marketing-root .ctt-cap-chip--meta {
+  --rest-rotate: 0deg;
+  left: -34px;
+  bottom: -28px;
+  transform: rotate(var(--rest-rotate));
+  font-size: 10.5px;
+  color: #8A8298;
+}
+
+/* =====================================================
+   CARD 2 — VOICE
+   ===================================================== */
+.marketing-root .ctt-voice {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  height: 500px;
+  margin: 0 auto;
+}
+/* Back-layer screenshot — peeks behind the voice note from the upper-left. */
+/* Voice note — upper half of the gradient, nudged slightly left of center. */
+.marketing-root .ctt-voice-note {
+  position: absolute;
+  left: 50%;
+  top: 18px;
+  transform: translateX(calc(-50% - 40px));
+  width: 440px;
+  background: #fff;
+  border: 1px solid #E8E2D4;
+  border-radius: 18px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6),
+    0 32px 60px -24px rgba(26, 20, 36, 0.32),
+    0 12px 24px -14px rgba(26, 20, 36, 0.15);
+  overflow: hidden;
+  z-index: 3;
+}
+.marketing-root .ctt-voice-note-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #EBE6DC;
+}
+.marketing-root .ctt-voice-note-av {
+  width: 32px;
+  height: 32px;
+  border-radius: 99px;
+  background-color: #C97A2B;
+  background-size: cover;
+  background-position: center;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+}
+.marketing-root .ctt-voice-note-who {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.marketing-root .ctt-voice-note-n {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1A1424;
+  letter-spacing: -0.005em;
+}
+.marketing-root .ctt-voice-note-t {
+  font-size: 11px;
+  color: #8A8298;
+  font-family: var(--mk-font-mono);
+  letter-spacing: 0.03em;
+}
+.marketing-root .ctt-voice-note-live {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: 99px;
+  background: #FEE9DC;
+  color: #9F4A12;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.marketing-root .ctt-voice-note-live i {
+  width: 6px;
+  height: 6px;
+  border-radius: 99px;
+  background: #E0571E;
+  animation: ctt-rec-blink 1.4s ease-in-out infinite;
+}
+@keyframes ctt-rec-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+.marketing-root .ctt-voice-note-body {
+  padding: 14px 16px 16px;
+}
+.marketing-root .ctt-voice-wave {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 64px;
+  padding: 6px 0;
+}
+.marketing-root .ctt-voice-wave i {
+  display: block;
+  width: 3px;
+  border-radius: 99px;
+  background: #C97A2B;
+  height: 30%;
+  animation: ctt-wave-bounce 1.2s ease-in-out infinite;
+  transform-origin: center;
+}
+.marketing-root .ctt-voice-wave i:nth-child(odd)  { background: #2A2235; opacity: 0.4; }
+.marketing-root .ctt-voice-wave i:nth-child(3n)   { background: #C97A2B; opacity: 0.95; }
+.marketing-root .ctt-voice-wave i:nth-child(5n)   { background: #C97A2B; opacity: 0.7; }
+.marketing-root .ctt-voice-wave i:nth-child(1)  { height: 30%; animation-delay: 0s; }
+.marketing-root .ctt-voice-wave i:nth-child(2)  { height: 55%; animation-delay: .05s; }
+.marketing-root .ctt-voice-wave i:nth-child(3)  { height: 75%; animation-delay: .1s; }
+.marketing-root .ctt-voice-wave i:nth-child(4)  { height: 42%; animation-delay: .15s; }
+.marketing-root .ctt-voice-wave i:nth-child(5)  { height: 90%; animation-delay: .2s; }
+.marketing-root .ctt-voice-wave i:nth-child(6)  { height: 60%; animation-delay: .25s; }
+.marketing-root .ctt-voice-wave i:nth-child(7)  { height: 38%; animation-delay: .3s; }
+.marketing-root .ctt-voice-wave i:nth-child(8)  { height: 80%; animation-delay: .35s; }
+.marketing-root .ctt-voice-wave i:nth-child(9)  { height: 48%; animation-delay: .4s; }
+.marketing-root .ctt-voice-wave i:nth-child(10) { height: 68%; animation-delay: .45s; }
+.marketing-root .ctt-voice-wave i:nth-child(11) { height: 32%; animation-delay: .5s; }
+.marketing-root .ctt-voice-wave i:nth-child(12) { height: 88%; animation-delay: .55s; }
+.marketing-root .ctt-voice-wave i:nth-child(13) { height: 52%; animation-delay: .6s; }
+.marketing-root .ctt-voice-wave i:nth-child(14) { height: 72%; animation-delay: .65s; }
+.marketing-root .ctt-voice-wave i:nth-child(15) { height: 40%; animation-delay: .7s; }
+.marketing-root .ctt-voice-wave i:nth-child(16) { height: 84%; animation-delay: .75s; }
+.marketing-root .ctt-voice-wave i:nth-child(17) { height: 46%; animation-delay: .8s; }
+.marketing-root .ctt-voice-wave i:nth-child(18) { height: 64%; animation-delay: .85s; }
+.marketing-root .ctt-voice-wave i:nth-child(19) { height: 36%; animation-delay: .9s; }
+.marketing-root .ctt-voice-wave i:nth-child(20) { height: 78%; animation-delay: .95s; }
+.marketing-root .ctt-voice-wave i:nth-child(21) { height: 54%; animation-delay: 1s; }
+.marketing-root .ctt-voice-wave i:nth-child(22) { height: 66%; animation-delay: 1.05s; }
+.marketing-root .ctt-voice-wave i:nth-child(23) { height: 42%; animation-delay: 1.1s; }
+.marketing-root .ctt-voice-wave i:nth-child(24) { height: 82%; animation-delay: 1.15s; }
+.marketing-root .ctt-voice-wave i:nth-child(25) { height: 50%; animation-delay: 1.2s; }
+.marketing-root .ctt-voice-wave i:nth-child(26) { height: 70%; animation-delay: 1.25s; }
+.marketing-root .ctt-voice-wave i:nth-child(27) { height: 34%; animation-delay: 1.3s; }
+.marketing-root .ctt-voice-wave i:nth-child(28) { height: 60%; animation-delay: 1.35s; }
+.marketing-root .ctt-voice-wave i:nth-child(29) { height: 44%; animation-delay: 1.4s; }
+.marketing-root .ctt-voice-wave i:nth-child(30) { height: 74%; animation-delay: 1.45s; }
+.marketing-root .ctt-voice-wave i:nth-child(31) { height: 38%; animation-delay: 1.5s; }
+.marketing-root .ctt-voice-wave i:nth-child(32) { height: 86%; animation-delay: 1.55s; }
+.marketing-root .ctt-voice-wave i:nth-child(33) { height: 48%; animation-delay: 1.6s; }
+.marketing-root .ctt-voice-wave i:nth-child(34) { height: 62%; animation-delay: 1.65s; }
+.marketing-root .ctt-voice-wave i:nth-child(35) { height: 40%; animation-delay: 1.7s; }
+.marketing-root .ctt-voice-wave i:nth-child(36) { height: 78%; animation-delay: 1.75s; }
+.marketing-root .ctt-voice-wave i:nth-child(37) { height: 52%; animation-delay: 1.8s; }
+.marketing-root .ctt-voice-wave i:nth-child(38) { height: 68%; animation-delay: 1.85s; }
+.marketing-root .ctt-voice-wave i:nth-child(39) { height: 36%; animation-delay: 1.9s; }
+.marketing-root .ctt-voice-wave i:nth-child(40) { height: 80%; animation-delay: 1.95s; }
+.marketing-root .ctt-voice-wave i:nth-child(41) { height: 46%; animation-delay: 2s; }
+.marketing-root .ctt-voice-wave i:nth-child(42) { height: 72%; animation-delay: 2.05s; }
+.marketing-root .ctt-voice-wave i:nth-child(43) { height: 40%; animation-delay: 2.1s; }
+.marketing-root .ctt-voice-wave i:nth-child(44) { height: 88%; animation-delay: 2.15s; }
+.marketing-root .ctt-voice-wave i:nth-child(45) { height: 54%; animation-delay: 2.2s; }
+.marketing-root .ctt-voice-wave i:nth-child(46) { height: 64%; animation-delay: 2.25s; }
+.marketing-root .ctt-voice-wave i:nth-child(47) { height: 38%; animation-delay: 2.3s; }
+.marketing-root .ctt-voice-wave i:nth-child(48) { height: 82%; animation-delay: 2.35s; }
+.marketing-root .ctt-voice-wave i:nth-child(49) { height: 48%; animation-delay: 2.4s; }
+.marketing-root .ctt-voice-wave i:nth-child(50) { height: 70%; animation-delay: 2.45s; }
+.marketing-root .ctt-voice-wave i:nth-child(51) { height: 34%; animation-delay: 2.5s; }
+.marketing-root .ctt-voice-wave i:nth-child(52) { height: 86%; animation-delay: 2.55s; }
+.marketing-root .ctt-voice-wave i:nth-child(53) { height: 56%; animation-delay: 2.6s; }
+.marketing-root .ctt-voice-wave i:nth-child(54) { height: 66%; animation-delay: 2.65s; }
+.marketing-root .ctt-voice-wave i:nth-child(55) { height: 42%; animation-delay: 2.7s; }
+.marketing-root .ctt-voice-wave i:nth-child(56) { height: 76%; animation-delay: 2.75s; }
+.marketing-root .ctt-voice-wave i:nth-child(57) { height: 50%; animation-delay: 2.8s; }
+.marketing-root .ctt-voice-wave i:nth-child(58) { height: 62%; animation-delay: 2.85s; }
+.marketing-root .ctt-voice-wave i:nth-child(59) { height: 38%; animation-delay: 2.9s; }
+.marketing-root .ctt-voice-wave i:nth-child(60) { height: 78%; animation-delay: 2.95s; }
+@keyframes ctt-wave-bounce {
+  0%, 100% { transform: scaleY(0.55); }
+  50%      { transform: scaleY(1.0); }
+}
+/* Row: 0:18 timer (left) · waveform (center, fills the space) · send button (right). */
+.marketing-root .ctt-voice-note-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-left: 14px;
+}
+.marketing-root .ctt-voice-note-timer {
+  font-family: var(--mk-font-mono);
+  font-size: 12px;
+  color: #8A8298;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.marketing-root .ctt-voice-note-row .ctt-voice-wave {
+  flex: 1;
+}
+/* Circular send button — uses the warm amber accent that matches the
+   highlighted bars in the waveform itself, instead of the brand violet. */
+.marketing-root .ctt-voice-note-send {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #C97A2B;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  padding: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(201, 122, 43, 0.3);
+}
+/* Live transcription paragraph — sits below the waveform, italic + muted
+   so it reads as the spoken words being captured rather than a heading. */
+.marketing-root .ctt-voice-note-tx {
+  margin: 12px 4px 0;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(26, 20, 36, 0.08);
+  font-size: 13px;
+  line-height: 1.5;
+  color: #5C5468;
+  font-style: italic;
+  position: relative;
+}
+.marketing-root .ctt-voice-note-tx-q {
+  font-family: var(--font-fraunces), "Fraunces", serif;
+  font-style: italic;
+  font-size: 22px;
+  line-height: 0;
+  color: #C97A2B;
+  margin-right: 4px;
+  position: relative;
+  top: 5px;
+}
+/* Bridge — small "AI transcribing…" pill + downward arrow that visually
+   connects the voice note (above) to the AI-drafted ticket (below). */
+.marketing-root .ctt-voice-bridge {
+  position: absolute;
+  left: 50%;
+  top: 251px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  z-index: 5;
+  pointer-events: none;
+}
+.marketing-root .ctt-voice-bridge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 99px;
+  background: #fff;
+  border: 1px solid #E8E2D4;
+  box-shadow: 0 6px 14px -8px rgba(26, 20, 36, 0.25);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #3B2F8C;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.marketing-root .ctt-voice-bridge-spark {
+  color: var(--violet);
+  font-size: 12px;
+  line-height: 1;
+  animation: ctt-pulse-soft 1.6s ease-in-out infinite;
+}
+.marketing-root .ctt-voice-bridge-arrow {
+  color: #fff;
+  display: block;
+  animation: ctt-bridge-bob 1.8s ease-in-out infinite;
+}
+@keyframes ctt-bridge-bob {
+  0%, 100% { transform: translateY(-2px); }
+  50%      { transform: translateY(2px); }
+}
+/* AI draft — lower half, nudged right of center, anchored to the bottom
+   of the panel so it sits cleanly below the voice note without overlap. */
+.marketing-root .ctt-voice-draft {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(calc(-50% + 50px));
+  width: 380px;
+  background: #fff;
+  border: 1px solid #E8E2D4;
+  border-radius: 16px;
+  box-shadow: 0 24px 48px -22px rgba(26, 20, 36, 0.32);
+  overflow: hidden;
+  z-index: 4;
+}
+.marketing-root .ctt-voice-draft-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0 0 14px;
+  padding: 3px 9px;
+  border-radius: 99px;
+  background: var(--violet-soft);
+  color: #3B2F8C;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.marketing-root .ctt-voice-draft-tag i {
+  width: 5px;
+  height: 5px;
+  border-radius: 99px;
+  background: var(--violet);
+  animation: ctt-pulse-soft 1.6s ease-in-out infinite;
+}
+@keyframes ctt-pulse-soft {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+.marketing-root .ctt-voice-draft-title {
+  margin: 10px 16px 5px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1A1424;
+  letter-spacing: -0.012em;
+}
+.marketing-root .ctt-voice-draft-sub {
+  margin: 0 16px 12px;
+  font-size: 13px;
+  color: #5C5468;
+  line-height: 1.5;
+}
+.marketing-root .ctt-voice-draft-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid #F0EDE3;
+  background: #FBF8F1;
+}
+.marketing-root .ctt-voice-draft-chip {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+.marketing-root .ctt-voice-draft-chip.sev { background: #FEE5DC; color: #9C3F1A; }
+.marketing-root .ctt-voice-draft-chip.tag { background: #F2EEE6; color: #2A2235; }
+.marketing-root .ctt-voice-draft-ex {
+  margin-left: auto;
+  font-family: var(--mk-font-mono);
+  font-size: 10.5px;
+  color: #8A8298;
+  letter-spacing: 0.04em;
+}
+
+/* =====================================================
+   CARD 3 — SESSIONS
+   ===================================================== */
+.marketing-root .ctt-sess {
+  position: relative;
+  width: 100%;
+  max-width: 700px;
+  height: 440px;
+  margin: 0 auto;
+}
+/* Back-layer ticket stack — peeks behind the URL hero from the upper-left. */
+.marketing-root .ctt-sess-stack {
+  position: absolute;
+  left: -30px;
+  top: 30px;
+  width: 340px;
+  display: flex;
+  flex-direction: column;
+  transform: rotate(-3deg);
+  z-index: 1;
+}
+.marketing-root .ctt-sess-tile {
+  background: #fff;
+  border: 1px solid #E8E2D4;
+  border-radius: 13px;
+  padding: 13px 15px;
+  box-shadow: 0 18px 34px -22px rgba(26, 20, 36, 0.24);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.marketing-root .ctt-sess-tile + .ctt-sess-tile {
+  margin-top: 11px;
+}
+.marketing-root .ctt-sess-thumb {
+  width: 52px;
+  height: 36px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #E9E2F3, #D6CCEC);
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+.marketing-root .ctt-sess-thumb::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  right: 14px;
+  top: 7px;
+  height: 4px;
+  border-radius: 99px;
+  background: rgba(26, 20, 36, 0.10);
+}
+.marketing-root .ctt-sess-thumb::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 15px;
+  width: 60%;
+  height: 3px;
+  border-radius: 99px;
+  background: rgba(26, 20, 36, 0.07);
+}
+.marketing-root .ctt-sess-tile.t-voice .ctt-sess-thumb {
+  background: linear-gradient(135deg, #F4E4C9, #E8C896);
+}
+.marketing-root .ctt-sess-tile.t-sess .ctt-sess-thumb {
+  background: linear-gradient(135deg, #CFE0DA, #A9C8BD);
+}
+.marketing-root .ctt-sess-tinfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.marketing-root .ctt-sess-tt {
+  font-size: 12.5px;
+  color: #1A1424;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.marketing-root .ctt-sess-tmeta {
+  font-family: var(--mk-font-mono);
+  font-size: 10.5px;
+  color: #8A8298;
+  letter-spacing: 0.03em;
+}
+.marketing-root .ctt-sess-status {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.marketing-root .ctt-sess-status.open { background: #FEE9DC; color: #9F4A12; }
+.marketing-root .ctt-sess-status.prog { background: var(--violet-soft); color: #3B2F8C; }
+.marketing-root .ctt-sess-status.resv { background: #DEEFE3; color: #1F6F3D; }
+/* HERO: shareable session URL card — the "share the whole session" moment. */
+.marketing-root .ctt-sess-url {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-46%, -52%) rotate(2deg);
+  width: 520px;
+  background: #fff;
+  border: 1px solid #E8E2D4;
+  border-radius: 20px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6),
+    0 44px 80px -24px rgba(26, 20, 36, 0.38),
+    0 14px 28px -14px rgba(47, 122, 110, 0.22);
+  overflow: hidden;
+  z-index: 3;
+}
+.marketing-root .ctt-sess-url::after {
+  content: "";
+  position: absolute;
+  inset: -30px;
+  z-index: -1;
+  background: radial-gradient(closest-side, rgba(47, 122, 110, 0.22), transparent 65%);
+  filter: blur(12px);
+  pointer-events: none;
+}
+.marketing-root .ctt-sess-url-h {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #EBE6DC;
+}
+.marketing-root .ctt-sess-url-ic {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: #E2EFEB;
+  color: #2F7A6E;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.marketing-root .ctt-sess-url-title {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.marketing-root .ctt-sess-url-n {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1A1424;
+  letter-spacing: -0.005em;
+}
+.marketing-root .ctt-sess-url-t {
+  font-family: var(--mk-font-mono);
+  font-size: 10.5px;
+  color: #8A8298;
+  letter-spacing: 0.03em;
+}
+.marketing-root .ctt-sess-url-live {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: 99px;
+  background: #E2EFEB;
+  color: #2F7A6E;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.marketing-root .ctt-sess-url-live i {
+  width: 6px;
+  height: 6px;
+  border-radius: 99px;
+  background: #2F7A6E;
+  box-shadow: 0 0 0 0 rgba(47, 122, 110, 0.5);
+  animation: ctt-live-dot 1.6s ease-out infinite;
+}
+@keyframes ctt-live-dot {
+  0%   { box-shadow: 0 0 0 0 rgba(47, 122, 110, 0.5); }
+  70%  { box-shadow: 0 0 0 6px rgba(47, 122, 110, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(47, 122, 110, 0); }
+}
+.marketing-root .ctt-sess-url-body {
+  padding: 16px;
+}
+.marketing-root .ctt-sess-url-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: 11px;
+  background: #FBF9F4;
+  border: 1px solid #E8E2D4;
+}
+.marketing-root .ctt-sess-url-lk {
+  color: #8A8298;
+  flex-shrink: 0;
+}
+.marketing-root .ctt-sess-url-u {
+  flex: 1;
+  font-family: var(--mk-font-mono);
+  font-size: 12.5px;
+  color: #1A1424;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.marketing-root .ctt-sess-url-dim {
+  color: #8A8298;
+}
+.marketing-root .ctt-sess-url-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 7px;
+  background: #1A1424;
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+.marketing-root .ctt-sess-url-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 16px;
+  border-top: 1px solid #F0EDE3;
+  background: #FBFAF5;
+}
+.marketing-root .ctt-sess-presence {
+  display: flex;
+  align-items: center;
+}
+.marketing-root .ctt-sess-av {
+  width: 30px;
+  height: 30px;
+  border-radius: 99px;
+  border: 2px solid #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 2px 6px -2px rgba(26, 20, 36, 0.18);
+}
+.marketing-root .ctt-sess-av + .ctt-sess-av {
+  margin-left: -8px;
+}
+.marketing-root .ctt-sess-av.a1 { background-color: #5A49BF; }
+.marketing-root .ctt-sess-av.a2 { background-color: #C97A2B; }
+.marketing-root .ctt-sess-av.a3 { background-color: #2F7A6E; }
+.marketing-root .ctt-sess-av.a4 {
+  background-color: #2A2235;
+  background-image: none;
+  color: #fff;
+  font-size: 10px;
+}
+.marketing-root .ctt-sess-av.live-now {
+  box-shadow:
+    0 0 0 0 rgba(47, 122, 110, 0.45),
+    0 2px 6px -2px rgba(26, 20, 36, 0.18);
+  animation: ctt-av-pulse 2s ease-out infinite;
+}
+@keyframes ctt-av-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(47, 122, 110, 0.45), 0 2px 6px -2px rgba(26, 20, 36, 0.18); }
+  70%  { box-shadow: 0 0 0 8px rgba(47, 122, 110, 0),  0 2px 6px -2px rgba(26, 20, 36, 0.18); }
+  100% { box-shadow: 0 0 0 0 rgba(47, 122, 110, 0),    0 2px 6px -2px rgba(26, 20, 36, 0.18); }
+}
+.marketing-root .ctt-sess-who {
+  font-size: 12px;
+  color: #5C5468;
+  line-height: 1.3;
+}
+.marketing-root .ctt-sess-who b {
+  color: #1A1424;
+  font-weight: 500;
+}
+.marketing-root .ctt-sess-share {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  background: #2F7A6E;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: 0 6px 14px -6px rgba(47, 122, 110, 0.5);
+}
+.marketing-root .ctt-sess-comment {
+  position: absolute;
+  right: -30px;
+  bottom: 28px;
+  width: 260px;
+  background: #fff;
+  border: 1px solid #E8E2D4;
+  border-radius: 14px;
+  box-shadow: 0 26px 50px -20px rgba(26, 20, 36, 0.32);
+  padding: 14px 15px;
+  transform: rotate(-4deg);
+  z-index: 4;
+}
+.marketing-root .ctt-sess-comment-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.marketing-root .ctt-sess-comment-av {
+  width: 24px;
+  height: 24px;
+  border-radius: 99px;
+  background-color: var(--violet);
+  background-size: cover;
+  background-position: center;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+}
+.marketing-root .ctt-sess-comment-n {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1A1424;
+}
+.marketing-root .ctt-sess-comment-t {
+  font-size: 10.5px;
+  color: #8A8298;
+  font-family: var(--mk-font-mono);
+  letter-spacing: 0.04em;
+  margin-left: auto;
+}
+.marketing-root .ctt-sess-comment-c {
+  font-size: 13px;
+  line-height: 1.45;
+  color: #2A2235;
+  margin: 0;
+}
+
+/* ---- Responsive: visual column collapses to a stack on tablets/phones ----
+   The new mockups use absolute positioning, which falls apart in a narrow
+   column. Below 1099px (where the card body collapses to single-column),
+   we re-flow each mockup as a vertical stack with relative children. */
+@media (max-width: 1099px) {
+  .marketing-root .ctt-cap,
+  .marketing-root .ctt-voice,
+  .marketing-root .ctt-sess {
+    height: auto;
+    min-height: 420px;
+  }
+  .marketing-root .ctt-cap-browser {
+    position: relative;
+    right: 0;
+    top: 0;
+    width: 100%;
+    max-width: 420px;
+    margin: -30px auto 0;
+  }
+  .marketing-root .ctt-cap-toast {
+    position: absolute;
+    left: 12px;
+    top: 8px;
+  }
+  .marketing-root .ctt-voice-note {
+    position: relative;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: 380px;
+    margin: -30px auto 0;
+  }
+  .marketing-root .ctt-voice-bridge {
+    position: relative;
+    left: 0;
+    top: 0;
+    transform: none;
+    margin: 12px auto 0;
+  }
+  .marketing-root .ctt-voice-draft {
+    position: relative;
+    left: 0;
+    bottom: 0;
+    width: 85%;
+    margin: 8px auto 0;
+    transform: none;
+  }
+  .marketing-root .ctt-sess-stack {
+    position: relative;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin-top: 18px;
+  }
+  .marketing-root .ctt-sess-url {
+    position: relative;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 18px auto 0;
+    transform: none;
+  }
+  .marketing-root .ctt-sess-comment {
+    position: relative;
+    right: 0;
+    bottom: 0;
+    width: 80%;
+    margin: 18px auto 0;
+    transform: rotate(-1deg);
+  }
+}
+
 
 /* ============================================================
    FINAL CTA â€” closing moment of the marketing page.
@@ -2029,9 +2675,14 @@
 .marketing-root .section-eyebrow:has(.section-eyebrow-text)::before {
   display: none;
 }
+.marketing-root .section-eyebrow .section-eyebrow-dash,
 .marketing-root .section-eyebrow-dash {
-  color: rgba(15, 23, 42, 0.30);
-  font-weight: 500;
+  color: var(--violet, #5A49BF);
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
 }
 .marketing-root .section-eyebrow-text {
   display: inline-block;
@@ -2666,6 +3317,15 @@
   text-transform: uppercase;
   color: var(--ink-3);
   margin-bottom: 20px;
+}
+.marketing-root .who-its-for-eyebrow .who-its-for-eyebrow-star,
+.marketing-root .who-its-for-eyebrow-star {
+  color: var(--violet, #5A49BF);
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1;
+  margin-right: 2px;
+  vertical-align: -1px;
 }
 
 .marketing-root .who-its-for-headline {
@@ -3613,13 +4273,14 @@
     transform: none !important;
     transition: none !important;
   }
-  /* Context chips: present at rest, no stagger. */
-  .marketing-root .ctt-ctx-chip {
-    opacity: 1 !important;
-    transform: none !important;
-    transition: none !important;
-  }
-  .marketing-root .capture-mock-pill-orb {
+  /* Mockup motion: freeze shimmer/wave/pulse for reduced-motion users. */
+  .marketing-root .ctt-cap-highlight,
+  .marketing-root .ctt-cap-crs::after,
+  .marketing-root .ctt-voice-note-live i,
+  .marketing-root .ctt-voice-wave i,
+  .marketing-root .ctt-voice-draft-tag i,
+  .marketing-root .ctt-sess-url-live i,
+  .marketing-root .ctt-sess-av.live-now {
     animation: none !important;
   }
 }
@@ -3696,16 +4357,6 @@
     overflow: auto;
   }
   .marketing-root .ag-flow { grid-template-columns: 1fr; }
-  /* Voice context chips: on phones the column is too tight for floating
-     chips on every edge. Keep the two top corners (page + environment â€” the
-     most telling context) and drop the bottom pair to avoid colliding with
-     the card. */
-  .marketing-root .ctt-ctx-chip--br,
-  .marketing-root .ctt-ctx-chip--bl {
-    display: none;
-  }
-  .marketing-root .ctt-ctx-chip--tl { top: 16px; left: 12px; }
-  .marketing-root .ctt-ctx-chip--tr { top: 40px; right: 12px; }
 }
 
 /* =================================================================
@@ -6232,7 +6883,10 @@
   position: relative;
   width: 100%;
   padding: 88px 32px 96px;
-  background: #0a0a0c;
+  background:
+    radial-gradient(58% 72% at 8% 22%, rgba(78, 36, 130, 0.4) 0%, rgba(78, 36, 130, 0) 62%),
+    radial-gradient(52% 68% at 92% 60%, rgba(20, 60, 110, 0.4) 0%, rgba(20, 60, 110, 0) 62%),
+    radial-gradient(120% 100% at 50% 50%, #0a0a0c 38%, #06060a 100%);
   color: var(--ag-text);
   font-family: "DM Sans", system-ui, sans-serif;
   font-feature-settings: "ss01";

@@ -43,7 +43,7 @@ export function SessionsDetail() {
     <section id="teams" className="signature-session-section">
       <header className="signature-session-header">
         <div className="section-eyebrow">
-          <span className="section-eyebrow-dash">—</span>
+          <span className="section-eyebrow-dash">✦</span>
           <span className="section-eyebrow-text">One place for everything</span>
         </div>
         <h2 className="signature-session-headline">

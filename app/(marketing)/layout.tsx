@@ -8,11 +8,45 @@
 // .marketing-root wrapper. Future routes under (marketing)/ should also
 // compose their own chrome — this layout is a deliberate pass-through so
 // each page owns its top-level styling decisions.
+//
+// Editorial fonts (Caveat / Fraunces / JetBrains Mono) are loaded here and
+// exposed as CSS vars on the wrapper so any marketing section can reach for
+// them without re-importing.
+
+import { Caveat, Fraunces, JetBrains_Mono } from "next/font/google";
+
+const caveat = Caveat({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-caveat",
+});
+
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  style: ["normal", "italic"],
+  display: "swap",
+  variable: "--font-fraunces",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  display: "swap",
+  variable: "--font-jetbrains-mono",
+});
 
 export default function MarketingLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  return (
+    <div
+      className={`${caveat.variable} ${fraunces.variable} ${jetbrainsMono.variable}`}
+    >
+      {children}
+    </div>
+  );
 }

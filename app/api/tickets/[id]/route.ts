@@ -551,10 +551,17 @@ export const PATCH = withAuthorization(
               // Mirror the comment.mention email path so description mentions
               // also send the mention email (not just an in-app notification).
               // recipientIds already excludes the actor (self-mention guard
-              // above).
+              // above). The description is rich-text HTML; convert it to plain
+              // text so mention spans render as "@Name" and tags don't leak.
               const emailSessionName = sessionTitle || "a session";
               const { sendMentionEmail } = await import(
                 "@/lib/email/notificationEmails"
+              );
+              const { descriptionToPlainText } = await import(
+                "@/lib/email/helpers"
+              );
+              const descriptionPreview = descriptionToPlainText(
+                contentUpdates.description ?? ""
               );
               await Promise.allSettled(
                 recipientIds.map((uid) =>
@@ -563,7 +570,7 @@ export const PATCH = withAuthorization(
                     mentionerName: actor.actorName,
                     ticketTitle: feedbackTitle,
                     sessionName: emailSessionName,
-                    message: contentUpdates.description ?? "",
+                    message: descriptionPreview,
                     sessionId,
                     feedbackId: id,
                   })

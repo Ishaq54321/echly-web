@@ -53,6 +53,7 @@ export interface DemoComment {
   userName: string;
   userId: string;
   avatarColor?: string | null;
+  avatarUrl?: string | null;
   message: string;
   timestampLabel: string;
   reactions: { emoji: string; count: number; mine: boolean }[];
@@ -75,6 +76,7 @@ export function CommentItem({
   return (
     <div className={`flex gap-2.5 group/item relative ${(comment.resolved || isThreadResolved) ? "opacity-60" : ""}`}>
       <UserAvatar
+        avatarUrl={comment.avatarUrl}
         name={comment.userName}
         colorSeed={comment.userId}
         className={`${avatarSize} text-xs`}

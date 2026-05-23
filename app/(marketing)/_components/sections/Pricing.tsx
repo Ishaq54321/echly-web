@@ -5,7 +5,10 @@ export function Pricing() {
   return (
     <section id="pricing" className="pricing">
       <div className="pr-head">
-        <span className="section-eyebrow">Pricing</span>
+        <span className="section-eyebrow">
+          <span className="section-eyebrow-dash">✦</span>
+          <span className="section-eyebrow-text">Pricing</span>
+        </span>
         <h2 className="pr-h">
           Simple pricing.
           <br />

@@ -39,6 +39,8 @@ export interface MockComment {
   /** uid-like seed; also the avatar fallback color seed. */
   userId: string;
   avatarColor: string;
+  /** Real-photo URL for this commenter; falls back to color+initials if absent. */
+  avatarUrl?: string;
   body: string;
   /** Minutes-ago offset used to derive a {seconds} pseudo-Timestamp. */
   minutesAgo: number;

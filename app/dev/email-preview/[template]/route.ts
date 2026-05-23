@@ -50,6 +50,7 @@ import {
   workspaceDeletedMemberText,
 } from "@/lib/email/templates/workspaceDeletedMember";
 import { refundIssuedEmailHtml, refundIssuedEmailText } from "@/lib/email/templates/refundIssued";
+import { commentExcerpt } from "@/lib/email/helpers";
 
 export const dynamic = "force-dynamic";
 
@@ -237,12 +238,17 @@ const TEMPLATES: Record<string, () => Variant> = {
     };
   },
   "new-comment": () => {
+    // Pass raw stored comment text through commentExcerpt() so the preview
+    // exercises the mention-markup flattening (a raw `@[Name](uid)` reaching
+    // this template would be a regression — see commentExcerpt in
+    // lib/email/helpers.ts).
     const p = {
       commenterName: "Jordan Lee",
       ticketTitle: "CTA button is below the fold on mobile",
       sessionName: "Homepage redesign feedback",
-      commentExcerpt:
-        "Confirmed on iPhone 14 — the primary button only shows after a scroll. We should pull it up above the testimonial block.",
+      commentExcerpt: commentExcerpt(
+        "@[Sam Chen](abc123XYZ) confirmed on iPhone 14 — the primary button only shows after a scroll. We should pull it up above the testimonial block."
+      ),
       commentUrl: "https://annote.ai/s/PLACEHOLDER#feedback-abc123",
     };
     return { html: newCommentEmailHtml(p), text: newCommentEmailText(p) };
@@ -252,8 +258,9 @@ const TEMPLATES: Record<string, () => Variant> = {
       mentionerName: "Jordan Lee",
       ticketTitle: "CTA button is below the fold on mobile",
       sessionName: "Homepage redesign feedback",
-      commentExcerpt:
-        "@sam can you take this one? It overlaps with the nav work you're already doing.",
+      commentExcerpt: commentExcerpt(
+        "@[Sam Chen](abc123XYZ) can you take this one? It overlaps with the nav work you're already doing."
+      ),
       commentUrl: "https://annote.ai/s/PLACEHOLDER#feedback-abc123",
     };
     return { html: mentionEmailHtml(p), text: mentionEmailText(p) };

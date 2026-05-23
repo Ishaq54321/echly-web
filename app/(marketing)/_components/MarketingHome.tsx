@@ -9,7 +9,6 @@ import { BuiltForAgenciesDark } from "./sections/BuiltForAgenciesDark";
 import { WhoItsFor } from "./sections/WhoItsFor";
 import { Pricing } from "./sections/Pricing";
 import { FAQ } from "./sections/FAQ";
-import { FounderNote } from "./sections/FounderNote";
 import { FinalCTA } from "./sections/FinalCTA";
 
 export function MarketingHome() {
@@ -24,7 +23,6 @@ export function MarketingHome() {
         <WhoItsFor />
         <Pricing />
         <FAQ />
-        <FounderNote />
         <FinalCTA />
       </main>
       <MarketingFooter />
