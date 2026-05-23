@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    ANNOTE Marketing â€” V7 styles, scoped to .marketing-root
    Tokens, animations, and layouts are isolated from the app.
    ============================================================ */
@@ -111,6 +111,7 @@
 }
 .marketing-root .annc-text {
   color: var(--wine-ink);
+  font-size: 14.5px;
 }
 .marketing-root .annc-btn {
   display: inline-flex;
@@ -378,8 +379,7 @@
 .marketing-root .hero {
   position: relative;
   overflow: hidden;
-  /* Hero band matches the page foundation (#F9F9F9) for one continuous canvas. */
-  background: #F9F9F9;
+  background: #FFFFFF;
 }
 
 /* â”€â”€ Animated aurora background â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -863,7 +863,7 @@
   padding: 96px 24px 64px;
   width: 100%;
   max-width: none;
-  background: var(--bg-0);
+  background: #F2F0EB;
 }
 
 .marketing-root .ctt-headline {
@@ -889,7 +889,7 @@
   margin: 0 auto 40px;
 
   background: #ffffff;
-  border: 1px solid rgba(15, 23, 42, 0.06);
+  border: 1px solid #D9D7D2;
   border-radius: 20px;
   overflow: hidden;
 
@@ -939,7 +939,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 20px 32px;
-  border-bottom: 1px dashed rgba(15, 23, 42, 0.08);
+  border-bottom: 1.5px dashed #D9D7D2;
   background: rgba(15, 23, 42, 0.015);
 }
 .marketing-root .ctt-card-header-eyebrow {
@@ -1820,121 +1820,78 @@
 /* ============ SESSIONS DETAIL ============ */
 .marketing-root .sessions-detail {
   position: relative;
-  /* Inset rounded panel (ClickUp-style): max-width + auto margins center the
-     panel and let the light page show at the sides; rounded corners + clipped
-     overflow shape the black field. The vertical padding is the panel's
-     internal spacing. */
-  margin: 0 auto;
-  max-width: 1360px;
+  /* Full-bleed band: shares the page background so this section blends with
+     the rest of the marketing canvas. */
+  width: 100%;
   padding: 56px 32px 64px;
-  border-radius: 28px;
   overflow: hidden;
-  /* Near-black base: a subtle linear gradient adds depth; the rich color
-     gradient still lives behind the demo stage. */
-  background: linear-gradient(180deg, #0F0F0F 0%, #191919 100%);
+  background: #FFFFFF;
 }
 @media (max-width: 720px) {
   .marketing-root .sessions-detail {
-    margin: 0 12px;
-    border-radius: 20px;
     padding: 40px 18px 44px;
   }
 }
 .marketing-root .sd-head {
   position: relative;
   z-index: 1;
-  max-width: 980px;
+  max-width: 1280px;
   margin: 0 auto 32px;
-  text-align: center;
+  display: grid;
+  grid-template-columns: 633px 1fr;
+  gap: 180px;
+  align-items: center;
+  text-align: left;
+}
+@media (max-width: 860px) {
+  .marketing-root .sd-head {
+    grid-template-columns: 1fr;
+    gap: 18px;
+    text-align: center;
+  }
 }
 .marketing-root .sd-head .section-eyebrow {
-  justify-content: center;
-  color: #FFFFFF;
+  justify-content: flex-start;
+  color: var(--ink-2);
 }
 .marketing-root .sd-head .section-eyebrow::before {
-  background: #FFFFFF;
+  background: var(--ink-2);
 }
 .marketing-root .sd-h {
-  font-size: clamp(28px, 3.4vw, 44px);
-  font-weight: 500;
-  letter-spacing: -0.024em;
-  line-height: 1.1;
-  margin: 0 0 18px;
-  color: #FFFFFF;
+  font-size: 48px;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+  margin: 0;
+  background: linear-gradient(90deg, #1B1626 0%, #1B1626 60%, #7A7A7A 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 .marketing-root .sd-p {
-  font-size: 16px;
-  color: #FFFFFF;
+  font-size: 18px;
+  color: var(--ink-2);
   font-weight: 450;
-  max-width: 58ch;
-  margin: 0 auto;
-  line-height: 1.6;
-  letter-spacing: -0.003em;
+  max-width: 38ch;
+  margin: 0 auto 0 0;
+  line-height: 1.55;
+  letter-spacing: -0.005em;
+  text-align: left;
+}
+@media (max-width: 860px) {
+  .marketing-root .sd-p {
+    margin: 0 auto;
+  }
 }
 .marketing-root .sd-p b {
-  color: #FFFFFF;
+  color: var(--ink-2);
   font-weight: inherit;
 }
 .marketing-root .sd-stage {
   position: relative;
   z-index: 1;
-  max-width: 1180px;
+  max-width: 1280px;
   margin: 0 auto;
-}
-/* Background glow behind the demo window: ONE large conic gradient sweeping
-   through orange â†’ pink â†’ magenta â†’ violet â†’ blue â†’ cyan, masked with a
-   radial fade so it bleeds softly into the black field at the edges. Sits
-   above the section's black bg (z-index 0) but below the window
-   (.session-demo-stage, z-index 1). */
-.marketing-root .sd-stage::before {
-  content: "";
-  position: absolute;
-  inset: -420px -380px;
-  z-index: 0;
-  pointer-events: none;
-  background: conic-gradient(
-    from 210deg at 50% 50%,
-    #ff8a3d,
-    #f15ba2,
-    #d23ce0,
-    #8a4fff,
-    #4664e6,
-    #3ad0ff,
-    #8a4fff,
-    #d23ce0,
-    #ff8a3d
-  );
-  filter: blur(120px);
-  opacity: 0.1;
-  -webkit-mask-image: radial-gradient(closest-side at 50% 50%, #000 35%, transparent 100%);
-  mask-image: radial-gradient(closest-side at 50% 50%, #000 35%, transparent 100%);
-}
-/* Corner-hugging glow: a conic-filled rounded rectangle sized slightly larger
-   than the demo window and blurred, so colored light bleeds evenly past ALL
-   four edges AND the rounded corners. The window (z-index 1, opaque bg) covers
-   the centre, leaving only the glow that rings the rounded-rect outline â€” this
-   is what fills in the corners the radial ::before glow misses. */
-.marketing-root .sd-stage::after {
-  content: "";
-  position: absolute;
-  inset: -26px;
-  z-index: 0;
-  pointer-events: none;
-  border-radius: 28px;
-  background: conic-gradient(
-    from 210deg at 50% 50%,
-    #ff8a3d,
-    #f15ba2,
-    #d23ce0,
-    #8a4fff,
-    #4664e6,
-    #3ad0ff,
-    #8a4fff,
-    #d23ce0,
-    #ff8a3d
-  );
-  filter: blur(34px);
-  opacity: 0.1;
 }
 .marketing-root .sd-window {
   display: grid;
@@ -2323,274 +2280,6 @@
 .marketing-root .cc-dot.a { background: var(--ink-3); opacity: 0.7; }
 .marketing-root .cc-dot.t { background: var(--violet); opacity: 0.5; }
 
-/* ============ AGENCIES flow ============ */
-/* ============ BUILT FOR AGENCIES ============ */
-/* Full-bleed opaque background so the page's cream/blue atmosphere does not
-   show through the side gutters; inner content stays width-constrained. */
-.marketing-root .agency-section {
-  width: 100%;
-  padding: 96px 32px 80px;
-  background: #FFFFFF;
-}
-.marketing-root .agency-inner {
-  width: 100%;
-  max-width: 1440px;
-  margin: 0 auto;
-}
-.marketing-root .agency-section-header {
-  text-align: center;
-  max-width: 760px;
-  margin: 0 auto 64px;
-}
-.marketing-root .agency-eyebrow {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  margin-bottom: 20px;
-}
-.marketing-root .agency-eyebrow::before {
-  content: "â€” ";
-  color: var(--line-1);
-}
-.marketing-root .agency-headline {
-  font-size: clamp(28px, 3.2vw, 42px);
-  font-weight: 500;
-  line-height: 1.08;
-  letter-spacing: -0.025em;
-  margin: 0 0 18px;
-  color: var(--ink-1);
-}
-.marketing-root .agency-subheading {
-  font-size: clamp(15px, 1.1vw, 17px);
-  line-height: 1.55;
-  color: var(--ink-2);
-  margin: 0 auto;
-  max-width: 620px;
-  letter-spacing: -0.003em;
-}
-
-/* --- Cards row --- */
-.marketing-root .agency-cards-row {
-  display: grid;
-  grid-template-columns: 1fr 40px 1fr 40px 1fr 40px 1fr;
-  gap: 0;
-  align-items: stretch;
-}
-.marketing-root .agency-card {
-  background: #FFFFFF;
-  border: 1px solid var(--line-1);
-  border-radius: var(--mk-radius-lg);
-  padding: 28px;
-  display: flex;
-  flex-direction: column;
-  min-height: 360px;
-  box-shadow:
-    0 1px 2px rgba(20, 16, 30, 0.03),
-    0 8px 24px -12px rgba(20, 16, 30, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 1);
-  opacity: 0;
-  transform: translateY(20px);
-  transition:
-    opacity 0.6s ease-out,
-    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.marketing-root .agency-card.in-view {
-  opacity: 1;
-  transform: translateY(0);
-}
-.marketing-root .agency-card:hover {
-  transform: translateY(-3px);
-  box-shadow:
-    0 2px 4px rgba(20, 16, 30, 0.04),
-    0 16px 32px -12px rgba(20, 16, 30, 0.10),
-    inset 0 1px 0 rgba(255, 255, 255, 1);
-}
-
-/* --- Arrow connectors --- */
-.marketing-root .agency-arrow {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--ink-3);
-}
-
-/* --- Card internal anatomy --- */
-.marketing-root .agency-card-eyebrow {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  margin-bottom: 16px;
-}
-.marketing-root .agency-card-title {
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 1.25;
-  letter-spacing: -0.015em;
-  color: var(--ink-1);
-  margin: 0 0 12px;
-}
-.marketing-root .agency-card-body {
-  font-size: 14px;
-  line-height: 1.55;
-  color: var(--ink-2);
-  margin: 0 0 20px;
-}
-.marketing-root .agency-card-divider {
-  height: 1px;
-  background: var(--line-1);
-  margin: 0 0 20px;
-}
-.marketing-root .agency-card-visual {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-}
-
-/* --- Avatar rows (cards 1 & 2) --- */
-.marketing-root .agency-avatar-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-}
-.marketing-root .agency-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1px solid var(--line-1);
-  flex-shrink: 0;
-}
-.marketing-root .agency-avatar-label {
-  font-size: 13px;
-  color: var(--ink-2);
-  letter-spacing: -0.003em;
-}
-
-/* --- Share URL + brand chip (card 3) --- */
-.marketing-root .agency-share-url {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  background: transparent;
-  border: 1px solid var(--line-1);
-  border-radius: 10px;
-  margin-bottom: 12px;
-}
-.marketing-root .agency-share-url svg {
-  width: 14px;
-  height: 14px;
-  color: var(--ink-3);
-  flex-shrink: 0;
-}
-.marketing-root .agency-share-url-text {
-  font-family: var(--mk-font-mono);
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink-1);
-  letter-spacing: -0.01em;
-}
-.marketing-root .agency-brand-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  background: rgba(90, 73, 191, 0.06);
-  border-radius: 999px;
-  font-size: 12px;
-  color: var(--violet);
-  font-weight: 500;
-  align-self: flex-start;
-}
-.marketing-root .agency-brand-chip svg {
-  width: 12px;
-  height: 12px;
-}
-
-/* --- Ticket cards (card 4) --- */
-.marketing-root .agency-ticket-card {
-  background: transparent;
-  border: 1px solid var(--line-1);
-  border-radius: 10px;
-  padding: 12px 14px;
-  margin-bottom: 8px;
-}
-.marketing-root .agency-ticket-card:last-child {
-  margin-bottom: 0;
-}
-.marketing-root .agency-ticket-title {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink-1);
-  margin-bottom: 8px;
-  line-height: 1.3;
-}
-.marketing-root .agency-ticket-meta {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.marketing-root .agency-ticket-priority {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 2px 8px;
-  border-radius: 999px;
-}
-.marketing-root .agency-ticket-priority--high {
-  background: rgba(247, 126, 44, 0.12);
-  color: #C8531B;
-}
-.marketing-root .agency-ticket-priority--medium {
-  background: rgba(245, 158, 11, 0.12);
-  color: #B45309;
-}
-.marketing-root .agency-ticket-assignee {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  color: var(--ink-2);
-}
-.marketing-root .agency-ticket-assignee img {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-/* --- Responsive --- */
-@media (max-width: 1199px) {
-  .marketing-root .agency-cards-row {
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-  }
-  .marketing-root .agency-arrow {
-    display: none;
-  }
-}
-@media (max-width: 767px) {
-  .marketing-root .agency-cards-row {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .marketing-root .agency-card {
-    opacity: 1;
-    transform: none;
-    transition: box-shadow 0.25s ease;
-  }
-}
-
 /* ============ WHO IT'S FOR ============ */
 /* === SECTION CONTAINER === */
 /* Full-bleed opaque white background so the page's cream/blue atmosphere does
@@ -2618,15 +2307,13 @@
   margin-bottom: 20px;
 }
 
-/* Headline matches .agency-headline (BuiltForAgencies) exactly: same
-   clamp size, 500 weight, solid --ink-1 — no gradient text fill. */
 .marketing-root .who-its-for-headline {
   font-size: clamp(28px, 3.2vw, 42px);
   font-weight: 500;
   line-height: 1.08;
   letter-spacing: -0.025em;
   color: var(--ink-1);
-  margin: 0 0 18px 0;
+  margin: 0 0 8px 0;
 }
 
 .marketing-root .who-its-for-subheading {
@@ -5184,6 +4871,109 @@
   /* The headline + sub ARE click targets (handler frames their bounds). */
   pointer-events: auto;
 }
+/* Premium "New" pill that sits above the hero headline. Replaces the old
+   site-wide AnnouncementBar — same message, but anchored to the hero so it
+   reads as a feature highlight rather than a top-of-page banner. The pill
+   shows a neutral grey stroke by default and only reveals the violet→magenta
+   brand gradient border on hover, so it sits quietly under the headline but
+   lights up when invited. */
+.marketing-root .hcd-hero-pill {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px 6px 6px;
+  margin: 0 auto 24px;
+  border-radius: 999px;
+  background: #ffffff;
+  background-clip: padding-box;
+  border: 1px solid transparent;
+  position: relative;
+  font-size: 13px;
+  color: #15101F;
+  text-decoration: none;
+  letter-spacing: -0.003em;
+  box-shadow:
+    0 1px 2px rgba(21, 16, 31, 0.04),
+    0 8px 24px -12px rgba(21, 16, 31, 0.08);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+/* Default: a soft neutral stroke (matches the four-tier neutral palette's
+   placeholder tier #B5AEBE). The mask trick stays so the same ::before slot
+   can swap to the gradient on hover without changing layout. */
+.marketing-root .hcd-hero-pill::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: #B5AEBE;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+  transition: background 0.2s ease;
+}
+.marketing-root .hcd-hero-pill:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 1px 2px rgba(21, 16, 31, 0.05),
+    0 14px 32px -14px rgba(110, 63, 176, 0.35);
+}
+.marketing-root .hcd-hero-pill:hover::before {
+  background: linear-gradient(
+    100deg,
+    #6E3FB0 0%,
+    #5A49BF 32%,
+    #5E6AD2 56%,
+    #C51A68 100%
+  );
+}
+.marketing-root .hcd-hero-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #81296E;
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+.marketing-root .hcd-hero-pill-text {
+  color: #15101F;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.marketing-root .hcd-hero-pill-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(21, 16, 31, 0.06);
+  color: #15101F;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.marketing-root .hcd-hero-pill:hover .hcd-hero-pill-arrow {
+  background: rgba(21, 16, 31, 0.1);
+  transform: translateX(2px);
+}
+@media (max-width: 640px) {
+  .marketing-root .hcd-hero-pill {
+    font-size: 12px;
+    padding: 5px 12px 5px 5px;
+    margin-bottom: 20px;
+  }
+  .marketing-root .hcd-hero-pill-text {
+    font-size: 12.5px;
+  }
+}
+
 .marketing-root .hcd-hero-h1 {
   /* v21: scaled up from the v16 restrained 40â€“64px/500 (which read washed-out on
      the lighter bg), then dialed back per feedback â€” smaller and lighter than
@@ -5304,8 +5094,43 @@
   /* v17: the headline scales to ~60vw here; pull the tray in toward the edge so
      it keeps clear of the now-wider copy on tighter viewports. */
   .marketing-root .hcd-tray-anchor {
-    right: 32px;
+    right: 16px;
     bottom: 80px;
+  }
+}
+/* Desktop tiers — tray scales with viewport so it doesn't look tiny on 27"
+   monitors or cramped on small MacBooks. Base rule below targets 1100–1439px
+   (13"/14" MacBooks @ default scaling). */
+@media (min-width: 1440px) and (max-width: 1727px) {
+  /* Standard desktop: 15"/16" MacBooks, common 1080p externals. */
+  .marketing-root .hcd-tray-anchor {
+    width: 380px;
+    right: 32px;
+  }
+  .marketing-root .hcd-tray-anchor .pill-tickets {
+    max-height: 540px;
+  }
+}
+@media (min-width: 1728px) and (max-width: 2199px) {
+  /* Large laptops & 1440p externals: 16" MBP native, 27" iMac. */
+  .marketing-root .hcd-tray-anchor {
+    width: 420px;
+    right: 40px;
+    bottom: 56px;
+  }
+  .marketing-root .hcd-tray-anchor .pill-tickets {
+    max-height: 580px;
+  }
+}
+@media (min-width: 2200px) {
+  /* 4K / 5K external monitors — give the tray room to breathe. */
+  .marketing-root .hcd-tray-anchor {
+    width: 480px;
+    right: 56px;
+    bottom: 72px;
+  }
+  .marketing-root .hcd-tray-anchor .pill-tickets {
+    max-height: 640px;
   }
 }
 /* When the comment cursor is active, hide the native cursor over the stage. */
@@ -5333,8 +5158,8 @@
 .marketing-root .hcd-tray-anchor {
   position: absolute;
   bottom: 40px;
-  right: 48px;
-  width: 360px;
+  right: 20px;
+  width: 340px;
   max-width: calc(100% - 44px);
 }
 .marketing-root .hcd-tray-anchor .echly-v2 {
@@ -5344,7 +5169,7 @@
 .marketing-root .hcd-tray-anchor .pill-tickets {
   width: 100%;
   max-width: 100%;
-  max-height: 420px;
+  max-height: 520px;
 }
 /* Glass refinement Fix 2: multi-layer elevation. Ambient close shadow â†’ mid
    falloff â†’ far cast (floating feel), plus an inner-top white highlight that
@@ -5701,6 +5526,45 @@
   content-visibility: visible;
 }
 
+/* Sidebar ticket-row hover wash — mirrors the production session page
+   (TicketItem.tsx uses `hover:bg-[var(--surface-hover)]`). The Tailwind
+   arbitrary class doesn't reliably beat `.marketing-root button { background:
+   transparent }` in this scope, so force the hover explicitly. Skip the
+   currently-selected row (aria-current="true") so its brand-subtle background
+   isn't washed out on hover. */
+.marketing-root .session-demo-stage .tl-vrow:hover:not([aria-current="true"]) {
+  background: var(--surface-hover);
+}
+
+/* Action buttons (Resolve / Reopen / Assign / Priority / Activity) — mirror the
+   `hover:bg-[var(--surface-hover)] hover:border-[var(--border-strong)]` /
+   `hover:bg-[var(--brand-muted)]` patterns from FeedbackHeader.tsx and
+   AssignDropdown/PriorityDropdown. Same scope-override reason as the ticket
+   rows above: the Tailwind arbitrary-value hover classes lose to the scoped
+   `.marketing-root button { background: transparent }` reset.
+
+   Layout (SessionFeedbackHeader.tsx): the action buttons live in
+   `<div class="flex flex-wrap items-center gap-2">`. We match via the
+   `flex-wrap` utility class which is unique to that row in the header. */
+.marketing-root .session-demo-detail-main header .flex-wrap > button:hover,
+.marketing-root .session-demo-detail-main header .flex-wrap > div button:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+/* Resolve (active, non-resolved) variant uses brand-subtle bg → brand-muted on
+   hover. Match the button by its brand-subtle background utility. */
+.marketing-root .session-demo-detail-main header .flex-wrap > button.bg-\[var\(--brand-subtle\)\]:hover {
+  background: var(--brand-muted);
+  border-color: var(--brand-muted);
+}
+/* Delete (icon-only) variant: red wash on hover. Identified by its danger
+   hover utility. */
+.marketing-root .session-demo-detail-main header button.hover\:bg-\[var\(--color-danger-bg\)\]:hover {
+  background: var(--color-danger-bg);
+  border-color: rgba(229, 72, 77, 0.3);
+  color: var(--color-danger);
+}
+
 /* Sidebar "Invite Team" â€” black fill (the bg-[var(--text-heading)] arbitrary
    class wasn't applying in this scope; force it explicitly). */
 .marketing-root .session-demo-invite-btn {
@@ -5858,3 +5722,1215 @@
     padding: 20px 18px 40px;
   }
 }
+
+/* ============================================================
+   BUILT FOR AGENCIES — DARK REDESIGN
+   Scoped under .marketing-root. All ag-, qa-, team-, rev-, ship-
+   class names are unique to this section.
+   ============================================================ */
+
+.marketing-root .ag-root {
+  --ag-bg: #0a0a0c;
+  --ag-bg-2: #0e0e12;
+  --ag-surface: #101015;
+  --ag-surface-2: #16161d;
+  --ag-line: rgba(255, 255, 255, 0.07);
+  --ag-line-2: rgba(255, 255, 255, 0.11);
+  --ag-text: #f5f5f7;
+  --ag-body: rgba(245, 245, 247, 0.58);
+  --ag-mute: rgba(245, 245, 247, 0.38);
+  --ag-faint: rgba(245, 245, 247, 0.22);
+  --ag-accent: oklch(72% 0.16 295);
+  --ag-accent-2: oklch(72% 0.16 245);
+  --ag-warm: oklch(72% 0.18 32);
+  --ag-amber: oklch(80% 0.15 75);
+  --ag-green: oklch(74% 0.14 155);
+
+  position: relative;
+  width: 100%;
+  padding: 88px 32px 96px;
+  background: #0a0a0c;
+  color: var(--ag-text);
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-feature-settings: "ss01";
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.marketing-root .ag-bg-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  mix-blend-mode: overlay;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 3px 3px;
+}
+.marketing-root .ag-bg-glow {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.35;
+}
+.marketing-root .ag-bg-glow--1 {
+  top: -200px;
+  left: -120px;
+  width: 520px;
+  height: 520px;
+  background: oklch(55% 0.22 295);
+  opacity: 0.22;
+}
+.marketing-root .ag-bg-glow--2 {
+  bottom: -180px;
+  right: -100px;
+  width: 560px;
+  height: 560px;
+  background: oklch(55% 0.2 245);
+  opacity: 0.16;
+}
+
+/* HEADER */
+.marketing-root .ag-head {
+  position: relative;
+  z-index: 2;
+  max-width: 1280px;
+  margin: 0 auto 56px;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 64px;
+  align-items: end;
+  padding-bottom: 36px;
+  border-bottom: 1px solid var(--ag-line);
+}
+.marketing-root .ag-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  color: var(--ag-mute);
+  margin-bottom: 24px;
+}
+.marketing-root .ag-kicker-mark {
+  color: var(--ag-accent);
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  letter-spacing: 0;
+}
+.marketing-root .ag-title {
+  margin: 0;
+  font-size: clamp(40px, 5vw, 64px);
+  line-height: 1;
+  letter-spacing: -0.025em;
+  font-weight: 400;
+  color: #fafafc;
+  max-width: 720px;
+}
+.marketing-root .ag-title em {
+  font-style: normal;
+  color: var(--ag-mute);
+  font-weight: 400;
+}
+.marketing-root .ag-head-right {
+  padding-bottom: 8px;
+  /* Hug the right edge of the section so the lede/meta sit further right
+     instead of starting flush against the headline. */
+  justify-self: end;
+  max-width: 480px;
+}
+.marketing-root .ag-lede {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--ag-body);
+  max-width: 480px;
+  letter-spacing: -0.005em;
+}
+.marketing-root .ag-head-meta {
+  margin-top: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--ag-mute);
+}
+.marketing-root .ag-head-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ag-green);
+  box-shadow: 0 0 0 4px rgba(74, 222, 128, 0.12);
+  animation: ag-pulse 2.2s ease-in-out infinite;
+}
+@keyframes ag-pulse {
+  50% {
+    box-shadow: 0 0 0 7px rgba(74, 222, 128, 0.05);
+  }
+}
+
+/* GRID */
+.marketing-root .ag-grid {
+  position: relative;
+  z-index: 2;
+  max-width: 1280px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--ag-line);
+  border: 1px solid var(--ag-line);
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+/* CARD BASE */
+.marketing-root .ag-card {
+  position: relative;
+  background: linear-gradient(180deg, #0c0c10 0%, #0a0a0c 100%);
+  padding: 36px 36px 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 510px;
+  overflow: hidden;
+}
+.marketing-root .ag-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 60% at 50% 0%, rgba(255, 255, 255, 0.025), transparent 60%);
+  pointer-events: none;
+}
+.marketing-root .ag-card-head {
+  max-width: 460px;
+  position: relative;
+  z-index: 1;
+}
+.marketing-root .ag-eyebrow {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  color: var(--ag-faint);
+  margin-bottom: 18px;
+}
+.marketing-root .ag-h {
+  margin: 0 0 12px;
+  font-size: 28px;
+  line-height: 1.1;
+  letter-spacing: -0.022em;
+  font-weight: 500;
+  color: #fafafc;
+}
+.marketing-root .ag-p {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--ag-body);
+  letter-spacing: -0.003em;
+  max-width: 420px;
+}
+.marketing-root .ag-stage {
+  position: relative;
+  flex: 1;
+  margin: 28px -36px 0;
+  min-height: 280px;
+}
+
+/* CARD 1 — QA */
+.marketing-root .qa-stage {
+  margin-top: 24px;
+  padding: 0 30px 30px;
+  overflow: hidden;
+}
+.marketing-root .qa-canvas {
+  position: absolute;
+  left: 30px;
+  right: 30px;
+  top: 0;
+  bottom: 100px;
+  background: linear-gradient(180deg, #131319, #0e0e13);
+  border: 1px solid var(--ag-line);
+  border-radius: 12px;
+  overflow: hidden;
+  opacity: 0.55;
+  filter: saturate(0.6);
+}
+.marketing-root .qa-canvas-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--ag-line);
+  background: rgba(255, 255, 255, 0.015);
+}
+.marketing-root .qa-canvas-bar i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+}
+.marketing-root .qa-url {
+  margin-left: 8px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--ag-mute);
+  letter-spacing: 0.02em;
+}
+.marketing-root .qa-canvas-body {
+  padding: 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.marketing-root .qa-block {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+}
+.marketing-root .qa-block.w70 {
+  width: 70%;
+}
+.marketing-root .qa-block.w50 {
+  width: 50%;
+}
+.marketing-root .qa-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+.marketing-root .qa-card-mock {
+  height: 64px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
+  border: 1px solid var(--ag-line);
+  position: relative;
+}
+.marketing-root .qa-card-mock.target {
+  border-color: rgba(165, 137, 255, 0.5);
+  box-shadow: 0 0 0 1px rgba(165, 137, 255, 0.3), 0 0 24px -4px rgba(165, 137, 255, 0.35);
+}
+.marketing-root .qa-target-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 10px;
+  border: 1.5px solid var(--ag-accent);
+  animation: qa-target 2.2s ease-in-out infinite;
+}
+@keyframes qa-target {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 0.45;
+  }
+}
+
+.marketing-root .qa-pin {
+  position: absolute;
+  left: 50%;
+  top: 88px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ag-accent);
+  color: #fff;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 600;
+  box-shadow: 0 0 0 4px rgba(165, 137, 255, 0.18), 0 6px 16px -4px rgba(165, 137, 255, 0.5);
+  z-index: 3;
+  animation: qa-pin-drop 4s ease-out infinite;
+}
+@keyframes qa-pin-drop {
+  0% {
+    transform: translateX(-50%) translateY(-12px);
+    opacity: 0;
+  }
+  10%,
+  90% {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.marketing-root .qa-memo {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  width: 88%;
+  background: linear-gradient(180deg, #181820, #131319);
+  border: 1px solid var(--ag-line-2);
+  border-radius: 14px;
+  padding: 14px 14px 12px;
+  box-shadow: 0 24px 50px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  z-index: 4;
+  box-sizing: border-box;
+}
+.marketing-root .qa-memo-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.marketing-root .qa-memo-meta {
+  flex: 1;
+  min-width: 0;
+}
+.marketing-root .qa-memo-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.005em;
+}
+.marketing-root .qa-memo-role {
+  color: var(--ag-mute);
+  font-weight: 400;
+}
+.marketing-root .qa-memo-sub {
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--ag-mute);
+  letter-spacing: 0.04em;
+}
+.marketing-root .qa-rec-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: oklch(70% 0.2 25);
+  animation: qa-rec 1.2s infinite;
+}
+@keyframes qa-rec {
+  50% {
+    opacity: 0.25;
+  }
+}
+.marketing-root .qa-timer {
+  color: var(--ag-body);
+}
+.marketing-root .qa-memo-stop {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--ag-line);
+  color: oklch(70% 0.2 25);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.marketing-root .qa-wave {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2.5px;
+  height: 36px;
+  margin: 10px 0 8px;
+  padding: 0 2px;
+}
+.marketing-root .qa-wave i {
+  --h: 6px;
+  width: 3.5px;
+  flex: 0 0 3.5px;
+  height: var(--h);
+  min-height: 3.5px;
+  border-radius: 999px;
+  background: rgba(245, 245, 247, 0.78);
+  animation: qa-wave 1.8s ease-in-out infinite;
+  transform-origin: center;
+}
+@keyframes qa-wave {
+  0%,
+  100% {
+    transform: scaleY(0.55);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+.marketing-root .qa-transcribe {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.06);
+}
+.marketing-root .qa-trans-label {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  color: var(--ag-accent);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.marketing-root .qa-trans-text {
+  font-size: 11.5px;
+  color: var(--ag-body);
+  letter-spacing: -0.002em;
+  font-style: italic;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* CARD 2 — TEAM */
+.marketing-root .team-stage {
+  padding: 0 36px 36px;
+}
+.marketing-root .team-session {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, #161620, #101017);
+  border: 1px solid var(--ag-line-2);
+  border-radius: 10px;
+  margin-bottom: 12px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+}
+.marketing-root .team-session-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: oklch(70% 0.18 25);
+  box-shadow: 0 0 0 3px rgba(255, 100, 80, 0.18);
+  animation: ag-pulse 1.6s infinite;
+}
+.marketing-root .team-session-label {
+  color: oklch(70% 0.18 25);
+  font-weight: 600;
+}
+.marketing-root .team-session-name {
+  color: #fff;
+  font-family: "DM Sans", sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  font-size: 12px;
+}
+.marketing-root .team-session-spacer {
+  flex: 1;
+}
+.marketing-root .team-session-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ag-body);
+  font-family: "DM Sans", sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+}
+.marketing-root .team-count-dots {
+  display: inline-flex;
+  gap: 2px;
+}
+.marketing-root .team-count-dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--ag-faint);
+}
+.marketing-root .team-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+}
+.marketing-root .team-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.012));
+  border: 1px solid var(--ag-line);
+  border-radius: 11px;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: team-row-in 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+  position: relative;
+}
+@keyframes team-row-in {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.marketing-root .team-row-meta {
+  flex: 1;
+  min-width: 0;
+}
+.marketing-root .team-row-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.005em;
+}
+.marketing-root .team-row-role {
+  color: var(--ag-mute);
+  font-weight: 400;
+}
+.marketing-root .team-row-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--ag-mute);
+  letter-spacing: 0.04em;
+}
+.marketing-root .team-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.marketing-root .team-row-cursor {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #0a0a0c;
+}
+.marketing-root .team-row--joining {
+  background: transparent;
+  border: 1px dashed var(--ag-line-2);
+  justify-content: center;
+  padding: 8px 14px;
+  opacity: 0;
+  animation: team-row-in 0.6s 1s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+.marketing-root .team-row-ghost {
+  display: none;
+}
+.marketing-root .team-joining-text {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  color: var(--ag-faint);
+  letter-spacing: 0.08em;
+}
+.marketing-root .team-cursor {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+}
+.marketing-root .team-cursor--1 {
+  top: 28%;
+  right: 12%;
+  animation: team-cursor-1 6s ease-in-out infinite;
+}
+.marketing-root .team-cursor--2 {
+  bottom: 32%;
+  left: 8%;
+  animation: team-cursor-2 7s 1.5s ease-in-out infinite;
+}
+@keyframes team-cursor-1 {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  20%,
+  70% {
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-30px, 20px);
+  }
+}
+@keyframes team-cursor-2 {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  20%,
+  70% {
+    opacity: 1;
+  }
+  50% {
+    transform: translate(40px, -15px);
+  }
+}
+
+/* CARD 3 — REVIEW */
+.marketing-root .review-stage {
+  padding: 0 30px 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.marketing-root .rev-ring {
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  border-radius: 50%;
+  border: 1px solid var(--ag-accent);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.4);
+  pointer-events: none;
+}
+.marketing-root .rev-ring--1 {
+  width: 220px;
+  height: 220px;
+  animation: rev-ring 3.5s ease-out infinite;
+}
+.marketing-root .rev-ring--2 {
+  width: 220px;
+  height: 220px;
+  animation: rev-ring 3.5s 1.2s ease-out infinite;
+}
+.marketing-root .rev-ring--3 {
+  width: 220px;
+  height: 220px;
+  animation: rev-ring 3.5s 2.4s ease-out infinite;
+}
+@keyframes rev-ring {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+  30% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.5);
+  }
+}
+.marketing-root .rev-card {
+  position: relative;
+  width: 92%;
+  background: linear-gradient(180deg, #16161e 0%, #0e0e14 100%);
+  border: 1px solid var(--ag-line-2);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.7), 0 0 80px -20px rgba(165, 137, 255, 0.22);
+  z-index: 2;
+  box-sizing: border-box;
+}
+.marketing-root .rev-card-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--ag-line);
+}
+.marketing-root .rev-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--ag-line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.marketing-root .rev-card-meta {
+  flex: 1;
+  min-width: 0;
+}
+.marketing-root .rev-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.008em;
+}
+.marketing-root .rev-card-sub {
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--ag-mute);
+}
+.marketing-root .rev-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ag-green);
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.15);
+  animation: ag-pulse 2s infinite;
+}
+.marketing-root .rev-card-secure {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid var(--ag-line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ag-body);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.marketing-root .rev-url {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 9px 9px 9px 12px;
+  background: #050507;
+  border: 1px solid var(--ag-line-2);
+  border-radius: 9px;
+  position: relative;
+  overflow: hidden;
+}
+.marketing-root .rev-link-ic {
+  color: var(--ag-mute);
+  flex-shrink: 0;
+}
+.marketing-root .rev-url-text {
+  flex: 1;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.marketing-root .rev-url-host {
+  color: var(--ag-mute);
+}
+.marketing-root .rev-url-slug {
+  color: #fff;
+}
+.marketing-root .rev-url-caret {
+  display: inline-block;
+  width: 1.5px;
+  height: 12px;
+  background: var(--ag-accent);
+  margin-left: 2px;
+  animation: rev-caret 1s infinite;
+}
+@keyframes rev-caret {
+  50% {
+    opacity: 0;
+  }
+}
+.marketing-root .rev-copy {
+  padding: 5px 10px;
+  background: var(--ag-accent);
+  color: #fff;
+  border: 0;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  font-family: inherit;
+  cursor: pointer;
+}
+.marketing-root .rev-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+.marketing-root .rev-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: rgba(165, 137, 255, 0.1);
+  border: 1px solid rgba(165, 137, 255, 0.18);
+  color: oklch(82% 0.1 295);
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: -0.002em;
+}
+.marketing-root .rev-pill svg {
+  color: var(--ag-accent);
+}
+.marketing-root .rev-faces {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+}
+.marketing-root .rev-faces .ag-av {
+  margin-left: -6px;
+}
+.marketing-root .rev-faces .ag-av:first-child {
+  margin-left: 0;
+}
+.marketing-root .rev-faces-plus {
+  margin-left: 4px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  color: var(--ag-mute);
+  letter-spacing: 0.04em;
+}
+.marketing-root .rev-ping {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 8px 8px;
+  background: rgba(20, 20, 26, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--ag-line-2);
+  border-radius: 99px;
+  font-size: 11.5px;
+  color: var(--ag-body);
+  white-space: nowrap;
+  opacity: 0;
+  z-index: 3;
+}
+.marketing-root .rev-ping span:not(.ag-av) {
+  font-weight: 500;
+}
+.marketing-root .rev-ping--1 {
+  top: 12%;
+  right: 6%;
+  animation: rev-ping-1 6s ease-out infinite;
+}
+.marketing-root .rev-ping--2 {
+  bottom: 14%;
+  left: 4%;
+  animation: rev-ping-2 6s 3s ease-out infinite;
+}
+@keyframes rev-ping-1 {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  10%,
+  50% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  60%,
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@keyframes rev-ping-2 {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  10%,
+  50% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  60%,
+  100% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* CARD 4 — SHIP */
+.marketing-root .ship-stage {
+  padding: 0 30px 30px;
+  position: relative;
+}
+.marketing-root .ship-ticket {
+  position: absolute;
+  left: 30px;
+  right: 30px;
+  background: linear-gradient(180deg, #161620, #0f0f15);
+  border: 1px solid var(--ag-line-2);
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 20px 40px -16px rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  box-sizing: border-box;
+}
+.marketing-root .ship-ticket--1 {
+  bottom: 30px;
+  z-index: 3;
+  animation: ship-in-1 0.8s 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+.marketing-root .ship-ticket--2 {
+  bottom: 132px;
+  z-index: 2;
+  transform: scale(0.96);
+  animation: ship-in-2 0.8s 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+.marketing-root .ship-ticket--3 {
+  bottom: 226px;
+  z-index: 1;
+  transform: scale(0.92);
+  padding: 10px 14px;
+  animation: ship-in-3 0.8s 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+@keyframes ship-in-1 {
+  0% {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes ship-in-2 {
+  0% {
+    transform: scale(0.92) translateY(12px);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(0.96) translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes ship-in-3 {
+  0% {
+    transform: scale(0.88) translateY(12px);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(0.92) translateY(0);
+    opacity: 0.4;
+  }
+}
+.marketing-root .ship-ticket-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.marketing-root .ship-ticket-id {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--ag-mute);
+}
+.marketing-root .ship-prio {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+.marketing-root .ship-prio--high {
+  background: rgba(255, 110, 76, 0.14);
+  color: oklch(78% 0.18 32);
+  border: 1px solid rgba(255, 110, 76, 0.22);
+}
+.marketing-root .ship-prio--med {
+  background: rgba(245, 183, 58, 0.12);
+  color: oklch(82% 0.15 75);
+  border: 1px solid rgba(245, 183, 58, 0.2);
+}
+.marketing-root .ship-prio--low {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ag-mute);
+  border: 1px solid var(--ag-line);
+}
+.marketing-root .ship-ticket-status {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--ag-mute);
+  letter-spacing: 0.06em;
+}
+.marketing-root .ship-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: oklch(70% 0.16 245);
+}
+.marketing-root .ship-status-dot--ok {
+  background: var(--ag-green);
+}
+.marketing-root .ship-ticket-title {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.005em;
+  margin-bottom: 10px;
+}
+.marketing-root .ship-ticket-title-faded {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ag-mute);
+  letter-spacing: -0.003em;
+}
+.marketing-root .ship-ticket-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+.marketing-root .ship-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--ag-line);
+  border-radius: 5px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--ag-body);
+  letter-spacing: 0.02em;
+}
+.marketing-root .ship-ticket-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--ag-line);
+}
+.marketing-root .ship-assign {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #fff;
+}
+.marketing-root .ship-divider {
+  width: 1px;
+  height: 10px;
+  background: var(--ag-line-2);
+}
+.marketing-root .ship-foot-meta {
+  font-size: 11px;
+  color: var(--ag-mute);
+}
+.marketing-root .ship-ide {
+  position: absolute;
+  top: 18px;
+  right: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px;
+  background: rgba(20, 20, 26, 0.7);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--ag-line-2);
+  border-radius: 99px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--ag-body);
+  letter-spacing: 0.04em;
+  z-index: 4;
+  animation: ship-ide-in 1s 1.4s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+@keyframes ship-ide-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.marketing-root .ship-ide-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ag-green);
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.15);
+  animation: ag-pulse 2s infinite;
+}
+
+/* AVATAR base */
+.marketing-root .ag-av {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.marketing-root .ag-av--photo {
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.04);
+}
+.marketing-root .ag-av.ring {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 0 1.5px #0a0a0c;
+}
+
+/* Responsive: collapse 2-col grid + header on narrow viewports */
+@media (max-width: 960px) {
+  .marketing-root .ag-root {
+    padding: 64px 24px 72px;
+  }
+  .marketing-root .ag-head {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    align-items: start;
+  }
+  .marketing-root .ag-title {
+    font-size: 44px;
+  }
+  .marketing-root .ag-grid {
+    grid-template-columns: 1fr;
+  }
+  .marketing-root .ag-card {
+    padding: 28px 24px 0;
+    min-height: 460px;
+  }
+  .marketing-root .ag-stage {
+    margin: 24px -24px 0;
+  }
+  .marketing-root .qa-canvas,
+  .marketing-root .qa-stage,
+  .marketing-root .team-stage,
+  .marketing-root .review-stage,
+  .marketing-root .ship-stage,
+  .marketing-root .ship-ticket {
+    /* keep insets predictable on narrow */
+  }
+  .marketing-root .qa-canvas {
+    left: 24px;
+    right: 24px;
+  }
+  .marketing-root .qa-stage,
+  .marketing-root .review-stage,
+  .marketing-root .ship-stage {
+    padding: 0 24px 24px;
+  }
+  .marketing-root .team-stage {
+    padding: 0 24px 28px;
+  }
+  .marketing-root .ship-ticket {
+    left: 24px;
+    right: 24px;
+  }
+  .marketing-root .ship-ide {
+    right: 24px;
+  }
+}
+

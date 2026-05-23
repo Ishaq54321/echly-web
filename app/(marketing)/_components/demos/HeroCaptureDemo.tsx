@@ -215,6 +215,8 @@ export function HeroCaptureDemo() {
       if (target.closest("[data-annote-ui]")) return;
       // …and the real CTA button, which must navigate to /signup, not capture.
       if (target.closest(".hcd-hero-cta")) return;
+      // …and the "New" feature pill above the headline, which links to #whats-new.
+      if (target.closest(".hcd-hero-pill")) return;
 
       const stageRect = stage.getBoundingClientRect();
 
@@ -279,7 +281,9 @@ export function HeroCaptureDemo() {
     // Comment cursor only over the click-target zone — never over annote UI or
     // the real CTA button (which keeps its own pointer cursor).
     const overCarveout =
-      !!target.closest("[data-annote-ui]") || !!target.closest(".hcd-hero-cta");
+      !!target.closest("[data-annote-ui]") ||
+      !!target.closest(".hcd-hero-cta") ||
+      !!target.closest(".hcd-hero-pill");
     setInDemoZone(!overCarveout && demo.kind === "idle");
   }, [demo.kind]);
 
@@ -441,6 +445,19 @@ export function HeroCaptureDemo() {
           element and runs the capture sequence (handled in handleStageClick).
           The only carve-out is the real "Get Annote" CTA. */}
       <div className="hcd-hero-copy">
+        <a
+          className="hcd-hero-pill"
+          href="#whats-new"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span className="hcd-hero-pill-badge">New</span>
+          <span className="hcd-hero-pill-text">
+            Voice-to-ticket with full page context
+          </span>
+          <span className="hcd-hero-pill-arrow">
+            <ArrowIcon size={11} />
+          </span>
+        </a>
         <h1 className="hcd-hero-h1">
           Feedback at the
           <br />

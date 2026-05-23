@@ -14,9 +14,7 @@ export function SessionsDetail() {
     <section id="teams" className="sessions-detail">
       <div className="sd-head">
         <h2 className="sd-h">
-          Stop chasing feedback across
-          <br />
-          five different tools.
+          Stop chasing feedback across five different tools.
         </h2>
         <p className="sd-p">
           Annote replaces email threads, Slack DMs, and stray Looms with one

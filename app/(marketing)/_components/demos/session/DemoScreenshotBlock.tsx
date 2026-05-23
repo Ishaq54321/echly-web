@@ -20,7 +20,7 @@
  */
 "use client";
 
-import { Info, Pencil, ZoomIn } from "lucide-react";
+import { Info } from "lucide-react";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { StaticPin } from "./screenshots/StaticPin";
 import type { MockScreenshot } from "./sessionMockData";
@@ -80,27 +80,6 @@ export function DemoScreenshotBlock({
 
         <div className="absolute inset-0 bg-gradient-to-t from-white/20 via-transparent to-transparent pointer-events-none" />
 
-        {canEdit && onEdit && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit();
-            }}
-            className="absolute top-3 right-[3.75rem] p-3 rounded-xl bg-white/95 text-[var(--text-primary-strong)] shadow-[var(--shadow-level-2)] hover:bg-white hover:shadow-[var(--shadow-level-3)] transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)]"
-            aria-label="Edit screenshot"
-          >
-            <Pencil className="h-[1.375rem] w-[1.375rem]" strokeWidth={1.5} />
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={onExpand}
-          className="absolute top-3 right-3 p-3 rounded-xl bg-white/95 text-[var(--text-primary-strong)] shadow-[var(--shadow-level-2)] hover:bg-white hover:shadow-[var(--shadow-level-3)] transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-ring)]"
-          aria-label="Expand screenshot"
-        >
-          <ZoomIn className="h-[1.375rem] w-[1.375rem]" strokeWidth={1.5} />
-        </button>
         {infoTooltip ? (
           <div className="absolute top-3 left-3">
             <Tooltip content={infoTooltip} position="right">
