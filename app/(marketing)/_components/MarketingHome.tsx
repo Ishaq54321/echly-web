@@ -9,8 +9,8 @@ import { BuiltForAgenciesDark } from "./sections/BuiltForAgenciesDark";
 import { WhoItsFor } from "./sections/WhoItsFor";
 import { Pricing } from "./sections/Pricing";
 import { FAQ } from "./sections/FAQ";
-import { Editorial } from "./sections/Editorial";
-import { Closing } from "./sections/Closing";
+import { FounderNote } from "./sections/FounderNote";
+import { FinalCTA } from "./sections/FinalCTA";
 
 export function MarketingHome() {
   return (
@@ -18,14 +18,14 @@ export function MarketingHome() {
       <MarketingHeader />
       <main>
         <Hero />
+        <ClickToTicket />
         <SessionsDetail />
         <BuiltForAgenciesDark />
-        <ClickToTicket />
         <WhoItsFor />
         <Pricing />
         <FAQ />
-        <Editorial />
-        <Closing />
+        <FounderNote />
+        <FinalCTA />
       </main>
       <MarketingFooter />
     </div>

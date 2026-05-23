@@ -32,10 +32,7 @@
 import { useEffect, useMemo } from "react";
 import { VoiceTicketDemo } from "../demos";
 import { CapturePill } from "../demos/annote/CapturePill";
-import { getTicketIconFromTags } from "@/lib/utils/getTicketIconFromTags";
 import {
-  Link as LinkIcon,
-  UserPlus,
   MousePointerClick,
   AudioLines,
   Share,
@@ -48,15 +45,6 @@ const PHOTO = {
   sarah: "/marketing/people/sarah-kim.jpg",
   james: "/marketing/people/james-okafor.jpg",
 } as const;
-
-/** Sessions-mock ticket rows. Icons derive from the title via the same
- *  taxonomy the real dashboard ticket list uses (getTicketIconFromTags). */
-const SESSION_TICKETS = [
-  { title: "Onboarding skips step on back arrow", meta: "Maya · 12m ago" },
-  { title: "Dashboard legend overlaps data in dark mode", meta: "Sarah · 34m ago" },
-  { title: "Add to cart stays disabled after restock", meta: "Alex · 1h ago" },
-  { title: "Settings save fires twice on Enter", meta: "Daniel · 2h ago" },
-] as const;
 
 /* ---------------- Icons ---------------- */
 
@@ -142,6 +130,10 @@ export function ClickToTicket() {
 
   return (
     <section id="product" className="ctt-root">
+      <div className="section-eyebrow ctt-section-eyebrow">
+        <span className="section-eyebrow-dash">—</span>
+        <span className="section-eyebrow-text">The workflow</span>
+      </div>
       <h2 className="ctt-headline">From click to ticket.</h2>
 
       {/* Section 1: Capture (copy left / visual right) */}
@@ -331,93 +323,32 @@ function ContextChips() {
   );
 }
 
-/* ---------- Sessions mockup ---------- */
+/* ---------- Sessions mockup ----------
+ *
+ * This is now a TEASER, not a competing demo. The signature interactive
+ * session view lives in <SessionsDetail /> earlier on the page; this card
+ * just reminds viewers what they already saw. A single rounded card with the
+ * share icon, a one-line headline, and the four collaborator avatars.
+ */
 
 function SessionsMockup() {
   return (
-    <div className="sessions-mock">
-      <div className="sessions-mock-topbar">
-        <div className="sessions-mock-avatars">
+    <div className="sessions-mock-teaser">
+      <div className="sessions-mock-teaser-card">
+        <div className="sessions-mock-teaser-icon">
+          <Share size={18} strokeWidth={2} />
+        </div>
+        <div className="sessions-mock-teaser-text">
+          <div className="sessions-mock-teaser-title">One session, one URL</div>
+          <div className="sessions-mock-teaser-sub">
+            Maya, Daniel, Sarah + 1 viewing
+          </div>
+        </div>
+        <div className="sessions-mock-teaser-avatars">
           <img src={PHOTO.maya} alt="" />
           <img src={PHOTO.daniel} alt="" />
           <img src={PHOTO.sarah} alt="" />
-        </div>
-        {/* Share + Copy link merged pill — matches the SessionTopBar pill in the
-            "Stop chasing feedback" section (SessionTopBar.tsx). */}
-        <div className="flex items-center bg-[var(--brand)] rounded-[var(--radius-btn)] shadow-[0_1px_0_rgba(255,255,255,0.2)_inset,0_1px_2px_rgba(90,73,191,0.3)] overflow-hidden">
-          <span className="flex items-center gap-1 h-[28px] px-3 text-white text-[12px] font-semibold tracking-[-0.005em]">
-            <UserPlus size={13} strokeWidth={2} />
-            Share
-          </span>
-          <span className="w-[1.5px] self-stretch bg-white/50" />
-          <span className="flex items-center justify-center h-[28px] w-[30px] text-white">
-            <LinkIcon size={13} strokeWidth={2} />
-          </span>
-        </div>
-      </div>
-
-      <div className="sessions-mock-body">
-        <div className="sessions-mock-sidebar">
-          <div className="sessions-mock-session-header">
-            <div className="sessions-mock-session-title">
-              Q2 client QA
-            </div>
-            <div className="sessions-mock-session-meta">6 tickets · May 18</div>
-          </div>
-
-          <div className="sessions-mock-ticket-list">
-            {SESSION_TICKETS.map((t, i) => {
-              const Icon = getTicketIconFromTags(null, t.title);
-              return (
-                <div
-                  key={t.title}
-                  className={`sessions-mock-ticket${i === 0 ? " sessions-mock-ticket--active" : ""}`}
-                >
-                  <span className="sessions-mock-ticket-icon">
-                    <Icon size={14} strokeWidth={2} />
-                  </span>
-                  <div className="sessions-mock-ticket-text">
-                    <div className="sessions-mock-ticket-title">{t.title}</div>
-                    <div className="sessions-mock-ticket-meta">{t.meta}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="sessions-mock-detail">
-          <div className="sessions-mock-ticket-header">
-            <h4 className="sessions-mock-detail-title">
-              Onboarding skips step on back arrow
-            </h4>
-          </div>
-
-          <div className="sessions-mock-screenshot">
-            <div className="sessions-mock-screenshot-phone">
-              <div className="sessions-mock-screenshot-ui" />
-              <div className="sessions-mock-screenshot-cta" />
-            </div>
-            <div className="sessions-mock-screenshot-pin">1</div>
-          </div>
-
-          <div className="sessions-mock-section">
-            <div className="sessions-mock-section-label">Description</div>
-            <p className="sessions-mock-description">
-              On the back arrow, the onboarding flow skips ahead to step 5
-              instead of returning to the previous step. The router push is
-              overwriting history.replaceState.
-            </p>
-          </div>
-
-          <div className="sessions-mock-section">
-            <div className="sessions-mock-section-label">Tags</div>
-            <div className="sessions-mock-tags">
-              <span className="sessions-mock-tag">onboarding</span>
-              <span className="sessions-mock-tag">navigation</span>
-              <span className="sessions-mock-tag">bug</span>
-            </div>
-          </div>
+          <img src="/marketing/people/alex-nguyen.jpg" alt="" />
         </div>
       </div>
     </div>

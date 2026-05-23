@@ -87,14 +87,24 @@ type DemoState =
  *
  * Click → first word ≈ 300ms · click → modal-visible ≈ 5.3s.
  */
+/**
+ * Polish pass: slowed for tactile readability. Every beat got more room so
+ * viewers see each step land rather than experiencing the sequence as a blur.
+ *
+ *   highlight 350 (was 150) Â· pill-in 500 (was 100) Â· listening 150 (was 50) Â·
+ *   transcribing 3600 (was 3000) Â· transcript-hold 1800 (was 1500) Â·
+ *   sending 350 (was 200) Â· ticket-lands 400 (was 300)
+ *
+ * Click â†’ first word â‰ˆ 1.0s (was 0.3s). Click â†’ modal-visible â‰ˆ 7.0s (was 5.3s).
+ */
 const PHASE_DURATION: Record<CapturePhase, number> = {
-  highlight: 150,
-  "pill-in": 100,
-  listening: 50,
-  transcribing: 3000,
-  "transcript-hold": 1500,
-  sending: 200,
-  "ticket-lands": 300,
+  highlight: 600,
+  "pill-in": 700,
+  listening: 200,
+  transcribing: 4200,
+  "transcript-hold": 1800,
+  sending: 700,
+  "ticket-lands": 500,
   "modal-opens": 0,
 };
 
@@ -497,7 +507,7 @@ export function HeroCaptureDemo() {
 
         {isPillVisible && pillAnchor && (
           <div
-            className="hcd-pill-anchor is-visible"
+            className={`hcd-pill-anchor is-visible${phase === "sending" ? " is-structuring" : ""}`}
             style={{ top: pillAnchor.top, left: pillAnchor.left }}
           >
             <CapturePill
@@ -522,12 +532,13 @@ export function HeroCaptureDemo() {
                     : "listening"
                 }
                 transcript={DEMO_TRANSCRIPT}
-                // v9 (Fix 6): ~21 words, 150ms delay + 21×130ms ≈ 2.9s, inside
-                // the 3000ms transcribing phase so the last word lands with a
-                // small buffer before transcript-hold. The short delay gives the
-                // start-of-box cursor ~300ms of blink before the first word.
-                wordIntervalMs={130}
-                typingDelayMs={150}
+                // Polish pass: slowed to ~30 chars/sec (human reading speed).
+                // ~21 words × 190ms ≈ 4.0s, inside the 4200ms transcribing phase
+                // so the last word lands with a small buffer before
+                // transcript-hold. The 250ms delay gives the start-of-box cursor
+                // a brief blink before the first word.
+                wordIntervalMs={190}
+                typingDelayMs={250}
               />
             )}
           </div>

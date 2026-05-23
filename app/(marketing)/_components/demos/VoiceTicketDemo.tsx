@@ -189,6 +189,18 @@ export function VoiceTicketDemo() {
           ))}
         </div>
         <div className={`vtdemo-stage${showPolished ? " is-polished" : ""}`}>
+          {/* Polish-pass magic moment: a radial purple pulse blooms over the
+              stage during the brief `pressing` beat â€” the visual bridge
+              between raw transcript and structured ticket. It's keyed on
+              `pressing` so React remounts the element each loop and the CSS
+              animation retriggers. Suppressed under prefers-reduced-motion. */}
+          {!reduced && pressing && (
+            <span
+              key={`pulse-${state.phase}`}
+              className="voice-morph-pulse"
+              aria-hidden="true"
+            />
+          )}
           <div className="vtdemo-rough">
             &ldquo;
             {ROUGH_TRANSCRIPT.slice(0, visibleChars)}

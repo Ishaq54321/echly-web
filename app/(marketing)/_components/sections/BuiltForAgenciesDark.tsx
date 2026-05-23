@@ -269,7 +269,7 @@ function CardTeam() {
 
 function CardReview() {
   return (
-    <article className="ag-card ag-card--review">
+    <article className="ag-card ag-card--review ag-card--featured">
       <div className="ag-card-head">
         <Eyebrow>03 · REVIEW</Eyebrow>
         <h3 className="ag-h">
@@ -505,7 +505,7 @@ export function BuiltForAgenciesDark() {
           </p>
           <div className="ag-head-meta">
             <span className="ag-head-dot"></span>
-            Used by 2,400+ studios &amp; in-house teams
+            Built for studios and in-house teams shipping client work.
           </div>
         </div>
       </header>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowIcon } from "../icons";
 
 type FaqEntry = {
   q: string;
@@ -10,33 +9,16 @@ type FaqEntry = {
 
 const FAQS: ReadonlyArray<FaqEntry> = [
   {
-    q: "How is Annote different from Loom or a screenshot tool?",
-    a: "Loom records video. Screenshot tools take pictures. Annote captures the page — voice, context, AI — and produces structured tickets your team can ship.",
+    q: "Do I need to install anything to view a session?",
+    a: "No. Anyone with the link can view the session in their browser. Comments, replies, status updates — all without an account or install. The Chrome extension is only for the person doing the capturing.",
   },
   {
-    q: "Do my clients or teammates need to install anything?",
-    a: "No. Only people capturing feedback install the extension. Viewing a session is just opening a link.",
+    q: "What happens if my voice notes aren't perfect?",
+    a: "That's the point. Speak however you'd normally talk through feedback — half-formed, casual, with filler words. Annote's AI structures the rough notes into clean tickets with title, description, severity, and tags. You can edit, rewrite, or send as-is.",
   },
   {
-    q: "Is the AI optional?",
-    a: "Always. Edit, rewrite, or ignore the draft.",
-  },
-  {
-    q: "Will this work on my Webflow / Framer / staging site?",
-    a: "Yes. Annote works on any website — live, staging, or local. Custom integrations available for Webflow and Framer on Business and Enterprise plans.",
-  },
-  {
-    q: "Can I white-label sessions for client work?",
-    a: "Yes, on the Business plan. Custom logo, colors, and domain on every shared session.",
-  },
-  {
-    q: "Where does my data live?",
-    a: (
-      <>
-        Encrypted in transit and at rest. SSO and SAML on Enterprise.{" "}
-        <a href="#security">Read about security →</a>
-      </>
-    ),
+    q: "Does this work on staging environments and password-protected sites?",
+    a: "Yes. Annote captures whatever you're looking at in your browser — production, staging, localhost, behind auth, behind feature flags. If you can see it in a tab, you can capture it.",
   },
 ];
 
@@ -47,14 +29,14 @@ export function FAQ() {
     <section id="faq" className="faq">
       <div className="faq-inner">
         <div className="faq-left">
-          <span className="section-eyebrow">FAQ</span>
+          <div className="section-eyebrow">
+            <span className="section-eyebrow-dash">—</span>
+            <span className="section-eyebrow-text">Questions</span>
+          </div>
           <h2 className="faq-h">Quick answers.</h2>
           <p className="faq-p">
-            Most things you&apos;d want to know in under a minute.
+            Three things people ask before they sign up.
           </p>
-          <a className="faq-all" href="#all-faq">
-            Read all FAQs <ArrowIcon size={11} />
-          </a>
         </div>
         <div className="faq-list">
           {FAQS.map((entry, i) => {

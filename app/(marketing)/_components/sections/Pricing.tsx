@@ -22,9 +22,9 @@ export function Pricing() {
             $0<span className="pr-period">free forever</span>
           </div>
           <ul className="pr-features">
-            <li>Up to 5 members</li>
+            <li>Limited members</li>
             <li>50 tickets / month</li>
-            <li>300 AI improvements / month</li>
+            <li>Limited AI improvements / month</li>
             <li>Basic insights</li>
           </ul>
           <Link className="btn-white pr-cta" href="/signup">
@@ -36,12 +36,12 @@ export function Pricing() {
           <div className="pr-rec-badge">Recommended</div>
           <div className="pr-tier">Business</div>
           <div className="pr-amount">
-            $38<span className="pr-period">/mo · 2 seats · $19/seat</span>
+            $19<span className="pr-period">/mo per seat</span>
           </div>
           <ul className="pr-features">
             <li>Unlimited members</li>
             <li>Unlimited tickets</li>
-            <li>1,500 AI improvements / month</li>
+            <li>Unlimited AI improvements / month</li>
             <li>Priority support</li>
             <li>Custom branding</li>
             <li>Integrations</li>

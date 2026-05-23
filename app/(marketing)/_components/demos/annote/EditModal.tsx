@@ -77,10 +77,10 @@ export function EditModal({ ticket, onClose = () => {} }: EditModalProps) {
         className="editor-overlay"
         role="dialog"
         aria-label="Edit ticket"
-        initial={{ opacity: 0, scale: 0.96, x: "-50%", y: "-50%" }}
+        initial={{ opacity: 0, scale: 0.95, x: "-50%", y: "-50%" }}
         animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
         exit={{ opacity: 0, scale: 0.98, x: "-50%", y: "-50%" }}
-        transition={{ duration: 0.25, ease: [0.22, 0.61, 0.36, 1] }}
+        transition={{ duration: 0.32, ease: [0.22, 0.61, 0.36, 1] }}
       >
 
         {/* ── Header ── */}

@@ -865,6 +865,10 @@
   max-width: none;
   background: #F2F0EB;
 }
+.marketing-root .ctt-section-eyebrow {
+  align-self: center;
+  color: rgba(15, 23, 42, 0.50);
+}
 
 .marketing-root .ctt-headline {
   font-size: clamp(40px, 5vw, 64px);
@@ -1551,6 +1555,243 @@
   background: #fff;
 }
 
+/* ============ Sessions teaser card (reduced from full mockup) ============
+   The signature session view is now its own section above; this card in the
+   ClickToTicket grid is a small reminder, not a competing demo. */
+.marketing-root .sessions-mock-teaser {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+.marketing-root .sessions-mock-teaser-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  background: #FFFFFF;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: 14px;
+  box-shadow:
+    0 2px 4px rgba(15, 23, 42, 0.04),
+    0 12px 32px -8px rgba(15, 23, 42, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+  max-width: 380px;
+}
+.marketing-root .sessions-mock-teaser-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #F0ECFB;
+  color: #5A49BF;
+  flex-shrink: 0;
+}
+.marketing-root .sessions-mock-teaser-text {
+  flex: 1;
+  min-width: 0;
+}
+.marketing-root .sessions-mock-teaser-title {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #15101F;
+  margin-bottom: 2px;
+  letter-spacing: -0.005em;
+}
+.marketing-root .sessions-mock-teaser-sub {
+  font-size: 13px;
+  color: rgba(15, 23, 42, 0.60);
+}
+.marketing-root .sessions-mock-teaser-avatars {
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+}
+.marketing-root .sessions-mock-teaser-avatars img {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid white;
+  margin-left: -8px;
+  object-fit: cover;
+}
+.marketing-root .sessions-mock-teaser-avatars img:first-child {
+  margin-left: 0;
+}
+
+/* ============================================================
+   FOUNDER NOTE â€” replaces the placeholder "Becoming Annote" editorial.
+   Centered, narrow column with portrait + paragraphs + signature.
+   ============================================================ */
+.marketing-root .founder-note-section {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 96px 32px 80px;
+}
+.marketing-root .founder-note-container {
+  max-width: 920px;
+  margin: 0 auto;
+}
+.marketing-root .founder-note-eyebrow {
+  color: rgba(15, 23, 42, 0.50);
+  margin-bottom: 8px;
+}
+.marketing-root .founder-note-grid {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 40px;
+  align-items: start;
+  margin-top: 32px;
+}
+.marketing-root .founder-note-photo {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 4px solid white;
+  box-shadow:
+    0 2px 4px rgba(15, 23, 42, 0.06),
+    0 8px 24px -8px rgba(15, 23, 42, 0.12);
+}
+.marketing-root .founder-note-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.marketing-root .founder-note-content {
+  display: flex;
+  flex-direction: column;
+}
+.marketing-root .founder-note-paragraph {
+  font-size: 17px;
+  line-height: 1.65;
+  color: rgba(15, 23, 42, 0.75);
+  margin: 0 0 16px;
+}
+.marketing-root .founder-note-paragraph:last-of-type {
+  margin-bottom: 24px;
+}
+.marketing-root .founder-note-signature {
+  margin-top: 16px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+.marketing-root .founder-note-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #15101F;
+  margin-bottom: 6px;
+}
+.marketing-root .founder-note-handles {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.marketing-root .founder-note-handles a {
+  color: #5A49BF;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+.marketing-root .founder-note-handles a:hover {
+  color: #15101F;
+  text-decoration: underline;
+}
+.marketing-root .founder-note-handle-divider {
+  color: rgba(15, 23, 42, 0.30);
+}
+@media (max-width: 767px) {
+  .marketing-root .founder-note-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    text-align: center;
+  }
+  .marketing-root .founder-note-photo {
+    margin: 0 auto;
+    width: 120px;
+    height: 120px;
+  }
+  .marketing-root .founder-note-signature {
+    text-align: center;
+  }
+  .marketing-root .founder-note-handles {
+    justify-content: center;
+  }
+}
+
+/* ============================================================
+   FINAL CTA â€” closing moment of the marketing page.
+   Replaces the old "Feedback at the speed of seeing it" tagline repeat.
+   ============================================================ */
+.marketing-root .final-cta-section {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 96px 32px 80px;
+  text-align: center;
+}
+.marketing-root .final-cta-container {
+  max-width: 680px;
+  margin: 0 auto;
+}
+.marketing-root .final-cta-headline {
+  font-size: clamp(36px, 4vw, 56px);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  margin: 0 0 16px;
+  background: linear-gradient(180deg, #15101F 0%, #15101F 40%, #54495F 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: #15101F;
+}
+.marketing-root .final-cta-sub {
+  font-size: 17px;
+  line-height: 1.55;
+  color: rgba(15, 23, 42, 0.65);
+  margin: 0 auto 36px;
+  max-width: 520px;
+}
+.marketing-root .final-cta-buttons {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.marketing-root .final-cta-primary {
+  /* Inherits from .mk-hero-cta. */
+}
+.marketing-root .final-cta-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 56px;
+  padding: 0 22px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  color: #15101F;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.marketing-root .final-cta-secondary:hover {
+  background: rgba(15, 23, 42, 0.04);
+  border-color: rgba(15, 23, 42, 0.22);
+  transform: translateY(-1px);
+}
+.marketing-root .final-cta-secondary svg {
+  flex-shrink: 0;
+}
+
 /* ============ DARK EDITORIAL ============ */
 .marketing-root .editorial {
   background: var(--wine-0);
@@ -1782,6 +2023,19 @@
   background: var(--ink-3);
   opacity: 0.5;
 }
+/* New unified eyebrow pattern: when children spans (.section-eyebrow-dash +
+   .section-eyebrow-text) are present, suppress the ::before dash so the
+   visible dash is the literal text-em-dash in markup. */
+.marketing-root .section-eyebrow:has(.section-eyebrow-text)::before {
+  display: none;
+}
+.marketing-root .section-eyebrow-dash {
+  color: rgba(15, 23, 42, 0.30);
+  font-weight: 500;
+}
+.marketing-root .section-eyebrow-text {
+  display: inline-block;
+}
 
 /* ============ WORKFLOW ============ */
 .marketing-root .workflow {
@@ -1817,7 +2071,114 @@
   font-weight: 500;
 }
 
-/* ============ SESSIONS DETAIL ============ */
+/* ============================================================
+   SIGNATURE SESSION VIEW â€” Stop chasing feedback (rebuilt)
+   Headline + sub sit above; the demo owns the viewport-width canvas
+   below, framed by an atmospheric light wash. Replaces the old
+   .sessions-detail / .sd-* composition (kept below as dormant CSS in
+   case anything still references it).
+   ============================================================ */
+.marketing-root .signature-session-section {
+  position: relative;
+  width: 100%;
+  margin: 0 auto;
+  padding: 96px 0 80px;
+  background: #FFFFFF;
+}
+@media (max-width: 860px) {
+  .marketing-root .signature-session-section {
+    padding: 64px 0 56px;
+  }
+}
+.marketing-root .signature-session-header {
+  text-align: center;
+  max-width: 820px;
+  margin: 0 auto 64px;
+  padding: 0 32px;
+}
+@media (max-width: 860px) {
+  .marketing-root .signature-session-header {
+    margin-bottom: 40px;
+  }
+}
+.marketing-root .signature-session-header .section-eyebrow {
+  margin-left: auto;
+  margin-right: auto;
+  color: rgba(15, 23, 42, 0.50);
+}
+.marketing-root .signature-session-headline {
+  font-size: 48px;
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  color: #15101F;
+  margin: 0 0 28px;
+}
+.marketing-root .signature-session-headline-gradient {
+  background: linear-gradient(90deg, #5A49BF 0%, #8A7DCC 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.marketing-root .signature-session-sub {
+  font-size: clamp(17px, 1.35vw, 21px);
+  line-height: 1.55;
+  color: rgba(15, 23, 42, 0.65);
+  margin: 0 auto;
+  max-width: 640px;
+}
+.marketing-root .signature-session-demo-wrapper {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 32px;
+  opacity: 0;
+  transform: translateY(40px) scale(0.98);
+  transition:
+    opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.marketing-root .signature-session-demo-wrapper.in-view {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .marketing-root .signature-session-demo-wrapper {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+/* Inside the signature wrapper the existing .session-demo-stage gets a more
+   editorial elevation: bigger radius, multi-layer shadow, taller stage. */
+.marketing-root .signature-session-demo-wrapper .session-demo-stage {
+  border-radius: 20px;
+  border: none;
+  box-shadow:
+    0 2px 4px rgba(15, 23, 42, 0.04),
+    0 12px 32px rgba(15, 23, 42, 0.08),
+    0 32px 80px -20px rgba(15, 23, 42, 0.16),
+    0 0 0 1px rgba(15, 23, 42, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+  height: 820px;
+}
+@media (max-width: 1099px) and (min-width: 901px) {
+  .marketing-root .signature-session-demo-wrapper .session-demo-stage {
+    height: 720px;
+  }
+}
+@media (max-width: 900px) {
+  .marketing-root .signature-session-demo-wrapper {
+    padding: 0 18px;
+  }
+  .marketing-root .signature-session-demo-wrapper .session-demo-stage {
+    height: auto;
+    border-radius: 16px;
+  }
+}
+
+/* ============ SESSIONS DETAIL (legacy â€” unused by new SessionsDetail) ============ */
 .marketing-root .sessions-detail {
   position: relative;
   /* Full-bleed band: shares the page background so this section blends with
@@ -4612,6 +4973,80 @@
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.55; transform: scale(0.8); }
 }
+
+/* ============================================================
+   HERO CAPTURE DEMO â€” POLISH MICRO-INTERACTIONS
+   - Tray idle breath (subtle "the page is alive" pulse)
+   - Hover lift on tray ticket rows
+   - Cursor tooltip scale-in bounce
+   - Recording dot: two concentric radiating pulse rings
+   ============================================================ */
+
+/* Tray idle breath â€” the .pill.pill-tickets sits inside the hero stage. */
+.marketing-root .hcd-tray-anchor .pill-tickets {
+  animation: hcd-tray-idle-breath 4s ease-in-out infinite;
+}
+@keyframes hcd-tray-idle-breath {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.97; }
+}
+
+/* Hover lift on tray ticket rows. The real production tray uses `.tl-vrow`
+   (verified by the [Real extension tray hierarchy] memory). */
+.marketing-root .hcd-tray-anchor .tl-vrow {
+  transition: transform 0.15s ease-out, background 0.15s ease-out;
+}
+.marketing-root .hcd-tray-anchor .tl-vrow:hover:not([aria-current="true"]) {
+  transform: translateY(-1px);
+  background: rgba(90, 73, 191, 0.04);
+}
+
+/* Cursor tooltip scale-in bounce â€” plays once each time the tooltip renders
+   (which is every time the user enters the demo zone with the comment cursor). */
+.marketing-root .hcd-cursor-tooltip {
+  animation: hcd-cursor-tooltip-bounce 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes hcd-cursor-tooltip-bounce {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* Recording dot â€” two concentric radiating pulse rings. The base heartbeat
+   animation stays (scale + opacity); these add the outward-radiating glow. */
+.marketing-root .hcd-pill-anchor .echly-pill-rec-dot {
+  position: relative;
+}
+.marketing-root .hcd-pill-anchor .echly-pill-rec-dot::before,
+.marketing-root .hcd-pill-anchor .echly-pill-rec-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.5);
+  animation: hcd-recording-pulse 2s ease-out infinite;
+}
+.marketing-root .hcd-pill-anchor .echly-pill-rec-dot::after {
+  animation-delay: 1s;
+}
+@keyframes hcd-recording-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.5); }
+  100% { box-shadow: 0 0 0 16px rgba(255, 77, 79, 0); }
+}
+
+/* Reduced motion â€” suppress the polish animations. */
+@media (prefers-reduced-motion: reduce) {
+  .marketing-root .hcd-tray-anchor .pill-tickets,
+  .marketing-root .hcd-cursor-tooltip,
+  .marketing-root .hcd-pill-anchor .echly-pill-rec-dot::before,
+  .marketing-root .hcd-pill-anchor .echly-pill-rec-dot::after {
+    animation: none;
+  }
+  .marketing-root .hcd-tray-anchor .tl-vrow {
+    transition: none;
+  }
+}
+
 .marketing-root .echly-pill-content {
   display: inline-flex;
   align-items: center;
@@ -4815,9 +5250,10 @@
      Everything â€” stageRef coords, pill anchor, highlight rect â€” now shares one
      viewport-wide coordinate system. */
   width: 100%;
-  /* v22: the demo fills the visible viewport below the announcement bar + nav so
-     it matches the screen it sits against without overflowing it. */
-  height: calc(100vh - 180px);
+  /* Final polish: signature canvas. The hero is the SHOWCASE — bigger min-height
+     so the headline + sub + tray all read as co-equal anchors. */
+  height: calc(100vh - 160px);
+  min-height: clamp(760px, 94vh, 1040px);
   margin: 0 auto;
   overflow: hidden;
   /* v14 (Annote-as-hero): the demo container is fully TRANSPARENT â€” no white
@@ -4828,6 +5264,37 @@
   background: transparent;
   isolation: isolate;
   font-family: var(--echly-font);
+}
+/* Atmospheric brand-violet wash anchored to the right side where the tray lives.
+   A soft radial glow that gives the tray visual weight as a "moment" rather than
+   a floating element, without competing with the centered headline copy. */
+.marketing-root .hcd::before {
+  content: "";
+  position: absolute;
+  top: 25%;
+  right: 0;
+  width: 55vw;
+  height: 75%;
+  background: radial-gradient(
+    ellipse 65% 55% at 82% 50%,
+    rgba(90, 73, 191, 0.10) 0%,
+    rgba(90, 73, 191, 0.04) 40%,
+    rgba(90, 73, 191, 0) 72%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+@media (max-width: 1099px) {
+  /* On narrow viewports the tray drops below the copy; soften the wash so it
+     doesn't bleed into the centered copy. */
+  .marketing-root .hcd::before {
+    width: 100%;
+    background: radial-gradient(
+      ellipse 70% 40% at 50% 85%,
+      rgba(90, 73, 191, 0.08) 0%,
+      rgba(90, 73, 191, 0) 70%
+    );
+  }
 }
 @media (max-width: 1099px) {
   .marketing-root .hcd {
@@ -5104,33 +5571,33 @@
 @media (min-width: 1440px) and (max-width: 1727px) {
   /* Standard desktop: 15"/16" MacBooks, common 1080p externals. */
   .marketing-root .hcd-tray-anchor {
-    width: 380px;
-    right: 32px;
+    width: 460px;
+    right: 40px;
   }
   .marketing-root .hcd-tray-anchor .pill-tickets {
-    max-height: 540px;
+    max-height: 660px;
   }
 }
 @media (min-width: 1728px) and (max-width: 2199px) {
   /* Large laptops & 1440p externals: 16" MBP native, 27" iMac. */
   .marketing-root .hcd-tray-anchor {
-    width: 420px;
-    right: 40px;
-    bottom: 56px;
+    width: 500px;
+    right: 48px;
+    bottom: 64px;
   }
   .marketing-root .hcd-tray-anchor .pill-tickets {
-    max-height: 580px;
+    max-height: 700px;
   }
 }
 @media (min-width: 2200px) {
   /* 4K / 5K external monitors — give the tray room to breathe. */
   .marketing-root .hcd-tray-anchor {
-    width: 480px;
-    right: 56px;
-    bottom: 72px;
+    width: 560px;
+    right: 64px;
+    bottom: 80px;
   }
   .marketing-root .hcd-tray-anchor .pill-tickets {
-    max-height: 640px;
+    max-height: 760px;
   }
 }
 /* When the comment cursor is active, hide the native cursor over the stage. */
@@ -5157,10 +5624,14 @@
    stage floor where it lost contrast. */
 .marketing-root .hcd-tray-anchor {
   position: absolute;
-  bottom: 40px;
-  right: 20px;
-  width: 340px;
-  max-width: calc(100% - 44px);
+  bottom: 56px;
+  right: 28px;
+  width: 420px;
+  max-width: calc(100% - 56px);
+  z-index: 4;
+}
+.marketing-root .hcd-tray-anchor .pill-tickets {
+  max-height: 600px;
 }
 .marketing-root .hcd-tray-anchor .echly-v2 {
   flex: initial;
@@ -5169,7 +5640,7 @@
 .marketing-root .hcd-tray-anchor .pill-tickets {
   width: 100%;
   max-width: 100%;
-  max-height: 520px;
+  max-height: 640px;
 }
 /* Glass refinement Fix 2: multi-layer elevation. Ambient close shadow â†’ mid
    falloff â†’ far cast (floating feel), plus an inner-top white highlight that
@@ -5218,15 +5689,27 @@
   transform: translateX(-50%);
 }
 
-/* Pill anchor â€” positioned by the orchestrator (Fix 4), fades in. */
+/* Pill anchor â€” positioned by the orchestrator (Fix 4). On `.is-visible` the
+   pill bounces in from below the highlight with a soft overshoot (380ms,
+   ease-out-back), reinforcing the "anchored to the click" beat. */
 .marketing-root .hcd-pill-anchor {
   position: absolute;
   opacity: 0;
-  transition: opacity 200ms ease;
+  transform: translateY(8px) scale(0.94);
+  transition:
+    opacity 200ms ease,
+    transform 200ms ease;
   pointer-events: auto;
 }
 .marketing-root .hcd-pill-anchor.is-visible {
   opacity: 1;
+  transform: translateY(0) scale(1);
+  animation: hcd-pill-bounce-in 460ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes hcd-pill-bounce-in {
+  0%   { opacity: 0; transform: translateY(10px) scale(0.92); }
+  60%  { opacity: 1; transform: translateY(-2px) scale(1.015); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 .marketing-root .hcd-pill-anchor .echly-pill-root {
   position: relative;
@@ -5939,6 +6422,36 @@
   flex: 1;
   margin: 28px -36px 0;
   min-height: 280px;
+}
+
+/* FEATURED card — one editorially distinct treatment so the eye has a clear
+   "land here first" moment. Slightly more padding, a brand-violet eyebrow, and
+   a soft purple-tinted halo over the base shadow. Sits on top of the .ag-grid's
+   1px gap line, so a thin outset shadow gives it the impression of lift. */
+.marketing-root .ag-card--featured {
+  padding: 44px 40px 0;
+  background: linear-gradient(180deg, #0e0e14 0%, #0a0a0c 100%);
+  z-index: 1;
+  box-shadow:
+    inset 0 0 0 1px rgba(165, 149, 240, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 1px 2px rgba(15, 23, 42, 0.20),
+    0 18px 48px -10px rgba(90, 73, 191, 0.18);
+}
+.marketing-root .ag-card--featured::before {
+  background: radial-gradient(
+    120% 60% at 50% 0%,
+    rgba(165, 149, 240, 0.07),
+    transparent 60%
+  );
+}
+.marketing-root .ag-card--featured .ag-eyebrow {
+  color: rgba(165, 149, 240, 0.85);
+}
+@media (max-width: 960px) {
+  .marketing-root .ag-card--featured {
+    padding: 32px 26px 0;
+  }
 }
 
 /* CARD 1 — QA */
@@ -6931,6 +7444,218 @@
   }
   .marketing-root .ship-ide {
     right: 24px;
+  }
+}
+
+/* =====================================================================
+   POLISH PASS â€” signature animation moments
+   Hero highlight glow, structuring shimmer, voice morph pulse,
+   ticket field stagger, avatar presence pulse, dark section transitions,
+   CTA hierarchy. Pure CSS, no new deps. All respect prefers-reduced-motion
+   via the global block at the very bottom of this file.
+   ===================================================================== */
+
+/* â”€â”€ Hero highlight rect: scale-in 0.92 â†’ 1.0 with brand purple glow pulse â”€â”€
+   The highlighter remounts per-rect (React key), so this animation triggers
+   once per click rather than continuously. */
+.marketing-root .hcd-element-highlight {
+  animation: hcd-highlight-impact 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: center;
+  will-change: transform, box-shadow;
+}
+@keyframes hcd-highlight-impact {
+  0% {
+    transform: scale(0.92);
+    box-shadow: 0 0 0 0 rgba(90, 73, 191, 0.0);
+  }
+  45% {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 10px rgba(90, 73, 191, 0.16);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(90, 73, 191, 0);
+  }
+}
+
+/* â”€â”€ Hero pill: "Structuring..." shimmer during `sending` phase â”€â”€
+   A subtle horizontal gradient sweep over the pill body, signalling AI
+   processing without changing the pill's existing geometry. Applied to the
+   inner `.echly-pill-content` so the pseudo-element rides over the glass. */
+.marketing-root .hcd-pill-anchor.is-structuring .echly-pill-content {
+  position: relative;
+  overflow: hidden;
+}
+.marketing-root .hcd-pill-anchor.is-structuring .echly-pill-content::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgba(90, 73, 191, 0.0) 15%,
+    rgba(90, 73, 191, 0.12) 50%,
+    rgba(90, 73, 191, 0.0) 85%
+  );
+  background-size: 200% 100%;
+  animation: hcd-pill-structuring-shimmer 1400ms linear infinite;
+  border-radius: inherit;
+  z-index: 2;
+}
+@keyframes hcd-pill-structuring-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* â”€â”€ Voice morph: purple pulse between raw â†’ structured states â”€â”€
+   Sits inside .vtdemo-stage during the brief `pressing` beat, then fades.
+   Field stagger appears as the polished ticket renders. */
+.marketing-root .vtdemo-stage .voice-morph-pulse {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at center,
+    rgba(90, 73, 191, 0.32) 0%,
+    rgba(90, 73, 191, 0.10) 35%,
+    rgba(90, 73, 191, 0.0) 70%
+  );
+  opacity: 0;
+  animation: voice-morph-pulse 640ms ease-out forwards;
+  z-index: 1;
+  border-radius: 12px;
+}
+@keyframes voice-morph-pulse {
+  0%   { opacity: 0; transform: scale(0.55); }
+  45%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.25); }
+}
+
+/* Stagger the polished ticket's interior fields as the morph completes. The
+   .vtdemo-polished container fades up via its existing rule; this adds a
+   per-row appear so the ticket feels constructed rather than dropped. */
+.marketing-root .vtdemo-stage.is-polished .tcm-head,
+.marketing-root .vtdemo-stage.is-polished .tcm-title,
+.marketing-root .vtdemo-stage.is-polished .tcm-meta-row,
+.marketing-root .vtdemo-stage.is-polished .tcm-send {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: vtdemo-field-appear 380ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.marketing-root .vtdemo-stage.is-polished .tcm-head      { animation-delay: 120ms; }
+.marketing-root .vtdemo-stage.is-polished .tcm-title     { animation-delay: 180ms; }
+.marketing-root .vtdemo-stage.is-polished .tcm-meta-row:nth-child(1) { animation-delay: 240ms; }
+.marketing-root .vtdemo-stage.is-polished .tcm-meta-row:nth-child(2) { animation-delay: 280ms; }
+.marketing-root .vtdemo-stage.is-polished .tcm-meta-row:nth-child(3) { animation-delay: 320ms; }
+.marketing-root .vtdemo-stage.is-polished .tcm-send      { animation-delay: 380ms; }
+@keyframes vtdemo-field-appear {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* â”€â”€ Session view: avatar presence pulse â”€â”€
+   Cycles a soft amber glow ring across the existing viewer avatars in the
+   session top bar. The base 2px amber ring (boxShadow on the wrapping span,
+   set inline in PresenceAvatarRow) stays static; this layer adds a separate
+   pulsing glow that travels avatar-to-avatar. ~2s per avatar.
+   Scoped to .session-demo-stage so it only runs in the marketing forklift. */
+.marketing-root .session-demo-stage [data-presence-pulse] {
+  position: relative;
+}
+.marketing-root .session-demo-stage [data-presence-pulse]::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 999px;
+  pointer-events: none;
+  box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.0);
+  opacity: 0;
+  /* 8s total = 2s per avatar Ã— 4 avatars. */
+  animation: session-avatar-presence-pulse 8s ease-in-out infinite;
+}
+.marketing-root .session-demo-stage [data-presence-pulse="0"]::after { animation-delay: 0s; }
+.marketing-root .session-demo-stage [data-presence-pulse="1"]::after { animation-delay: 2s; }
+.marketing-root .session-demo-stage [data-presence-pulse="2"]::after { animation-delay: 4s; }
+.marketing-root .session-demo-stage [data-presence-pulse="3"]::after { animation-delay: 6s; }
+@keyframes session-avatar-presence-pulse {
+  0%   { opacity: 0; box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.0); }
+  6%   { opacity: 1; box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.32); }
+  16%  { opacity: 1; box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.20); }
+  25%  { opacity: 0; box-shadow: 0 0 0 8px rgba(245, 158, 11, 0.0); }
+  100% { opacity: 0; box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.0); }
+}
+
+/* Dark section: flat solid background, no atmospheric fade. The hard edge
+   against the adjacent light sections is intentional. */
+
+/* â”€â”€ Hero CTA contrast: strengthen primary, soften secondary â”€â”€
+   The primary CTA gets a subtle vertical gradient (so the dark surface reads
+   tactile rather than flat) plus a deeper shadow stack. Hover lifts 1px and
+   deepens the shadow. The secondary is dialed back: more transparent fill,
+   lighter shadow â€” it now supports rather than competes. */
+.marketing-root .mk-hero-cta {
+  background: linear-gradient(180deg, #1F1A2A 0%, #15101F 100%);
+  box-shadow:
+    0 2px 4px rgba(15, 23, 42, 0.14),
+    0 14px 32px rgba(15, 23, 42, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transition:
+    transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.18s ease-out,
+    background 0.18s ease-out;
+}
+.marketing-root .mk-hero-cta:hover {
+  background: linear-gradient(180deg, #2A2536 0%, #1F1A2A 100%);
+  transform: translateY(-1px);
+  box-shadow:
+    0 2px 4px rgba(15, 23, 42, 0.16),
+    0 18px 40px rgba(15, 23, 42, 0.30),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+.marketing-root .hcd-hero-cta-secondary {
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(21, 16, 31, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.marketing-root .hcd-hero-cta-secondary:hover {
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(21, 16, 31, 0.14);
+}
+
+/* â”€â”€ prefers-reduced-motion: global suppression for the polish-pass animations
+   The original section-specific @media blocks above stay in place; this is an
+   additional belt-and-braces rule covering the new keyframes introduced in
+   this pass. Disables looping/auto animations; transitions still apply at
+   ~0ms so state changes remain functional. */
+@media (prefers-reduced-motion: reduce) {
+  .marketing-root .hcd-element-highlight,
+  .marketing-root .hcd-pill-anchor.is-visible,
+  .marketing-root .hcd-pill-anchor.is-structuring .echly-pill-content::after,
+  .marketing-root .vtdemo-stage .voice-morph-pulse,
+  .marketing-root .vtdemo-stage.is-polished .tcm-head,
+  .marketing-root .vtdemo-stage.is-polished .tcm-title,
+  .marketing-root .vtdemo-stage.is-polished .tcm-meta-row,
+  .marketing-root .vtdemo-stage.is-polished .tcm-send,
+  .marketing-root .session-demo-stage [data-presence-pulse]::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  /* Make sure ticket fields remain visible (no opacity:0 lingering). */
+  .marketing-root .vtdemo-stage.is-polished .tcm-head,
+  .marketing-root .vtdemo-stage.is-polished .tcm-title,
+  .marketing-root .vtdemo-stage.is-polished .tcm-meta-row,
+  .marketing-root .vtdemo-stage.is-polished .tcm-send {
+    opacity: 1;
+    transform: none;
+  }
+  /* Pill anchor at rest. */
+  .marketing-root .hcd-pill-anchor.is-visible {
+    opacity: 1;
+    transform: none;
   }
 }
 

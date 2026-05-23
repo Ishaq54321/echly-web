@@ -42,10 +42,16 @@ const HIGHLIGHT_OUTSET = 7;
 
 export function ElementHighlighter({ rect, visible = true }: ElementHighlighterProps) {
   if (!rect || !visible) return null;
+  // The `hcd-element-highlight` class is keyed off `rect` so React remounts the
+  // element on every new capture — that retriggers the entry animation
+  // (scale-in + brand glow pulse). Pure-CSS, runs once per click.
+  const rectKey = `${rect.top}-${rect.left}-${rect.width}-${rect.height}`;
   return (
     <div
+      key={rectKey}
       aria-hidden="true"
       data-annote-ui="true"
+      className="hcd-element-highlight"
       style={{
         position: "absolute",
         top: rect.top - HIGHLIGHT_OUTSET,

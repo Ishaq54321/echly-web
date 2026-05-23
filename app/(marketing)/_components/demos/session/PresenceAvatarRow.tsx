@@ -32,11 +32,12 @@ export function PresenceAvatarRow({ viewers }: { viewers: readonly Viewer[] }) {
 
   return (
     <div className="flex items-center gap-1.5">
-      {visible.map((u) => (
+      {visible.map((u, i) => (
         <Tooltip key={u.id} content={u.name || "Viewer"} position="bottom">
           <span
             className="inline-flex rounded-full"
             style={{ boxShadow: "0 0 0 2px var(--color-warning)" }}
+            data-presence-pulse={i}
           >
             <UserAvatar
               avatarUrl={u.avatarUrl}
