@@ -55,15 +55,11 @@ export function MarketingFooter() {
         <div className="foot-brand">
           <div className="foot-brand-row">
             <span className="mk-logo-mark">
-              <AnnoteLogo width={22} height={28} />
+              <AnnoteLogo width={22} height={28} variant="white" />
             </span>
             <span className="mk-logo-word">Annote</span>
           </div>
-          <p className="foot-tag">
-            Built for the people
-            <br />
-            who care about the details.
-          </p>
+          <p className="foot-tag">Feedback at the speed of seeing it.</p>
         </div>
         {COLUMNS.map((col) => (
           <div className="foot-col" key={col.heading}>

@@ -7,7 +7,6 @@
  * the rest of the page uses for big type.
  */
 import Link from "next/link";
-import { ArrowIcon, DownloadIcon } from "../icons";
 
 export function FinalCTA() {
   return (
@@ -19,11 +18,8 @@ export function FinalCTA() {
         </p>
 
         <div className="final-cta-buttons">
-          <Link className="mk-hero-cta final-cta-primary" href="/signup">
-            <span className="mk-hero-cta-label">Get Annote for free</span>
-            <span className="mk-hero-cta-arrow">
-              <ArrowIcon size={14} />
-            </span>
+          <Link className="final-cta-primary" href="/signup">
+            Get Annote for free
           </Link>
           <a
             className="final-cta-secondary"
@@ -31,8 +27,7 @@ export function FinalCTA() {
             target="_blank"
             rel="noopener noreferrer"
           >
-            <DownloadIcon size={18} />
-            <span>Install Chrome Extension</span>
+            Install Chrome Extension
           </a>
         </div>
       </div>

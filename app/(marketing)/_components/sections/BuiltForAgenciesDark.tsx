@@ -1,12 +1,18 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+import { SessionDemoStage } from "../demos/session/SessionDemoStage";
+
 /**
  * <BuiltForAgenciesDark />
  *
- * Dark, ambient 2x2 lifecycle grid: QA → Team → Review → Ship. Each card has a
- * unique animated demo (voice memo, joining avatars, radiating share rings,
- * stacking tickets). All `.ag-*` styles live in marketing.css scoped under
- * `.marketing-root`.
+ * Two-part section sharing one ambient backdrop:
+ *  1. "What they see" — signature session demo (forklifted SessionDemoStage),
+ *     animated in via IntersectionObserver.
+ *  2. Dark 2x2 lifecycle grid: QA → Team → Review → Ship.
+ *
+ * Both share the .ag-root background so the seam is invisible. All `.ag-*`
+ * styles live in marketing.css scoped under `.marketing-root`.
  */
 
 /**
@@ -269,7 +275,7 @@ function CardTeam() {
 
 function CardReview() {
   return (
-    <article className="ag-card ag-card--review ag-card--featured">
+    <article className="ag-card ag-card--review">
       <div className="ag-card-head">
         <Eyebrow>03 · REVIEW</Eyebrow>
         <h3 className="ag-h">
@@ -481,9 +487,59 @@ function CardShip() {
 }
 
 export function BuiltForAgenciesDark() {
+  const demoRef = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
+
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") {
+      setInView(true);
+      return;
+    }
+    const node = demoRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setInView(true);
+            observer.unobserve(entry.target);
+          }
+        }
+      },
+      { threshold: 0.15 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <section id="personas" className="ag-root">
       <div className="ag-bg-grain"></div>
+
+      <header id="teams" className="signature-session-header">
+        <div className="section-eyebrow">
+          <span className="section-eyebrow-dash">✦</span>
+          <span className="section-eyebrow-text">What they see</span>
+        </div>
+        <h2 className="signature-session-headline">
+          Send one link. Everyone
+          <br />
+          <span className="signature-session-headline-gradient">
+            sees the same thing.
+          </span>
+        </h2>
+        <p className="signature-session-sub">
+          Tickets, comments, screenshots, status — all live. No accounts, no
+          installs.
+        </p>
+      </header>
+
+      <div
+        ref={demoRef}
+        className={`signature-session-demo-wrapper${inView ? " in-view" : ""}`}
+      >
+        <SessionDemoStage />
+      </div>
 
       <header className="ag-head">
         <div className="ag-head-left">
@@ -499,9 +555,7 @@ export function BuiltForAgenciesDark() {
         </div>
         <div className="ag-head-right">
           <p className="ag-lede">
-            From the first QA pass to the final dev handoff — Annote keeps every
-            piece of feedback in one place, with the context that makes it
-            actionable.
+            First QA pass to dev handoff. One place. One workflow.
           </p>
           <div className="ag-head-meta">
             <span className="ag-head-dot"></span>

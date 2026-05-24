@@ -44,18 +44,18 @@ export function SessionsDetail() {
       <header className="signature-session-header">
         <div className="section-eyebrow">
           <span className="section-eyebrow-dash">✦</span>
-          <span className="section-eyebrow-text">One place for everything</span>
+          <span className="section-eyebrow-text">What they see</span>
         </div>
         <h2 className="signature-session-headline">
-          Stop chasing feedback across
+          Send one link. Everyone
           <br />
           <span className="signature-session-headline-gradient">
-            five different tools.
+            sees the same thing.
           </span>
         </h2>
         <p className="signature-session-sub">
-          Email threads, Slack DMs, scattered Looms — replaced by one workflow.
-          Click on the thing, say what&apos;s wrong, send the link.
+          Tickets, comments, screenshots, status — all live. No accounts, no
+          installs.
         </p>
       </header>
 

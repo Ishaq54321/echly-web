@@ -379,7 +379,7 @@
 .marketing-root .hero {
   position: relative;
   overflow: hidden;
-  background: #FFFFFF;
+  background: linear-gradient(180deg, #FFFFFF 0%, #FFFFFF 70%, #E8EFFC 100%);
 }
 
 /* â”€â”€ Animated aurora background â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -863,7 +863,7 @@
   padding: 96px 24px 64px;
   width: 100%;
   max-width: none;
-  background: #F2F0EB;
+  background: #FAF9F7;
 }
 .marketing-root .ctt-section-eyebrow {
   align-self: center;
@@ -872,16 +872,12 @@
 
 .marketing-root .ctt-headline {
   font-size: clamp(40px, 5vw, 64px);
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.04em;
   text-align: center;
   margin: 0 auto 20px;
   max-width: 800px;
-  background: linear-gradient(90deg, #15101F 0%, #54495F 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
   color: #15101F;
 }
 .marketing-root .ctt-sub {
@@ -2375,8 +2371,7 @@
    ============================================================ */
 .marketing-root .final-cta-section {
   width: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
+  background: #E8E0FF;
   padding: 96px 32px 80px;
   text-align: center;
 }
@@ -2388,9 +2383,9 @@
   font-size: clamp(36px, 4vw, 56px);
   font-weight: 700;
   line-height: 1.05;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.04em;
   margin: 0 0 16px;
-  background: linear-gradient(180deg, #15101F 0%, #15101F 40%, #54495F 100%);
+  background: linear-gradient(90deg, #15101F 0%, #15101F 40%, #54495F 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -2410,32 +2405,37 @@
   align-items: center;
   flex-wrap: wrap;
 }
-.marketing-root .final-cta-primary {
-  /* Inherits from .mk-hero-cta. */
-}
+.marketing-root .final-cta-primary,
 .marketing-root .final-cta-secondary {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 56px;
+  justify-content: center;
+  height: 48px;
   padding: 0 22px;
-  border-radius: 999px;
-  background: transparent;
-  border: 1px solid rgba(15, 23, 42, 0.14);
-  color: #15101F;
+  border-radius: 12px;
   font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.005em;
   text-decoration: none;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
 }
-.marketing-root .final-cta-secondary:hover {
-  background: rgba(15, 23, 42, 0.04);
-  border-color: rgba(15, 23, 42, 0.22);
+.marketing-root .final-cta-primary {
+  background: #15101F;
+  color: #FFFFFF;
+}
+.marketing-root .final-cta-primary:hover {
+  background: #1C1729;
   transform: translateY(-1px);
 }
-.marketing-root .final-cta-secondary svg {
-  flex-shrink: 0;
+.marketing-root .final-cta-secondary {
+  background: #FFFFFF;
+  color: #15101F;
+}
+.marketing-root .final-cta-secondary:hover {
+  background: #F5F5F5;
+  transform: translateY(-1px);
 }
 
 /* ============ DARK EDITORIAL ============ */
@@ -2519,7 +2519,7 @@
 .marketing-root .ed-h {
   font-size: clamp(30px, 3.4vw, 44px);
   font-weight: 500;
-  letter-spacing: -0.024em;
+  letter-spacing: -0.04em;
   line-height: 1.12;
   margin: 0 0 18px;
   color: var(--wine-ink);
@@ -2704,7 +2704,7 @@
 .marketing-root .workflow-h {
   font-size: clamp(30px, 3.8vw, 48px);
   font-weight: 500;
-  letter-spacing: -0.024em;
+  letter-spacing: -0.04em;
   line-height: 1.1;
   margin: 0 0 22px;
   color: var(--ink-1);
@@ -2733,8 +2733,59 @@
   position: relative;
   width: 100%;
   margin: 0 auto;
-  padding: 96px 0 80px;
-  background: #FFFFFF;
+  padding: 80px 0 120px;
+  /* Three-layer Linear-style lit-surface composition:
+     1. Soft purple ceiling light from above (catches top of dashboard).
+     2. Strong lit "table surface" pool from below — brightest at 78% y,
+        fading upward — so the floor reads as a visibly lit surface rather
+        than symmetric ambient atmosphere.
+     3. Deep dark base. */
+  background:
+    /* Corner vignettes: darken the four corners so the centred surface pool
+       reads as a lit stage with the demo placed in it, not a flat-lit space.
+       Each radial peaks at its corner and fades to transparent inward. */
+    radial-gradient(
+      ellipse 50% 60% at 0% 100%,
+      rgba(0, 0, 0, 0.55) 0%,
+      rgba(0, 0, 0, 0) 70%
+    ),
+    radial-gradient(
+      ellipse 50% 60% at 100% 100%,
+      rgba(0, 0, 0, 0.55) 0%,
+      rgba(0, 0, 0, 0) 70%
+    ),
+    radial-gradient(
+      ellipse 45% 55% at 0% 0%,
+      rgba(0, 0, 0, 0.40) 0%,
+      rgba(0, 0, 0, 0) 70%
+    ),
+    radial-gradient(
+      ellipse 45% 55% at 100% 0%,
+      rgba(0, 0, 0, 0.40) 0%,
+      rgba(0, 0, 0, 0) 70%
+    ),
+    radial-gradient(
+      ellipse 70% 30% at 50% 0%,
+      rgba(100, 80, 180, 0.20) 0%,
+      rgba(80, 60, 150, 0.10) 30%,
+      rgba(40, 30, 80, 0) 60%
+    ),
+    radial-gradient(
+      ellipse 70% 50% at 50% 78%,
+      rgba(160, 130, 240, 0.55) 0%,
+      rgba(130, 100, 220, 0.40) 20%,
+      rgba(100, 75, 190, 0.25) 40%,
+      rgba(70, 55, 140, 0.10) 60%,
+      rgba(40, 30, 80, 0) 80%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(8, 6, 14, 1) 0%,
+      rgba(16, 10, 32, 1) 35%,
+      rgba(26, 16, 50, 1) 55%,
+      rgba(16, 10, 32, 1) 80%,
+      rgba(14, 10, 24, 1) 100%
+    );
 }
 @media (max-width: 860px) {
   .marketing-root .signature-session-section {
@@ -2755,18 +2806,24 @@
 .marketing-root .signature-session-header .section-eyebrow {
   margin-left: auto;
   margin-right: auto;
-  color: rgba(15, 23, 42, 0.50);
+  color: rgba(255, 255, 255, 0.55);
+}
+/* On the dark shared surface the eyebrow ✦ glyph (inherits --violet) reads
+   too purple/dim — lift it to a soft white so the lockup stays legible. */
+.marketing-root .signature-session-header .section-eyebrow .section-eyebrow-dash {
+  color: rgba(255, 255, 255, 0.70);
 }
 .marketing-root .signature-session-headline {
   font-size: 48px;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.05;
-  letter-spacing: -0.025em;
-  color: #15101F;
-  margin: 0 0 28px;
+  letter-spacing: -0.04em;
+  color: #FFFFFF;
+  margin: 0 0 14px;
 }
 .marketing-root .signature-session-headline-gradient {
-  background: linear-gradient(90deg, #5A49BF 0%, #8A7DCC 100%);
+  /* Lighter purple tones so the gradient pops against the dark surface. */
+  background: linear-gradient(90deg, #B8A8F0 0%, #9580E8 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -2775,20 +2832,53 @@
 .marketing-root .signature-session-sub {
   font-size: clamp(17px, 1.35vw, 21px);
   line-height: 1.55;
-  color: rgba(15, 23, 42, 0.65);
+  color: rgba(255, 255, 255, 0.70);
   margin: 0 auto;
-  max-width: 640px;
+  max-width: 780px;
+  text-wrap: balance;
 }
 .marketing-root .signature-session-demo-wrapper {
+  position: relative;
   width: 100%;
   max-width: 1440px;
   margin: 0 auto;
-  padding: 0 32px;
+  padding: 0 52px;
   opacity: 0;
   transform: translateY(40px) scale(0.98);
   transition:
     opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
     transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+/* Backlight: two soft purple glows confined to small boxes anchored just
+   behind the dashboard's bottom-left and bottom-right corners. Each glow
+   sits in its own corner region — no bleed across the full bottom. */
+.marketing-root .signature-session-demo-wrapper::before,
+.marketing-root .signature-session-demo-wrapper::after {
+  content: "";
+  position: absolute;
+  bottom: -60px;
+  width: 340px;
+  height: 240px;
+  background: radial-gradient(
+    ellipse 60% 80% at 50% 30%,
+    rgba(160, 120, 240, 0.55) 0%,
+    rgba(130, 95, 220, 0.30) 30%,
+    rgba(90, 65, 180, 0.10) 60%,
+    rgba(60, 45, 130, 0) 85%
+  );
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(28px);
+}
+.marketing-root .signature-session-demo-wrapper::before {
+  left: 32px;
+}
+.marketing-root .signature-session-demo-wrapper::after {
+  right: 32px;
+}
+.marketing-root .signature-session-demo-wrapper > * {
+  position: relative;
+  z-index: 2;
 }
 .marketing-root .signature-session-demo-wrapper.in-view {
   opacity: 1;
@@ -2806,13 +2896,21 @@
 .marketing-root .signature-session-demo-wrapper .session-demo-stage {
   border-radius: 20px;
   border: none;
+  /* Dark-bg elevation: deep, high-opacity black shadows so the dashboard
+     reads as a real object on a dark surface; a purple atmospheric glow
+     above (-30px y) suggests ambient brand-coloured light spilling onto
+     the top edge of the dashboard. */
+  /* All diffuse layers use negative spread so the shadow concentrates
+     directly underneath the dashboard rather than bleeding equally onto
+     the left and right sides. The thin rim border + inset top highlight
+     handle the side edges themselves. */
   box-shadow:
-    0 2px 4px rgba(15, 23, 42, 0.04),
-    0 12px 32px rgba(15, 23, 42, 0.08),
-    0 32px 80px -20px rgba(15, 23, 42, 0.16),
-    0 0 0 1px rgba(15, 23, 42, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 1);
-  height: 820px;
+    0 30px 40px -20px rgba(0, 0, 0, 0.75),
+    0 60px 80px -40px rgba(0, 0, 0, 0.65),
+    0 100px 120px -50px rgba(140, 100, 230, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    0 0 0 1px rgba(255, 255, 255, 0.08);
+  height: 790px;
 }
 @media (max-width: 1099px) and (min-width: 901px) {
   .marketing-root .signature-session-demo-wrapper .session-demo-stage {
@@ -2827,6 +2925,21 @@
     height: auto;
     border-radius: 16px;
   }
+}
+
+/* Inner panels (left tickets list, right detail card) inside the signature
+   demo: layer in a soft ambient shadow + a faint top edge highlight + a thin
+   hairline border so each panel reads as a raised physical card sitting in
+   the dashboard frame rather than a flat painted region. Scoped to the
+   signature wrapper so production session views are untouched. */
+.marketing-root .signature-session-demo-wrapper .session-demo-sidebar,
+.marketing-root .signature-session-demo-wrapper .session-demo-detail {
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.05),
+    0 4px 12px rgba(15, 23, 42, 0.06),
+    0 12px 28px -8px rgba(15, 23, 42, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 0 0 1px rgba(15, 23, 42, 0.06);
 }
 
 /* ============ SESSIONS DETAIL (legacy â€” unused by new SessionsDetail) ============ */
@@ -3238,7 +3351,7 @@
 .marketing-root .context-quote {
   font-size: clamp(28px, 3.4vw, 44px);
   font-weight: 400;
-  letter-spacing: -0.024em;
+  letter-spacing: -0.04em;
   line-height: 1.18;
   margin: 0 0 28px;
   color: var(--ink-1);
@@ -3292,561 +3405,498 @@
 .marketing-root .cc-dot.a { background: var(--ink-3); opacity: 0.7; }
 .marketing-root .cc-dot.t { background: var(--violet); opacity: 0.5; }
 
-/* ============ WHO IT'S FOR ============ */
-/* === SECTION CONTAINER === */
-/* Full-bleed opaque white background so the page's cream/blue atmosphere does
-   not show through the side gutters; inner content stays width-constrained
-   (mirrors .agency-section). */
-.marketing-root .who-its-for-section {
-  width: 100%;
-  padding: 96px 32px 80px 32px;
+/* ============ PRICING ============ */
+.marketing-root .pricing-section {
+  --pricing-grad: linear-gradient(135deg, #5A49BF 0%, #8B5CB8 50%, #D63384 100%);
+  --pricing-grad-hover: linear-gradient(135deg, #6B5AC9 0%, #9C6DC0 50%, #E04590 100%);
   background: #FFFFFF;
+  width: 100%;
+  padding: 100px 32px;
 }
-
-/* === SECTION HEADER === */
-.marketing-root .who-its-for-header {
+.marketing-root .pricing-inner {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+.marketing-root .pricing-header {
   text-align: center;
-  max-width: 820px;
-  margin: 0 auto 48px auto;
+  margin-bottom: 64px;
 }
-
-.marketing-root .who-its-for-eyebrow {
-  font-size: 12px;
+.marketing-root .pricing-header .section-eyebrow {
+  justify-content: center;
+}
+.marketing-root .pricing-headline {
+  font-size: clamp(28px, 3.4vw, 44px);
   font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  margin-bottom: 20px;
-}
-.marketing-root .who-its-for-eyebrow .who-its-for-eyebrow-star,
-.marketing-root .who-its-for-eyebrow-star {
-  color: var(--violet, #5A49BF);
-  font-weight: 600;
-  font-size: 15px;
-  line-height: 1;
-  margin-right: 2px;
-  vertical-align: -1px;
-}
-
-.marketing-root .who-its-for-headline {
-  font-size: clamp(28px, 3.2vw, 42px);
-  font-weight: 500;
-  line-height: 1.08;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  margin: 0 0 16px;
   color: var(--ink-1);
-  margin: 0 0 8px 0;
 }
-
-.marketing-root .who-its-for-subheading {
-  font-size: clamp(15px, 1.1vw, 17px);
+.marketing-root .pricing-headline-gradient {
+  background: var(--pricing-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.marketing-root .pricing-subhead {
+  font-size: 16px;
   line-height: 1.55;
   color: var(--ink-2);
-  margin: 0 auto 32px auto;
-  max-width: 620px;
   letter-spacing: -0.003em;
+  margin: 0 auto;
+  max-width: 540px;
 }
 
-/* === TAB NAVIGATION === */
-.marketing-root .who-its-for-tabs {
+/* Billing toggle */
+.marketing-root .billing-toggle {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 6px;
-  background: #FFFFFF;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 999px;
-
-  /* Subtle elevation */
+  padding: 4px;
+  background: #15101F;
+  border-radius: 10px;
+  margin: 32px auto 0;
   box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.03),
-    0 8px 24px -12px rgba(15, 23, 42, 0.06);
+    0 1px 2px rgba(20, 16, 30, 0.10),
+    0 4px 12px rgba(20, 16, 30, 0.08);
 }
-
-.marketing-root .who-its-for-tab {
+.marketing-root .billing-toggle-option {
   display: inline-flex;
   align-items: center;
-  height: 38px;
-  padding: 0 18px;
-  font-size: 14px;
-  font-weight: 500;
-  color: rgba(15, 23, 42, 0.65);
+  justify-content: center;
+  height: 32px;
+  padding: 0 22px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.75);
   background: transparent;
   border: none;
-  border-radius: 999px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  letter-spacing: -0.005em;
+  transition: background 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
-
-.marketing-root .who-its-for-tab:hover {
-  color: #15101F;
-  background: rgba(15, 23, 42, 0.04);
-}
-
-.marketing-root .who-its-for-tab.is-active {
-  background: #15101F;
-  color: #FFFFFF;
-  font-weight: 600;
-
-  /* Subtle inset highlight */
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 1px 2px rgba(15, 23, 42, 0.20);
-}
-
-.marketing-root .who-its-for-tab.is-active:hover {
-  background: #1F1A2A;
+.marketing-root .billing-toggle-option:hover {
   color: #FFFFFF;
 }
-
-/* === CONTENT CARD === */
-.marketing-root .who-its-for-content-card {
-  max-width: 1070px;
-  margin: 0 auto;
+.marketing-root .billing-toggle-option:focus-visible {
+  outline: 2px solid var(--violet);
+  outline-offset: 2px;
+}
+.marketing-root .billing-toggle-option.is-active {
   background: #FFFFFF;
-  border-radius: 24px;
-  padding: 40px 56px;
-  border: 1px solid var(--line-1);
-
-  box-shadow: var(--mk-sh-lg);
+  color: var(--ink-1);
+  box-shadow:
+    0 1px 2px rgba(20, 16, 30, 0.20),
+    0 2px 6px rgba(20, 16, 30, 0.15);
 }
 
-.marketing-root .who-its-for-grid {
+/* Tiers grid */
+.marketing-root .pricing-tiers {
   display: grid;
-  grid-template-columns: 1fr 1.0fr;
-  gap: 52px;
-  align-items: center;
-  min-height: 300px;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 24px;
+  align-items: stretch;
+  position: relative;
+  padding-top: 14px;
 }
 
-/* === COPY COLUMN === */
-.marketing-root .who-its-for-copy-column {
+/* Standard tier card */
+.marketing-root .pricing-tier {
+  position: relative;
+  background: #FFFFFF;
+  border: 1px solid var(--line-1);
+  border-radius: var(--mk-radius-lg);
+  padding: 36px 32px;
+  display: flex;
+  flex-direction: column;
+
+  box-shadow:
+    0 1px 2px rgba(20, 16, 30, 0.03),
+    0 8px 24px -8px rgba(20, 16, 30, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.marketing-root .pricing-tier:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 2px 4px rgba(20, 16, 30, 0.04),
+    0 16px 32px -12px rgba(20, 16, 30, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+/* FEATURED tier — Business — gradient stroke only */
+.marketing-root .pricing-tier--featured {
+  background-image:
+    linear-gradient(#FFFFFF, #FFFFFF),
+    var(--pricing-grad);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  border: 2px solid transparent;
+  transform: scale(1.03);
+  z-index: 2;
+
+  box-shadow:
+    0 1px 2px rgba(20, 16, 30, 0.03),
+    0 8px 24px -8px rgba(20, 16, 30, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+.marketing-root .pricing-tier--featured:hover {
+  transform: scale(1.03) translateY(-2px);
+  box-shadow:
+    0 2px 4px rgba(20, 16, 30, 0.04),
+    0 16px 32px -12px rgba(20, 16, 30, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+/* Recommended badge */
+.marketing-root .pricing-tier-badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  background: var(--pricing-grad);
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  white-space: nowrap;
+
+  box-shadow:
+    0 2px 4px rgba(90, 73, 191, 0.30),
+    0 4px 12px rgba(90, 73, 191, 0.20),
+    inset 0 1px 0 rgba(255, 255, 255, 0.20);
+}
+
+/* Tier header */
+.marketing-root .pricing-tier-header {
+  margin-bottom: 24px;
+}
+.marketing-root .pricing-tier-name {
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  color: var(--ink-2);
+  margin-bottom: 8px;
+}
+.marketing-root .pricing-tier--featured .pricing-tier-name {
+  color: var(--violet);
+}
+.marketing-root .pricing-tier-tagline {
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--ink-1);
+  min-height: 42px;
+}
+
+/* Price block — equal vertical space across tiers */
+.marketing-root .pricing-tier-price-block {
+  margin-bottom: 24px;
+  min-height: 100px;
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
-
-.marketing-root .who-its-for-tab-title {
-  font-size: clamp(28px, 2.8vw, 40px);
+.marketing-root .pricing-tier-price {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-weight: 700;
+  color: var(--ink-1);
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.marketing-root .pricing-tier-price-currency {
+  font-size: 24px;
+  font-weight: 600;
+  align-self: flex-start;
+  margin-top: 6px;
+}
+.marketing-root .pricing-tier-price-number {
+  font-size: 56px;
+}
+.marketing-root .pricing-tier-price-period-inline {
+  font-size: 14px;
   font-weight: 500;
-  line-height: 1.05;
-  letter-spacing: -0.022em;
-  color: #15101F;
-  margin: 0 0 20px 0;
-  max-width: 440px;
+  color: var(--ink-3);
+  margin-left: 8px;
+}
+.marketing-root .pricing-tier-price--custom {
+  font-size: 40px;
+  font-weight: 700;
+}
+.marketing-root .pricing-tier-price-period {
+  font-size: 13px;
+  color: var(--ink-3);
+  margin-top: 6px;
+}
+.marketing-root .pricing-tier-price-billed {
+  font-size: 13px;
+  color: var(--ink-3);
+  margin-top: 8px;
+  min-height: 18px;
+}
+.marketing-root .pricing-tier-price-original {
+  text-decoration: line-through;
+  color: var(--ink-4);
+  margin-right: 4px;
+}
+.marketing-root .pricing-tier-price-actual {
+  color: var(--ink-1);
+  font-weight: 600;
+}
+.marketing-root .pricing-tier-savings-row {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 22px;
+}
+.marketing-root .pricing-tier-savings-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  background: var(--pricing-grad);
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  box-shadow:
+    0 1px 2px rgba(90, 73, 191, 0.20),
+    0 2px 6px rgba(140, 65, 175, 0.18);
+}
+.marketing-root .pricing-tier-savings-billed {
+  font-size: 13px;
+  color: var(--ink-3);
+  letter-spacing: -0.003em;
 }
 
-/* Second clause of each tab title: plain grey, no gradient fill. */
-.marketing-root .who-its-for-tab-title-gradient {
-  color: var(--ink-2);
+/* CTA buttons */
+.marketing-root .pricing-tier-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  padding: 0 24px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: var(--mk-radius-btn);
+  text-decoration: none;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              background 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  margin-bottom: 32px;
+  cursor: pointer;
+  letter-spacing: -0.003em;
 }
 
-.marketing-root .who-its-for-tab-body {
-  font-size: 16px;
-  line-height: 1.6;
-  color: rgba(15, 23, 42, 0.70);
-  margin: 0 0 28px 0;
-  max-width: 460px;
+/* Primary CTA — Business — solid brand purple */
+.marketing-root .pricing-tier-cta--primary {
+  background: linear-gradient(180deg, var(--violet-2) 0%, var(--violet) 100%);
+  color: #FFFFFF;
+  border: none;
+
+  box-shadow:
+    0 2px 4px rgba(90, 73, 191, 0.20),
+    0 8px 20px rgba(90, 73, 191, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+.marketing-root .pricing-tier-cta--primary:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 4px 6px rgba(90, 73, 191, 0.24),
+    0 12px 28px rgba(90, 73, 191, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
-.marketing-root .who-its-for-bullets {
+/* Secondary CTA — Starter — dark solid */
+.marketing-root .pricing-tier-cta--secondary {
+  background: var(--ink-1);
+  color: #FFFFFF;
+  border: 1px solid var(--ink-1);
+
+  box-shadow:
+    0 1px 2px rgba(20, 16, 30, 0.10),
+    0 4px 12px rgba(20, 16, 30, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.marketing-root .pricing-tier-cta--secondary:hover {
+  transform: translateY(-1px);
+  background: #2A2238;
+  box-shadow:
+    0 2px 4px rgba(20, 16, 30, 0.12),
+    0 8px 20px rgba(20, 16, 30, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
+}
+
+/* Tertiary CTA — Enterprise — outlined */
+.marketing-root .pricing-tier-cta--tertiary {
+  background: transparent;
+  color: var(--ink-1);
+  border: 1px solid rgba(20, 16, 30, 0.15);
+}
+.marketing-root .pricing-tier-cta--tertiary:hover {
+  background: rgba(20, 16, 30, 0.04);
+  border-color: rgba(20, 16, 30, 0.25);
+}
+
+.marketing-root .pricing-tier-cta:focus-visible {
+  outline: 2px solid var(--violet);
+  outline-offset: 3px;
+}
+
+/* Features list */
+.marketing-root .pricing-tier-features {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.marketing-root .pricing-tier-features-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-1);
+  margin-bottom: 16px;
+}
+.marketing-root .pricing-tier-features-list {
   list-style: none;
   padding: 0;
   margin: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-.marketing-root .who-its-for-bullets li {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  font-size: 14.5px;
-  line-height: 1.5;
-  color: rgba(15, 23, 42, 0.75);
-  padding-left: 24px;
-  position: relative;
-}
-
-/* Checkmark bullets â€” matches ClickUp reference */
-.marketing-root .who-its-for-bullets li::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 6px;
-  width: 14px;
-  height: 14px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14' fill='none'%3E%3Cpath d='M2 7l3 3 7-7' stroke='%2315101F' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-size: 14px 14px;
-  background-repeat: no-repeat;
-  background-position: center;
-}
-
-/* === FEATURES COLUMN === */
-.marketing-root .who-its-for-features-column {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.marketing-root .who-its-for-feature-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px 20px;
-  background: #FFFFFF;
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  border-radius: 14px;
-
-  /* Subtle elevation */
-  box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.03),
-    0 4px 12px -4px rgba(15, 23, 42, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 1);
-
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
-              box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.marketing-root .who-its-for-feature-card:hover {
-  transform: translateY(-1px);
-  box-shadow:
-    0 2px 4px rgba(15, 23, 42, 0.04),
-    0 8px 20px -6px rgba(15, 23, 42, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 1);
-}
-
-.marketing-root .who-its-for-feature-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  flex-shrink: 0;
-}
-
-.marketing-root .who-its-for-feature-text {
   flex: 1;
+}
+.marketing-root .pricing-tier-features-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
   font-size: 14.5px;
-  font-weight: 500;
-  color: #15101F;
-  line-height: 1.4;
-  white-space: nowrap;
-}
-
-/* === TAB CONTENT TRANSITION === */
-.marketing-root .who-its-for-copy-column,
-.marketing-root .who-its-for-features-column {
-  animation: who-its-for-fade-in 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes who-its-for-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* === WHO IT'S FOR — RESPONSIVE === */
-@media (max-width: 1099px) {
-  .marketing-root .who-its-for-grid {
-    grid-template-columns: 1fr;
-    gap: 40px;
-  }
-
-  .marketing-root .who-its-for-content-card {
-    padding: 40px 32px;
-  }
-}
-
-@media (max-width: 767px) {
-  .marketing-root .who-its-for-section {
-    padding: 64px 16px 56px 16px;
-  }
-
-  .marketing-root .who-its-for-tabs {
-    flex-wrap: wrap;
-    justify-content: center;
-    width: 100%;
-    border-radius: 16px;
-  }
-
-  .marketing-root .who-its-for-tab {
-    height: 34px;
-    padding: 0 14px;
-    font-size: 13px;
-  }
-
-  .marketing-root .who-its-for-content-card {
-    padding: 32px 20px;
-    border-radius: 16px;
-  }
-
-  .marketing-root .who-its-for-tab-title {
-    font-size: 26px;
-  }
-
-  .marketing-root .who-its-for-feature-card {
-    padding: 14px 16px;
-  }
-
-  .marketing-root .who-its-for-feature-text {
-    font-size: 13.5px;
-  }
-}
-
-/* ============ PRICING ============ */
-.marketing-root .pricing {
-  background: var(--bg-0);
-  padding: 100px 32px;
-}
-.marketing-root .pr-head {
-  max-width: 980px;
-  margin: 0 auto 48px;
-  text-align: center;
-}
-.marketing-root .pr-head .section-eyebrow {
-  justify-content: center;
-}
-.marketing-root .pr-h {
-  font-size: clamp(28px, 3.4vw, 44px);
-  font-weight: 500;
-  letter-spacing: -0.024em;
-  line-height: 1.1;
-  margin: 0 0 16px;
+  line-height: 1.45;
   color: var(--ink-1);
-}
-.marketing-root .pr-p {
-  font-size: 16px;
-  color: var(--ink-2);
-  letter-spacing: -0.003em;
-  margin: 0;
-}
-.marketing-root .pr-row {
-  max-width: 1180px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 18px;
-  align-items: stretch;
-}
-.marketing-root .pr-card {
-  background: #FFFFFF;
-  border: 1px solid var(--line-1);
-  border-radius: var(--mk-radius-xl);
-  padding: 32px 28px 28px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  position: relative;
-  box-shadow: var(--mk-sh-sm);
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
-}
-.marketing-root .pr-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--mk-sh-md);
-}
-.marketing-root .pr-card.is-rec {
-  background: #FFFFFF;
-  border-color: rgba(90, 73, 191, 0.30);
-  box-shadow: 0 24px 60px -24px rgba(90, 73, 191, 0.25), var(--mk-sh-sm);
-}
-.marketing-root .pr-rec-badge {
-  position: absolute;
-  top: -12px;
-  left: 28px;
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  padding: 5px 12px;
-  border-radius: 999px;
-  background: var(--violet);
-  color: #FFFFFE;
-  box-shadow: 0 6px 16px -4px rgba(90, 73, 191, 0.40);
-}
-.marketing-root .pr-tier {
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: -0.012em;
-  color: var(--ink-1);
-}
-.marketing-root .pr-amount {
-  font-size: 40px;
-  font-weight: 500;
-  letter-spacing: -0.028em;
-  line-height: 1;
-  color: var(--ink-1);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.marketing-root .pr-period {
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--ink-3);
   letter-spacing: -0.003em;
 }
-.marketing-root .pr-features {
-  list-style: none;
-  padding: 18px 0 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  border-top: 1px solid var(--line-1);
-}
-.marketing-root .pr-features li {
-  font-size: 14px;
-  color: var(--ink-2);
-  letter-spacing: -0.003em;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding-left: 0;
-  position: relative;
-}
-.marketing-root .pr-features li::before {
-  content: "";
-  flex-shrink: 0;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--violet-soft);
-  position: relative;
-  margin-top: 4px;
-  box-shadow: inset 0 0 0 1px rgba(90, 73, 191, 0.30);
-}
-.marketing-root .pr-features li::after {
-  content: "";
-  position: absolute;
-  left: 4px;
-  top: 8px;
-  width: 6px;
-  height: 3px;
-  border-left: 1.5px solid var(--violet);
-  border-bottom: 1.5px solid var(--violet);
-  transform: rotate(-45deg);
-}
-.marketing-root .pr-cta {
-  margin-top: auto;
-  justify-content: center;
-  width: 100%;
-  height: 44px;
-}
-
-/* ============ FAQ ============ */
-.marketing-root .faq {
-  background: var(--bg-0);
-  padding: 100px 32px 120px;
-  border-top: 1px solid var(--line-1);
-}
-.marketing-root .faq-inner {
-  max-width: 1180px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: 0.6fr 1fr;
-  gap: 60px;
-  align-items: flex-start;
-}
-.marketing-root .faq-left {
-  position: sticky;
-  top: 40px;
-}
-.marketing-root .faq-h {
-  font-size: clamp(28px, 3.4vw, 44px);
-  font-weight: 500;
-  letter-spacing: -0.024em;
-  line-height: 1.1;
-  margin: 0 0 14px;
-  color: var(--ink-1);
-}
-.marketing-root .faq-p {
-  font-size: 16px;
-  color: var(--ink-2);
-  letter-spacing: -0.003em;
-  margin: 0 0 22px;
-}
-.marketing-root .faq-all {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
+.marketing-root .pricing-tier-features-check {
+  width: 16px;
+  height: 16px;
   color: var(--violet);
-  font-size: 14px;
-  font-weight: 500;
-  border-bottom: 1px solid var(--violet);
-  padding-bottom: 2px;
+  flex-shrink: 0;
+  margin-top: 2px;
 }
+
+/* ============ FAQ ============
+   Notion Calendar pattern: single-column accordion, plain background, headline
+   as section title (no eyebrow, no subhead), thin hair-line dividers, restrained
+   typography. The calm moment between Pricing and FinalCTA. */
+.marketing-root .faq-section {
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 96px 32px 80px;
+}
+.marketing-root .faq-container {
+  width: 100%;
+}
+
+/* Headline — bold, confident, no eyebrow */
+.marketing-root .faq-headline {
+  font-size: clamp(36px, 4vw, 56px);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  color: #15101F;
+  margin: 0 0 56px 0;
+}
+
+/* Accordion list */
 .marketing-root .faq-list {
   display: flex;
   flex-direction: column;
-  border-top: 1px solid var(--line-1);
 }
+
+/* Individual FAQ item — hair-line dividers, no heavy borders */
 .marketing-root .faq-item {
-  border-bottom: 1px solid var(--line-1);
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
 }
-.marketing-root .faq-q {
+.marketing-root .faq-item.is-last {
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+/* Question button */
+.marketing-root .faq-question {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  padding: 22px 0;
-  font-size: 15.5px;
-  font-weight: 500;
-  color: var(--ink-1);
-  letter-spacing: -0.012em;
-  text-align: left;
+  padding: 24px 0;
+  background: transparent;
+  border: none;
   cursor: pointer;
-  transition: color 0.15s ease;
+  text-align: left;
+  font-family: inherit;
+  transition: color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.marketing-root .faq-q:hover { color: var(--violet); }
-.marketing-root .faq-ic {
-  position: relative;
-  width: 16px;
-  height: 16px;
+.marketing-root .faq-question-text {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  color: #15101F;
+  padding-right: 24px;
+}
+
+/* Plus/Minus icon */
+.marketing-root .faq-question-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: rgba(15, 23, 42, 0.55);
   flex-shrink: 0;
+  transition: color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.marketing-root .faq-ic::before,
-.marketing-root .faq-ic::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  background: var(--ink-2);
-  transform: translate(-50%, -50%);
-  transition: transform 0.25s ease, opacity 0.25s ease;
+.marketing-root .faq-item.is-open .faq-question-icon,
+.marketing-root .faq-question:hover .faq-question-icon {
+  color: #15101F;
 }
-.marketing-root .faq-ic::before { width: 12px; height: 1.5px; }
-.marketing-root .faq-ic::after { width: 1.5px; height: 12px; }
-.marketing-root .faq-item.is-open .faq-ic::after {
-  transform: translate(-50%, -50%) rotate(90deg);
-  opacity: 0;
+.marketing-root .faq-question-icon svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.5;
 }
-.marketing-root .faq-a {
-  overflow: hidden;
+
+/* Answer wrapper — smooth height transition */
+.marketing-root .faq-answer-wrapper {
   max-height: 0;
-  transition: max-height 0.35s ease;
+  overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.marketing-root .faq-item.is-open .faq-a {
-  max-height: 280px;
+.marketing-root .faq-item.is-open .faq-answer-wrapper {
+  max-height: 400px;
 }
-.marketing-root .faq-a-in {
-  padding: 0 0 22px;
-  font-size: 15px;
-  color: var(--ink-2);
-  letter-spacing: -0.003em;
+
+.marketing-root .faq-answer {
+  font-size: 16px;
   line-height: 1.6;
-  max-width: 60ch;
-}
-.marketing-root .faq-a-in a {
-  color: var(--violet);
-  border-bottom: 1px solid var(--violet);
+  color: rgba(15, 23, 42, 0.70);
+  padding: 0 0 24px 0;
+  max-width: 760px;
 }
 
 /* =================================================================
@@ -4306,9 +4356,36 @@
     gap: 14px;
   }
   .marketing-root .ag-arrow { display: none; }
-  .marketing-root .pr-row { grid-template-columns: 1fr; max-width: 480px; }
-  .marketing-root .faq-inner { grid-template-columns: 1fr; gap: 36px; }
-  .marketing-root .faq-left { position: static; }
+  .marketing-root .pricing-tiers {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  .marketing-root .pricing-tier--featured {
+    transform: none;
+  }
+  .marketing-root .pricing-tier--featured:hover {
+    transform: translateY(-2px);
+  }
+  .marketing-root .faq-section {
+    padding: 64px 20px 56px;
+  }
+  .marketing-root .faq-headline {
+    font-size: 32px;
+    margin-bottom: 40px;
+  }
+  .marketing-root .faq-question {
+    padding: 20px 0;
+  }
+  .marketing-root .faq-question-text {
+    font-size: 16px;
+    padding-right: 16px;
+  }
+  .marketing-root .faq-answer {
+    font-size: 15px;
+    padding-bottom: 20px;
+  }
 }
 
 /* From-click-to-ticket cards: collapse to single column (copy on top, visual
@@ -6100,7 +6177,7 @@
   font-size: clamp(48px, 5.5vw, 76px);
   font-weight: 600;
   line-height: 1.0;
-  letter-spacing: -0.028em;
+  letter-spacing: -0.04em;
   margin: 0 auto;
   color: #15101F;
   /* Wider column to let the bigger type breathe across two balanced lines. */
@@ -6720,15 +6797,21 @@
 
 /* ---- Share modal (self-contained overlay/panel; see ShareModal.tsx) ---- */
 .marketing-root .session-share-overlay {
-  position: fixed;
+  /* Absolute (not fixed) so the wash is confined to the dashboard frame
+     — .session-demo-stage is position:relative + overflow:hidden, so the
+     overlay tints only the dashboard and never bleeds onto the
+     surrounding dark section. */
+  position: absolute;
   inset: 0;
-  z-index: 1000;
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Light frosted-glass backdrop (Fix 4g) â€” not dark dimming. */
-  background: rgba(250, 249, 247, 0.55);
-  backdrop-filter: blur(6px);
+  /* Darker wash: dimming tint + stronger blur so the dashboard clearly
+     recedes behind the popup. */
+  background: rgba(15, 12, 25, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   padding: 20px;
   font-family: "DM Sans", var(--echly-font);
 }
@@ -6883,10 +6966,13 @@
   position: relative;
   width: 100%;
   padding: 88px 32px 96px;
+  /* Superhuman-style ambient backdrop: deep near-black canvas with two
+     soft glows spanning the full height — cool blue rising from the
+     left, warm magenta rising from the right. */
   background:
-    radial-gradient(58% 72% at 8% 22%, rgba(78, 36, 130, 0.4) 0%, rgba(78, 36, 130, 0) 62%),
-    radial-gradient(52% 68% at 92% 60%, rgba(20, 60, 110, 0.4) 0%, rgba(20, 60, 110, 0) 62%),
-    radial-gradient(120% 100% at 50% 50%, #0a0a0c 38%, #06060a 100%);
+    radial-gradient(75% 90% at 8% 50%, rgba(40, 70, 150, 0.42) 0%, rgba(40, 70, 150, 0) 65%),
+    radial-gradient(70% 85% at 92% 55%, rgba(150, 50, 110, 0.34) 0%, rgba(150, 50, 110, 0) 65%),
+    radial-gradient(120% 100% at 50% 0%, #07070a 0%, #050507 70%, #030305 100%);
   color: var(--ag-text);
   font-family: "DM Sans", system-ui, sans-serif;
   font-feature-settings: "ss01";
@@ -6932,7 +7018,7 @@
   position: relative;
   z-index: 2;
   max-width: 1280px;
-  margin: 0 auto 56px;
+  margin: 140px auto 56px;
   display: grid;
   grid-template-columns: 1.05fr 0.95fr;
   gap: 64px;
@@ -6961,7 +7047,7 @@
   margin: 0;
   font-size: clamp(40px, 5vw, 64px);
   line-height: 1;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.04em;
   font-weight: 400;
   color: #fafafc;
   max-width: 720px;
@@ -7025,7 +7111,7 @@
   overflow: hidden;
 }
 
-/* CARD BASE */
+/* CARD BASE — neutral black cards with a lighter purple eyebrow only. */
 .marketing-root .ag-card {
   position: relative;
   background: linear-gradient(180deg, #0c0c10 0%, #0a0a0c 100%);
@@ -7052,7 +7138,7 @@
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.22em;
-  color: var(--ag-faint);
+  color: rgba(170, 140, 240, 0.85);
   margin-bottom: 18px;
 }
 .marketing-root .ag-h {
@@ -7076,36 +7162,6 @@
   flex: 1;
   margin: 28px -36px 0;
   min-height: 280px;
-}
-
-/* FEATURED card — one editorially distinct treatment so the eye has a clear
-   "land here first" moment. Slightly more padding, a brand-violet eyebrow, and
-   a soft purple-tinted halo over the base shadow. Sits on top of the .ag-grid's
-   1px gap line, so a thin outset shadow gives it the impression of lift. */
-.marketing-root .ag-card--featured {
-  padding: 44px 40px 0;
-  background: linear-gradient(180deg, #0e0e14 0%, #0a0a0c 100%);
-  z-index: 1;
-  box-shadow:
-    inset 0 0 0 1px rgba(165, 149, 240, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 1px 2px rgba(15, 23, 42, 0.20),
-    0 18px 48px -10px rgba(90, 73, 191, 0.18);
-}
-.marketing-root .ag-card--featured::before {
-  background: radial-gradient(
-    120% 60% at 50% 0%,
-    rgba(165, 149, 240, 0.07),
-    transparent 60%
-  );
-}
-.marketing-root .ag-card--featured .ag-eyebrow {
-  color: rgba(165, 149, 240, 0.85);
-}
-@media (max-width: 960px) {
-  .marketing-root .ag-card--featured {
-    padding: 32px 26px 0;
-  }
 }
 
 /* CARD 1 — QA */
