@@ -14,8 +14,6 @@ export const metadata = {
 const CATEGORY_LABEL: Record<string, string> = {
   lifecycle: "onboarding and product",
   notifications: "comment, mention, and assignment",
-  digest: "weekly digest",
-  marketing: "product announcement",
   all: "non-essential",
 };
 
@@ -46,8 +44,6 @@ async function applyUnsubscribe(formData: FormData): Promise<void> {
   if (verified.category === "all") {
     update["emailPreferences.lifecycle"] = false;
     update["emailPreferences.notifications"] = false;
-    update["emailPreferences.digest"] = false;
-    update["emailPreferences.marketing"] = false;
   } else {
     update[`emailPreferences.${verified.category}`] = false;
   }
@@ -138,9 +134,6 @@ export default async function UnsubscribePage({
           </p>
           <p className="mt-6 text-sm text-[#54495F]">
             Changed your mind?{" "}
-            {/* TODO(post-launch): build /settings notifications tab so this
-                resubscribe link lands on a real preferences UI. For Phase 3
-                the tab doesn't exist yet; the unsubscribe flow stands alone. */}
             <a
               href="/settings?tab=notifications"
               className="text-[#5A49BF] underline"

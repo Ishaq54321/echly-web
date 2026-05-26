@@ -3409,7 +3409,7 @@
 .marketing-root .pricing-section {
   --pricing-grad: linear-gradient(135deg, #5A49BF 0%, #8B5CB8 50%, #D63384 100%);
   --pricing-grad-hover: linear-gradient(135deg, #6B5AC9 0%, #9C6DC0 50%, #E04590 100%);
-  background: #FFFFFF;
+  background: linear-gradient(180deg, #FFFFFF 0%, #FFFFFF 70%, #E9EFFB 100%);
   width: 100%;
   padding: 100px 32px;
 }
@@ -3805,12 +3805,13 @@
    typography. The calm moment between Pricing and FinalCTA. */
 .marketing-root .faq-section {
   width: 100%;
-  max-width: 1080px;
-  margin: 0 auto;
+  background: #FFFFFF;
   padding: 96px 32px 80px;
 }
 .marketing-root .faq-container {
   width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
 }
 
 /* Headline — bold, confident, no eyebrow */
@@ -6299,33 +6300,33 @@
 @media (min-width: 1440px) and (max-width: 1727px) {
   /* Standard desktop: 15"/16" MacBooks, common 1080p externals. */
   .marketing-root .hcd-tray-anchor {
-    width: 460px;
+    width: 395px;
     right: 40px;
   }
   .marketing-root .hcd-tray-anchor .pill-tickets {
-    max-height: 660px;
+    max-height: 640px;
   }
 }
 @media (min-width: 1728px) and (max-width: 2199px) {
   /* Large laptops & 1440p externals: 16" MBP native, 27" iMac. */
   .marketing-root .hcd-tray-anchor {
-    width: 500px;
+    width: 435px;
     right: 48px;
     bottom: 64px;
   }
   .marketing-root .hcd-tray-anchor .pill-tickets {
-    max-height: 700px;
+    max-height: 680px;
   }
 }
 @media (min-width: 2200px) {
   /* 4K / 5K external monitors — give the tray room to breathe. */
   .marketing-root .hcd-tray-anchor {
-    width: 560px;
+    width: 495px;
     right: 64px;
     bottom: 80px;
   }
   .marketing-root .hcd-tray-anchor .pill-tickets {
-    max-height: 760px;
+    max-height: 740px;
   }
 }
 /* When the comment cursor is active, hide the native cursor over the stage. */
@@ -6354,12 +6355,12 @@
   position: absolute;
   bottom: 56px;
   right: 28px;
-  width: 420px;
+  width: 355px;
   max-width: calc(100% - 56px);
   z-index: 4;
 }
 .marketing-root .hcd-tray-anchor .pill-tickets {
-  max-height: 600px;
+  max-height: 580px;
 }
 .marketing-root .hcd-tray-anchor .echly-v2 {
   flex: initial;
@@ -6368,7 +6369,7 @@
 .marketing-root .hcd-tray-anchor .pill-tickets {
   width: 100%;
   max-width: 100%;
-  max-height: 640px;
+  max-height: 620px;
 }
 /* Glass refinement Fix 2: multi-layer elevation. Ambient close shadow â†’ mid
    falloff â†’ far cast (floating feel), plus an inner-top white highlight that
@@ -6428,6 +6429,7 @@
     opacity 200ms ease,
     transform 200ms ease;
   pointer-events: auto;
+  z-index: 5;
 }
 .marketing-root .hcd-pill-anchor.is-visible {
   opacity: 1;

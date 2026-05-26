@@ -18,6 +18,8 @@ interface TicketResolvedProps {
   ticketUrl: string;
   /** Optional resolution note added by the resolver. Omitted from the body when absent. */
   resolutionNote?: string;
+  /** Signed unsubscribe URL — threaded through by sendEmailWithPreferences. */
+  unsubscribeUrl?: string;
 }
 
 export function ticketResolvedSubject(ticketTitle: string): string {
@@ -31,6 +33,7 @@ export function ticketResolvedEmailHtml({
   sessionName,
   ticketUrl,
   resolutionNote,
+  unsubscribeUrl,
 }: TicketResolvedProps): string {
   const safeFirst = escapeEmailHtml(reporterFirstName);
   const safeResolver = escapeEmailHtml(resolverName);
@@ -45,6 +48,7 @@ export function ticketResolvedEmailHtml({
     preheader: `${resolverName} resolved "${ticketTitle}" in ${sessionName}.`,
     category: "Ticket resolved",
     title: "Your ticket was resolved",
+    unsubscribeUrl,
     content: emailCardV2({
       content: `
         ${emailParagraphV2(`Hey ${safeFirst},`)}
@@ -72,10 +76,12 @@ export function ticketResolvedEmailText({
   sessionName,
   ticketUrl,
   resolutionNote,
+  unsubscribeUrl,
 }: TicketResolvedProps): string {
   const trimmedNote = (resolutionNote ?? "").trim();
   const noteLine = trimmedNote ? `\n"${trimmedNote}"\n` : "";
   return plainTextShellV2({
+    unsubscribeUrl,
     body: `Hey ${reporterFirstName},
 
 ${resolverName} resolved your ticket: "${ticketTitle}" in ${sessionName}.

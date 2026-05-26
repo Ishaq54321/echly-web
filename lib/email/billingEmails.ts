@@ -87,6 +87,8 @@ export async function sendSubscriptionConfirmationEmail(params: {
       html: subscriptionConfirmationEmailHtml(props),
       text: subscriptionConfirmationEmailText(props),
       fromVariant: "founder",
+      templateName: "subscriptionConfirmation",
+      templateCategory: "transactional",
     });
     return { sent: true };
   } catch (err) {
@@ -126,6 +128,8 @@ export async function sendSubscriptionCancelledEmail(params: {
       html: subscriptionCancelledEmailHtml(props),
       text: subscriptionCancelledEmailText(props),
       fromVariant: "founder",
+      templateName: "subscriptionCancelled",
+      templateCategory: "transactional",
     });
     return { sent: true };
   } catch (err) {
@@ -151,6 +155,8 @@ export async function sendPaymentFailedEmail(params: {
       html: paymentFailedEmailHtml(props),
       text: paymentFailedEmailText(props),
       fromVariant: "founder",
+      templateName: "paymentFailed",
+      templateCategory: "transactional",
     });
     return { sent: true };
   } catch (err) {
@@ -188,6 +194,8 @@ export async function sendRenewalReceiptEmail(params: {
       html: renewalReceiptEmailHtml(props),
       text: renewalReceiptEmailText(props),
       fromVariant: "founder",
+      templateName: "renewalReceipt",
+      templateCategory: "transactional",
     });
     return { sent: true };
   } catch (err) {
@@ -223,6 +231,8 @@ export async function sendUpcomingRenewalReminderEmail(params: {
       html: upcomingRenewalReminderEmailHtml(props),
       text: upcomingRenewalReminderEmailText(props),
       fromVariant: "founder",
+      templateName: "upcomingRenewalReminder",
+      templateCategory: "transactional",
     });
     return { sent: true };
   } catch (err) {
@@ -254,6 +264,8 @@ export async function sendCardExpiringEmail(params: {
       html: cardExpiringEmailHtml(props),
       text: cardExpiringEmailText(props),
       fromVariant: "founder",
+      templateName: "cardExpiring",
+      templateCategory: "transactional",
     });
     return { sent: true };
   } catch (err) {
@@ -280,6 +292,8 @@ export async function sendPaymentMethodUpdatedEmail(params: {
       html: paymentMethodUpdatedEmailHtml(props),
       text: paymentMethodUpdatedEmailText(props),
       fromVariant: "founder",
+      templateName: "paymentMethodUpdated",
+      templateCategory: "transactional",
     });
     return { sent: true };
   } catch (err) {
@@ -351,6 +365,8 @@ export async function sendPlanChangedEmail(params: {
       html: planChangedEmailHtml(props),
       text: planChangedEmailText(props),
       fromVariant: "founder",
+      templateName: "planChanged",
+      templateCategory: "transactional",
     });
     return { sent: true };
   } catch (err) {
@@ -391,6 +407,8 @@ export async function sendRefundIssuedEmail(params: {
       html: refundIssuedEmailHtml(props),
       text: refundIssuedEmailText(props),
       fromVariant: "founder",
+      templateName: "refundIssued",
+      templateCategory: "transactional",
     });
     return { sent: true };
   } catch (err) {
@@ -444,6 +462,8 @@ export async function sendSeatAddedEmail(params: {
       html: seatAddedEmailHtml(props),
       text: seatAddedEmailText(props),
       fromVariant: "founder",
+      templateName: "seatAdded",
+      templateCategory: "transactional",
     });
     return { sent: true };
   } catch (err) {

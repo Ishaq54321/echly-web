@@ -380,6 +380,7 @@ export const PATCH = withAuthorization(
               const { ticketUrl } = await import("@/lib/email/urls");
               await sendTicketResolvedEmail({
                 recipientUid: reporterUid,
+                actorUid: actorId,
                 ticketTitle: ticketTitleForEmail,
                 sessionName: sessionNameForEmail,
                 resolverName: actor.actorName,
@@ -488,8 +489,16 @@ export const PATCH = withAuthorization(
                   const { sendTicketAssignedEmail } = await import(
                     "@/lib/email/notificationEmails"
                   );
+                  // Cooldown note: ticketAssigned fires here (~line 491),
+                  // BEFORE the description-mention email (~line 568). When the
+                  // same PATCH both reassigns a ticket TO Daniel and mentions
+                  // Daniel in the new description, ticketAssigned lands first
+                  // and the cooldown layer (lib/email/cooldowns.ts) suppresses
+                  // the subsequent mention email — assignment is action-
+                  // required, mention is informational, so assignment wins.
                   await sendTicketAssignedEmail({
                     assigneeUid: afterAssigneeId,
+                    actorUid: activityActorId,
                     assignerName: actor.actorName,
                     ticketTitle: ticketTitleForEmail,
                     sessionName: sessionNameForEmail,
@@ -567,6 +576,7 @@ export const PATCH = withAuthorization(
                 recipientIds.map((uid) =>
                   sendMentionEmail({
                     recipientUid: uid,
+                    actorUid: actorId,
                     mentionerName: actor.actorName,
                     ticketTitle: feedbackTitle,
                     sessionName: emailSessionName,

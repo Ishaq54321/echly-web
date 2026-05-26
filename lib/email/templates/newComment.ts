@@ -24,6 +24,8 @@ interface NewCommentProps {
   commentExcerpt: string;
   /** Deep link to the ticket / comment. */
   commentUrl: string;
+  /** Signed unsubscribe URL — threaded through by sendEmailWithPreferences. */
+  unsubscribeUrl?: string;
 }
 
 /**
@@ -42,6 +44,7 @@ export function newCommentEmailHtml({
   sessionName,
   commentExcerpt,
   commentUrl,
+  unsubscribeUrl,
 }: NewCommentProps): string {
   const safeCommenter = escapeEmailHtml(commenterName);
   const safeSession = escapeEmailHtml(sessionName);
@@ -51,6 +54,7 @@ export function newCommentEmailHtml({
     preheader: `"${commentExcerpt}"`,
     category: "New comment",
     title: `${commenterName} commented on '${sessionName}'`,
+    unsubscribeUrl,
     content: emailCardV2({
       content: `
         ${emailParagraphV2(
@@ -77,8 +81,10 @@ export function newCommentEmailText({
   sessionName,
   commentExcerpt,
   commentUrl,
+  unsubscribeUrl,
 }: NewCommentProps): string {
   return plainTextShellV2({
+    unsubscribeUrl,
     body: `${commenterName} left a comment on a ticket you captured in "${sessionName}":
 
 "${commentExcerpt}"

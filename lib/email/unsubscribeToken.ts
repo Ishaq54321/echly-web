@@ -13,8 +13,25 @@ import type { OptOutCategory } from "./preferences";
  * (the timestamp is in the payload only so identical tokens differ over time).
  */
 
-const SECRET =
-  process.env.UNSUBSCRIBE_SECRET ?? "dev-only-secret-change-in-production";
+const DEV_SECRET_FALLBACK = "dev-only-secret-change-in-production";
+const SECRET = process.env.UNSUBSCRIBE_SECRET ?? DEV_SECRET_FALLBACK;
+
+// Safety net: warn loudly at module load when production is running with the
+// dev fallback. The secret has been confirmed set in Vercel, but if it ever
+// regresses (env var rename, missing env in a preview deploy promoted to
+// prod, etc.) every unsubscribe token would be forgeable. This does NOT
+// change behavior — we keep the fallback so local dev still works without
+// configuring the env var.
+if (
+  process.env.NODE_ENV === "production" &&
+  (!process.env.UNSUBSCRIBE_SECRET || SECRET === DEV_SECRET_FALLBACK)
+) {
+  console.error(
+    "[unsubscribeToken] UNSUBSCRIBE_SECRET is missing in production — " +
+      "unsubscribe tokens are being signed with the dev fallback and are " +
+      "forgeable. Set UNSUBSCRIBE_SECRET in the production environment."
+  );
+}
 
 /** "all" unsubscribes every opt-out category at once (footer "Unsubscribe"). */
 export type UnsubscribeCategory = OptOutCategory | "all";
@@ -22,8 +39,6 @@ export type UnsubscribeCategory = OptOutCategory | "all";
 const VALID_CATEGORIES: ReadonlySet<string> = new Set<UnsubscribeCategory>([
   "lifecycle",
   "notifications",
-  "digest",
-  "marketing",
   "all",
 ]);
 

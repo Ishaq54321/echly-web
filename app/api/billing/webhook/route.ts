@@ -151,6 +151,17 @@ export async function POST(req: Request) {
     // After all side effects succeed, record this event so a redelivery
     // is recognized as a duplicate. Includes TTL field for Firestore auto-cleanup
     // (configure 30-day TTL on `expiresAt` field in Firebase Console).
+    //
+    // KNOWN LIMITATION (deferred post-launch hardening): the idempotency stamp
+    // is written AFTER the handler's side-effects rather than as part of the
+    // same transaction. If a handler that has already sent an email (e.g.
+    // renewalReceipt, cardExpiring, paymentMethodUpdated, refundIssued,
+    // upcomingRenewalReminder — events with no inner Firestore state guard)
+    // throws or 5xx's after the send but before this write, the next Stripe
+    // retry re-runs the handler and re-sends the email. Stripe retries are
+    // rare in practice, but if this becomes a real problem the fix is to move
+    // the dedup write into the same transaction as the state mutation, or to
+    // record per-template stamps inside the handler. Leaving as-is for now.
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30);
     await idempotencyRef.set({

@@ -17,6 +17,8 @@ interface InviteAcceptedProps {
   workspaceName: string;
   memberCount: number;
   workspaceMembersUrl: string;
+  /** Signed unsubscribe URL — threaded through by sendEmailWithPreferences. */
+  unsubscribeUrl?: string;
 }
 
 export function inviteAcceptedEmailHtml(props: InviteAcceptedProps): string {
@@ -29,6 +31,7 @@ export function inviteAcceptedEmailHtml(props: InviteAcceptedProps): string {
     preheader: `${props.acceptedByName} joined ${props.workspaceName}.`,
     category: "Workspace update",
     title: `${props.acceptedByName} joined your workspace`,
+    unsubscribeUrl: props.unsubscribeUrl,
     content: emailCardV2({
       content: `
         ${emailParagraphV2(`Hey ${inviter},`)}
@@ -53,6 +56,7 @@ export function inviteAcceptedEmailHtml(props: InviteAcceptedProps): string {
 export function inviteAcceptedEmailText(props: InviteAcceptedProps): string {
   const memberWord = props.memberCount === 1 ? "member" : "members";
   return plainTextShellV2({
+    unsubscribeUrl: props.unsubscribeUrl,
     body: `Hey ${props.inviterFirstName},
 
 ${props.acceptedByName} (${props.acceptedByEmail}) just accepted your invitation and joined "${props.workspaceName}".

@@ -12,11 +12,17 @@ import type { UserDoc } from "@/lib/repositories/usersRepository.server";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://annote.ai";
 
 /**
- * The Phase 1 email shell renders the literal token "{{UNSUBSCRIBE_URL}}" in
- * the footer / plain-text trailer when no unsubscribeUrl is supplied (see
- * emailShellV2 / plainTextShellV2 defaults in components.ts). This wrapper
- * substitutes it with a real signed URL at send time, so individual templates
- * don't each need to thread the URL through their signatures.
+ * Preference-gated templates now thread `unsubscribeUrl` end-to-end:
+ * dispatcher → htmlBuilder/textBuilder → template → emailShellV2 /
+ * plainTextShellV2. The previous architecture relied on the shell defaulting
+ * to a `{{UNSUBSCRIBE_URL}}` placeholder which this layer substituted at send
+ * time; the placeholder default has been removed (transactional emails were
+ * shipping it literally), so the URL must flow through as data.
+ *
+ * substituteUnsub is retained as a no-op safety net: if a template forgets to
+ * forward the URL but happens to embed the legacy placeholder string in its
+ * own markup, this still rewrites it. Modern templates render the URL
+ * directly and the substitution finds nothing to replace.
  */
 const UNSUB_PLACEHOLDER = "{{UNSUBSCRIBE_URL}}";
 
@@ -60,6 +66,10 @@ export async function sendEmailWithPreferences(params: {
   textBuilder?: (unsubscribeUrl: string) => string;
   fromVariant?: FromVariant;
   replyTo?: string;
+  /** Resend dashboard tag (template family). See sendEmailOrLog. */
+  templateName?: string;
+  /** Optional second Resend tag for category-level filtering. */
+  templateCategory?: string;
 }): Promise<EmailSendResult> {
   const { user, category, subject, htmlBuilder, textBuilder } = params;
 
@@ -89,6 +99,9 @@ export async function sendEmailWithPreferences(params: {
       text,
       fromVariant: params.fromVariant,
       replyTo: params.replyTo,
+      unsubscribeUrl,
+      templateName: params.templateName,
+      templateCategory: params.templateCategory ?? category,
     });
     return { sent: true };
   } catch (err) {
@@ -111,6 +124,8 @@ export async function sendEmailWithPreferencesByUid(params: {
   textBuilder?: (unsubscribeUrl: string) => string;
   fromVariant?: FromVariant;
   replyTo?: string;
+  templateName?: string;
+  templateCategory?: string;
 }): Promise<EmailSendResult> {
   const user = await getUserByIdRepo(params.uid);
   if (!user) {

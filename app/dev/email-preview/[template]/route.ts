@@ -56,6 +56,13 @@ export const dynamic = "force-dynamic";
 
 const NEXT_BILLING = new Date("2026-06-19T00:00:00Z");
 
+// Fake but realistically-shaped unsubscribe URL — preference-gated templates
+// receive this so the dev preview shows the "Unsubscribe · annote.ai" footer
+// row exactly as production renders it. Transactional templates leave their
+// `unsubscribeUrl` prop unset and render the bare "annote.ai" footer.
+const PREVIEW_UNSUBSCRIBE_URL =
+  "https://annote.ai/unsubscribe?token=PREVIEW_TOKEN";
+
 interface Variant {
   html: string;
   text: string;
@@ -223,7 +230,7 @@ const TEMPLATES: Record<string, () => Variant> = {
 
   // ── Phase 4: new event-driven templates ──
   "welcome": () => {
-    const p = { firstName: "Sam" };
+    const p = { firstName: "Sam", unsubscribeUrl: PREVIEW_UNSUBSCRIBE_URL };
     return { html: welcomeEmailHtml(p), text: welcomeEmailText(p) };
   },
   "session-opened": () => {
@@ -231,6 +238,7 @@ const TEMPLATES: Record<string, () => Variant> = {
       recipientName: "Sarah Chen",
       sessionName: "Homepage redesign feedback",
       sessionUrl: "https://annote.ai/s/PLACEHOLDER",
+      unsubscribeUrl: PREVIEW_UNSUBSCRIBE_URL,
     };
     return {
       html: sessionOpenedEmailHtml(p),
@@ -250,6 +258,7 @@ const TEMPLATES: Record<string, () => Variant> = {
         "@[Sam Chen](abc123XYZ) confirmed on iPhone 14 — the primary button only shows after a scroll. We should pull it up above the testimonial block."
       ),
       commentUrl: "https://annote.ai/s/PLACEHOLDER#feedback-abc123",
+      unsubscribeUrl: PREVIEW_UNSUBSCRIBE_URL,
     };
     return { html: newCommentEmailHtml(p), text: newCommentEmailText(p) };
   },
@@ -262,6 +271,7 @@ const TEMPLATES: Record<string, () => Variant> = {
         "@[Sam Chen](abc123XYZ) can you take this one? It overlaps with the nav work you're already doing."
       ),
       commentUrl: "https://annote.ai/s/PLACEHOLDER#feedback-abc123",
+      unsubscribeUrl: PREVIEW_UNSUBSCRIBE_URL,
     };
     return { html: mentionEmailHtml(p), text: mentionEmailText(p) };
   },
@@ -271,6 +281,7 @@ const TEMPLATES: Record<string, () => Variant> = {
       ticketTitle: "CTA button is below the fold on mobile",
       sessionName: "Homepage redesign feedback",
       ticketUrl: "https://annote.ai/s/PLACEHOLDER#feedback-abc123",
+      unsubscribeUrl: PREVIEW_UNSUBSCRIBE_URL,
     };
     return {
       html: ticketAssignedEmailHtml(p),
@@ -287,6 +298,7 @@ const TEMPLATES: Record<string, () => Variant> = {
       daysRemaining: 6,
       resetDate: "June 19, 2026",
       upgradeUrl: "https://annote.ai/settings?tab=billing",
+      unsubscribeUrl: PREVIEW_UNSUBSCRIBE_URL,
     };
     return {
       html: planLimitApproachingEmailHtml(p),
@@ -300,6 +312,7 @@ const TEMPLATES: Record<string, () => Variant> = {
       workspaceName: "Acme Design",
       resetDate: "June 19, 2026",
       upgradeUrl: "https://annote.ai/settings?tab=billing",
+      unsubscribeUrl: PREVIEW_UNSUBSCRIBE_URL,
     };
     return { html: planLimitHitEmailHtml(p), text: planLimitHitEmailText(p) };
   },
@@ -313,6 +326,7 @@ const TEMPLATES: Record<string, () => Variant> = {
       workspaceName: "Acme Engineering",
       memberCount: 4,
       workspaceMembersUrl: "https://annote.ai/settings?tab=workspace",
+      unsubscribeUrl: PREVIEW_UNSUBSCRIBE_URL,
     };
     return { html: inviteAcceptedEmailHtml(p), text: inviteAcceptedEmailText(p) };
   },
@@ -343,6 +357,7 @@ const TEMPLATES: Record<string, () => Variant> = {
       ticketUrl: "https://annote.ai/s/PLACEHOLDER#feedback-abc123",
       resolutionNote:
         "Fixed by removing the legacy event listener — should ship in 2.4.1.",
+      unsubscribeUrl: PREVIEW_UNSUBSCRIBE_URL,
     };
     return {
       html: ticketResolvedEmailHtml(p),

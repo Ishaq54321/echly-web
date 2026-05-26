@@ -21,6 +21,8 @@ interface SessionOpenedProps {
   sessionName: string;
   /** Public URL to open the session. */
   sessionUrl: string;
+  /** Signed unsubscribe URL — threaded through by sendEmailWithPreferences. */
+  unsubscribeUrl?: string;
 }
 
 /**
@@ -35,6 +37,7 @@ export function sessionOpenedEmailHtml({
   recipientName,
   sessionName,
   sessionUrl,
+  unsubscribeUrl,
 }: SessionOpenedProps): string {
   const safeRecipient = escapeEmailHtml(recipientName);
   const safeSession = escapeEmailHtml(sessionName);
@@ -43,6 +46,7 @@ export function sessionOpenedEmailHtml({
     preheader: `"${sessionName}" — opened a moment ago.`,
     category: "Session ready",
     title: "Your session is ready to view",
+    unsubscribeUrl,
     content: emailCardV2({
       content: `
         ${emailParagraphV2(
@@ -65,8 +69,10 @@ export function sessionOpenedEmailText({
   recipientName,
   sessionName,
   sessionUrl,
+  unsubscribeUrl,
 }: SessionOpenedProps): string {
   return plainTextShellV2({
+    unsubscribeUrl,
     body: `${recipientName} just opened the session you shared: "${sessionName}."
 
 That's the moment Annote pays off — when the work you captured leaves your screen and lands on someone else's. Comments, replies, and resolutions will show up in your dashboard as they happen.

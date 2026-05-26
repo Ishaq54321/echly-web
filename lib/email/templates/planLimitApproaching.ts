@@ -27,6 +27,8 @@ interface PlanLimitApproachingProps {
   resetDate: string;
   /** Link to the plan / upgrade options page. */
   upgradeUrl: string;
+  /** Signed unsubscribe URL — threaded through by sendEmailWithPreferences. */
+  unsubscribeUrl?: string;
 }
 
 /**
@@ -50,6 +52,7 @@ export function planLimitApproachingEmailHtml({
   daysRemaining,
   resetDate,
   upgradeUrl,
+  unsubscribeUrl,
 }: PlanLimitApproachingProps): string {
   const greetingName = firstName ? escapeEmailHtml(firstName) : "there";
   const safeWorkspace = escapeEmailHtml(workspaceName);
@@ -62,6 +65,7 @@ export function planLimitApproachingEmailHtml({
     category: "Plan usage",
     title: "You're approaching your monthly limit",
     metadata: `${usagePct}% of ${escapeEmailHtml(planName)} plan used`,
+    unsubscribeUrl,
     content: emailCardV2({
       content: `
         ${emailParagraphV2(`Hey ${greetingName},`)}
@@ -92,11 +96,13 @@ export function planLimitApproachingEmailText({
   daysRemaining,
   resetDate,
   upgradeUrl,
+  unsubscribeUrl,
 }: PlanLimitApproachingProps): string {
   const greetingName = firstName ?? "there";
   const days = daysLabel(daysRemaining);
 
   return plainTextShellV2({
+    unsubscribeUrl,
     body: `Hey ${greetingName},
 
 You've used ${usageCount} of your ${planLimit} captures this month on ${workspaceName}. At your current pace, you'll hit the limit in about ${days}.

@@ -24,6 +24,8 @@ interface MentionProps {
   commentExcerpt: string;
   /** Deep link to the ticket / comment. */
   commentUrl: string;
+  /** Signed unsubscribe URL — threaded through by sendEmailWithPreferences. */
+  unsubscribeUrl?: string;
 }
 
 /**
@@ -43,6 +45,7 @@ export function mentionEmailHtml({
   sessionName,
   commentExcerpt,
   commentUrl,
+  unsubscribeUrl,
 }: MentionProps): string {
   const safeMentioner = escapeEmailHtml(mentionerName);
   const safeTitle = escapeEmailHtml(ticketTitle);
@@ -54,6 +57,7 @@ export function mentionEmailHtml({
     category: "You were mentioned",
     title: `${mentionerName} tagged you in a comment`,
     metadata: `On '${safeSession}'`,
+    unsubscribeUrl,
     content: emailCardV2({
       content: `
         ${emailParagraphV2(
@@ -76,8 +80,10 @@ export function mentionEmailText({
   sessionName,
   commentExcerpt,
   commentUrl,
+  unsubscribeUrl,
 }: MentionProps): string {
   return plainTextShellV2({
+    unsubscribeUrl,
     body: `${mentionerName} mentioned you in a comment on "${ticketTitle}" in ${sessionName}:
 
 "${commentExcerpt}"

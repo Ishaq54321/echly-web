@@ -15,11 +15,19 @@ import type { UserDoc } from "@/lib/repositories/usersRepository.server";
  * means that category is still ENABLED (opt-out model, default all-true).
  */
 
+/**
+ * Preference categories shipped to users.
+ *
+ * Previously included `digest` and `marketing` as forward-looking placeholders.
+ * Both were removed (2026-05): nothing read them, the unsubscribe page UI was
+ * the only writer, and they showed up in the "all" unsubscribe path as dead
+ * flags. Existing Firestore docs may still carry the fields; the runtime
+ * reader ignores unknown keys via the spread overlay below, so no migration
+ * is required.
+ */
 export const DEFAULT_EMAIL_PREFERENCES = {
   lifecycle: true,
   notifications: true,
-  digest: true,
-  marketing: true,
 } as const;
 
 export type EmailPreferences = {

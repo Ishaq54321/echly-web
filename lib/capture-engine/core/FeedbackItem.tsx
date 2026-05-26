@@ -217,9 +217,14 @@ export function TicketEditorOverlay({
   const dateLine = ticket.createdAt ? formatLocalDateTime(ticket.createdAt) : null;
   const screenshotInfoTooltip = [trimmedPageArea, deviceLine, dateLine].filter(Boolean).join("\n");
 
-  useEffect(() => {
-    setScreenshotLoaded(false);
-  }, [screenshotUrl]);
+  // Ref callback handles the cache-hit case: if the browser already has the
+  // image, `complete` is true synchronously when the element mounts, so the
+  // `onLoad` event never fires. Either path flips `screenshotLoaded`.
+  const screenshotImgRef = useCallback((node: HTMLImageElement | null) => {
+    if (node && node.complete && node.naturalWidth > 0) {
+      setScreenshotLoaded(true);
+    }
+  }, []);
 
   // Escape closes overlay
   useEffect(() => {
@@ -328,9 +333,9 @@ export function TicketEditorOverlay({
               }}
             >
               <img
+                ref={screenshotImgRef}
                 src={screenshotUrl}
                 alt=""
-                loading="lazy"
                 className={screenshotLoaded ? "loaded" : ""}
                 onLoad={() => setScreenshotLoaded(true)}
               />

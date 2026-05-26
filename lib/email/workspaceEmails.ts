@@ -82,6 +82,8 @@ export async function sendWorkspaceInviteEmail({
       subject: `You've been invited to join ${workspaceName}`,
       html: workspaceInviteEmailHtml(props),
       text: workspaceInviteEmailText(props),
+      templateName: "workspaceInvite",
+      templateCategory: "transactional",
     });
     return { sent: true };
   } catch (err) {
@@ -109,6 +111,8 @@ export async function sendWorkspaceInviteReminderEmail({
       subject: `Your invitation to ${workspaceName} expires in ${expiresInDays} days`,
       html: workspaceInviteReminderHtml(props),
       text: workspaceInviteReminderText(props),
+      templateName: "workspaceInviteReminder",
+      templateCategory: "transactional",
     });
     return { sent: true };
   } catch (err) {
@@ -148,6 +152,8 @@ export async function sendSessionInviteEmail({
       subject: `You've been invited to view ${sessionName}`,
       html: sessionInviteEmailHtml(props),
       text: sessionInviteEmailText(props),
+      templateName: "sessionInvite",
+      templateCategory: "transactional",
     });
     return { sent: true };
   } catch (err) {
@@ -178,6 +184,8 @@ export async function sendAccessRequestNotificationEmail({
           subject: `${requesterEmail} requested access to ${sessionName}`,
           html: accessRequestNotificationEmailHtml(props),
           text: accessRequestNotificationEmailText(props),
+          templateName: "accessRequestNotification",
+          templateCategory: "transactional",
         })
       )
     );
@@ -216,6 +224,8 @@ export async function sendAccessRequestResultEmail({
         : `Access request for ${sessionName}`,
       html: accessRequestResultEmailHtml(props),
       text: accessRequestResultEmailText(props),
+      templateName: "accessRequestResult",
+      templateCategory: "transactional",
     });
     return { sent: true };
   } catch (err) {
@@ -242,6 +252,8 @@ export async function sendEmailChangeConfirmation({
       subject: "Confirm your new email address",
       html: emailChangeEmailHtml(props),
       text: emailChangeEmailText(props),
+      templateName: "emailChange",
+      templateCategory: "transactional",
     });
     return { sent: true };
   } catch (err) {
@@ -266,6 +278,8 @@ export async function sendPasswordResetEmail({
       subject: "Reset your Annote password",
       html: passwordResetEmailHtml(props),
       text: passwordResetEmailText(props),
+      templateName: "passwordReset",
+      templateCategory: "transactional",
     });
     return { sent: true };
   } catch (err) {
@@ -290,6 +304,8 @@ export async function sendEmailVerification({
       subject: "Verify your email — Annote",
       html: emailVerificationHtml(props),
       text: emailVerificationText(props),
+      templateName: "emailVerification",
+      templateCategory: "transactional",
     });
     return { sent: true };
   } catch (err) {
@@ -320,6 +336,8 @@ export async function sendWorkspaceDeletionConfirmationEmail({
       html: workspaceDeletedConfirmationHtml(props),
       text: workspaceDeletedConfirmationText(props),
       fromVariant: "founder",
+      templateName: "workspaceDeletedConfirmation",
+      templateCategory: "transactional",
     });
     return { sent: true };
   } catch (err) {
@@ -360,6 +378,8 @@ export async function sendMemberRemovedEmail({
       subject: memberRemovedSubject(workspaceName),
       html: memberRemovedEmailHtml(props),
       text: memberRemovedEmailText(props),
+      templateName: "memberRemoved",
+      templateCategory: "transactional",
     });
     return { sent: true };
   } catch (err) {
@@ -393,6 +413,8 @@ export async function sendEmailChangeNoticeEmail({
       subject: emailChangeNoticeSubject(),
       html: emailChangeNoticeHtml(props),
       text: emailChangeNoticeText(props),
+      templateName: "emailChangeNotice",
+      templateCategory: "transactional",
     });
     return { sent: true };
   } catch (err) {
@@ -432,6 +454,8 @@ export async function sendOwnershipTransferredOldEmail({
       subject: ownershipTransferredOldSubject(workspaceName),
       html: ownershipTransferredOldHtml(props),
       text: ownershipTransferredOldText(props),
+      templateName: "ownershipTransferredOld",
+      templateCategory: "transactional",
     });
     return { sent: true };
   } catch (err) {
@@ -492,6 +516,8 @@ export async function sendOwnershipTransferredNewEmail({
       html: ownershipTransferredNewHtml(props),
       text: ownershipTransferredNewText(props),
       fromVariant: "founder",
+      templateName: "ownershipTransferredNew",
+      templateCategory: "transactional",
     });
     return { sent: true };
   } catch (err) {
@@ -539,6 +565,8 @@ export async function sendWorkspaceDeletedMemberEmail({
       subject: workspaceDeletedMemberSubject(workspaceName),
       html: workspaceDeletedMemberHtml(props),
       text: workspaceDeletedMemberText(props),
+      templateName: "workspaceDeletedMember",
+      templateCategory: "transactional",
     });
     return { sent: true };
   } catch (err) {
@@ -578,8 +606,12 @@ export async function sendInviteAcceptedEmail({
       uid: inviterUid,
       category: "notifications",
       subject: `${acceptedByName} joined your workspace`,
-      htmlBuilder: () => inviteAcceptedEmailHtml(props),
-      textBuilder: () => inviteAcceptedEmailText(props),
+      htmlBuilder: (unsubscribeUrl) =>
+        inviteAcceptedEmailHtml({ ...props, unsubscribeUrl }),
+      textBuilder: (unsubscribeUrl) =>
+        inviteAcceptedEmailText({ ...props, unsubscribeUrl }),
+      templateName: "inviteAccepted",
+      templateCategory: "notifications",
     });
   } catch (err) {
     console.error("[sendInviteAcceptedEmail] failed:", err);

@@ -25,6 +25,7 @@ export function ticketUrl(sessionId: string, feedbackId: string): string {
  * the rest of the app uses (ExtensionStep / useSessionEntryCta / /docs); all
  * get the real id at once when the listing is published.
  */
+// TODO: replace with real Chrome Web Store extension ID once published.
 export const EXTENSION_INSTALL_URL =
   "https://chromewebstore.google.com/detail/echly/PLACEHOLDER";
 

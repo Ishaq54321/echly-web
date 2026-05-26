@@ -7,6 +7,11 @@ import type { EmailSendResult } from "./types";
 import type { UserDoc } from "@/lib/repositories/usersRepository.server";
 import { commentExcerpt, displayName, greetingName } from "./helpers";
 import { sessionUrl, ticketUrl, EXTENSION_INSTALL_URL } from "./urls";
+import {
+  checkCooldown,
+  stampCooldownSent,
+  type CooldownEventType,
+} from "./cooldowns";
 import { welcomeEmailHtml, welcomeEmailText } from "./templates/welcome";
 import {
   sessionOpenedEmailHtml,
@@ -88,9 +93,13 @@ export async function sendWelcomeEmail(params: {
     user,
     category: "lifecycle",
     subject: "Welcome to Annote — one thing to do first",
-    htmlBuilder: () => welcomeEmailHtml({ firstName, installUrl }),
-    textBuilder: () => welcomeEmailText({ firstName, installUrl }),
+    htmlBuilder: (unsubscribeUrl) =>
+      welcomeEmailHtml({ firstName, installUrl, unsubscribeUrl }),
+    textBuilder: (unsubscribeUrl) =>
+      welcomeEmailText({ firstName, installUrl, unsubscribeUrl }),
     fromVariant: "founder",
+    templateName: "welcome",
+    templateCategory: "lifecycle",
   });
   console.log(
     `[welcome-email] uid=${user.uid} sent=${result.sent}${
@@ -122,8 +131,12 @@ export async function sendSessionOpenedEmail(params: {
     user: owner,
     category: "notifications",
     subject: sessionOpenedSubject(viewerName),
-    htmlBuilder: () => sessionOpenedEmailHtml(props),
-    textBuilder: () => sessionOpenedEmailText(props),
+    htmlBuilder: (unsubscribeUrl) =>
+      sessionOpenedEmailHtml({ ...props, unsubscribeUrl }),
+    textBuilder: (unsubscribeUrl) =>
+      sessionOpenedEmailText({ ...props, unsubscribeUrl }),
+    templateName: "sessionOpened",
+    templateCategory: "notifications",
   });
   console.log(
     `[session-opened-email] owner=${owner.uid} session=${sessionId} sent=${result.sent}${
@@ -140,6 +153,7 @@ export async function sendSessionOpenedEmail(params: {
  */
 export async function sendNewCommentEmail(params: {
   recipientUid: string;
+  actorUid: string;
   commenterName: string;
   ticketTitle: string;
   sessionName: string;
@@ -149,6 +163,7 @@ export async function sendNewCommentEmail(params: {
 }): Promise<EmailSendResult> {
   const {
     recipientUid,
+    actorUid,
     commenterName,
     ticketTitle,
     sessionName,
@@ -156,6 +171,16 @@ export async function sendNewCommentEmail(params: {
     sessionId,
     feedbackId,
   } = params;
+
+  const cooldown = await applyCooldownGate({
+    recipientUid,
+    actorUid,
+    eventType: "newComment",
+    label: "new-comment-email",
+    feedbackId,
+  });
+  if (!cooldown.ok) return cooldown.result;
+
   const excerpt = commentExcerpt(message);
   const props = {
     commenterName,
@@ -169,9 +194,20 @@ export async function sendNewCommentEmail(params: {
     uid: recipientUid,
     category: "notifications",
     subject: newCommentSubject(commenterName, ticketTitle),
-    htmlBuilder: () => newCommentEmailHtml(props),
-    textBuilder: () => newCommentEmailText(props),
+    htmlBuilder: (unsubscribeUrl) =>
+      newCommentEmailHtml({ ...props, unsubscribeUrl }),
+    textBuilder: (unsubscribeUrl) =>
+      newCommentEmailText({ ...props, unsubscribeUrl }),
+    templateName: "newComment",
+    templateCategory: "notifications",
   });
+  if (result.sent) {
+    void stampCooldownSent({
+      recipientUid,
+      actorUid,
+      eventType: "newComment",
+    });
+  }
   console.log(
     `[new-comment-email] recipient=${recipientUid} feedback=${feedbackId} sent=${result.sent}${
       !result.sent ? ` reason=${result.reason}` : ""
@@ -186,6 +222,7 @@ export async function sendNewCommentEmail(params: {
  */
 export async function sendMentionEmail(params: {
   recipientUid: string;
+  actorUid: string;
   mentionerName: string;
   ticketTitle: string;
   sessionName: string;
@@ -195,6 +232,7 @@ export async function sendMentionEmail(params: {
 }): Promise<EmailSendResult> {
   const {
     recipientUid,
+    actorUid,
     mentionerName,
     ticketTitle,
     sessionName,
@@ -202,6 +240,16 @@ export async function sendMentionEmail(params: {
     sessionId,
     feedbackId,
   } = params;
+
+  const cooldown = await applyCooldownGate({
+    recipientUid,
+    actorUid,
+    eventType: "mention",
+    label: "mention-email",
+    feedbackId,
+  });
+  if (!cooldown.ok) return cooldown.result;
+
   const excerpt = commentExcerpt(message);
   const props = {
     mentionerName,
@@ -215,9 +263,20 @@ export async function sendMentionEmail(params: {
     uid: recipientUid,
     category: "notifications",
     subject: mentionSubject(mentionerName, ticketTitle),
-    htmlBuilder: () => mentionEmailHtml(props),
-    textBuilder: () => mentionEmailText(props),
+    htmlBuilder: (unsubscribeUrl) =>
+      mentionEmailHtml({ ...props, unsubscribeUrl }),
+    textBuilder: (unsubscribeUrl) =>
+      mentionEmailText({ ...props, unsubscribeUrl }),
+    templateName: "mention",
+    templateCategory: "notifications",
   });
+  if (result.sent) {
+    void stampCooldownSent({
+      recipientUid,
+      actorUid,
+      eventType: "mention",
+    });
+  }
   console.log(
     `[mention-email] recipient=${recipientUid} feedback=${feedbackId} sent=${result.sent}${
       !result.sent ? ` reason=${result.reason}` : ""
@@ -233,6 +292,7 @@ export async function sendMentionEmail(params: {
  */
 export async function sendTicketAssignedEmail(params: {
   assigneeUid: string;
+  actorUid: string;
   assignerName: string;
   ticketTitle: string;
   sessionName: string;
@@ -241,12 +301,23 @@ export async function sendTicketAssignedEmail(params: {
 }): Promise<EmailSendResult> {
   const {
     assigneeUid,
+    actorUid,
     assignerName,
     ticketTitle,
     sessionName,
     sessionId,
     feedbackId,
   } = params;
+
+  const cooldown = await applyCooldownGate({
+    recipientUid: assigneeUid,
+    actorUid,
+    eventType: "ticketAssigned",
+    label: "ticket-assigned-email",
+    feedbackId,
+  });
+  if (!cooldown.ok) return cooldown.result;
+
   const props = {
     assignerName,
     ticketTitle,
@@ -258,9 +329,20 @@ export async function sendTicketAssignedEmail(params: {
     uid: assigneeUid,
     category: "notifications",
     subject: ticketAssignedSubject(assignerName),
-    htmlBuilder: () => ticketAssignedEmailHtml(props),
-    textBuilder: () => ticketAssignedEmailText(props),
+    htmlBuilder: (unsubscribeUrl) =>
+      ticketAssignedEmailHtml({ ...props, unsubscribeUrl }),
+    textBuilder: (unsubscribeUrl) =>
+      ticketAssignedEmailText({ ...props, unsubscribeUrl }),
+    templateName: "ticketAssigned",
+    templateCategory: "notifications",
   });
+  if (result.sent) {
+    void stampCooldownSent({
+      recipientUid: assigneeUid,
+      actorUid,
+      eventType: "ticketAssigned",
+    });
+  }
   console.log(
     `[ticket-assigned-email] assignee=${assigneeUid} feedback=${feedbackId} sent=${result.sent}${
       !result.sent ? ` reason=${result.reason}` : ""
@@ -301,9 +383,13 @@ export async function sendPlanLimitApproachingEmail(params: {
     user: owner,
     category: "lifecycle",
     subject: planLimitApproachingSubject(planName),
-    htmlBuilder: () => planLimitApproachingEmailHtml(props),
-    textBuilder: () => planLimitApproachingEmailText(props),
+    htmlBuilder: (unsubscribeUrl) =>
+      planLimitApproachingEmailHtml({ ...props, unsubscribeUrl }),
+    textBuilder: (unsubscribeUrl) =>
+      planLimitApproachingEmailText({ ...props, unsubscribeUrl }),
     fromVariant: "founder",
+    templateName: "planLimitApproaching",
+    templateCategory: "lifecycle",
   });
   console.log(
     `[plan-approaching-email] owner=${owner.uid} sent=${result.sent}${
@@ -339,9 +425,13 @@ export async function sendPlanLimitHitEmail(params: {
     user: owner,
     category: "lifecycle",
     subject: planLimitHitSubject(),
-    htmlBuilder: () => planLimitHitEmailHtml(props),
-    textBuilder: () => planLimitHitEmailText(props),
+    htmlBuilder: (unsubscribeUrl) =>
+      planLimitHitEmailHtml({ ...props, unsubscribeUrl }),
+    textBuilder: (unsubscribeUrl) =>
+      planLimitHitEmailText({ ...props, unsubscribeUrl }),
     fromVariant: "founder",
+    templateName: "planLimitHit",
+    templateCategory: "lifecycle",
   });
   console.log(
     `[plan-hit-email] owner=${owner.uid} sent=${result.sent}${
@@ -358,6 +448,7 @@ export async function sendPlanLimitHitEmail(params: {
  */
 export async function sendTicketResolvedEmail(params: {
   recipientUid: string;
+  actorUid: string;
   ticketTitle: string;
   sessionName: string;
   resolverName: string;
@@ -366,12 +457,21 @@ export async function sendTicketResolvedEmail(params: {
 }): Promise<EmailSendResult> {
   const {
     recipientUid,
+    actorUid,
     ticketTitle,
     sessionName,
     resolverName,
     ticketUrl,
     resolutionNote,
   } = params;
+
+  const cooldown = await applyCooldownGate({
+    recipientUid,
+    actorUid,
+    eventType: "ticketResolved",
+    label: "ticket-resolved-email",
+  });
+  if (!cooldown.ok) return cooldown.result;
 
   const { getUserByIdRepo } = await import(
     "@/lib/repositories/usersRepository.server"
@@ -394,9 +494,20 @@ export async function sendTicketResolvedEmail(params: {
     user: recipient,
     category: "notifications",
     subject: ticketResolvedSubject(ticketTitle),
-    htmlBuilder: () => ticketResolvedEmailHtml(props),
-    textBuilder: () => ticketResolvedEmailText(props),
+    htmlBuilder: (unsubscribeUrl) =>
+      ticketResolvedEmailHtml({ ...props, unsubscribeUrl }),
+    textBuilder: (unsubscribeUrl) =>
+      ticketResolvedEmailText({ ...props, unsubscribeUrl }),
+    templateName: "ticketResolved",
+    templateCategory: "notifications",
   });
+  if (result.sent) {
+    void stampCooldownSent({
+      recipientUid,
+      actorUid,
+      eventType: "ticketResolved",
+    });
+  }
   console.log(
     `[ticket-resolved-email] recipient=${recipientUid} sent=${result.sent}${
       !result.sent ? ` reason=${result.reason}` : ""
@@ -413,6 +524,36 @@ function greetingNameForUser(user: UserLike): string | undefined {
     email: user.email,
   });
   return name === "there" ? undefined : name;
+}
+
+/**
+ * Apply the per-actor cooldown gate before composing/sending. Returns
+ * `{ ok: true }` when the caller should proceed; otherwise returns the
+ * suppressed `EmailSendResult` so the dispatcher can short-circuit.
+ *
+ * Cooldown is checked BEFORE the preference gate — it's the cheaper check,
+ * and short-circuiting here avoids loading the recipient user doc for sends
+ * we know we'd drop. The post-send stamp is written by the caller after a
+ * confirmed send (so opt-outs don't accumulate phantom stamps).
+ */
+async function applyCooldownGate(params: {
+  recipientUid: string;
+  actorUid: string;
+  eventType: CooldownEventType;
+  label: string;
+  feedbackId?: string;
+}): Promise<{ ok: true } | { ok: false; result: EmailSendResult }> {
+  const { recipientUid, actorUid, eventType, label, feedbackId } = params;
+  // Defensive: missing actor means we can't bucket the cooldown — let it
+  // through. The natural per-event dedup at the trigger site is still active.
+  if (!actorUid || !recipientUid) return { ok: true };
+  const check = await checkCooldown({ recipientUid, actorUid, eventType });
+  if (check.ok) return { ok: true };
+  const suffix = feedbackId ? ` feedback=${feedbackId}` : "";
+  console.log(
+    `[${label}] recipient=${recipientUid}${suffix} sent=false reason=cooldown actor=${actorUid} eventType=${eventType}`
+  );
+  return { ok: false, result: { sent: false, reason: "cooldown" } };
 }
 
 /** Re-export so callers resolving a viewer/commenter name use the same logic. */

@@ -270,6 +270,7 @@ export async function addCommentRepo(
       ...mentionRecipients.map((uid) =>
         sendMentionEmail({
           recipientUid: uid,
+          actorUid: resolvedUserId,
           mentionerName: actor.actorName,
           ticketTitle: emailTicketTitle,
           sessionName: emailSessionName,
@@ -281,6 +282,7 @@ export async function addCommentRepo(
       ...commentRecipients.map((uid) =>
         sendNewCommentEmail({
           recipientUid: uid,
+          actorUid: resolvedUserId,
           commenterName: actor.actorName,
           ticketTitle: emailTicketTitle,
           sessionName: emailSessionName,

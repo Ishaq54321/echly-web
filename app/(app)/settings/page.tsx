@@ -85,6 +85,7 @@ function SectionHeader({
 const TABS = [
   { id: "profile", label: "My account" },
   { id: "workspace", label: "Workspace" },
+  { id: "notifications", label: "Notifications" },
   { id: "security", label: "Security" },
   { id: "billing", label: "Billing" },
 ] as const;
@@ -207,6 +208,7 @@ function SettingsPageInner() {
               loading={sectionLoading}
             />
           )}
+          {activeTab === "notifications" && <NotificationsTab />}
           {activeTab === "security" && <SecurityTab />}
           {activeTab === "billing" && <BillingTab />}
           {/* Post-checkout success bridge. Mounted at the settings shell —
@@ -2673,6 +2675,284 @@ function MembersTab({
         onClose={() => setInviteModalOpen(false)}
         onInviteSent={(inv) => handleInviteSent(inv as SerializedInvitation)}
       />
+    </div>
+  );
+}
+
+/* ——— Notifications tab ——— */
+type NotificationsPrefs = { lifecycle: boolean; notifications: boolean };
+
+function NotificationsTab() {
+  const isMobile = useIsMobile();
+  const [prefs, setPrefs] = useState<NotificationsPrefs | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function showToast(msg: string) {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast(msg);
+    toastTimerRef.current = setTimeout(() => setToast(null), 3000);
+  }
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await authFetch("/api/users/email-preferences");
+        if (!res?.ok) {
+          setLoadError("Failed to load preferences.");
+          return;
+        }
+        const json = (await res.json()) as {
+          success: boolean;
+          data?: { preferences: NotificationsPrefs };
+        };
+        if (json.success && json.data?.preferences) {
+          setPrefs(json.data.preferences);
+        } else {
+          setLoadError("Failed to load preferences.");
+        }
+      } catch {
+        setLoadError("Failed to load preferences.");
+      }
+    })();
+  }, []);
+
+  async function setCategory(
+    category: keyof NotificationsPrefs,
+    enabled: boolean
+  ) {
+    if (!prefs) return;
+    const previous = prefs[category];
+    setPrefs({ ...prefs, [category]: enabled });
+    try {
+      const res = await authFetch("/api/users/email-preferences", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category, enabled }),
+      });
+      if (!res?.ok) {
+        setPrefs((p) => (p ? { ...p, [category]: previous } : p));
+        showToast("Failed to update — try again");
+        return;
+      }
+      showToast(enabled ? "Turned on" : "Turned off");
+    } catch {
+      setPrefs((p) => (p ? { ...p, [category]: previous } : p));
+      showToast("Failed to update — try again");
+    }
+  }
+
+  const sectionStyle: React.CSSProperties = {
+    padding: isMobile ? "20px 16px" : "28px 32px",
+    borderBottom: "1px solid var(--surface-hover)",
+  };
+
+  if (loadError) {
+    return (
+      <div
+        style={{ maxWidth: "min(900px, 100%)", width: "100%", padding: "32px 0" }}
+      >
+        <div
+          style={{
+            background: "white",
+            border: "1px solid var(--border)",
+            borderRadius: 16,
+            padding: "28px 32px",
+          }}
+        >
+          <p style={{ color: "var(--text-secondary)" }}>{loadError}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!prefs) {
+    return (
+      <div
+        style={{ maxWidth: "min(900px, 100%)", width: "100%", padding: "32px 0" }}
+        aria-busy="true"
+        aria-live="polite"
+      >
+        <style>{`@keyframes shimmer { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } } .skeleton { animation: shimmer 1.5s ease infinite; }`}</style>
+        <div
+          style={{ marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid var(--surface-hover)" }}
+        >
+          <div className="skeleton" style={{ height: 22, width: 220, background: "var(--surface-hover)", borderRadius: 6, marginBottom: 8 }} />
+          <div className="skeleton" style={{ height: 14, width: 320, background: "var(--surface-hover)", borderRadius: 4 }} />
+        </div>
+        <div style={{ background: "white", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
+          {[0, 1].map((i) => (
+            <div key={i} style={{ padding: "28px 32px", borderBottom: i === 0 ? "1px solid var(--surface-hover)" : "none" }}>
+              <div className="skeleton" style={{ height: 56, background: "var(--surface-subtle)", borderRadius: 9 }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{ maxWidth: "min(900px, 100%)", width: "100%", padding: "32px 0" }}
+      className="ech-content-enter pb-16"
+    >
+      {toast && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 24,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 50,
+            padding: "10px 18px",
+            borderRadius: 10,
+            background: "var(--text-heading)",
+            color: "white",
+            fontSize: 14,
+            fontWeight: 500,
+            pointerEvents: "none",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {toast}
+        </div>
+      )}
+
+      <div
+        style={{
+          marginBottom: 28,
+          paddingBottom: 20,
+          borderBottom: "1px solid var(--surface-hover)",
+        }}
+      >
+        <h1 className="text-lg font-semibold text-[var(--text-heading)] mb-1">
+          Notification Settings
+        </h1>
+        <p style={{ fontSize: 14, color: "var(--text-secondary)", margin: 0 }}>
+          Choose which emails Annote sends you
+        </p>
+      </div>
+
+      <div
+        style={{
+          background: "white",
+          border: "1px solid var(--border)",
+          borderRadius: 16,
+          overflow: "hidden",
+        }}
+      >
+        <NotificationToggleRow
+          title="Activity notifications"
+          description="Comments, mentions, assignments, resolutions, and session views."
+          enabled={prefs.notifications}
+          onToggle={(v) => void setCategory("notifications", v)}
+          style={sectionStyle}
+        />
+        <NotificationToggleRow
+          title="Product updates"
+          description="Welcome, plan limits, and account milestones."
+          enabled={prefs.lifecycle}
+          onToggle={(v) => void setCategory("lifecycle", v)}
+          style={{ ...sectionStyle, borderBottom: "none" }}
+        />
+      </div>
+
+      <p
+        style={{
+          fontSize: 13,
+          color: "var(--text-tertiary)",
+          marginTop: 20,
+          lineHeight: 1.5,
+        }}
+      >
+        Account and security emails (password resets, invoices, invitations)
+        are always sent regardless of these preferences.
+      </p>
+    </div>
+  );
+}
+
+function NotificationToggleRow({
+  title,
+  description,
+  enabled,
+  onToggle,
+  style,
+}: {
+  title: string;
+  description: string;
+  enabled: boolean;
+  onToggle: (next: boolean) => void;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+        gap: 24,
+        ...style,
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p
+          style={{
+            fontSize: 16,
+            fontWeight: 600,
+            color: "var(--text-heading)",
+            margin: 0,
+          }}
+        >
+          {title}
+        </p>
+        <p
+          style={{
+            fontSize: 14,
+            color: "var(--text-secondary)",
+            margin: "4px 0 0",
+            lineHeight: 1.5,
+          }}
+        >
+          {description}
+        </p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={enabled}
+        aria-label={title}
+        onClick={() => onToggle(!enabled)}
+        style={{
+          flexShrink: 0,
+          marginTop: 2,
+          width: 44,
+          height: 24,
+          borderRadius: 999,
+          border: "none",
+          background: enabled ? "var(--brand)" : "var(--surface-hover)",
+          position: "relative",
+          cursor: "pointer",
+          transition: "background-color 180ms ease",
+          padding: 0,
+        }}
+      >
+        <span
+          aria-hidden
+          style={{
+            position: "absolute",
+            top: 2,
+            left: enabled ? 22 : 2,
+            width: 20,
+            height: 20,
+            borderRadius: "50%",
+            background: "white",
+            boxShadow: "0 1px 3px rgba(0, 0, 0, 0.18)",
+            transition: "left 180ms ease",
+          }}
+        />
+      </button>
     </div>
   );
 }

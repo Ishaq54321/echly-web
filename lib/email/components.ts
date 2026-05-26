@@ -64,8 +64,14 @@ interface ShellV2Options {
   /** Inner content — raw HTML, expected to be one or more emailCardV2() blocks. */
   content: string;
   /**
-   * Unsubscribe link href. Phase 3 wires this up; for now it's a passthrough.
-   * Defaults to the placeholder token Phase 3 will substitute.
+   * Unsubscribe link href. Optional — only preference-gated mail
+   * (welcome, notifications, lifecycle) passes one. When absent the footer
+   * renders the "annote.ai" link on its own, with no unsubscribe row,
+   * matching how transactional mail from Linear / Stripe / Notion looks.
+   *
+   * Do not pass the literal `{{UNSUBSCRIBE_URL}}` placeholder here — that
+   * was the pre-fix default and shipped a broken href to inboxes. The
+   * preference-gated path now threads a real signed URL all the way down.
    */
   unsubscribeUrl?: string;
   /**
@@ -96,11 +102,12 @@ interface ShellV2Options {
 export function emailShellV2({
   preheader,
   content,
-  unsubscribeUrl = "{{UNSUBSCRIBE_URL}}",
+  unsubscribeUrl,
   category,
   title,
   metadata,
 }: ShellV2Options): string {
+  const hasUnsub = typeof unsubscribeUrl === "string" && unsubscribeUrl.length > 0;
   const pre = preheader ?? "";
 
   // Header strip (Direction C): category → title → metadata stacked above body.
@@ -171,15 +178,15 @@ export function emailShellV2({
             </td>
           </tr>
 
-          <!-- Footer: wordmark + tagline + unsubscribe -->
+          <!-- Footer: wordmark + tagline + (optional unsubscribe) + annote.ai -->
           <tr>
             <td align="center" style="padding:40px 0 0 0;text-align:center;">
               <p style="margin:0;font-size:${EMAIL_SIZES.footerFontSize}px;font-weight:500;color:${EMAIL_COLORS.textFooter};line-height:1.4;">Annote</p>
               <p style="margin:4px 0 0 0;font-size:${EMAIL_SIZES.footerFontSize}px;color:${EMAIL_COLORS.textFooter};line-height:1.4;">Capture feedback in a click.</p>
               <p style="margin:16px 0 0 0;font-size:${EMAIL_SIZES.footerFontSize}px;color:${EMAIL_COLORS.textFooter};line-height:1.4;">
-                <a href="${unsubscribeUrl}" style="color:${EMAIL_COLORS.textFooter};text-decoration:underline;">Unsubscribe</a>
+                ${hasUnsub ? `<a href="${unsubscribeUrl}" style="color:${EMAIL_COLORS.textFooter};text-decoration:underline;">Unsubscribe</a>
                 <span style="color:${EMAIL_COLORS.hairline};">&nbsp;·&nbsp;</span>
-                <a href="https://annote.ai" style="color:${EMAIL_COLORS.textFooter};text-decoration:none;">annote.ai</a>
+                ` : ""}<a href="https://annote.ai" style="color:${EMAIL_COLORS.textFooter};text-decoration:none;">annote.ai</a>
               </p>
             </td>
           </tr>
@@ -335,15 +342,25 @@ interface PlainTextV2Options {
   unsubscribeUrl?: string;
 }
 
-/** V2 plain-text wrapper with sign-off footer. */
+/**
+ * V2 plain-text wrapper with sign-off footer.
+ *
+ * `unsubscribeUrl` is optional and mirrors the HTML shell: only preference-
+ * gated mail passes a real signed URL, in which case an `Unsubscribe:` line
+ * is appended. Transactional callers leave it undefined and the line is
+ * omitted (no broken `{{UNSUBSCRIBE_URL}}` literal ships to inboxes).
+ */
 export function plainTextShellV2({
   body,
-  unsubscribeUrl = "{{UNSUBSCRIBE_URL}}",
+  unsubscribeUrl,
 }: PlainTextV2Options): string {
+  const trailer =
+    typeof unsubscribeUrl === "string" && unsubscribeUrl.length > 0
+      ? `\nUnsubscribe: ${unsubscribeUrl}`
+      : "";
   return `${body}
 
 ---
 Capture feedback in a click.
-Annote · annote.ai
-Unsubscribe: ${unsubscribeUrl}`;
+Annote · annote.ai${trailer}`;
 }

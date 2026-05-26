@@ -406,20 +406,27 @@ export interface UserDoc {
    * still enabled. Always read via getEmailPreferences() in
    * lib/email/preferences.ts so defaults apply. Transactional email
    * (password reset, verification, billing, security) ignores this entirely.
+   *
+   * Legacy `digest` and `marketing` fields may still exist on older docs; they
+   * are ignored at runtime. No migration needed.
    */
   emailPreferences?: {
-    lifecycle: boolean; // welcome, drip, milestone emails
+    lifecycle: boolean; // welcome, plan limits, account milestones
     notifications: boolean; // comment, mention, assignment, session-opened
-    digest: boolean; // weekly digest (deferred to post-launch)
-    marketing: boolean; // future product announcements
   };
 
   /**
-   * Tracks one-time email sends so cron retries / duplicate triggers don't
-   * re-send. Each key is set to the server timestamp of the first send.
+   * Tracks email sends so retries / duplicate triggers don't re-send. Each
+   * key is set to the server timestamp of the first send.
+   *
+   * `cooldowns` holds per-(actor, eventType) stamps used by
+   * lib/email/cooldowns.ts to suppress burst-driven storms (e.g. one user
+   * resolving 100 tickets to the same reporter). Keys are encoded as
+   * `${actorUid}_${eventType}` and overwritten on each successful send.
    */
   emailSends?: {
     welcome?: Timestamp;
+    cooldowns?: Record<string, Timestamp>;
     // Future: day1Capture, day3Sessions, day7InviteTeam, day14CheckIn, inactivity
   };
 

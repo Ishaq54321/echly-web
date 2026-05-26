@@ -21,6 +21,8 @@ interface PlanLimitHitProps {
   resetDate: string;
   /** Link to upgrade to Pro. */
   upgradeUrl: string;
+  /** Signed unsubscribe URL — threaded through by sendEmailWithPreferences. */
+  unsubscribeUrl?: string;
 }
 
 /** Subject line. Static; exported for parity with the other plan-limit email. */
@@ -34,6 +36,7 @@ export function planLimitHitEmailHtml({
   workspaceName,
   resetDate,
   upgradeUrl,
+  unsubscribeUrl,
 }: PlanLimitHitProps): string {
   const greetingName = firstName ? escapeEmailHtml(firstName) : "there";
   const safeWorkspace = escapeEmailHtml(workspaceName);
@@ -44,6 +47,7 @@ export function planLimitHitEmailHtml({
       "Existing sessions and shares still work. Only new captures pause.",
     category: "Plan usage",
     title: "You've reached your monthly limit",
+    unsubscribeUrl,
     content: emailCardV2({
       content: `
         ${emailParagraphV2(`Hey ${greetingName},`)}
@@ -80,10 +84,12 @@ export function planLimitHitEmailText({
   workspaceName,
   resetDate,
   upgradeUrl,
+  unsubscribeUrl,
 }: PlanLimitHitProps): string {
   const greetingName = firstName ?? "there";
 
   return plainTextShellV2({
+    unsubscribeUrl,
     body: `Hey ${greetingName},
 
 You've used all ${planLimit} captures on ${workspaceName} this month. Here's exactly what that means:

@@ -19,6 +19,8 @@ interface TicketAssignedProps {
   sessionName: string;
   /** Deep link to open the ticket. */
   ticketUrl: string;
+  /** Signed unsubscribe URL — threaded through by sendEmailWithPreferences. */
+  unsubscribeUrl?: string;
 }
 
 /**
@@ -34,6 +36,7 @@ export function ticketAssignedEmailHtml({
   ticketTitle,
   sessionName,
   ticketUrl,
+  unsubscribeUrl,
 }: TicketAssignedProps): string {
   const safeAssigner = escapeEmailHtml(assignerName);
   const safeTitle = escapeEmailHtml(ticketTitle);
@@ -43,6 +46,7 @@ export function ticketAssignedEmailHtml({
     preheader: `${ticketTitle} — in ${sessionName}.`,
     category: "Ticket assigned",
     title: `${assignerName} assigned you a ticket`,
+    unsubscribeUrl,
     content: emailCardV2({
       content: `
         ${emailParagraphV2(
@@ -69,8 +73,10 @@ export function ticketAssignedEmailText({
   ticketTitle,
   sessionName,
   ticketUrl,
+  unsubscribeUrl,
 }: TicketAssignedProps): string {
   return plainTextShellV2({
+    unsubscribeUrl,
     body: `${assignerName} assigned you a ticket in "${sessionName}":
 
 "${ticketTitle}"

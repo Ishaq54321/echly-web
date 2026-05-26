@@ -20,6 +20,8 @@ interface WelcomeProps {
   firstName?: string;
   /** Override the extension install URL (defaults to the Chrome Web Store listing). */
   installUrl?: string;
+  /** Signed unsubscribe URL — threaded through by sendEmailWithPreferences. */
+  unsubscribeUrl?: string;
 }
 
 const DOCS_LINK = docsUrl();
@@ -27,6 +29,7 @@ const DOCS_LINK = docsUrl();
 export function welcomeEmailHtml({
   firstName,
   installUrl = EXTENSION_INSTALL_URL,
+  unsubscribeUrl,
 }: WelcomeProps): string {
   const greetingName = firstName ? escapeEmailHtml(firstName) : "there";
 
@@ -34,6 +37,7 @@ export function welcomeEmailHtml({
     preheader: "Thanks for signing up — here's the quick guide.",
     category: "Welcome to Annote",
     title: "You're in",
+    unsubscribeUrl,
     content: emailCardV2({
       content: `
         ${emailParagraphV2(`Hey ${greetingName},`)}
@@ -64,10 +68,12 @@ export function welcomeEmailHtml({
 export function welcomeEmailText({
   firstName,
   installUrl = EXTENSION_INSTALL_URL,
+  unsubscribeUrl,
 }: WelcomeProps): string {
   const greetingName = firstName ?? "there";
 
   return plainTextShellV2({
+    unsubscribeUrl,
     body: `Hey ${greetingName},
 
 Thanks for signing up. Annote is, in one sentence: click anywhere on a page, say what you mean, get a clean ticket. The faster you try it on a real page, the faster it makes sense.
