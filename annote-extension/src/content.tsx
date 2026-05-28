@@ -18,6 +18,8 @@ import { createRoot } from "react-dom/client";
 import { apiFetch, API_BASE, throwIfHttpError } from "./api";
 import { getSessionsCached, invalidateSessionsCache } from "./cachedSessions";
 import { uploadScreenshot, generateFeedbackId } from "./contentScreenshot";
+import { requestSnapshot as requestConsoleSnapshot } from "./console/bridge";
+import { requestNetworkSnapshot } from "./network/bridge";
 import CaptureWidget from "@/lib/capture-engine/core/CaptureWidget";
 import type { StructuredFeedback, CaptureContext, FeedbackJob } from "@/lib/capture-engine/core/types";
 import { ExtensionCaptureEnvironment } from "@/lib/capture-engine/ExtensionCaptureEnvironment";
@@ -699,12 +701,23 @@ function ContentApp({ widgetRoot }: ContentAppProps) {
       }
 
       const currentUrl = typeof window !== "undefined" ? window.location.href : "";
-      const { ocrImageDataUrl: _ocrImg, ...contextForApi } = (context ?? {}) as Record<string, unknown>;
+      // Extract the console snapshot before the rest goes to /api/structure-feedback.
+      // AI must NEVER see logs (per spec: pure metadata, not AI input).
+      const consoleSnapshot = (context as CaptureContext | null)?.consoleSnapshot ?? null;
+      const networkSnapshot = (context as CaptureContext | null)?.networkSnapshot ?? null;
+      const {
+        ocrImageDataUrl: _ocrImg,
+        consoleSnapshot: _consoleSnap,
+        networkSnapshot: _networkSnap,
+        ...contextForApi
+      } = (context ?? {}) as Record<string, unknown>;
       const enrichedContext: CaptureContext = {
         ...(contextForApi as Omit<CaptureContext, "url">),
         url: (context as CaptureContext | null)?.url ?? currentUrl,
       };
       delete (enrichedContext as Record<string, unknown>).ocrImageDataUrl;
+      delete (enrichedContext as Record<string, unknown>).consoleSnapshot;
+      delete (enrichedContext as Record<string, unknown>).networkSnapshot;
 
       type StructureTicket = {
         title?: string;
@@ -830,6 +843,27 @@ function ContentApp({ widgetRoot }: ContentAppProps) {
                       typeof navigator !== "undefined" && typeof navigator.userAgent === "string"
                         ? navigator.userAgent
                         : undefined,
+                    ...(consoleSnapshot
+                      ? {
+                          consoleLogs: consoleSnapshot.logs,
+                          exceptions: consoleSnapshot.exceptions,
+                          consoleLogCount: consoleSnapshot.logs.length,
+                          exceptionCount: consoleSnapshot.exceptions.length,
+                          errorCount: consoleSnapshot.logs.filter((l) => l.level === "error").length,
+                          warningCount: consoleSnapshot.logs.filter((l) => l.level === "warn").length,
+                        }
+                      : {}),
+                    ...(networkSnapshot
+                      ? {
+                          networkRequests: networkSnapshot.requests,
+                          networkRequestCount: networkSnapshot.requests.length,
+                          networkErrorCount: networkSnapshot.requests.filter(
+                            (r) =>
+                              r.errored === true ||
+                              (typeof r.status === "number" && r.status >= 400 && r.status < 600)
+                          ).length,
+                        }
+                      : {}),
                   },
                   screenshotId: finalScreenshotId,
                 },
@@ -1450,6 +1484,8 @@ function ContentApp({ widgetRoot }: ContentAppProps) {
           __extensionSavingState={isSaving}
           onExtensionSavingSignalsChange={onExtensionSavingSignalsChange}
           captureMode={uiGlobal.captureMode}
+          requestConsoleSnapshot={() => requestConsoleSnapshot(500)}
+          requestNetworkSnapshot={() => requestNetworkSnapshot(500)}
           onComplete={handleComplete}
           onDelete={handleDelete}
           onUpdate={handleUpdate}

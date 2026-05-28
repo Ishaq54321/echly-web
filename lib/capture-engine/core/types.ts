@@ -1,5 +1,9 @@
 import type { MutableRefObject } from "react";
 import type { CaptureEnvironment } from "../CaptureEnvironment";
+import type { ConsoleLogEntry, ExceptionEntry, NetworkRequestEntry } from "@/lib/domain/feedback";
+
+// Re-export so existing consumers of `from "../types"` continue to work.
+export type { ConsoleLogEntry, ExceptionEntry, NetworkRequestEntry };
 
 export type StructuredFeedback = {
   id: string;
@@ -28,6 +32,19 @@ export type ElementRect = {
   height: number;
 };
 
+/** Point-in-time snapshot of the extension's MAIN-world console buffer, attached to a single ticket at click time. `ConsoleLogEntry` / `ExceptionEntry` are re-exported above from lib/domain/feedback.ts; the extension keeps its own bundler-isolated copy in annote-extension/src/console/types.ts. */
+export type ConsoleSnapshot = {
+  logs: ConsoleLogEntry[];
+  exceptions: ExceptionEntry[];
+  capturedAt: number;
+};
+
+/** Point-in-time snapshot of the extension's MAIN-world network buffer, attached to a single ticket at click time. Sibling to ConsoleSnapshot. NetworkRequestEntry is re-exported above from lib/domain/feedback.ts; the extension keeps its own bundler-isolated copy in annote-extension/src/network/types.ts. */
+export type NetworkSnapshot = {
+  requests: NetworkRequestEntry[];
+  capturedAt: number;
+};
+
 /** Pending session feedback (screenshot + context + optional element position). Screenshot is optional so capture flow can continue when screenshot fails. */
 export type SessionFeedbackPending = {
   screenshot?: string | null;
@@ -35,6 +52,10 @@ export type SessionFeedbackPending = {
   elementRect?: ElementRect | null;
   /** Live reference to the clicked element so the persistent selection overlay can re-measure on scroll/resize. */
   targetElement?: HTMLElement | null;
+  /** Console logs + exceptions captured by the extension MAIN-world script up to the click moment. Null when not in extension mode or when the bridge timed out. */
+  consoleSnapshot?: ConsoleSnapshot | null;
+  /** Network requests captured by the extension MAIN-world wrapper up to the click moment. Null when not in extension mode or when the bridge timed out. */
+  networkSnapshot?: NetworkSnapshot | null;
 };
 
 /** Context captured with the region (URL, scroll, viewport, selected-element subtree). */
@@ -74,6 +95,10 @@ export type CaptureContext = {
   ocrImageDataUrl?: string | null;
   /** Pin position as percentage of container (0–100) for annotation placement. */
   pinPosition?: { xPercent: number; yPercent: number } | null;
+  /** Console-log capture snapshot taken at click time. Threaded through here so handleComplete can forward logs to the ECHLY_CREATE_FEEDBACK payload without changing the onComplete signature. Extension mode only. */
+  consoleSnapshot?: ConsoleSnapshot | null;
+  /** Network-capture snapshot taken at click time. Sibling to consoleSnapshot — threaded through onComplete for the same reason. Extension mode only. */
+  networkSnapshot?: NetworkSnapshot | null;
 };
 
 export interface Recording {
@@ -246,6 +271,10 @@ export type CaptureWidgetProps = {
   sessionStartErrorBanner?: string | null;
   /** Extension: clear session start error banner (e.g. after user dismisses or retries). */
   onSessionStartErrorDismiss?: () => void;
+  /** Extension: request a snapshot of the MAIN-world console buffer at click time. Resolves to a snapshot (possibly empty) within ~500ms; never rejects so ticket creation cannot be blocked by log capture. Web app leaves this undefined. */
+  requestConsoleSnapshot?: () => Promise<ConsoleSnapshot>;
+  /** Extension: request a snapshot of the MAIN-world network buffer at click time. Sibling of requestConsoleSnapshot. Resolves to null on timeout (~500ms) so ticket creation is never blocked by network capture. Web app leaves this undefined. */
+  requestNetworkSnapshot?: () => Promise<NetworkSnapshot | null>;
   /** Optional capture environment adapter (extension, dashboard, etc.). When provided, useCaptureWidget uses it instead of direct props/callbacks. */
   environment?: CaptureEnvironment;
   /**

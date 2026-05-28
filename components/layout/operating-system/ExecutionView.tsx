@@ -26,6 +26,14 @@ export interface ExecutionViewProps {
   onToggleActivity?: () => void;
   /** Reflects panel open state so the Activity button can show pressed. */
   isActivityPanelOpen?: boolean;
+  /** Phase 5: toggles the Dev Tools side panel (Console + Metadata). */
+  onToggleDevTools?: () => void;
+  /** Reflects Dev Tools panel open state so the button can show pressed. */
+  isDevToolsPanelOpen?: boolean;
+  /** Phase 5E / N5D: header badge jump-to callbacks (open Dev Tools with preset tab + filter). */
+  onJumpToExceptions?: () => void;
+  onJumpToErrors?: () => void;
+  onJumpToNetworkErrors?: () => void;
   /** Pin-placement mode for the screenshot (driven by the MapPin action). */
   isCommentMode?: boolean;
   /** Toggles screenshot pin-placement mode (Phase 26.7 comment action). */
@@ -36,7 +44,6 @@ export interface ExecutionViewProps {
   highlightedCommentId?: string | null;
   /** True while PATCH resolve is in flight (dashboard Resolve control). */
   resolveSubmitting?: boolean;
-  impactScore?: number | null;
   comments?: Comment[];
   loadingComments?: boolean;
   sendPinComment?: (position: { xPercent: number; yPercent: number }, message: string, mentionedUserIds?: string[]) => Promise<string | null>;
@@ -123,12 +130,16 @@ function ExecutionViewInner({
   canEdit,
   onToggleActivity,
   isActivityPanelOpen = false,
+  onToggleDevTools,
+  isDevToolsPanelOpen = false,
+  onJumpToExceptions,
+  onJumpToErrors,
+  onJumpToNetworkErrors,
   isCommentMode = false,
   onTogglePinMode,
   onExitCommentMode,
   highlightedCommentId,
   resolveSubmitting = false,
-  impactScore,
   comments = [],
   loadingComments = false,
   sendPinComment,
@@ -182,7 +193,6 @@ function ExecutionViewInner({
         item={displayItem}
         onSaveTitle={isPublicReadOnly || isShareSurface ? undefined : onSaveTitle}
         resolveAffirmationKey={resolveAffirmationKey}
-        impactScore={impactScore}
         onResolvedChange={
           isPublicReadOnly || isShareSurface ? undefined : onResolvedChange
         }
@@ -193,6 +203,19 @@ function ExecutionViewInner({
           isPublicReadOnly || isShareSurface ? undefined : onToggleActivity
         }
         isActivityPanelOpen={isActivityPanelOpen}
+        onToggleDevTools={
+          isPublicReadOnly || isShareSurface ? undefined : onToggleDevTools
+        }
+        isDevToolsPanelOpen={isDevToolsPanelOpen}
+        onJumpToExceptions={
+          isPublicReadOnly || isShareSurface ? undefined : onJumpToExceptions
+        }
+        onJumpToErrors={
+          isPublicReadOnly || isShareSurface ? undefined : onJumpToErrors
+        }
+        onJumpToNetworkErrors={
+          isPublicReadOnly || isShareSurface ? undefined : onJumpToNetworkErrors
+        }
         onDelete={isShareSurface ? undefined : onDelete}
         readOnly={isPublicReadOnly}
         readOnlyPermissions={isPublicReadOnly ? readOnlyPermissions : undefined}

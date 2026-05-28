@@ -90,6 +90,8 @@ export default function CaptureWidget({
   feedbackUsage,
   feedbackLimit,
   fetchClient,
+  requestConsoleSnapshot,
+  requestNetworkSnapshot,
 }: CaptureWidgetProps) {
   const [resumeModalOpen, setResumeModalOpen] = useState(false);
   const showResumeModal = resumeModalOpen || (openResumeModalProp ?? false);
@@ -217,6 +219,8 @@ export default function CaptureWidget({
     feedbackLimitReached,
     triggerUpgradeShake,
     onEditTicket: setEditingTicketId,
+    requestConsoleSnapshot,
+    requestNetworkSnapshot,
   });
 
   /** Session limit: prop (from parent e.g. extension) takes precedence; otherwise use hook state (set when startSession returns limitReached). */
@@ -653,6 +657,7 @@ export default function CaptureWidget({
           listeningAudioLevel={state.listeningAudioLevel ?? 0}
           audioAnalyser={state.audioAnalyser ?? null}
           voiceError={state.voiceError}
+          isAwaitingMicrophone={state.isAwaitingMicrophone}
           onRetryVoice={handlers.retryVoiceCapture}
           onResetVoice={handlers.resetVoiceRecording}
           onSelectMicrophone={handlers.selectVoiceMicrophone}

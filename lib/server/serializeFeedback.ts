@@ -75,6 +75,30 @@ export function serializeTicket(ticket: Feedback, access: AccessContext): Record
     priority: ticket.priority ?? null,
     creatorName: ticket.creatorName ?? null,
     creatorAvatarUrl: ticket.creatorAvatarUrl ?? null,
+    // Phase 4: console-log capture. No access gating — entries are redacted
+    // at the extension's capture site before storage, so they're safe to
+    // surface to anyone with read access on the ticket. Omit when absent so
+    // the API contract stays clean for tickets filed without any console
+    // activity (rather than always emitting empty arrays / zero counts).
+    ...(ticket.consoleLogs ? { consoleLogs: ticket.consoleLogs } : {}),
+    ...(ticket.exceptions ? { exceptions: ticket.exceptions } : {}),
+    ...(typeof ticket.consoleLogCount === "number"
+      ? { consoleLogCount: ticket.consoleLogCount }
+      : {}),
+    ...(typeof ticket.exceptionCount === "number"
+      ? { exceptionCount: ticket.exceptionCount }
+      : {}),
+    ...(typeof ticket.errorCount === "number" ? { errorCount: ticket.errorCount } : {}),
+    ...(typeof ticket.warningCount === "number" ? { warningCount: ticket.warningCount } : {}),
+    // Phase N4: network-request capture. Mirror console: redacted at capture
+    // time, safe for all viewers with read access, omit when absent.
+    ...(ticket.networkRequests ? { networkRequests: ticket.networkRequests } : {}),
+    ...(typeof ticket.networkRequestCount === "number"
+      ? { networkRequestCount: ticket.networkRequestCount }
+      : {}),
+    ...(typeof ticket.networkErrorCount === "number"
+      ? { networkErrorCount: ticket.networkErrorCount }
+      : {}),
   };
 }
 

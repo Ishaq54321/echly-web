@@ -71,6 +71,18 @@ if (isProd && !process.env.ECHLY_WEB_APP_URL) {
 const webAppUrl = process.env.ECHLY_WEB_APP_URL || "http://localhost:3000";
 const apiBase = process.env.ECHLY_API_BASE || webAppUrl;
 
+// Parallel-build output dir. When ECHLY_EXT_OUT_DIR is set, build artifacts
+// land there instead of extDir, and static assets (manifest, icons, fonts,
+// popup.css) are copied across after the four esbuild passes finish. Input
+// paths (entry points, alias-plugin stubs) always resolve from extDir.
+const outDir = process.env.ECHLY_EXT_OUT_DIR
+  ? path.resolve(root, process.env.ECHLY_EXT_OUT_DIR)
+  : extDir;
+const isParallelBuild = outDir !== extDir;
+if (isParallelBuild && !fs.existsSync(outDir)) {
+  fs.mkdirSync(outDir, { recursive: true });
+}
+
 const define = {
   "process.env.NODE_ENV": JSON.stringify(nodeEnv),
   "process.env.ECHLY_WEB_APP_URL": JSON.stringify(webAppUrl),
@@ -84,7 +96,7 @@ await esbuild.build({
   entryPoints: [path.join(extDir, "src", "bootstrap.ts")],
   bundle: true,
   format: "iife",
-  outfile: path.join(extDir, "bootstrap.js"),
+  outfile: path.join(outDir, "bootstrap.js"),
   platform: "browser",
   target: "chrome110",
   minify: true,
@@ -113,7 +125,7 @@ await esbuild.build({
   bundle: true,
   format: "esm",
   splitting: true,
-  outdir: path.join(extDir, "widget"),
+  outdir: path.join(outDir, "widget"),
   entryNames: "widget",
   chunkNames: "chunks/[name]-[hash]",
   platform: "browser",
@@ -135,7 +147,7 @@ await esbuild.build({
 await esbuild.build({
   entryPoints: [path.join(extDir, "src", "background.ts")],
   bundle: true,
-  outfile: path.join(extDir, "background.js"),
+  outfile: path.join(outDir, "background.js"),
   platform: "browser",
   target: "es2020",
   minify: true,
@@ -143,3 +155,73 @@ await esbuild.build({
   define,
   absWorkingDir: root,
 });
+
+// MAIN-world console capture: tiny IIFE injected into the page's own JS
+// context via manifest content_scripts entry with "world": "MAIN" (Chrome
+// 111+). Must be self-contained — no chrome.runtime access, no imports
+// from the cross-realm logger. Stays small (target ~5KB).
+await esbuild.build({
+  entryPoints: [path.join(extDir, "src", "console", "mainWorld.ts")],
+  bundle: true,
+  format: "iife",
+  outfile: path.join(outDir, "mainWorld.js"),
+  platform: "browser",
+  target: "chrome111",
+  minify: true,
+  treeShaking: true,
+  sourcemap: false,
+  loader: {
+    ".ts": "ts",
+  },
+  define,
+  absWorkingDir: root,
+});
+
+// MAIN-world network capture: sibling bundle to mainWorld.js. Wraps fetch and
+// XMLHttpRequest in the page's own JS context. Same constraints — no
+// chrome.runtime, no cross-realm imports. Kept as a separate bundle so a bug
+// in one wrapper cannot kill the other.
+await esbuild.build({
+  entryPoints: [path.join(extDir, "src", "network", "mainWorldNetwork.ts")],
+  bundle: true,
+  format: "iife",
+  outfile: path.join(outDir, "mainWorldNetwork.js"),
+  platform: "browser",
+  target: "chrome111",
+  minify: true,
+  treeShaking: true,
+  sourcemap: false,
+  loader: {
+    ".ts": "ts",
+  },
+  define,
+  absWorkingDir: root,
+});
+
+// Parallel-build asset sync. esbuild only emits the four JS bundles; the
+// loaded-unpacked extension also needs manifest, icons/fonts, the postcss-
+// built popup.css, and the extension-fonts.css that the css script
+// concatenates. For the localhost build we swap manifest.local.json into
+// place as manifest.json so the dev sees a distinct name in chrome://extensions.
+if (isParallelBuild) {
+  const manifestSrc = fs.existsSync(path.join(extDir, "manifest.local.json"))
+    ? path.join(extDir, "manifest.local.json")
+    : path.join(extDir, "manifest.json");
+  fs.copyFileSync(manifestSrc, path.join(outDir, "manifest.json"));
+
+  for (const name of ["popup.css", "extension-fonts.css"]) {
+    const src = path.join(extDir, name);
+    if (fs.existsSync(src)) {
+      fs.copyFileSync(src, path.join(outDir, name));
+    }
+  }
+
+  for (const dir of ["assets", "fonts"]) {
+    const src = path.join(extDir, dir);
+    if (fs.existsSync(src) && fs.statSync(src).isDirectory()) {
+      fs.cpSync(src, path.join(outDir, dir), { recursive: true });
+    }
+  }
+
+  console.log(`[esbuild] copied static assets to ${path.relative(root, outDir)}/`);
+}

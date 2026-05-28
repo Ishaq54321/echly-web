@@ -42,6 +42,8 @@ export type SessionOverlayProps = {
   listeningAudioLevel?: number;
   audioAnalyser?: AnalyserNode | null;
   voiceError?: VoiceCaptureError;
+  /** True while startListening is awaiting getUserMedia (drives the pill's "Waiting for microphone…" UI). */
+  isAwaitingMicrophone?: boolean;
   onRetryVoice?: () => void;
   onResetVoice?: () => void;
   onSelectMicrophone?: (deviceId: string) => void;
@@ -78,6 +80,7 @@ export function SessionOverlay({
   captureMode = "voice",
   audioAnalyser = null,
   voiceError = null,
+  isAwaitingMicrophone = false,
   onRetryVoice,
   onResetVoice,
   onSelectMicrophone,
@@ -382,6 +385,7 @@ export function SessionOverlay({
           isFinishing={isFinishing}
           mode={effectiveCaptureMode}
           voiceError={voiceError}
+          isAwaitingMicrophone={isAwaitingMicrophone}
           micPermissionBlocked={micPermissionBlocked}
           onSendVoice={onDoneVoice}
           onCancel={onCancel ?? (() => {})}

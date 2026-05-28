@@ -9,6 +9,7 @@
  */
 
 import "./sessionRelay";
+import { installBridgeListener } from "./console/bridge";
 
 declare global {
   interface Window {
@@ -61,6 +62,12 @@ if (window.__ECHLY_BOOTSTRAP_LOADED__) {
   // Already loaded (rare — content_scripts shouldn't double-fire, but be defensive).
 } else {
   window.__ECHLY_BOOTSTRAP_LOADED__ = true;
+
+  // Console-capture bridge listener: caches MAIN-world flush pushes so we
+  // can still return a snapshot during a hard navigation that tears down
+  // the MAIN script before the next requestSnapshot fires. Must be
+  // installed before any widget code runs.
+  installBridgeListener();
 
   let widgetLoaded = false;
   let widgetLoading: Promise<void> | null = null;

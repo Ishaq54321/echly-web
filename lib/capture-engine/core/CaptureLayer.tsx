@@ -55,6 +55,8 @@ export type CaptureLayerProps = {
   /** AnalyserNode for real-time audio visualizer (from useCaptureWidget state). */
   audioAnalyser?: AnalyserNode | null;
   voiceError?: VoiceCaptureError;
+  /** True while startListening is awaiting getUserMedia (drives the pill's "Waiting for microphone…" UI). */
+  isAwaitingMicrophone?: boolean;
   onRetryVoice?: () => void;
   onResetVoice?: () => void;
   onSelectMicrophone?: (deviceId: string) => void;
@@ -102,6 +104,7 @@ export function CaptureLayer({
   listeningAudioLevel = 0,
   audioAnalyser = null,
   voiceError = null,
+  isAwaitingMicrophone = false,
   onRetryVoice,
   onResetVoice,
   onSelectMicrophone,
@@ -139,6 +142,7 @@ export function CaptureLayer({
           listeningAudioLevel={listeningAudioLevel}
           audioAnalyser={audioAnalyser ?? null}
           voiceError={voiceError}
+          isAwaitingMicrophone={isAwaitingMicrophone}
           onRetryVoice={onRetryVoice}
           onResetVoice={onResetVoice}
           onSelectMicrophone={onSelectMicrophone}

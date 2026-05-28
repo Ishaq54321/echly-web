@@ -30,6 +30,50 @@ export interface StructuredFeedback {
   creatorAvatarUrl?: string | null;
 }
 
+/** Single console-log entry captured by the extension's MAIN-world wrapper and persisted with a ticket. Domain copy — the extension keeps its own bundler-isolated copy in annote-extension/src/console/types.ts; field names must stay in lockstep. */
+export interface ConsoleLogEntry {
+  timestamp: number;
+  level: "log" | "info" | "warn" | "error" | "debug";
+  message: string;
+  args?: string[];
+  source?: string;
+}
+
+/** Uncaught error / unhandled rejection captured by the extension's MAIN-world wrapper. Domain copy — shape must match annote-extension/src/console/types.ts. */
+export interface ExceptionEntry {
+  timestamp: number;
+  message: string;
+  stack?: string | null;
+  source?: string | null;
+  line?: number | null;
+  column?: number | null;
+  type: "error" | "unhandledrejection";
+}
+
+/** Single network request captured by the extension's MAIN-world fetch/XHR wrapper and persisted with a ticket. Domain copy — the extension keeps its own bundler-isolated copy in annote-extension/src/network/types.ts; field names must stay in lockstep. Headers and bodies are redacted at the extension's capture site before they reach this type. */
+export interface NetworkRequestEntry {
+  id: string;
+  timestamp: number;
+  url: string;
+  method: string;
+  status: number | null;
+  statusText: string | null;
+  durationMs: number | null;
+  source: "fetch" | "xhr";
+  requestHeaders: Record<string, string>;
+  responseHeaders: Record<string, string>;
+  requestBody: string | null;
+  requestBodyOriginalSize: number | null;
+  requestBodyTruncated: boolean;
+  responseBody: string | null;
+  responseBodyOriginalSize: number | null;
+  responseBodyTruncated: boolean;
+  responseContentType: string | null;
+  errored: boolean;
+  errorMessage: string | null;
+  initiatorPage: string | null;
+}
+
 /** Derived status for a ticket. Prefer explicit checks over !isResolved. */
 export type TicketStatus = "open" | "resolved";
 
@@ -103,6 +147,26 @@ export interface Feedback {
 
   /** Aggregated set of user IDs who have been @mentioned in any comment on this ticket. */
   mentionedUserIds?: string[] | null;
+
+  /** Console-log capture (Phase 4). All entries are redacted at the extension's capture site before storage; never persist unredacted PII. Omitted when no MAIN-world snapshot was attached at click time. */
+  consoleLogs?: ConsoleLogEntry[] | null;
+  /** Uncaught errors + unhandled rejections captured by the same MAIN-world wrapper. */
+  exceptions?: ExceptionEntry[] | null;
+  /** Denormalized count of consoleLogs (all levels). */
+  consoleLogCount?: number;
+  /** Denormalized count of exceptions. */
+  exceptionCount?: number;
+  /** Denormalized count of consoleLogs with level === "error". Surfaces in the header badge. */
+  errorCount?: number;
+  /** Denormalized count of consoleLogs with level === "warn". */
+  warningCount?: number;
+
+  /** Network-request capture (Phase N4). Headers and bodies are redacted at the extension's capture site before storage. Omitted when no MAIN-world snapshot was attached at click time or when the page had no network activity. */
+  networkRequests?: NetworkRequestEntry[] | null;
+  /** Denormalized count of networkRequests. */
+  networkRequestCount?: number;
+  /** Denormalized count of networkRequests where errored === true OR status >= 400. */
+  networkErrorCount?: number;
 }
 
 /** Returns explicit status for a feedback item. Use instead of !isResolved. */

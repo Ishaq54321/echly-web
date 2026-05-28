@@ -14,6 +14,8 @@ interface MicDevice {
 interface VoicePillContentProps {
   analyser: AnalyserNode | null;
   elapsedFormatted: string;
+  /** True while startListening is awaiting getUserMedia; swaps the waveform for "Waiting for microphone…". */
+  isAwaitingMicrophone?: boolean;
   onCancel: () => void;
   onReset: () => void;
   onSend: () => void;
@@ -26,6 +28,7 @@ interface VoicePillContentProps {
 export function VoicePillContent({
   analyser,
   elapsedFormatted,
+  isAwaitingMicrophone = false,
   onCancel,
   onReset,
   onSend,
@@ -123,7 +126,29 @@ export function VoicePillContent({
         {elapsedFormatted}
       </span>
 
-      <Waveform source={analyser} />
+      {isAwaitingMicrophone && analyser == null ? (
+        /* Honest loading state: the waveform container stays the same size
+         * so the pill doesn't reflow when the stream attaches and swaps
+         * this for <Waveform>. */
+        <div
+          className="echly-pill-waveform echly-pill-waveform--waiting"
+          role="status"
+          aria-live="polite"
+          style={{
+            justifyContent: "center",
+            textAlign: "center",
+            whiteSpace: "nowrap",
+            color: "var(--pill-ink-muted, #8A8096)",
+            fontSize: 12,
+            fontWeight: 500,
+            letterSpacing: "-0.01em",
+          }}
+        >
+          Waiting for mic…
+        </div>
+      ) : (
+        <Waveform source={analyser} />
+      )}
 
       <button
         type="button"

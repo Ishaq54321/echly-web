@@ -31,4 +31,12 @@ export interface FeedbackItemShape {
   assigneeName?: string | null;
   assigneeAvatarUrl?: string | null;
   priority?: "high" | "medium" | "low" | null;
+
+  /** Phase 5E header badges: counts surfaced from captured devtools data. */
+  consoleLogCount?: number;
+  errorCount?: number;
+  warningCount?: number;
+  exceptionCount?: number;
+  /** Phase N5D: failed network requests captured for this ticket. */
+  networkErrorCount?: number;
 }

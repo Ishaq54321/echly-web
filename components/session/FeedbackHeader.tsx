@@ -13,6 +13,7 @@ import {
   Check,
   Clock,
   Lock,
+  Terminal,
   Trash2,
   RotateCcw,
   PencilLine,
@@ -65,7 +66,6 @@ function StatusBadge({ status }: { status: FeedbackStatus }) {
 export interface SessionFeedbackHeaderProps {
   item: (FeedbackItemShape & { index: number; total: number }) | null;
   resolveAffirmationKey?: number;
-  impactScore?: number | null;
   onResolvedChange?: (isResolved: boolean) => void;
   resolveSubmitting?: boolean;
   /**
@@ -77,6 +77,15 @@ export interface SessionFeedbackHeaderProps {
   onToggleActivity?: () => void;
   /** Reflects panel open state so the button can show a pressed style. */
   isActivityPanelOpen?: boolean;
+  /** Phase 5: open/close the Dev Tools side panel (Console + Metadata). */
+  onToggleDevTools?: () => void;
+  /** Reflects Dev Tools panel open state so the button can show a pressed style. */
+  isDevToolsPanelOpen?: boolean;
+  /** Phase 5E: badge-jump callbacks that open Dev Tools to a specific tab/filter. */
+  onJumpToExceptions?: () => void;
+  onJumpToErrors?: () => void;
+  /** Phase N5D: badge-jump for failed network requests. */
+  onJumpToNetworkErrors?: () => void;
   onDelete?: () => void;
   readOnly?: boolean;
   readOnlyPermissions?: { canResolve: boolean; canComment: boolean };
@@ -112,11 +121,15 @@ export interface SessionFeedbackHeaderProps {
 export function SessionFeedbackHeader({
   item,
   resolveAffirmationKey = 0,
-  impactScore,
   onResolvedChange,
   resolveSubmitting = false,
   onToggleActivity,
   isActivityPanelOpen = false,
+  onToggleDevTools,
+  isDevToolsPanelOpen = false,
+  onJumpToExceptions,
+  onJumpToErrors,
+  onJumpToNetworkErrors,
   onDelete,
   readOnly = false,
   readOnlyPermissions,
@@ -191,11 +204,6 @@ export function SessionFeedbackHeader({
               }`}
             >
               <StatusBadge status={status} />
-            </span>
-          ) : null}
-          {item != null && impactScore != null ? (
-            <span className="text-[11.5px] tabular-nums text-[var(--text-secondary)] font-medium">
-              Impact {impactScore}
             </span>
           ) : null}
         </div>
@@ -533,6 +541,33 @@ export function SessionFeedbackHeader({
                   Activity
                 </button>
               ) : null}
+              {/* Dev Tools — sibling toggle (Phase 5): same chrome as Activity,
+                  opens the Console + Metadata side panel. Mutually exclusive
+                  with Activity in SessionPageClient. */}
+              {onToggleDevTools ? (
+                <button
+                  type="button"
+                  onClick={onToggleDevTools}
+                  className={isDevToolsPanelOpen ? actionBtnActive : actionBtn}
+                  aria-pressed={isDevToolsPanelOpen}
+                  aria-label={isDevToolsPanelOpen ? "Close dev tools panel" : "Open dev tools panel"}
+                >
+                  <Terminal
+                    size={14}
+                    strokeWidth={1.5}
+                    className={isDevToolsPanelOpen ? "text-[var(--brand)]" : undefined}
+                  />
+                  Dev Tools
+                </button>
+              ) : null}
+              <DevToolsBadges
+                exceptionCount={item?.exceptionCount}
+                errorCount={item?.errorCount}
+                networkErrorCount={item?.networkErrorCount}
+                onJumpToExceptions={onJumpToExceptions}
+                onJumpToErrors={onJumpToErrors}
+                onJumpToNetworkErrors={onJumpToNetworkErrors}
+              />
               {/* Spacer */}
               <div className="flex-1" />
               {/* Delete — wrapped in a flex box so the Tooltip's
@@ -557,5 +592,106 @@ export function SessionFeedbackHeader({
         </div>
       </div>
     </header>
+  );
+}
+
+/**
+ * Phase 5E / N5D: subtle inline-flex badge group surfaced from captured
+ * devtools counters. Order: [exception] [console error] [network error].
+ * The whole group renders nothing when all three counts are zero — that
+ * prevents layout shift across tickets with no captured devtools data.
+ */
+function DevToolsBadges({
+  exceptionCount,
+  errorCount,
+  networkErrorCount,
+  onJumpToExceptions,
+  onJumpToErrors,
+  onJumpToNetworkErrors,
+}: {
+  exceptionCount?: number;
+  errorCount?: number;
+  networkErrorCount?: number;
+  onJumpToExceptions?: () => void;
+  onJumpToErrors?: () => void;
+  onJumpToNetworkErrors?: () => void;
+}) {
+  const xCount = exceptionCount ?? 0;
+  const eCount = errorCount ?? 0;
+  const nCount = networkErrorCount ?? 0;
+  if (xCount <= 0 && eCount <= 0 && nCount <= 0) return null;
+
+  return (
+    <div className="inline-flex items-center gap-3 ml-1.5">
+      {xCount > 0 ? (
+        <DevToolsBadge
+          count={xCount}
+          singular="exception"
+          plural="exceptions"
+          hoverColor="var(--color-danger)"
+          tooltipNoun="exception"
+          onClick={onJumpToExceptions}
+        />
+      ) : null}
+      {eCount > 0 ? (
+        <DevToolsBadge
+          count={eCount}
+          singular="error"
+          plural="errors"
+          hoverColor="var(--color-warning-text)"
+          tooltipNoun="console error"
+          onClick={onJumpToErrors}
+        />
+      ) : null}
+      {nCount > 0 ? (
+        <DevToolsBadge
+          count={nCount}
+          singular="network error"
+          plural="network errors"
+          hoverColor="var(--color-danger)"
+          tooltipNoun="failed network request"
+          onClick={onJumpToNetworkErrors}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function DevToolsBadge({
+  count,
+  singular,
+  plural,
+  hoverColor,
+  tooltipNoun,
+  onClick,
+}: {
+  count: number;
+  singular: string;
+  plural: string;
+  hoverColor: string;
+  tooltipNoun: string;
+  onClick?: () => void;
+}) {
+  const label = `${count} ${count === 1 ? singular : plural}`;
+  const tooltip = `${count} ${tooltipNoun}${count === 1 ? "" : "s"} captured · click to view`;
+  const interactive = typeof onClick === "function";
+
+  const className = `inline-flex items-center text-[12px] font-medium text-[var(--text-tertiary)] transition-colors duration-120 ${
+    interactive ? "cursor-pointer" : "cursor-default"
+  } hover:text-[color:var(--devtools-badge-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface)] rounded-[4px] px-1`;
+
+  return (
+    <Tooltip content={tooltip}>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={!interactive}
+        className={className}
+        style={{ ["--devtools-badge-hover" as string]: hoverColor }}
+        aria-label={tooltip}
+      >
+        {label}
+      </button>
+    </Tooltip>
   );
 }

@@ -3,7 +3,13 @@ import { after } from "next/server";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { FieldPath, FieldValue, Timestamp } from "firebase-admin/firestore";
 import { assertQueryLimit } from "@/lib/querySafety";
-import type { Feedback, StructuredFeedback } from "@/lib/domain/feedback";
+import type {
+  ConsoleLogEntry,
+  ExceptionEntry,
+  Feedback,
+  NetworkRequestEntry,
+  StructuredFeedback,
+} from "@/lib/domain/feedback";
 import {
   decrementInsightsOnFeedbackDeleteRepo,
   incrementInsightsOnFeedbackCreateRepo,
@@ -46,34 +52,85 @@ const feedbackPayload = (
   sessionId: string,
   data: StructuredFeedback,
   createdAt: Date
-) => ({
-  userId,
-  sessionId,
-  title: data.title,
-  description: data.description ?? "",
-  type: data.type,
-  status: "open" as const,
-  createdAt,
-  commentCount: 0,
+) => {
+  // Phase 4: console-log capture. Use undefined-skip: only attach the field
+  // when present and non-empty so feedback docs from pages with no console
+  // activity stay free of empty arrays.
+  const consoleExtras = data as {
+    consoleLogs?: ConsoleLogEntry[];
+    exceptions?: ExceptionEntry[];
+    consoleLogCount?: number;
+    exceptionCount?: number;
+    errorCount?: number;
+    warningCount?: number;
+    networkRequests?: NetworkRequestEntry[];
+    networkRequestCount?: number;
+    networkErrorCount?: number;
+  };
+  const consoleFields: Record<string, unknown> = {};
+  if (Array.isArray(consoleExtras.consoleLogs) && consoleExtras.consoleLogs.length > 0) {
+    consoleFields.consoleLogs = consoleExtras.consoleLogs;
+  }
+  if (Array.isArray(consoleExtras.exceptions) && consoleExtras.exceptions.length > 0) {
+    consoleFields.exceptions = consoleExtras.exceptions;
+  }
+  if (typeof consoleExtras.consoleLogCount === "number" && consoleExtras.consoleLogCount > 0) {
+    consoleFields.consoleLogCount = consoleExtras.consoleLogCount;
+  }
+  if (typeof consoleExtras.exceptionCount === "number" && consoleExtras.exceptionCount > 0) {
+    consoleFields.exceptionCount = consoleExtras.exceptionCount;
+  }
+  if (typeof consoleExtras.errorCount === "number" && consoleExtras.errorCount > 0) {
+    consoleFields.errorCount = consoleExtras.errorCount;
+  }
+  if (typeof consoleExtras.warningCount === "number" && consoleExtras.warningCount > 0) {
+    consoleFields.warningCount = consoleExtras.warningCount;
+  }
 
-  tags: data.tags ?? null,
-  pageArea: data.pageArea ?? null,
+  // Phase N4: network-request capture. Same undefined-skip semantics so
+  // tickets filed on quiet pages stay free of empty arrays / zero counters.
+  const networkFields: Record<string, unknown> = {};
+  if (Array.isArray(consoleExtras.networkRequests) && consoleExtras.networkRequests.length > 0) {
+    networkFields.networkRequests = consoleExtras.networkRequests;
+  }
+  if (typeof consoleExtras.networkRequestCount === "number" && consoleExtras.networkRequestCount > 0) {
+    networkFields.networkRequestCount = consoleExtras.networkRequestCount;
+  }
+  if (typeof consoleExtras.networkErrorCount === "number" && consoleExtras.networkErrorCount > 0) {
+    networkFields.networkErrorCount = consoleExtras.networkErrorCount;
+  }
 
-  url: data.url ?? null,
-  viewportWidth: data.viewportWidth ?? null,
-  viewportHeight: data.viewportHeight ?? null,
-  userAgent: data.userAgent ?? null,
-  clientTimestamp: data.timestamp ?? null,
-  screenWidth: (data as { screenWidth?: number }).screenWidth ?? null,
-  screenHeight: (data as { screenHeight?: number }).screenHeight ?? null,
-  devicePixelRatio: (data as { devicePixelRatio?: number }).devicePixelRatio ?? null,
+  return {
+    userId,
+    sessionId,
+    title: data.title,
+    description: data.description ?? "",
+    type: data.type,
+    status: "open" as const,
+    createdAt,
+    commentCount: 0,
 
-  screenshotId: data.screenshotId ?? null,
-  screenshotStatus: data.screenshotStatus ?? null,
-  isDeleted: false,
-  creatorName: (data as { creatorName?: string | null }).creatorName ?? null,
-  creatorAvatarUrl: (data as { creatorAvatarUrl?: string | null }).creatorAvatarUrl ?? null,
-});
+    tags: data.tags ?? null,
+    pageArea: data.pageArea ?? null,
+
+    url: data.url ?? null,
+    viewportWidth: data.viewportWidth ?? null,
+    viewportHeight: data.viewportHeight ?? null,
+    userAgent: data.userAgent ?? null,
+    clientTimestamp: data.timestamp ?? null,
+    screenWidth: (data as { screenWidth?: number }).screenWidth ?? null,
+    screenHeight: (data as { screenHeight?: number }).screenHeight ?? null,
+    devicePixelRatio: (data as { devicePixelRatio?: number }).devicePixelRatio ?? null,
+
+    screenshotId: data.screenshotId ?? null,
+    screenshotStatus: data.screenshotStatus ?? null,
+    isDeleted: false,
+    creatorName: (data as { creatorName?: string | null }).creatorName ?? null,
+    creatorAvatarUrl: (data as { creatorAvatarUrl?: string | null }).creatorAvatarUrl ?? null,
+    ...consoleFields,
+    ...networkFields,
+  };
+};
 
 /** Same shape as {@link docToFeedback} for a row just written by {@link addFeedbackWithSessionCountersRepo} (avoids post-write read). */
 export function feedbackFromCreateInsert(args: {
@@ -84,6 +141,17 @@ export function feedbackFromCreateInsert(args: {
   createdAt: Date;
 }): Feedback {
   const row = args.data;
+  const consoleExtras = row as {
+    consoleLogs?: ConsoleLogEntry[];
+    exceptions?: ExceptionEntry[];
+    consoleLogCount?: number;
+    exceptionCount?: number;
+    errorCount?: number;
+    warningCount?: number;
+    networkRequests?: NetworkRequestEntry[];
+    networkRequestCount?: number;
+    networkErrorCount?: number;
+  };
   return {
     id: args.id,
     userId: requireUserId(args.userId, "feedbackFromCreateInsert"),
@@ -111,6 +179,36 @@ export function feedbackFromCreateInsert(args: {
     status: "open",
     creatorName: (row as { creatorName?: string | null }).creatorName ?? null,
     creatorAvatarUrl: (row as { creatorAvatarUrl?: string | null }).creatorAvatarUrl ?? null,
+    // Phase 4: only include when present so the API response and serializer
+    // stay clean of empty arrays for tickets filed without console activity.
+    ...(Array.isArray(consoleExtras.consoleLogs) && consoleExtras.consoleLogs.length > 0
+      ? { consoleLogs: consoleExtras.consoleLogs }
+      : {}),
+    ...(Array.isArray(consoleExtras.exceptions) && consoleExtras.exceptions.length > 0
+      ? { exceptions: consoleExtras.exceptions }
+      : {}),
+    ...(typeof consoleExtras.consoleLogCount === "number" && consoleExtras.consoleLogCount > 0
+      ? { consoleLogCount: consoleExtras.consoleLogCount }
+      : {}),
+    ...(typeof consoleExtras.exceptionCount === "number" && consoleExtras.exceptionCount > 0
+      ? { exceptionCount: consoleExtras.exceptionCount }
+      : {}),
+    ...(typeof consoleExtras.errorCount === "number" && consoleExtras.errorCount > 0
+      ? { errorCount: consoleExtras.errorCount }
+      : {}),
+    ...(typeof consoleExtras.warningCount === "number" && consoleExtras.warningCount > 0
+      ? { warningCount: consoleExtras.warningCount }
+      : {}),
+    // Phase N4: network-request capture. Same undefined-skip semantics.
+    ...(Array.isArray(consoleExtras.networkRequests) && consoleExtras.networkRequests.length > 0
+      ? { networkRequests: consoleExtras.networkRequests }
+      : {}),
+    ...(typeof consoleExtras.networkRequestCount === "number" && consoleExtras.networkRequestCount > 0
+      ? { networkRequestCount: consoleExtras.networkRequestCount }
+      : {}),
+    ...(typeof consoleExtras.networkErrorCount === "number" && consoleExtras.networkErrorCount > 0
+      ? { networkErrorCount: consoleExtras.networkErrorCount }
+      : {}),
   };
 }
 
@@ -833,6 +931,35 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
       typeof data.lastCommentByUid === "string" ? data.lastCommentByUid : null,
     lastCommentByName:
       typeof data.lastCommentByName === "string" ? data.lastCommentByName : null,
+    // Phase 4: optional; only include if persisted.
+    ...(Array.isArray(data.consoleLogs) && data.consoleLogs.length > 0
+      ? { consoleLogs: data.consoleLogs as ConsoleLogEntry[] }
+      : {}),
+    ...(Array.isArray(data.exceptions) && data.exceptions.length > 0
+      ? { exceptions: data.exceptions as ExceptionEntry[] }
+      : {}),
+    ...(typeof data.consoleLogCount === "number" && data.consoleLogCount > 0
+      ? { consoleLogCount: data.consoleLogCount }
+      : {}),
+    ...(typeof data.exceptionCount === "number" && data.exceptionCount > 0
+      ? { exceptionCount: data.exceptionCount }
+      : {}),
+    ...(typeof data.errorCount === "number" && data.errorCount > 0
+      ? { errorCount: data.errorCount }
+      : {}),
+    ...(typeof data.warningCount === "number" && data.warningCount > 0
+      ? { warningCount: data.warningCount }
+      : {}),
+    // Phase N4: optional; only include if persisted.
+    ...(Array.isArray(data.networkRequests) && data.networkRequests.length > 0
+      ? { networkRequests: data.networkRequests as NetworkRequestEntry[] }
+      : {}),
+    ...(typeof data.networkRequestCount === "number" && data.networkRequestCount > 0
+      ? { networkRequestCount: data.networkRequestCount }
+      : {}),
+    ...(typeof data.networkErrorCount === "number" && data.networkErrorCount > 0
+      ? { networkErrorCount: data.networkErrorCount }
+      : {}),
   };
 }
 

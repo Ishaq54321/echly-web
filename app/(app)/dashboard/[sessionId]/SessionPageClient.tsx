@@ -64,6 +64,12 @@ import {
 } from "@/components/layout/operating-system";
 import { useIsMobile, useMediaQuery } from "@/lib/hooks/useIsMobile";
 import { TicketActivityPanel } from "@/components/session/feedbackDetail/TicketActivityPanel";
+import {
+  DevToolsPanel,
+  type DevToolsTabId,
+  type DevToolsConsoleFilter,
+  type DevToolsNetworkFilter,
+} from "@/components/session/feedbackDetail/DevToolsPanel";
 import { CanvasEmptyState } from "@/components/empty/CanvasEmptyState";
 import { NoTicketsIllu } from "@/components/empty/canvasIllustrations";
 import { TopControlBar } from "@/components/ui/TopControlBar";
@@ -302,6 +308,26 @@ function bundleFeedbackRowToFeedback(
     creatorName: typeof row.creatorName === "string" ? row.creatorName : null,
     creatorAvatarUrl:
       typeof row.creatorAvatarUrl === "string" ? row.creatorAvatarUrl : null,
+    consoleLogs: Array.isArray(row.consoleLogs)
+      ? (row.consoleLogs as Feedback["consoleLogs"])
+      : undefined,
+    exceptions: Array.isArray(row.exceptions)
+      ? (row.exceptions as Feedback["exceptions"])
+      : undefined,
+    consoleLogCount:
+      typeof row.consoleLogCount === "number" ? row.consoleLogCount : undefined,
+    exceptionCount:
+      typeof row.exceptionCount === "number" ? row.exceptionCount : undefined,
+    errorCount: typeof row.errorCount === "number" ? row.errorCount : undefined,
+    warningCount:
+      typeof row.warningCount === "number" ? row.warningCount : undefined,
+    networkRequests: Array.isArray(row.networkRequests)
+      ? (row.networkRequests as Feedback["networkRequests"])
+      : undefined,
+    networkRequestCount:
+      typeof row.networkRequestCount === "number" ? row.networkRequestCount : undefined,
+    networkErrorCount:
+      typeof row.networkErrorCount === "number" ? row.networkErrorCount : undefined,
   };
 }
 
@@ -1490,6 +1516,20 @@ export default function SessionPageClient({
   // entry points (comment deep-link, image comment mode) still surface
   // the rail.
   const [isActivityPanelOpen, setIsActivityPanelOpen] = useState(false);
+  // Phase 5: Dev Tools side panel. Sibling of Activity. Mutually exclusive —
+  // opening one closes the other so the right column stays single-purpose
+  // (the layout grid only reserves a single 360px slot).
+  const [isDevToolsPanelOpen, setIsDevToolsPanelOpen] = useState(false);
+  const [devToolsInitialTab, setDevToolsInitialTab] =
+    useState<DevToolsTabId>("console");
+  const [devToolsInitialFilter, setDevToolsInitialFilter] =
+    useState<DevToolsConsoleFilter | undefined>(undefined);
+  // Phase N5D: Errors-only on the Network tab when set.
+  const [devToolsInitialNetworkFilter, setDevToolsInitialNetworkFilter] =
+    useState<DevToolsNetworkFilter | undefined>(undefined);
+  // Phase 5E: bumped each time the exception badge fires to retrigger the
+  // Console scroll-to-exceptions effect even if other inputs are unchanged.
+  const [devToolsScrollExceptionsKey, setDevToolsScrollExceptionsKey] = useState(0);
   const [isImageExpanded, setIsImageExpanded] = useState(false);
   const [openImageInEditMode, setOpenImageInEditMode] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -1505,6 +1545,7 @@ export default function SessionPageClient({
       if (e.key === "Escape") {
         setIsCommentMode(false);
         setIsActivityPanelOpen(false);
+        setIsDevToolsPanelOpen(false);
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -2556,8 +2597,59 @@ export default function SessionPageClient({
     setIsActivityPanelOpen((prev) => {
       const next = !prev;
       if (!next) setActiveThreadId(null);
+      // Mutual exclusion: opening Activity closes Dev Tools.
+      if (next) setIsDevToolsPanelOpen(false);
       return next;
     });
+  }, []);
+
+  // Phase 5: Dev Tools toggle. Mirrors handleToggleActivity — first click
+  // opens, second click closes. Opening closes the Activity panel (and any
+  // selected thread) so the single right-column slot is unambiguous.
+  const handleToggleDevTools = useCallback(() => {
+    setIsDevToolsPanelOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        setIsActivityPanelOpen(false);
+        setActiveThreadId(null);
+        // Default entry: Console tab, no preset filter.
+        setDevToolsInitialTab("console");
+        setDevToolsInitialFilter(undefined);
+        setDevToolsInitialNetworkFilter(undefined);
+      }
+      return next;
+    });
+  }, []);
+
+  // Phase 5E: header badge jump targets. Each opens Dev Tools (closing
+  // Activity), forces the right tab + filter, and re-keys the panel so a
+  // click while it's already open remounts with the new defaults.
+  const handleJumpToExceptions = useCallback(() => {
+    setIsActivityPanelOpen(false);
+    setActiveThreadId(null);
+    setDevToolsInitialTab("console");
+    setDevToolsInitialFilter(undefined);
+    setDevToolsInitialNetworkFilter(undefined);
+    setDevToolsScrollExceptionsKey((k) => k + 1);
+    setIsDevToolsPanelOpen(true);
+  }, []);
+
+  const handleJumpToErrors = useCallback(() => {
+    setIsActivityPanelOpen(false);
+    setActiveThreadId(null);
+    setDevToolsInitialTab("console");
+    setDevToolsInitialFilter("errors");
+    setDevToolsInitialNetworkFilter(undefined);
+    setIsDevToolsPanelOpen(true);
+  }, []);
+
+  const handleJumpToNetworkErrors = useCallback(() => {
+    setIsActivityPanelOpen(false);
+    setActiveThreadId(null);
+    setDevToolsInitialTab("network");
+    setDevToolsInitialFilter(undefined);
+    setDevToolsInitialNetworkFilter("errors");
+    setIsDevToolsPanelOpen(true);
   }, []);
 
   // Phase 26.7: the MapPin screenshot action toggles click-to-place
@@ -3835,8 +3927,20 @@ export default function SessionPageClient({
           sessionAccess?.canResolve ? handleToggleActivity : undefined
         }
         isActivityPanelOpen={isActivityPanelOpen}
+        onToggleDevTools={
+          sessionAccess?.canResolve ? handleToggleDevTools : undefined
+        }
+        isDevToolsPanelOpen={isDevToolsPanelOpen}
+        onJumpToExceptions={
+          sessionAccess?.canResolve ? handleJumpToExceptions : undefined
+        }
+        onJumpToErrors={
+          sessionAccess?.canResolve ? handleJumpToErrors : undefined
+        }
+        onJumpToNetworkErrors={
+          sessionAccess?.canResolve ? handleJumpToNetworkErrors : undefined
+        }
         highlightedCommentId={highlightedCommentId}
-        impactScore={(selectedItem as { impactScore?: number } | null)?.impactScore}
         comments={comments}
         loadingComments={loadingComments}
         participants={participants}
@@ -3950,8 +4054,8 @@ export default function SessionPageClient({
             padding: '0px 0px calc(56px + env(safe-area-inset-bottom))',
           } : {
             gridTemplateColumns: isDesktopWide
-              ? ((isActivityPanelOpen || activeThreadId != null) ? '346px 1fr 360px' : '346px 1fr')
-              : ((isActivityPanelOpen || activeThreadId != null) ? '1fr 360px' : '1fr'),
+              ? ((isActivityPanelOpen || activeThreadId != null || isDevToolsPanelOpen) ? '346px 1fr 360px' : '346px 1fr')
+              : ((isActivityPanelOpen || activeThreadId != null || isDevToolsPanelOpen) ? '1fr 360px' : '1fr'),
             gap: '14px',
             padding: '0px 14px 14px',
             transition: 'grid-template-columns 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -4049,17 +4153,19 @@ export default function SessionPageClient({
           </main>
           </section>
 
-          {/* Right card: per-ticket Activity timeline (Phase 26.1).
-              Replaces the old CommentPanel — comments now live in the
-              middle panel (ExecutionView). On mobile this becomes a
-              full-width pane reached via the Activity tab. */}
+          {/* Right card: per-ticket Activity timeline (Phase 26.1) OR Dev Tools
+              panel (Phase 5). Mutually exclusive — opening one closes the
+              other (see handleToggleActivity / handleToggleDevTools), so a
+              single aside slot is reused. Mobile Dev Tools is desktop-only
+              for now; the mobile tab bar has no Dev Tools entry. */}
           {effectiveSelectedId &&
             effectiveWorkspaceId &&
             sessionAccess?.canResolve &&
             (isMobile
               ? mobileTab === "activity"
-              : isActivityPanelOpen || activeThreadId != null) && (
+              : isActivityPanelOpen || activeThreadId != null || isDevToolsPanelOpen) && (
               <aside
+                key={isDevToolsPanelOpen ? "devtools" : "activity"}
                 className={`${
                   isMobile ? "flex flex-1 min-h-0" : "flex"
                 } flex-col min-h-0 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300`}
@@ -4069,17 +4175,35 @@ export default function SessionPageClient({
                   className="flex flex-col flex-1 min-h-0 bg-[var(--surface)] md:rounded-[14px] overflow-hidden"
                   style={isMobile ? undefined : { boxShadow: 'var(--shadow-panel)' }}
                 >
-                  <TicketActivityPanel
-                    workspaceId={effectiveWorkspaceId as string}
-                    feedbackId={effectiveSelectedId}
-                    sessionId={sessionId}
-                    onClose={() => {
-                      setActiveThreadId(null);
-                      setIsActivityPanelOpen(false);
-                      setIsCommentMode(false);
-                      if (isMobile) setMobileTab("session");
-                    }}
-                  />
+                  {isDevToolsPanelOpen ? (
+                    <DevToolsPanel
+                      // Re-key on every input that affects entry-time defaults
+                      // so a header badge click while the panel is already open
+                      // remounts with the new tab / filter / scroll target.
+                      key={`devtools-${devToolsInitialTab}-${devToolsInitialFilter ?? "none"}-${devToolsInitialNetworkFilter ?? "none"}-${devToolsScrollExceptionsKey}`}
+                      feedback={selectedBaseItem}
+                      initialTab={devToolsInitialTab}
+                      initialFilter={devToolsInitialFilter}
+                      initialNetworkFilter={devToolsInitialNetworkFilter}
+                      scrollToExceptions={devToolsScrollExceptionsKey > 0}
+                      onClose={() => {
+                        setIsDevToolsPanelOpen(false);
+                        if (isMobile) setMobileTab("session");
+                      }}
+                    />
+                  ) : (
+                    <TicketActivityPanel
+                      workspaceId={effectiveWorkspaceId as string}
+                      feedbackId={effectiveSelectedId}
+                      sessionId={sessionId}
+                      onClose={() => {
+                        setActiveThreadId(null);
+                        setIsActivityPanelOpen(false);
+                        setIsCommentMode(false);
+                        if (isMobile) setMobileTab("session");
+                      }}
+                    />
+                  )}
                 </div>
               </aside>
             )}

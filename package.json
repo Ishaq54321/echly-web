@@ -15,7 +15,11 @@
     "lint": "eslint",
     "build:extension": "npm run build:extension:css && npm run build:extension:js",
     "build:extension:css": "npx postcss app/globals.css -o annote-extension/popup.css && node -e \"const fs=require('fs'); const f=fs.readFileSync('annote-extension/extension-fonts.css','utf8'); const m=fs.readFileSync('annote-extension/popup.css','utf8'); fs.writeFileSync('annote-extension/popup.css', f+m);\"",
-    "build:extension:js": "node esbuild-extension.mjs"
+    "build:extension:js": "node esbuild-extension.mjs",
+    "build:extension:prod": "cross-env NODE_ENV=production ECHLY_WEB_APP_URL=https://annote.ai npm run build:extension",
+    "build:extension:local": "cross-env NODE_ENV=development ECHLY_WEB_APP_URL=http://localhost:3000 ECHLY_EXT_OUT_DIR=annote-extension-local npm run build:extension",
+    "test:console": "node --import tsx --test annote-extension/src/console/redact.test.ts",
+    "test:network": "node --import tsx --test annote-extension/src/network/redactNetwork.test.ts annote-extension/src/network/buffer.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.63",
@@ -72,6 +76,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "cross-env": "^10.1.0",
     "dotenv": "^17.3.1",
     "esbuild": "^0.24.0",
     "eslint": "^9",
@@ -81,6 +86,7 @@
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.7"
   }
 }

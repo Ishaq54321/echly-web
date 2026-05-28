@@ -1176,6 +1176,19 @@ async function createFeedbackInternal({
     screenHeight?: number;
     devicePixelRatio?: number;
     userAgent?: string;
+    // Phase 4: console-log capture fields. The server validates these
+    // independently — background just forwards them as part of the body.
+    consoleLogs?: unknown[];
+    exceptions?: unknown[];
+    consoleLogCount?: number;
+    exceptionCount?: number;
+    errorCount?: number;
+    warningCount?: number;
+    // Phase N3: network-capture fields. Same passthrough contract as the
+    // console fields — server validates; background only forwards.
+    networkRequests?: unknown[];
+    networkRequestCount?: number;
+    networkErrorCount?: number;
   };
   screenshotId: string;
 }): Promise<Response> {
@@ -2068,6 +2081,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           description?: string;
           tags?: string[];
           pageArea?: string | null;
+          // Phase 4: console-log capture fields. Forwarded as-is to the API.
+          consoleLogs?: unknown[];
+          exceptions?: unknown[];
+          consoleLogCount?: number;
+          exceptionCount?: number;
+          errorCount?: number;
+          warningCount?: number;
+          // Phase N3: network-capture fields. Forwarded as-is to the API.
+          networkRequests?: unknown[];
+          networkRequestCount?: number;
+          networkErrorCount?: number;
         };
         screenshotId?: string;
       };

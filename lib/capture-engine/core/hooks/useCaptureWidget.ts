@@ -9,9 +9,12 @@ import type {
   CaptureWidgetProps,
   Position,
   CaptureContext,
+  ConsoleSnapshot,
+  NetworkSnapshot,
   SessionFeedbackPending,
   VoiceCaptureError,
 } from "../types";
+import { useMicPermissionListener } from "./useMicPermissionListener";
 import { buildCaptureContext } from "../internal/contextHelpers";
 import { playDoneClick, playShutterSound } from "../internal/audioHelpers";
 import { logSession } from "../internal/sessionHelpers";
@@ -131,6 +134,8 @@ export function useCaptureWidget({
   feedbackLimitReached,
   triggerUpgradeShake,
   onEditTicket,
+  requestConsoleSnapshot,
+  requestNetworkSnapshot,
 }: CaptureWidgetProps) {
   if (typeof window !== "undefined" && !(window as Window & { __ECHLY_CAPTURE_STATE__?: { pending: SessionFeedbackPending | null } }).__ECHLY_CAPTURE_STATE__) {
     (window as Window & { __ECHLY_CAPTURE_STATE__?: { pending: SessionFeedbackPending | null } }).__ECHLY_CAPTURE_STATE__ = {
@@ -176,6 +181,16 @@ export function useCaptureWidget({
   } | null>(null);
   const [voiceError, setVoiceError] = useState<VoiceCaptureError>(null);
   const [micDeviceOverride, setMicDeviceOverride] = useState<string | null>(null);
+  /**
+   * True while startListening has invoked getUserMedia but the stream has not
+   * yet attached and no error has surfaced. Powers the pill's "Waiting for
+   * microphone…" copy so the user isn't staring at a flat-bar waveform with
+   * a running 00:00 timer during the permission prompt.
+   */
+  const [isAwaitingMicrophone, setIsAwaitingMicrophone] = useState(false);
+  /** Synchronous re-entry guard so the permission-grant listener can't stack
+   *  concurrent retries if Chrome fires multiple change events in flight. */
+  const retryInProgressRef = useRef(false);
 
   const sessionMode = globalSessionModeActive ?? false;
   const sessionPaused = globalSessionPaused ?? false;
@@ -570,6 +585,7 @@ export function useCaptureWidget({
   const startListening = useCallback(async () => {
     echlyLog("RECORDING", "start");
     setVoiceError(null);
+    setIsAwaitingMicrophone(true);
     const startTime = Date.now();
     voiceStartTimeRef.current = startTime;
     logger.debug("voice", "recording_started", { startTime });
@@ -631,7 +647,9 @@ export function useCaptureWidget({
       setIsFinishing(false);
       setState("voice_listening");
       setListeningAudioLevel(0);
+      setIsAwaitingMicrophone(false);
     } catch (err) {
+      setIsAwaitingMicrophone(false);
       // A site-level Permissions-Policy block is not a denial we can recover
       // from — surface it as its own error so the pill shows the honest
       // "switch to Write" panel instead of a doomed Try-again loop.
@@ -666,6 +684,52 @@ export function useCaptureWidget({
     setErrorMessage(null);
     startListening();
   }, [startListening]);
+
+  /**
+   * Why this listener exists: when the user clicks "Allow this time" in
+   * Chrome's mic prompt AFTER getUserMedia has already rejected (or while
+   * it's still pending), nothing in the recording flow was previously
+   * subscribed to the Permissions API. The pill would stay stuck on the
+   * error panel or the flat-bar waveform until the user manually clicked
+   * "Try again" or reopened the pill. This listener observes the
+   * permission flip and auto-retries startListening so the recording
+   * resumes without any extra user gesture.
+   *
+   * Gated to only run while we're in a stalled state (awaiting the prompt
+   * or already showing the mic_permission error panel), so a stray
+   * permission change during normal recording cannot interrupt it.
+   * Out of scope: granted→denied mid-recording (revocation), and
+   * multi-tab coordination — see audit Resolution.
+   */
+  const micListenerEnabled =
+    isAwaitingMicrophone || voiceError === "mic_permission";
+
+  useMicPermissionListener({
+    enabled: micListenerEnabled,
+    onChange: (next) => {
+      logger.debug("capture-widget-permission-listener", "fired", {
+        next,
+        voiceError,
+        isAwaitingMicrophone,
+        state: stateRef.current,
+      });
+      if (next !== "granted") return;
+      if (stateRef.current === "voice_listening") return;
+      if (retryInProgressRef.current) return;
+      retryInProgressRef.current = true;
+      logger.debug("capture-widget-permission-listener", "auto_retry");
+      try {
+        retryVoiceCapture();
+      } finally {
+        // startListening is async; release the guard on the next tick so
+        // an immediate duplicate change event is dropped but the next real
+        // failure→grant cycle can re-arm.
+        setTimeout(() => {
+          retryInProgressRef.current = false;
+        }, 0);
+      }
+    },
+  });
 
   /** Reset mid-recording: stop current MediaRecorder, discard buffer, restart fresh on the same mic. */
   const resetVoiceRecording = useCallback(async () => {
@@ -983,6 +1047,7 @@ export function useCaptureWidget({
   const discardListening = useCallback(() => {
     echlyLog("RECORDING", "discard");
     setVoiceError(null);
+    setIsAwaitingMicrophone(false);
     recordingActiveRef.current = false;
     setIsFinishing(false);
     const recorder = mediaRecorderRef.current;
@@ -1560,10 +1625,50 @@ export function useCaptureWidget({
       const targetElement = element instanceof HTMLElement ? element : null;
       lastSessionClickedElementRef.current = targetElement;
       sessionFeedbackPendingRef.current = true;
-      setPending({ screenshot: screenshot || undefined, context, elementRect, targetElement });
+
+      // Console + network snapshots — extension only. Run in parallel so the
+      // two 500ms timeouts don't compound. Both bridges resolve (never reject)
+      // within the timeout window even when the MAIN script is unreachable;
+      // capture must not block ticket creation.
+      let consoleSnapshot: ConsoleSnapshot | null = null;
+      let networkSnapshot: NetworkSnapshot | null = null;
+      if (requestConsoleSnapshot || requestNetworkSnapshot) {
+        const [consoleResult, networkResult] = await Promise.all([
+          requestConsoleSnapshot
+            ? requestConsoleSnapshot().catch((err) => {
+                logger.warn("extension", "console_snapshot_failed", err);
+                return null as ConsoleSnapshot | null;
+              })
+            : Promise.resolve(null as ConsoleSnapshot | null),
+          requestNetworkSnapshot
+            ? requestNetworkSnapshot().catch((err) => {
+                logger.warn("extension", "network_snapshot_failed", err);
+                return null as NetworkSnapshot | null;
+              })
+            : Promise.resolve(null as NetworkSnapshot | null),
+        ]);
+        consoleSnapshot = consoleResult ?? null;
+        networkSnapshot = networkResult ?? null;
+      }
+      setPending({
+        screenshot: screenshot || undefined,
+        context,
+        elementRect,
+        targetElement,
+        consoleSnapshot,
+        networkSnapshot,
+      });
       onSessionActivity?.();
     },
-    [getFullTabImage, sessionFeedbackPending, onSessionActivity, feedbackLimitReached, triggerUpgradeShake]
+    [
+      getFullTabImage,
+      sessionFeedbackPending,
+      onSessionActivity,
+      feedbackLimitReached,
+      triggerUpgradeShake,
+      requestConsoleSnapshot,
+      requestNetworkSnapshot,
+    ]
   );
 
   const handleSessionFeedbackSubmit = useCallback(
@@ -1618,6 +1723,16 @@ export function useCaptureWidget({
       try {
         pipelineActiveRef.current = true;
         logger.debug("ai", "processing_started", { source: "text_session_mode" });
+        // Stitch the click-time console + network snapshots onto the context
+        // so they reach handleComplete without changing the onComplete
+        // signature.
+        const contextWithSnapshot: CaptureContext | undefined = pending.context
+          ? {
+              ...pending.context,
+              consoleSnapshot: pending.consoleSnapshot ?? null,
+              networkSnapshot: pending.networkSnapshot ?? null,
+            }
+          : undefined;
         onComplete(transcript, pending.screenshot ?? null, {
           onSuccess: (ticket) => {
             pipelineActiveRef.current = false;
@@ -1636,7 +1751,7 @@ export function useCaptureWidget({
             if (root) removeMarker(placeholderId);
             setErrorMessage("AI processing failed.");
           },
-        }, pending.context ?? undefined, { sessionMode: true });
+        }, contextWithSnapshot, { sessionMode: true });
       } catch (error) {
         pipelineActiveRef.current = false;
         setSessionFeedbackSaving(false);
@@ -1651,6 +1766,7 @@ export function useCaptureWidget({
 
   const handleSessionFeedbackCancel = useCallback(() => {
     setVoiceError(null);
+    setIsAwaitingMicrophone(false);
     setIsFinishing(false);
     const recorder = mediaRecorderRef.current;
     try {
@@ -1683,6 +1799,7 @@ export function useCaptureWidget({
    */
   const stopVoiceForModeSwitch = useCallback(() => {
     setVoiceError(null);
+    setIsAwaitingMicrophone(false);
     setIsFinishing(false);
     const recorder = mediaRecorderRef.current;
     try {
@@ -1714,12 +1831,23 @@ export function useCaptureWidget({
     const pending = sessionFeedbackPending;
     if (!pending) return;
     const id = generateRecordingId();
+    // Stitch the click-time console + network snapshots onto the recording's
+    // context so they survive the voice-finalize handoff
+    // (active.context → onComplete). Mirrors the text-mode stitch in
+    // handleSessionFeedbackSubmit.
+    const contextWithSnapshot: CaptureContext | null = pending.context
+      ? {
+          ...pending.context,
+          consoleSnapshot: pending.consoleSnapshot ?? null,
+          networkSnapshot: pending.networkSnapshot ?? null,
+        }
+      : null;
     const newRecording: Recording = {
       id,
       screenshot: pending.screenshot ?? null,
       transcript: "",
       structuredOutput: null,
-      context: pending.context ?? null,
+      context: contextWithSnapshot,
       createdAt: Date.now(),
     };
     setRecordings((prev) => [...prev, newRecording]);
@@ -1915,6 +2043,7 @@ export function useCaptureWidget({
       sessionLimitReached,
       audioAnalyser,
       voiceError,
+      isAwaitingMicrophone,
       voiceMicDeviceId: micDeviceOverride ?? selectedMicrophoneId ?? "",
     },
     handlers,

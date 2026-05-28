@@ -209,6 +209,26 @@ function mapFeedbackFromSnap(snap: QueryDocumentSnapshot<DocumentData>): Feedbac
       typeof data.lastCommentByUid === "string" ? data.lastCommentByUid : null,
     lastCommentByName:
       typeof data.lastCommentByName === "string" ? data.lastCommentByName : null,
+    consoleLogs: Array.isArray(data.consoleLogs)
+      ? (data.consoleLogs as Feedback["consoleLogs"])
+      : undefined,
+    exceptions: Array.isArray(data.exceptions)
+      ? (data.exceptions as Feedback["exceptions"])
+      : undefined,
+    consoleLogCount:
+      typeof data.consoleLogCount === "number" ? data.consoleLogCount : undefined,
+    exceptionCount:
+      typeof data.exceptionCount === "number" ? data.exceptionCount : undefined,
+    errorCount: typeof data.errorCount === "number" ? data.errorCount : undefined,
+    warningCount:
+      typeof data.warningCount === "number" ? data.warningCount : undefined,
+    networkRequests: Array.isArray(data.networkRequests)
+      ? (data.networkRequests as Feedback["networkRequests"])
+      : undefined,
+    networkRequestCount:
+      typeof data.networkRequestCount === "number" ? data.networkRequestCount : undefined,
+    networkErrorCount:
+      typeof data.networkErrorCount === "number" ? data.networkErrorCount : undefined,
   };
 }
 

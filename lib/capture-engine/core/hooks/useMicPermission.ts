@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isMicBlockedBySitePolicy, isPolicyBlockError } from "../micSitePolicy";
+import { useMicPermissionListener } from "./useMicPermissionListener";
 
 export type MicPermissionState =
   | "idle" // not yet requested
@@ -164,7 +165,59 @@ export function useMicPermission({
    * reflects the new permission value into local state, and (on a
    * denied→granted transition) plays a brief success state then signals the
    * caller to resume the interrupted begin-recording flow.
+   *
+   * Subscription mechanics live in useMicPermissionListener; this hook only
+   * owns the classification + celebration state machine.
    */
+  const celebrateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const applyPermissionState = useCallback((next: PermissionState) => {
+    // Site-blocked is terminal for this page: the block is the site's
+    // Permissions-Policy, not a user/browser permission. No flip of the
+    // microphone permission can fix it, so ignore every change event and
+    // stay put — otherwise a stray "granted"/"prompt" would wrongly clear
+    // the site-blocked panel.
+    if (stateRef.current === "site-blocked") return;
+    if (next === "granted") {
+      // Don't recursively call requestPermission from a listener; just
+      // reflect that access is now available. The next user gesture
+      // (Begin click) will open the actual stream.
+      inFlightRef.current = false;
+      const prev = stateRef.current;
+      if (prev === "denied" || prev === "denied-permanent") {
+        // Recovered from a blocked state — celebrate briefly, then resume
+        // the flow the user originally clicked Begin for.
+        setState("granted-just-now");
+        if (celebrateTimerRef.current) clearTimeout(celebrateTimerRef.current);
+        celebrateTimerRef.current = setTimeout(() => {
+          setState("granted");
+          autoRecoverRef.current?.();
+        }, AUTO_RECOVER_CELEBRATE_MS);
+      } else if (prev !== "granted" && prev !== "granted-just-now") {
+        setState("granted");
+      }
+    } else if (next === "denied") {
+      setState("denied-permanent");
+    } else {
+      // "prompt" — reset to idle so the panel offers a fresh request.
+      setState((prev) =>
+        prev === "granted" ||
+        prev === "granting" ||
+        prev === "granted-just-now"
+          ? prev
+          : "idle",
+      );
+    }
+  }, []);
+
+  useMicPermissionListener({
+    enabled: true,
+    onChange: applyPermissionState,
+  });
+
+  /** Reflect the initial Permissions API state on mount so the panel shows
+   *  the correct status without waiting for a transition. The listener hook
+   *  only fires on change events, so we read once here. */
   useEffect(() => {
     if (
       typeof navigator === "undefined" ||
@@ -173,77 +226,21 @@ export function useMicPermission({
     ) {
       return;
     }
-
     let cancelled = false;
-    let statusRef: PermissionStatus | null = null;
-    let debounceId: ReturnType<typeof setTimeout> | null = null;
-    let celebrateId: ReturnType<typeof setTimeout> | null = null;
-
-    const applyState = () => {
-      if (cancelled || !statusRef) return;
-      // Site-blocked is terminal for this page: the block is the site's
-      // Permissions-Policy, not a user/browser permission. No flip of the
-      // microphone permission can fix it, so ignore every change event and
-      // stay put — otherwise a stray "granted"/"prompt" would wrongly clear
-      // the site-blocked panel.
-      if (stateRef.current === "site-blocked") return;
-      if (statusRef.state === "granted") {
-        // Don't recursively call requestPermission from a listener; just
-        // reflect that access is now available. The next user gesture
-        // (Begin click) will open the actual stream.
-        inFlightRef.current = false;
-        const prev = stateRef.current;
-        if (prev === "denied" || prev === "denied-permanent") {
-          // Recovered from a blocked state — celebrate briefly, then resume
-          // the flow the user originally clicked Begin for.
-          setState("granted-just-now");
-          celebrateId = setTimeout(() => {
-            if (cancelled) return;
-            setState("granted");
-            autoRecoverRef.current?.();
-          }, AUTO_RECOVER_CELEBRATE_MS);
-        } else if (prev !== "granted" && prev !== "granted-just-now") {
-          setState("granted");
-        }
-      } else if (statusRef.state === "denied") {
-        setState("denied-permanent");
-      } else {
-        // "prompt" — reset to idle so the panel offers a fresh request.
-        setState((prev) =>
-          prev === "granted" ||
-          prev === "granting" ||
-          prev === "granted-just-now"
-            ? prev
-            : "idle",
-        );
-      }
-    };
-
-    const handleChange = () => {
-      if (debounceId) clearTimeout(debounceId);
-      debounceId = setTimeout(applyState, 120);
-    };
-
     navigator.permissions
       .query({ name: "microphone" as PermissionName })
       .then((status) => {
         if (cancelled) return;
-        statusRef = status;
-        // Reflect the initial state for UI display (no getUserMedia here).
-        applyState();
-        status.addEventListener("change", handleChange);
+        applyPermissionState(status.state);
       })
       .catch(() => {
         /* not supported — stays idle, request fires on Begin */
       });
-
     return () => {
       cancelled = true;
-      if (debounceId) clearTimeout(debounceId);
-      if (celebrateId) clearTimeout(celebrateId);
-      statusRef?.removeEventListener("change", handleChange);
+      if (celebrateTimerRef.current) clearTimeout(celebrateTimerRef.current);
     };
-  }, []);
+  }, [applyPermissionState]);
 
   return {
     state,

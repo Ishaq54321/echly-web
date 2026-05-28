@@ -41,6 +41,8 @@ export interface CapturePillProps {
   mode: "voice" | "text";
   /** Voice failure state from useCaptureWidget. */
   voiceError: VoiceCaptureError;
+  /** True while startListening is awaiting getUserMedia and no stream/error has arrived. */
+  isAwaitingMicrophone?: boolean;
   /** True when the mic permission appears to be permanently blocked (e.g. denied at OS / chrome:// level). */
   micPermissionBlocked?: boolean;
   /** Finish + transcribe the current recording. */
@@ -71,6 +73,7 @@ export function CapturePill(props: CapturePillProps) {
     isFinishing,
     mode,
     voiceError,
+    isAwaitingMicrophone = false,
     micPermissionBlocked = false,
     onSendVoice,
     onCancel,
@@ -89,7 +92,10 @@ export function CapturePill(props: CapturePillProps) {
   const pillContentRef = useRef<HTMLDivElement>(null);
   const retryAttemptsRef = useRef(0);
 
-  const { elapsedFormatted, phase } = useRecordingTimer(isListening, onSendVoice, timerResetKey);
+  /** Gate the timer on stream-attached state so the user never sees a
+   *  ticking 00:0X while we're still waiting for getUserMedia to resolve. */
+  const timerActive = isListening && analyser != null;
+  const { elapsedFormatted, phase } = useRecordingTimer(timerActive, onSendVoice, timerResetKey);
 
   const handleResetVoice = useCallback(() => {
     setTimerResetKey((k) => k + 1);
@@ -301,6 +307,7 @@ export function CapturePill(props: CapturePillProps) {
             <VoicePillContent
               analyser={analyser}
               elapsedFormatted={elapsedFormatted}
+              isAwaitingMicrophone={isAwaitingMicrophone}
               onCancel={onCancel}
               onReset={handleResetVoice}
               onSend={onSendVoice}
