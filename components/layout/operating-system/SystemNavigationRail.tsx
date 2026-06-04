@@ -169,6 +169,7 @@ export function SystemNavigationRail({ onOpenCommandPalette }: SystemNavigationR
               email: user?.email,
             })}
             colorSeed={user?.uid}
+            eager
             className="h-full w-full"
           />
         </button>

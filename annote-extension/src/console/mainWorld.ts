@@ -28,6 +28,7 @@
 import { ConsoleBuffer } from "./buffer";
 import { isDenylisted } from "./denylist";
 import { redact } from "./redact";
+import { serializeNode } from "./serializeElement";
 import type {
   ConsoleLogEntry,
   ConsoleLogLevel,
@@ -53,6 +54,7 @@ declare global {
   window.__ECHLY_CONSOLE_WRAPPED__ = true;
 
   const LEVELS: readonly ConsoleLogLevel[] = ["log", "info", "warn", "error", "debug"];
+  const INTEGRITY_CHECK_INTERVAL_MS = 2000;
   const buffer = new ConsoleBuffer();
 
   // Wrapper functions we install. Keyed by level so the integrity check can
@@ -60,6 +62,18 @@ declare global {
   // (Sentry/LogRocket/HMR) replaces our wrapper, identity comparison detects
   // it and we re-wrap on top of the new layer.
   const ourWrappers: Partial<Record<ConsoleLogLevel, (...args: unknown[]) => unknown>> = {};
+  // Track every wrapper instance we've ever installed, per level. The
+  // integrity check uses this to detect when a downstream wrapper (page/SDK)
+  // has correctly captured one of our wrappers as its previous — in that case
+  // the call chain is intact and we MUST NOT re-wrap, or we'd leapfrog with
+  // the page's own integrity check.
+  const knownWrappers: Record<ConsoleLogLevel, WeakSet<object>> = {
+    log: new WeakSet<object>(),
+    info: new WeakSet<object>(),
+    warn: new WeakSet<object>(),
+    error: new WeakSet<object>(),
+    debug: new WeakSet<object>(),
+  };
 
   // The function we call through to for each level. Initialised at install
   // time to whatever was *currently* in window.console (which may itself be
@@ -101,9 +115,12 @@ declare global {
         for (const level of LEVELS) {
           const fn = iframeConsole[level];
           if (typeof fn === "function") {
-            // Bind to the iframe's console so internal `this` refs work even
-            // after we yank the iframe out of the DOM.
-            nativeConsole[level] = (fn as (...a: unknown[]) => unknown).bind(iframeConsole);
+            // Bind to the MAIN window's console (NOT the iframe's). Binding to
+            // the iframe's console ties our call to a document that becomes
+            // inactive after iframe.remove() — some Chrome versions then
+            // throw InvalidStateError. Binding to window.console keeps the
+            // call valid because window.console outlives the iframe document.
+            nativeConsole[level] = (fn as (...a: unknown[]) => unknown).bind(window.console);
           }
         }
       }
@@ -121,7 +138,7 @@ declare global {
       if (typeof nativeConsole[level] !== "function") {
         const fn = (window.console as Console & Record<string, unknown>)[level];
         if (typeof fn === "function") {
-          nativeConsole[level] = fn as (...a: unknown[]) => unknown;
+          nativeConsole[level] = (fn as (...a: unknown[]) => unknown).bind(window.console);
           if (!nativeConsole[level]) nativeSource = "window-fallback";
         }
       }
@@ -158,10 +175,15 @@ declare global {
           stack: typeof v.stack === "string" ? v.stack.slice(0, 1000) : undefined,
         };
       }
-      // DOM node check: avoid serialising entire subtrees.
+      // DOM node check: avoid serialising entire subtrees. Privacy-aware
+      // (Phase R2): an Element inside a customer-marked private region
+      // ([data-private]/.fs-block/.fs-mask/…) is serialized as
+      // "<hidden element>" rather than leaking its tag — mirroring how the
+      // user-actions surface already honors getPrivacyTreatment. Catches the
+      // real case: console.log(someElement) / console.log("state", domNode)
+      // where the node lives inside a private panel.
       if (typeof Node !== "undefined" && v instanceof Node) {
-        const tag = (v as Element).tagName ? (v as Element).tagName.toLowerCase() : v.nodeName;
-        return `<${tag}>`;
+        return serializeNode(v);
       }
       if (typeof v === "object") {
         if (seen.has(v as object)) return "<circular>";
@@ -255,40 +277,58 @@ declare global {
   }
 
   // ─── Capture pipeline ──────────────────────────────────────────
+  // Stringification + redaction together are the dominant per-log cost. On
+  // logging-heavy frameworks running below the 100/sec circuit-breaker
+  // threshold (e.g. 50/sec sustained for a 30-min session) the cumulative
+  // main-thread cost is noticeable. Defer that work to the next microtask
+  // so the page's console call returns before we serialize.
+  //
+  // Tradeoff: if the page reloads/navigates between the synchronous capture
+  // and the microtask running, the entry is lost. Acceptable for debug logs
+  // — exceptions still capture synchronously below.
   function captureLevel(level: ConsoleLogLevel, args: unknown[]): void {
     logsThisSecond += 1;
     if (circuitBreakerActive) return; // breaker handles its own state msgs
 
-    let stringifiedArgs: string[];
-    try {
-      stringifiedArgs = args.map(stringifyArg);
-    } catch {
-      return; // never throw from inside a console wrapper
-    }
-    const joined = stringifiedArgs.join(" ");
-    if (isDenylisted(joined)) return;
+    // Snapshot the args reference + metadata synchronously. The args array
+    // itself is held; if the caller mutates it before our microtask runs the
+    // stringifier will see the mutated state — acceptable since well-behaved
+    // code does not mutate args after calling console.*.
+    const timestamp = Date.now();
+    const source = safeLocationHref();
+    const capturedArgs = args;
+    queueMicrotask(() => {
+      let stringifiedArgs: string[];
+      try {
+        stringifiedArgs = capturedArgs.map(stringifyArg);
+      } catch {
+        return; // never throw from inside a console wrapper
+      }
+      const joined = stringifiedArgs.join(" ");
+      if (isDenylisted(joined)) return;
 
-    let redactedMessage: string;
-    let redactedArgs: string[];
-    try {
-      redactedMessage = redact(joined);
-      redactedArgs = stringifiedArgs.map(redact);
-    } catch {
-      return;
-    }
+      let redactedMessage: string;
+      let redactedArgs: string[];
+      try {
+        redactedMessage = redact(joined);
+        redactedArgs = stringifiedArgs.map(redact);
+      } catch {
+        return;
+      }
 
-    const entry: ConsoleLogEntry = {
-      timestamp: Date.now(),
-      level,
-      message: redactedMessage,
-      args: redactedArgs,
-      source: safeLocationHref(),
-    };
-    try {
-      buffer.addLog(entry);
-    } catch {
-      // swallow — don't let buffer errors break page logging
-    }
+      const entry: ConsoleLogEntry = {
+        timestamp,
+        level,
+        message: redactedMessage,
+        args: redactedArgs,
+        source,
+      };
+      try {
+        buffer.addLog(entry);
+      } catch {
+        // swallow — don't let buffer errors break page logging
+      }
+    });
   }
 
   // ─── Wrapper install / re-install ───────────────────────────────
@@ -302,9 +342,10 @@ declare global {
         | ((...a: unknown[]) => unknown)
         | undefined;
       if (typeof current === "function") {
-        // Assign-time cycle check: if the slot currently holds our own
-        // wrapper, calling it from ours would self-loop. Route to native.
-        if (current === ourWrappers[level]) {
+        // Assign-time cycle check: if the slot currently holds one of OUR
+        // wrappers (any previous installation), calling it from a new
+        // wrapper would self-loop. Route to native instead.
+        if (knownWrappers[level].has(current as unknown as object)) {
           const native = nativeConsole[level];
           if (typeof native === "function") {
             previousWrap[level] = native;
@@ -358,6 +399,7 @@ declare global {
         }
       };
       ourWrappers[level] = wrapper;
+      knownWrappers[level].add(wrapper as unknown as object);
       try {
         (window.console as Console & Record<string, unknown>)[level] = wrapper;
       } catch {
@@ -369,40 +411,162 @@ declare global {
   installWrappers();
 
   // Integrity check: if anything has overwritten our wrapper (HMR, Sentry
-  // re-initializing, etc.), re-install on top of it so the new outer layer
-  // keeps working AND our capture resumes.
+  // re-initializing, etc.), re-install on top of it. CRITICAL: only re-wrap
+  // when the current slot is a function we've never seen — if the slot
+  // holds a previously-installed wrapper of ours (the page/SDK wrapped on
+  // top of us with delegation intact), re-wrapping would leapfrog with
+  // their integrity check and create infinite nesting. Bumped to 2000ms
+  // (from 250ms) because late-init wrappers install once at page load,
+  // not continuously.
   setInterval(() => {
     let needsReinstall = false;
     for (const level of LEVELS) {
-      const current = (window.console as Console & Record<string, unknown>)[level];
-      if (current !== ourWrappers[level]) {
-        needsReinstall = true;
-        break;
+      const current = (window.console as Console & Record<string, unknown>)[level] as unknown;
+      if (current === ourWrappers[level]) continue; // unchanged
+      if (typeof current === "function" && knownWrappers[level].has(current as unknown as object)) {
+        // One of OUR previous wrappers is on top → page wrapped on top of us
+        // and correctly delegates. Leave alone.
+        continue;
       }
+      needsReinstall = true;
+      break;
     }
     if (needsReinstall) installWrappers();
-  }, 250);
+  }, INTEGRITY_CHECK_INTERVAL_MS);
 
   // ─── Exception listeners ───────────────────────────────────────
+  //
+  // We capture uncaught errors via BOTH addEventListener("error") and
+  // window.onerror. Some errors surface via only one path: a few SDKs and
+  // older code set window.onerror directly (which addEventListener observers
+  // still see), but there are also cases where a page's own window.onerror is
+  // assigned in a way that, combined with our wrapping order, makes the
+  // assignment path the reliable one. Setting both maximizes coverage.
+  //
+  // Dedup: a single uncaught error fires the "error" event AND window.onerror.
+  // To avoid recording it twice we key on message|source|line|column and skip
+  // a duplicate seen within ERROR_DEDUP_WINDOW_MS. The key is computed from
+  // the REDACTED message (redaction is deterministic, so identical raw errors
+  // collide as intended). addEventListener is the primary recorder because it
+  // fires first and carries the richest data (event.error.stack); window.
+  // onerror records only errors the listener didn't already capture, and
+  // always chains to any pre-existing page handler regardless.
+  const ERROR_DEDUP_WINDOW_MS = 1000;
+  let lastErrorKey: string | null = null;
+  let lastErrorAt = 0;
+
+  // Returns true if this error was just recorded by the sibling path (within
+  // the dedup window) and should be skipped. Otherwise stamps it as seen and
+  // returns false. Never throws.
+  function isDuplicateError(key: string): boolean {
+    try {
+      const now = Date.now();
+      if (lastErrorKey === key && now - lastErrorAt < ERROR_DEDUP_WINDOW_MS) {
+        return true;
+      }
+      lastErrorKey = key;
+      lastErrorAt = now;
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  // Build + record an exception entry from already-redacted fields, deduped
+  // against the sibling path. Returns nothing; never throws.
+  function recordError(
+    message: string,
+    stack: string | null,
+    source: string | null,
+    line: number | null,
+    column: number | null,
+  ): void {
+    try {
+      const key = `${message}|${source ?? ""}|${line ?? ""}|${column ?? ""}`;
+      if (isDuplicateError(key)) return;
+      const entry: ExceptionEntry = {
+        timestamp: Date.now(),
+        message,
+        stack,
+        source,
+        line,
+        column,
+        type: "error",
+      };
+      buffer.addException(entry);
+    } catch {
+      // swallow — never let exception capture break the page.
+    }
+  }
+
   window.addEventListener("error", (event) => {
     try {
       const message = redact(event.message || "");
       const stack =
         event.error && typeof event.error.stack === "string" ? redact(event.error.stack) : null;
-      const entry: ExceptionEntry = {
-        timestamp: Date.now(),
-        message,
-        stack,
-        source: event.filename ? redact(event.filename) : null,
-        line: typeof event.lineno === "number" ? event.lineno : null,
-        column: typeof event.colno === "number" ? event.colno : null,
-        type: "error",
-      };
-      buffer.addException(entry);
+      const source = event.filename ? redact(event.filename) : null;
+      const line = typeof event.lineno === "number" ? event.lineno : null;
+      const column = typeof event.colno === "number" ? event.colno : null;
+      recordError(message, stack, source, line, column);
     } catch {
       // swallow
     }
   });
+
+  // window.onerror — set in addition to the listener, chaining to whatever the
+  // page (or an SDK) already installed. CRITICAL discipline (matches the
+  // console/history wrappers): record in try/catch, never throw, and ALWAYS
+  // call the previous handler so the page's own error reporting is preserved.
+  // We return the previous handler's return value (a truthy return suppresses
+  // the browser's default "Uncaught" logging — we must not change that
+  // decision the page made). If there was no previous handler we return false
+  // so default browser behavior is unchanged.
+  try {
+    const previousOnError = typeof window.onerror === "function" ? window.onerror : null;
+    window.onerror = function (
+      this: unknown,
+      message: string | Event,
+      source?: string,
+      lineno?: number,
+      colno?: number,
+      error?: Error,
+    ): boolean {
+      try {
+        const msgStr = typeof message === "string" ? message : "";
+        const redMessage = redact(msgStr || "");
+        const stack = error && typeof error.stack === "string" ? redact(error.stack) : null;
+        const redSource = source ? redact(source) : null;
+        const line = typeof lineno === "number" ? lineno : null;
+        const column = typeof colno === "number" ? colno : null;
+        // Deduped against the addEventListener("error") path — for a normal
+        // uncaught error that fires both, only the first records.
+        recordError(redMessage, stack, redSource, line, column);
+      } catch {
+        // swallow — never break the page's error handling.
+      }
+      if (previousOnError) {
+        try {
+          return (
+            (previousOnError as (...a: unknown[]) => unknown).apply(this, [
+              message,
+              source,
+              lineno,
+              colno,
+              error,
+            ]) || false
+          ) as boolean;
+        } catch {
+          // The page's handler threw; don't propagate. Fall through to the
+          // default (return false → browser still logs the error).
+          return false;
+        }
+      }
+      return false;
+    };
+  } catch {
+    // Some pages freeze window.onerror or define it non-writable. Nothing we
+    // can do; the addEventListener("error") path still captures.
+  }
 
   window.addEventListener("unhandledrejection", (event) => {
     try {
@@ -455,19 +619,28 @@ declare global {
   // guard prevents user-visible breakage.
   window.addEventListener("message", (event) => {
     if (event.source !== window) return;
-    const data = event.data as ConsoleSnapshotRequest | undefined;
+    // Origin validation: same-window posts from the page have origin
+    // === window.origin; some legitimate same-window posts arrive with an
+    // empty origin (transitional document state). Reject anything else —
+    // this defeats targeted snapshot exfiltration where a foreign frame
+    // forges the structure tag.
+    if (event.origin !== "" && event.origin !== window.origin) return;
+    const data = event.data;
     if (!data || typeof data !== "object") return;
+    const typed = data as { type?: unknown };
+    if (typeof typed.type !== "string" || !typed.type.startsWith("ECHLY_")) return;
+    const msg = data as ConsoleSnapshotRequest;
     if (
-      data.source === CONSOLE_BRIDGE_SOURCE_ISOLATED &&
-      data.type === CONSOLE_SNAPSHOT_REQUEST &&
-      typeof data.requestId === "string"
+      msg.source === CONSOLE_BRIDGE_SOURCE_ISOLATED &&
+      msg.type === CONSOLE_SNAPSHOT_REQUEST &&
+      typeof msg.requestId === "string"
     ) {
       try {
         window.postMessage(
           {
             source: CONSOLE_BRIDGE_SOURCE_MAIN,
             type: CONSOLE_SNAPSHOT_RESPONSE,
-            requestId: data.requestId,
+            requestId: msg.requestId,
             snapshot: buffer.snapshot(),
           },
           "*",

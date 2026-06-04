@@ -225,12 +225,13 @@ export async function recordSessionViewIfNewRepo(
   const viewerRef = adminDb.doc(`sessionViews/${sessionId}/views/${viewerId}`);
   const sessionRef = adminDb.doc(`sessions/${sessionId}`);
 
-  // Captured inside the txn so we can fire the "first viewer" email AFTER the
-  // view is durably recorded (and only when this call was the first to record
-  // a non-creator viewer). Stays null on early-returns / repeat views.
+  // Captured inside the txn so we can write the "first viewer" notification
+  // AFTER the view is durably recorded (and only when this call was the first to
+  // record a non-creator viewer). Stays null on early-returns / repeat views.
   let firstView: {
     ownerUid: string;
     sessionName: string;
+    workspaceId: string;
   } | null = null;
 
   await adminDb.runTransaction(async (tx) => {
@@ -282,7 +283,7 @@ export async function recordSessionViewIfNewRepo(
     });
 
     // This call just recorded a brand-new non-creator viewer (creator/repeat
-    // views returned above). Mark it for the post-commit email dispatch.
+    // views returned above). Mark it for the post-commit notification dispatch.
     const ownerUid =
       typeof sessionData.createdByUserId === "string"
         ? sessionData.createdByUserId.trim()
@@ -290,21 +291,37 @@ export async function recordSessionViewIfNewRepo(
     if (ownerUid) {
       const title =
         typeof sessionData.title === "string" ? sessionData.title.trim() : "";
+      const wid =
+        typeof sessionData.workspaceId === "string"
+          ? sessionData.workspaceId.trim()
+          : "";
       firstView = {
         ownerUid,
         sessionName: title || "Untitled Session",
+        workspaceId: wid,
       };
     }
   });
 
-  // Phase 5: session-opened email. Fire-and-forget — never block view tracking.
-  // The emailSends.firstViewerNotified transaction guarantees exactly one send
-  // per session even if multiple viewers land simultaneously.
+  // DIGEST CUTOVER: session-opened previously sent an instant email with NO
+  // in-app notification record. We now write a `session.opened` in-app
+  // notification to the owner instead — it surfaces in the bell AND flows into
+  // the daily activity digest (the email itself is gone). Fire-and-forget so it
+  // never blocks view tracking. The emailSends.firstViewerNotified transaction
+  // (kept, key unchanged for back-compat) guarantees exactly ONE notification
+  // per session ever, even if multiple viewers land simultaneously — matching
+  // the previous once-per-session-email semantics.
   if (firstView) {
-    const fv: { ownerUid: string; sessionName: string } = firstView;
+    const fv: { ownerUid: string; sessionName: string; workspaceId: string } =
+      firstView;
     void (async () => {
       try {
-        const notified = await adminDb.runTransaction(async (tx) => {
+        // Don't notify the owner about their own view (defensive — the txn
+        // already skips creator views, but a self-view could still reach here
+        // via an aliased id). Also need a workspaceId to write the notification.
+        if (!fv.workspaceId || fv.ownerUid === viewerId) return;
+
+        const claimed = await adminDb.runTransaction(async (tx) => {
           const snap = await tx.get(sessionRef);
           if (!snap.exists) return false;
           if (snap.data()?.emailSends?.firstViewerNotified) return false;
@@ -319,16 +336,15 @@ export async function recordSessionViewIfNewRepo(
           );
           return true;
         });
-        if (!notified) return;
+        if (!claimed) return;
 
         const { getUserByIdRepo } = await import(
           "@/lib/repositories/usersRepository.server"
         );
-        const { sendSessionOpenedEmail, displayName } = await import(
-          "@/lib/email/notificationEmails"
+        const { displayName } = await import("@/lib/email/helpers");
+        const { dispatchNotifications } = await import(
+          "@/lib/server/notificationFanOut.server"
         );
-        const owner = await getUserByIdRepo(fv.ownerUid);
-        if (!owner?.email) return;
 
         const viewerName =
           (viewerProfile?.displayName ?? "").trim() ||
@@ -338,14 +354,23 @@ export async function recordSessionViewIfNewRepo(
                 (await getUserByIdRepo(viewerId)) ?? { email: null }
               ));
 
-        await sendSessionOpenedEmail({
-          owner,
-          viewerName,
+        await dispatchNotifications({
+          recipientIds: [fv.ownerUid],
+          workspaceId: fv.workspaceId,
           sessionId,
-          sessionName: fv.sessionName,
+          sessionTitle: fv.sessionName,
+          type: "session.opened",
+          actor: {
+            id: viewerId,
+            name: viewerName,
+            photoURL: viewerProfile?.avatarUrl ?? null,
+          },
+          title: `${viewerName} opened "${fv.sessionName}"`,
+          entityTitle: fv.sessionName,
+          body: null,
         });
       } catch (err) {
-        console.error("[session-opened-email] failed:", err);
+        console.error("[notification:session-opened] failed:", err);
       }
     })();
   }

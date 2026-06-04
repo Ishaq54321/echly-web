@@ -10,6 +10,9 @@ import { API_BASE, WEB_APP_URL } from "../config";
 import { requireApiSuccessData } from "@/lib/api/apiEnvelope";
 import { buildFeedbackPayload } from "@/utils/buildFeedbackPayload";
 import { ECHLY_STRICT_MODE } from "@/lib/guardrails";
+import type { ConsoleLogEntry, ExceptionEntry } from "./console/types";
+import type { NetworkRequestEntry } from "./network/types";
+import type { UserAction } from "./actions/types";
 
 const LOGIN_URL = `${WEB_APP_URL}/login`;
 /** Extension token TTL from backend is 15m; treat as valid for 14 min to avoid edge expiry. */
@@ -48,6 +51,14 @@ let cachedEchlyActive = false;
 /* Tabs known to have the content script loaded. Lets us skip the executeScript probe
    (50-150ms) on subsequent activations of the same tab. Cleared on navigation/removal. */
 const injectedTabs = new Set<number>();
+
+/* Tabs known to have the MAIN-world capture scripts (mainWorld.js + mainWorldNetwork.js
+   + mainWorldActions.js) injected. Sibling to injectedTabs but tracked independently —
+   capture is now session-gated and injected programmatically (Phase M1 migration), so a
+   tab can have bootstrap without capture, and vice versa is impossible. Cleared on
+   navigation/removal so the next inject call after navigation re-installs into the new
+   page realm. */
+const captureInjectedTabs = new Set<number>();
 
 /** Send a runtime message with bounded retries to handle the brief window
  *  where the content script's listener isn't registered yet. Silent on final failure
@@ -109,6 +120,12 @@ chrome.action.onClicked.addListener(() => {
       globalUIState.expanded = false;
       trayOpen = false;
       cachedEchlyActive = false;
+      /* Stage 2 — TRAY-CLOSE stop-signal (icon-toggle-off path). The user fully
+         closed the tray, so they are no longer engaged: stop capture and purge the
+         engagement buffer (memory + storage). Per the locked design we deliberately
+         LEAVE any active session as-is (orphaned, matching today's behavior) rather
+         than auto-ending it. */
+      stopAndPurgeCapture();
       await chrome.storage.local.set({ echlyActive: false });
       broadcastUIState();
       if (tab?.id) {
@@ -609,6 +626,10 @@ function endSessionFromIdle(): void {
   echlyLog("BACKGROUND", "session idle timeout — ending session");
   clearSessionIdleTimer();
   chrome.alarms.clear("echly-keepalive");
+  /* Stage 2 — SESSION-END stop-signal (IDLE end). Idle is a session-end, so stop
+     capture and purge the engagement buffer. See ECHLY_SESSION_MODE_END for the
+     lingering-wrappers limitation. */
+  stopAndPurgeCapture();
   activeSessionId = null;
   globalUIState.sessionId = null;
   globalUIState.sessionTitle = null;
@@ -717,6 +738,25 @@ chrome.runtime.onConnect.addListener((port) => {
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "echly-keepalive") {
     // No-op — just keeps the SW alive
+  } else if (alarm.name === ENGAGEMENT_FLUSH_ALARM) {
+    /* Stage 3 safety-net: coarse periodic poke of the active engaged tab to pull a
+       live snapshot, so a tab killed without a visibilitychange/beforeunload event
+       still contributes its tail to the engagement buffer. Only meaningful while
+       engaged; harmless otherwise (no tab handler responds, or the merge no-ops). */
+    if (!cachedEchlyActive || currentEngagementId == null) return;
+    void (async () => {
+      try {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        const tabId = tabs[0]?.id;
+        if (typeof tabId === "number") {
+          chrome.tabs
+            .sendMessage(tabId, { type: "ECHLY_REQUEST_CAPTURE_FLUSH" })
+            .catch(() => {});
+        }
+      } catch {
+        // ignore
+      }
+    })();
   }
 });
 
@@ -738,6 +778,39 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     await initializeSessionState();
 
     broadcastUIState();
+
+    /* Stage 1: cold-start re-arm. If the SW restarted while the user was engaged
+       (tray open/minimized or session paused/active), cachedEchlyActive is restored
+       from storage but the MAIN-world capture scripts in any pre-restart tab were lost
+       (captureInjectedTabs was zeroed) and so were the in-memory engagement buffers.
+       Gate on cachedEchlyActive (was session). Restore the persisted (claimed) engagement
+       buffer if one exists so a ticket filed post-restart keeps its pre-restart journey;
+       otherwise mint a fresh engagement. Then re-inject into the active tab.
+       Stale-tab safety: ensureCaptureInjected swallows executeScript failures
+       (restricted pages, dead tab IDs) without throwing or polluting the cache. */
+    if (cachedEchlyActive) {
+      // Resolve the active tab defensively — a tabs.query rejection must not skip
+      // establishing the engagement below (else currentEngagementId stays null while
+      // cachedEchlyActive=true and every flush is silently dropped).
+      let rehydrateTabId: number | undefined;
+      try {
+        const activeTabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        rehydrateTabId = activeTabs[0]?.id;
+      } catch (e) {
+        if (ECHLY_DEBUG) console.debug("[ECHLY] cold-start active-tab query failed", e);
+      }
+      try {
+        const restored = await restorePersistedEngagement(rehydrateTabId);
+        if (restored == null) {
+          beginEngagement(rehydrateTabId);
+        }
+        if (typeof rehydrateTabId === "number") {
+          void ensureCaptureInjected(rehydrateTabId);
+        }
+      } catch (e) {
+        if (ECHLY_DEBUG) console.debug("[ECHLY] cold-start capture rehydrate failed", e);
+      }
+    }
 
     if (ECHLY_DEBUG) console.log("[ECHLY] service worker initialized");
   } catch (err) {
@@ -1027,6 +1100,519 @@ async function ensureContentScriptInjected(tabId: number): Promise<boolean> {
   }
 }
 
+/**
+ * Ensure the MAIN-world capture scripts (mainWorld.js + mainWorldNetwork.js
+ * + mainWorldActions.js) are loaded in the given tab. Phase M1 of the
+ * session-driven injection migration: capture is no longer declarative —
+ * callers (session-start, tab activation during an active session, etc.)
+ * trigger this explicitly. Restricted pages (chrome://, the Web Store)
+ * silently fail and are not added to the cache so a later retry on a normal
+ * URL can succeed. mainWorldActions.js (Phase A3) inherits the same
+ * lifecycle for free — there is no separate gating needed.
+ */
+async function ensureCaptureInjected(tabId: number): Promise<boolean> {
+  if (captureInjectedTabs.has(tabId)) return true;
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      world: "MAIN",
+      files: ["mainWorld.js", "mainWorldNetwork.js", "mainWorldActions.js"],
+      injectImmediately: true,
+    });
+    captureInjectedTabs.add(tabId);
+    return true;
+  } catch (e) {
+    if (ECHLY_DEBUG) console.debug("[ECHLY] Failed to inject capture scripts", { tabId, error: e });
+    return false;
+  }
+}
+
+/** Drop a tab from the capture-injected cache. Used on navigation (the old MAIN-world
+ *  realm dies, so the next inject call must re-install) and session teardown (M3). */
+function clearCaptureInjection(tabId: number): void {
+  captureInjectedTabs.delete(tabId);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ENGAGEMENT BUFFER (Stages 3 + 4 — "capture follows Annote engagement")
+
+   The per-page MAIN-world ring buffers die on navigation (the realm is torn
+   down). To give a filed ticket the FULL multi-page journey, each engaged tab
+   forwards its flush-pushes to the service worker, where they accumulate in a
+   long-lived "engagement buffer" keyed by an engagement id. The engagement id
+   is minted at tray-open and changes on every re-open / soft-end re-arm, so a
+   fresh engagement always starts from a clean buffer (no stale cross-engagement
+   bleed).
+
+   Privacy (Stage 4): the buffer lives in SW MEMORY ONLY until the engagement's
+   session is CLAIMED (ECHLY_SESSION_MODE_START). Only after a claim do we mirror
+   to chrome.storage.local — so activity captured before the user commits to a
+   session never touches disk. Both stop-signals (tray-close, every session-end)
+   fully purge the in-memory buffer AND any storage mirror.
+
+   The buffer only ever holds ALREADY-REDACTED entries: network-body redaction
+   (redactNetwork.ts) and element privacy (privacy.ts) run at capture time, in
+   the MAIN world, upstream of every flush-push. The SW never sees raw data.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** ~last 10 minutes survive: a bug reported a few minutes after it happened is
+ *  kept, but a multi-hour paused session can't grow unbounded. */
+const ENGAGEMENT_BUFFER_MAX_AGE_MS = 10 * 60 * 1000;
+/** Per-surface entry cap (console logs, console exceptions, network, actions are
+ *  each capped independently). Cross-page aggregate; the per-page MAIN buffers
+ *  cap at 50, so 200 holds ~4 pages' worth before age/count eviction kicks in. */
+const ENGAGEMENT_BUFFER_MAX_ENTRIES_PER_SURFACE = 200;
+/** Total serialized-byte cap across all four surfaces for one engagement. Evict
+ *  oldest-across-surfaces until under cap. Mirrors the per-page byte caps. */
+const ENGAGEMENT_BUFFER_MAX_TOTAL_BYTES = 256 * 1024;
+/** chrome.storage.local key prefix for the persisted (post-claim) mirror. */
+const ENGAGEMENT_STORAGE_PREFIX = "echlyEngagementBuffer:";
+/** Coarse safety-net alarm: pokes the active engaged tab to pull a live snapshot
+ *  so a tab killed without an unload event still contributes its tail. Runs only
+ *  while engaged (created in beginEngagement, cleared in stopAndPurgeCapture). */
+const ENGAGEMENT_FLUSH_ALARM = "echly-engagement-flush";
+/** chrome.alarms minimum period is ~1 minute; that's an acceptable coarse net. */
+const ENGAGEMENT_FLUSH_PERIOD_MIN = 1;
+
+type EngagementConsoleLog = ConsoleLogEntry;
+type EngagementException = ExceptionEntry;
+type EngagementNetwork = NetworkRequestEntry;
+type EngagementAction = UserAction;
+
+interface EngagementBuffer {
+  logs: EngagementConsoleLog[];
+  exceptions: EngagementException[];
+  network: EngagementNetwork[];
+  actions: EngagementAction[];
+  /** True once ECHLY_SESSION_MODE_START claimed this engagement; gates persistence. */
+  claimed: boolean;
+}
+
+/** tabId → engagement id. One engagement per engaged tray; all tabs the user
+ *  visits during that engagement share the same id (set on tab activation /
+ *  navigation re-arm so every engaged tab forwards into the same buffer). */
+const tabEngagementIds = new Map<number, string>();
+/** engagement id → accumulated cross-navigation buffer (memory-resident). */
+const engagementBuffers = new Map<string, EngagementBuffer>();
+/** The engagement id for the CURRENT tray engagement. Minted at tray-open,
+ *  re-minted on soft-end re-arm; null when no tray is engaged. */
+let currentEngagementId: string | null = null;
+
+function genEngagementId(): string {
+  try {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+  } catch {
+    // ignore
+  }
+  return "eng-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+}
+
+function emptyEngagementBuffer(): EngagementBuffer {
+  return { logs: [], exceptions: [], network: [], actions: [], claimed: false };
+}
+
+/** Stable dedup key per surface. Network + actions carry their own UUID; console
+ *  logs/exceptions have NO id (see console/types.ts) so we synthesize a key from the
+ *  immutable capture fields. We include the SECONDARY discriminating fields (args/source
+ *  for logs; stack/source/line/column for exceptions) so two genuinely-distinct entries
+ *  that happen to share timestamp+level+message — common in error storms, exactly what
+ *  capture exists to record — are NOT collapsed. Idempotent re-pushes of the truly-same
+ *  entry still share all fields and dedup correctly. */
+function consoleLogKey(e: EngagementConsoleLog): string {
+  const args = Array.isArray(e.args) ? e.args.join("") : "";
+  return `${e.timestamp}|${e.level}|${e.message}|${e.source ?? ""}|${args}`;
+}
+function exceptionKey(e: EngagementException): string {
+  return `${e.timestamp}|${e.type}|${e.message}|${e.stack ?? ""}|${e.source ?? ""}|${e.line ?? ""}|${e.column ?? ""}`;
+}
+
+/** Mint (or reset to) a fresh engagement and bind it to the given tab. Returns
+ *  the new engagement id. Used at tray-open and soft-end re-arm. */
+function beginEngagement(tabId?: number): string {
+  const id = genEngagementId();
+  currentEngagementId = id;
+  engagementBuffers.set(id, emptyEngagementBuffer());
+  if (typeof tabId === "number") tabEngagementIds.set(tabId, id);
+  // Start the coarse safety-net flush alarm for this engagement (idempotent —
+  // chrome.alarms.create replaces an existing alarm of the same name).
+  try {
+    chrome.alarms.create(ENGAGEMENT_FLUSH_ALARM, { periodInMinutes: ENGAGEMENT_FLUSH_PERIOD_MIN });
+  } catch {
+    // ignore
+  }
+  return id;
+}
+
+/** Bind a tab to the current engagement (called when a new/activated/navigated
+ *  tab joins an already-engaged tray, so its flushes land in the same buffer). */
+function bindTabToCurrentEngagement(tabId: number): void {
+  if (currentEngagementId == null) return;
+  tabEngagementIds.set(tabId, currentEngagementId);
+}
+
+/**
+ * Resolve the engagement a tab belongs to.
+ *
+ * `requireBound` MUST be true for content-script-originated FLUSH ingestion: a tab
+ * that has no explicit binding must NOT fall back to currentEngagementId, otherwise a
+ * stale page from a purged engagement (whose binding was removed on close/end, but
+ * whose MAIN-world wrapper keeps running per the M3 limitation) would bleed its flush
+ * into a freshly-minted engagement after a re-open / soft-end re-arm. With requireBound
+ * the unbound flush is dropped, preserving the clean-buffer invariant.
+ *
+ * Without requireBound (the default) we fall back to currentEngagementId — correct for
+ * file-time/no-tab-context resolution where the active tab is, by construction, the
+ * current engagement.
+ */
+function resolveEngagementIdForTab(
+  tabId: number | undefined,
+  requireBound = false
+): string | null {
+  if (typeof tabId === "number") {
+    const bound = tabEngagementIds.get(tabId);
+    if (bound != null) return bound;
+  }
+  return requireBound ? null : currentEngagementId;
+}
+
+/** Age + count + byte eviction for one engagement buffer. Oldest-first within
+ *  each surface; the byte sweep then trims the globally-oldest entries across
+ *  surfaces until the buffer fits ENGAGEMENT_BUFFER_MAX_TOTAL_BYTES. */
+function evictEngagementBuffer(buf: EngagementBuffer): void {
+  const now = Date.now();
+  const cutoff = now - ENGAGEMENT_BUFFER_MAX_AGE_MS;
+
+  buf.logs = buf.logs.filter((e) => e.timestamp >= cutoff);
+  buf.exceptions = buf.exceptions.filter((e) => e.timestamp >= cutoff);
+  buf.network = buf.network.filter((e) => e.timestamp >= cutoff);
+  buf.actions = buf.actions.filter((e) => e.timestamp >= cutoff);
+
+  const cap = ENGAGEMENT_BUFFER_MAX_ENTRIES_PER_SURFACE;
+  if (buf.logs.length > cap) buf.logs = buf.logs.slice(buf.logs.length - cap);
+  if (buf.exceptions.length > cap) buf.exceptions = buf.exceptions.slice(buf.exceptions.length - cap);
+  if (buf.network.length > cap) buf.network = buf.network.slice(buf.network.length - cap);
+  if (buf.actions.length > cap) buf.actions = buf.actions.slice(buf.actions.length - cap);
+
+  // Byte-cap sweep: drop the single globally-oldest entry across all surfaces
+  // until the serialized buffer fits. Bounded by total entry count.
+  let guard = 0;
+  while (engagementBufferBytes(buf) > ENGAGEMENT_BUFFER_MAX_TOTAL_BYTES && guard < 4 * cap) {
+    guard += 1;
+    const oldest = oldestSurface(buf);
+    if (oldest == null) break;
+    buf[oldest].shift();
+  }
+}
+
+function engagementBufferBytes(buf: EngagementBuffer): number {
+  try {
+    return JSON.stringify({
+      logs: buf.logs,
+      exceptions: buf.exceptions,
+      network: buf.network,
+      actions: buf.actions,
+    }).length;
+  } catch {
+    return 0;
+  }
+}
+
+/** Which surface currently holds the globally-oldest entry (by timestamp). */
+function oldestSurface(buf: EngagementBuffer): "logs" | "exceptions" | "network" | "actions" | null {
+  let best: "logs" | "exceptions" | "network" | "actions" | null = null;
+  let bestTs = Infinity;
+  const consider = (surface: "logs" | "exceptions" | "network" | "actions") => {
+    const head = buf[surface][0];
+    if (head && head.timestamp < bestTs) {
+      bestTs = head.timestamp;
+      best = surface;
+    }
+  };
+  consider("logs");
+  consider("exceptions");
+  consider("network");
+  consider("actions");
+  return best;
+}
+
+/** Merge an incoming flush snapshot into the engagement buffer, deduped per
+ *  surface, then evict and (if claimed) persist. `surface` selects which arrays
+ *  in the snapshot are relevant; we tolerate a snapshot carrying any subset. */
+function mergeFlushIntoEngagement(
+  engagementId: string,
+  snapshot: {
+    logs?: EngagementConsoleLog[];
+    exceptions?: EngagementException[];
+    requests?: EngagementNetwork[];
+    actions?: EngagementAction[];
+  }
+): void {
+  let buf = engagementBuffers.get(engagementId);
+  if (!buf) {
+    buf = emptyEngagementBuffer();
+    engagementBuffers.set(engagementId, buf);
+  }
+
+  if (Array.isArray(snapshot.logs) && snapshot.logs.length > 0) {
+    const seen = new Set(buf.logs.map(consoleLogKey));
+    for (const e of snapshot.logs) {
+      const k = consoleLogKey(e);
+      if (!seen.has(k)) { seen.add(k); buf.logs.push(e); }
+    }
+    buf.logs.sort((a, b) => a.timestamp - b.timestamp);
+  }
+  if (Array.isArray(snapshot.exceptions) && snapshot.exceptions.length > 0) {
+    const seen = new Set(buf.exceptions.map(exceptionKey));
+    for (const e of snapshot.exceptions) {
+      const k = exceptionKey(e);
+      if (!seen.has(k)) { seen.add(k); buf.exceptions.push(e); }
+    }
+    buf.exceptions.sort((a, b) => a.timestamp - b.timestamp);
+  }
+  if (Array.isArray(snapshot.requests) && snapshot.requests.length > 0) {
+    const seen = new Set(buf.network.map((e) => e.id));
+    for (const e of snapshot.requests) {
+      if (e && !seen.has(e.id)) { seen.add(e.id); buf.network.push(e); }
+    }
+    buf.network.sort((a, b) => a.timestamp - b.timestamp);
+  }
+  if (Array.isArray(snapshot.actions) && snapshot.actions.length > 0) {
+    const seen = new Set(buf.actions.map((e) => e.id));
+    for (const e of snapshot.actions) {
+      if (e && !seen.has(e.id)) { seen.add(e.id); buf.actions.push(e); }
+    }
+    buf.actions.sort((a, b) => a.timestamp - b.timestamp);
+  }
+
+  evictEngagementBuffer(buf);
+  if (buf.claimed) void persistEngagementBuffer(engagementId);
+}
+
+/** Mark the current engagement claimed (session committed) and flush its
+ *  current memory state to disk. Idempotent. */
+function claimCurrentEngagement(): void {
+  if (currentEngagementId == null) return;
+  const buf = engagementBuffers.get(currentEngagementId);
+  if (!buf) return;
+  buf.claimed = true;
+  void persistEngagementBuffer(currentEngagementId);
+}
+
+async function persistEngagementBuffer(engagementId: string): Promise<void> {
+  const buf = engagementBuffers.get(engagementId);
+  if (!buf || !buf.claimed) return;
+  try {
+    await chrome.storage.local.set({
+      [ENGAGEMENT_STORAGE_PREFIX + engagementId]: {
+        logs: buf.logs,
+        exceptions: buf.exceptions,
+        network: buf.network,
+        actions: buf.actions,
+      },
+    });
+  } catch (e) {
+    if (ECHLY_DEBUG) console.debug("[ECHLY] persist engagement buffer failed", e);
+  }
+}
+
+/** Remove a storage key, swallowing BOTH synchronous throws and promise rejections.
+ *  chrome.storage.local.remove returns a promise in MV3; a bare `void chrome...remove()`
+ *  leaves a rejection unhandled. The purge invariant only needs best-effort cleanup, but
+ *  we must not drop the rejection on the floor. */
+function removeStorageKey(key: string): void {
+  try {
+    void chrome.storage.local.remove(key).catch(() => {});
+  } catch {
+    // chrome.storage unavailable — ignore.
+  }
+}
+
+/**
+ * Cold-start restore (Stage 4 persist-guard companion). In-memory engagement
+ * buffers and currentEngagementId are lost when the SW is evicted. Only CLAIMED
+ * engagements were ever mirrored to chrome.storage.local, so on restart we adopt
+ * the persisted (claimed) buffer — if one exists — as the current engagement so a
+ * ticket filed after the restart still carries the pre-restart journey. There is
+ * at most one persisted engagement at a time (both stop-signals remove it).
+ * Returns the adopted engagement id, or null if nothing was persisted/adoptable.
+ *
+ * FRESHNESS GATE (defense-in-depth for the rare case a stop-signal's fire-and-forget
+ * storage.remove was lost): after eviction, if the persisted buffer is entirely empty
+ * (every entry aged past the 10-min window — i.e. a stale mirror from a long-dead
+ * engagement), we do NOT adopt it; we delete the orphan and return null so a fresh
+ * engagement is minted instead. A recently-ended session's sub-10-min entries would
+ * survive eviction, but the in-memory delete on stop is synchronous and the remove is
+ * dispatched before the handler returns, so the realistic loss window is negligible.
+ */
+async function restorePersistedEngagement(boundTabId?: number): Promise<string | null> {
+  try {
+    const all = await chrome.storage.local.get(null);
+    const keys = Object.keys(all).filter((k) => k.startsWith(ENGAGEMENT_STORAGE_PREFIX));
+    if (keys.length === 0) return null;
+    // Defensive: if more than one slipped through, keep the first and drop the rest.
+    const [adopt, ...stale] = keys;
+    for (const k of stale) removeStorageKey(k);
+    const engagementId = adopt.slice(ENGAGEMENT_STORAGE_PREFIX.length);
+    const raw = all[adopt] as Partial<EngagementBuffer> | undefined;
+    const buf: EngagementBuffer = {
+      logs: Array.isArray(raw?.logs) ? raw!.logs! : [],
+      exceptions: Array.isArray(raw?.exceptions) ? raw!.exceptions! : [],
+      network: Array.isArray(raw?.network) ? raw!.network! : [],
+      actions: Array.isArray(raw?.actions) ? raw!.actions! : [],
+      claimed: true,
+    };
+    evictEngagementBuffer(buf);
+    const isEmpty =
+      buf.logs.length === 0 &&
+      buf.exceptions.length === 0 &&
+      buf.network.length === 0 &&
+      buf.actions.length === 0;
+    if (isEmpty) {
+      // Stale orphan mirror — drop it and mint fresh instead of adopting.
+      removeStorageKey(adopt);
+      return null;
+    }
+    engagementBuffers.set(engagementId, buf);
+    currentEngagementId = engagementId;
+    if (typeof boundTabId === "number") tabEngagementIds.set(boundTabId, engagementId);
+    return engagementId;
+  } catch (e) {
+    if (ECHLY_DEBUG) console.debug("[ECHLY] restore persisted engagement failed", e);
+    return null;
+  }
+}
+
+/** Snapshot of an engagement's accumulated cross-page entries, used at file-time. */
+function getEngagementSnapshot(engagementId: string | null): {
+  logs: EngagementConsoleLog[];
+  exceptions: EngagementException[];
+  network: EngagementNetwork[];
+  actions: EngagementAction[];
+} {
+  const empty = { logs: [], exceptions: [], network: [], actions: [] };
+  if (engagementId == null) return empty;
+  const buf = engagementBuffers.get(engagementId);
+  if (!buf) return empty;
+  evictEngagementBuffer(buf);
+  return {
+    logs: [...buf.logs],
+    exceptions: [...buf.exceptions],
+    network: [...buf.network],
+    actions: [...buf.actions],
+  };
+}
+
+/**
+ * Stage 3 file-time merge. Union the cross-navigation engagement buffer (all pages
+ * this engagement) with the current page's LIVE snapshot — which content.tsx already
+ * collected via requestSnapshot and placed on ticket.consoleLogs / exceptions /
+ * networkRequests / userActions — deduped by UUID (network/actions) or synthetic key
+ * (console — no id field), ordered by timestamp. Returns a NEW ticket object with the
+ * four capture surfaces replaced by the merged timeline and the *Count fields
+ * recomputed; non-capture ticket fields are passed through untouched.
+ *
+ * The live page may carry entries the engagement buffer hasn't seen yet (no flush
+ * since the last activity) and the buffer carries earlier pages the live snapshot
+ * never had — the union is the full timeline. Both inputs are already redacted.
+ */
+function mergeEngagementIntoTicket(
+  engagementId: string | null,
+  ticket: Record<string, unknown>
+): Record<string, unknown> {
+  const eng = getEngagementSnapshot(engagementId);
+
+  const liveLogs = Array.isArray(ticket.consoleLogs) ? (ticket.consoleLogs as EngagementConsoleLog[]) : [];
+  const liveExceptions = Array.isArray(ticket.exceptions) ? (ticket.exceptions as EngagementException[]) : [];
+  const liveNetwork = Array.isArray(ticket.networkRequests) ? (ticket.networkRequests as EngagementNetwork[]) : [];
+  const liveActions = Array.isArray(ticket.userActions) ? (ticket.userActions as EngagementAction[]) : [];
+
+  const dedupBy = <T,>(items: T[], key: (t: T) => string): T[] => {
+    const seen = new Set<string>();
+    const out: T[] = [];
+    for (const it of items) {
+      if (it == null) continue;
+      const k = key(it);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push(it);
+    }
+    return out;
+  };
+  const byTs = <T extends { timestamp: number }>(a: T, b: T) => a.timestamp - b.timestamp;
+
+  const logs = dedupBy([...eng.logs, ...liveLogs], consoleLogKey).sort(byTs);
+  const exceptions = dedupBy([...eng.exceptions, ...liveExceptions], exceptionKey).sort(byTs);
+  const network = dedupBy([...eng.network, ...liveNetwork], (e) => e.id).sort(byTs);
+  const actions = dedupBy([...eng.actions, ...liveActions], (e) => e.id).sort(byTs);
+
+  const merged: Record<string, unknown> = { ...ticket };
+
+  if (logs.length > 0 || exceptions.length > 0) {
+    merged.consoleLogs = logs;
+    merged.exceptions = exceptions;
+    merged.consoleLogCount = logs.length;
+    merged.exceptionCount = exceptions.length;
+    merged.errorCount = logs.filter((l) => l.level === "error").length;
+    merged.warningCount = logs.filter((l) => l.level === "warn").length;
+  }
+  if (network.length > 0) {
+    merged.networkRequests = network;
+    merged.networkRequestCount = network.length;
+    merged.networkErrorCount = network.filter(
+      (r) =>
+        r.errored === true ||
+        (typeof r.status === "number" && r.status >= 400 && r.status < 600)
+    ).length;
+  }
+  if (actions.length > 0) {
+    merged.userActions = actions;
+    merged.userActionCount = actions.length;
+  }
+
+  return merged;
+}
+
+/** Fully purge one engagement: in-memory buffer, every tab binding pointing at
+ *  it, and the persisted storage mirror. Used by both stop-signals. */
+function purgeEngagement(engagementId: string | null): void {
+  if (engagementId == null) return;
+  engagementBuffers.delete(engagementId);
+  for (const [tabId, id] of tabEngagementIds) {
+    if (id === engagementId) tabEngagementIds.delete(tabId);
+  }
+  removeStorageKey(ENGAGEMENT_STORAGE_PREFIX + engagementId);
+}
+
+/**
+ * The two stop-signals' shared teardown: drop the tab(s) from the capture cache
+ * (the existing stop mechanism — wrappers go unread and die on navigation per the
+ * documented M3 limitation) AND purge the engagement buffer (memory + storage).
+ *
+ * Called at BOTH stop-signals: user fully closes the tray, and any session-end
+ * (hard / soft / idle). `engagementId` defaults to the current engagement; pass
+ * an explicit id at soft-end to purge the ENDED session's buffer before re-arming.
+ */
+function stopAndPurgeCapture(engagementId: string | null = currentEngagementId): void {
+  // (a) Stop: drop all tabs from the capture-injected cache. The MAIN-world
+  // wrappers can't be cleanly uninstalled from the isolated world (M3 limit);
+  // they live in the page realm and die on navigation, harmless meanwhile.
+  captureInjectedTabs.clear();
+  // (b) Purge the engagement buffer (in-memory + persisted mirror + tab bindings).
+  purgeEngagement(engagementId);
+  if (engagementId === currentEngagementId) {
+    currentEngagementId = null;
+    // No engagement remains — stop the safety-net alarm. (Soft-end re-arm calls
+    // beginEngagement right after, which recreates it.)
+    try {
+      void chrome.alarms.clear(ENGAGEMENT_FLUSH_ALARM);
+    } catch {
+      // ignore
+    }
+  }
+}
+
 async function openWidgetInActiveTab(): Promise<void> {
   cachedEchlyActive = true;
   await chrome.storage.local.set({ echlyActive: true });
@@ -1056,6 +1642,21 @@ async function openWidgetInActiveTab(): Promise<void> {
   }
 
   await sendMessageWithRetry(tabId, { type: "ECHLY_OPEN_WIDGET" });
+
+  /* Stage 1 — ARM capture at tray-open. Capture now follows engagement, not the
+     session: the moment the tray opens, the user is "engaged" and we install the
+     MAIN-world capture scripts via the existing programmatic mechanism (unchanged).
+     Stage 3 — mint/bind the engagement that this tab's flush-pushes accumulate into.
+     A genuine open (no current engagement) starts a fresh buffer; a re-open while
+     still engaged (token refresh, redundant open) binds the active tab to the
+     existing engagement so we don't orphan its accumulated entries. The soft-end
+     re-arm path mints its own fresh engagement before calling here. */
+  if (currentEngagementId == null) {
+    beginEngagement(tabId);
+  } else {
+    bindTabToCurrentEngagement(tabId);
+  }
+  void ensureCaptureInjected(tabId);
 }
 
 async function openRecorderUI(tabId?: number): Promise<boolean> {
@@ -1092,6 +1693,16 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
   }
   try {
     await ensureContentScriptInjected(activeInfo.tabId);
+    /* Stage 1: capture now follows ENGAGEMENT across tabs (was session-gated).
+       When the user switches tabs while the tray is open/minimized or a session
+       is paused/active — i.e. cachedEchlyActive — that tab joins the engagement
+       and the widget auto-mounts there, so capture must install too. Bind the tab
+       to the current engagement first so its flush-pushes accumulate in the right
+       buffer. Idempotent via captureInjectedTabs.has; restricted-page errors swallowed. */
+    if (cachedEchlyActive) {
+      bindTabToCurrentEngagement(activeInfo.tabId);
+      void ensureCaptureInjected(activeInfo.tabId);
+    }
     await sendMessageWithRetry(activeInfo.tabId, {
       type: "ECHLY_GLOBAL_STATE",
       state: getCanonicalGlobalState(),
@@ -1106,14 +1717,22 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     activeOwnerTabId = null;
   }
   injectedTabs.delete(tabId);
+  captureInjectedTabs.delete(tabId);
+  /* Stage 3: drop the tab→engagement binding so the map doesn't accumulate dead
+     entries (and so a Chrome-reused tab id can't mis-bind to a stale engagement).
+     The accumulated buffer entries this tab contributed stay in the engagement
+     buffer until the engagement itself is purged — closing a tab is not a stop-signal. */
+  tabEngagementIds.delete(tabId);
 });
 
 /** Loom-style: only sync global state to the active tab after load completes. */
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   /* Page navigation destroys the content script — clear our injected-cache entry
-     so the next activation re-injects rather than trusting a stale flag. */
+     so the next activation re-injects rather than trusting a stale flag.
+     MAIN-world capture realm also dies on navigation, so reset that cache too. */
   if (changeInfo.status === "loading") {
     injectedTabs.delete(tabId);
+    captureInjectedTabs.delete(tabId);
   }
   if (changeInfo.status !== "complete") return;
   if (!tab.active) return;
@@ -1124,6 +1743,19 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (activeSessionForRehydrate && globalUIState.sessionModeActive && globalUIState.pointers.length === 0) {
       globalUIState.sessionLoading = true;
       void rehydrateSession(activeSessionForRehydrate);
+    }
+    /* Stage 1: re-inject MAIN-world capture after a navigation/reload while engaged.
+       Gated on cachedEchlyActive (was session) so capture persists across navigations
+       for the whole engagement, not just an active session. The "loading" branch above
+       already cleared captureInjectedTabs for this tab, so this call actually re-installs
+       (the .has() guard won't short-circuit). The pre-navigation page already flushed its
+       buffer to the SW engagement buffer (Stage 3) on visibilitychange/beforeunload, so
+       its entries survive into the new realm. Complete-stage injection is later than ideal
+       — early requests on the freshly reloaded page are missed — but injecting at "loading"
+       into a still-loading page is unreliable, so complete is the pragmatic choice. */
+    if (cachedEchlyActive) {
+      bindTabToCurrentEngagement(tabId);
+      void ensureCaptureInjected(tabId);
     }
     await sendMessageWithRetry(tabId, {
       type: "ECHLY_GLOBAL_STATE",
@@ -1189,6 +1821,9 @@ async function createFeedbackInternal({
     networkRequests?: unknown[];
     networkRequestCount?: number;
     networkErrorCount?: number;
+    // Phase A4: user-actions capture fields. Same passthrough contract.
+    userActions?: unknown[];
+    userActionCount?: number;
   };
   screenshotId: string;
 }): Promise<Response> {
@@ -1281,6 +1916,55 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ success: false, error: err?.message });
     });
     return true;
+  }
+
+  if (request.type === "ECHLY_INJECT_CAPTURE") {
+    /* Phase M1: programmatic-injection entry point for MAIN-world capture scripts.
+       Not yet wired to session-start (M2) or tab-switch (M3) — this handler exists
+       so M1 can be verified manually and so later phases have a clean call site. */
+    const explicit = (request as { tabId?: number }).tabId;
+    const tabId = typeof explicit === "number" ? explicit : sender.tab?.id;
+    if (typeof tabId !== "number") {
+      sendResponse({ ok: false, error: "No tab ID" });
+      return false;
+    }
+    void (async () => {
+      const ok = await ensureCaptureInjected(tabId);
+      sendResponse({ ok });
+    })();
+    return true;
+  }
+
+  if (request.type === "ECHLY_CAPTURE_FLUSH") {
+    /* Stage 3: a content-script bridge forwarded its page's flush snapshot. Merge it
+       into the cross-navigation engagement buffer keyed STRICTLY by the sender tab's
+       explicit binding (requireBound), deduped by UUID (network/actions) or synthetic
+       key (console — no id field). The snapshot only ever holds already-redacted entries
+       (redaction runs at capture time, in the MAIN world, upstream of the flush).
+       requireBound is critical: a stale page from a purged engagement (binding removed
+       on close/end, but MAIN-world wrapper still running per the M3 limitation) has NO
+       binding, so its flush resolves to null and is DROPPED — it must not fall back to
+       the current engagement, or it would bleed into a freshly re-armed engagement. */
+    const surface = (request as { surface?: string }).surface;
+    const snapshot = (request as { snapshot?: unknown }).snapshot;
+    const engagementId = resolveEngagementIdForTab(sender.tab?.id, true);
+    if (engagementId != null && snapshot && typeof snapshot === "object") {
+      const snap = snapshot as {
+        logs?: EngagementConsoleLog[];
+        exceptions?: EngagementException[];
+        requests?: EngagementNetwork[];
+        actions?: EngagementAction[];
+      };
+      if (surface === "console") {
+        mergeFlushIntoEngagement(engagementId, { logs: snap.logs, exceptions: snap.exceptions });
+      } else if (surface === "network") {
+        mergeFlushIntoEngagement(engagementId, { requests: snap.requests });
+      } else if (surface === "actions") {
+        mergeFlushIntoEngagement(engagementId, { actions: snap.actions });
+      }
+    }
+    sendResponse({ ok: true });
+    return false;
   }
 
   if (request.type === "ECHLY_EXTENSION_TOKEN") {
@@ -1457,6 +2141,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       trayOpen = false;
       globalUIState.visible = false;
       cachedEchlyActive = false;
+
+      /* Stage 2 — TRAY-CLOSE stop-signal (close-button / ECHLY_CLOSE_WIDGET path).
+         Same as the icon-toggle-off path: the user is no longer engaged, so stop
+         capture and purge the engagement buffer. The session (if any) is left
+         orphaned per the locked design — we do not auto-end it here. */
+      stopAndPurgeCapture();
 
       await chrome.storage.local.set({
         echlyActive: false,
@@ -1708,6 +2398,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     broadcastUIState(true);
     resetSessionIdleTimer();
     chrome.alarms.create("echly-keepalive", { periodInMinutes: 0.4 });
+    /* Stage 4 — CLAIM. Session-start is the privacy claim point: the user has
+       committed to a session, so the engagement buffer is now allowed to persist to
+       chrome.storage.local (pre-session activity stayed memory-only). Flushes its
+       current memory state to disk and marks subsequent merges persistable.
+       Stage 1 — the capture inject below is left in place: redundant (capture was
+       already armed at tray-open) but safe (idempotent via captureInjectedTabs). We
+       bind the session-start tab to the current engagement first so its flushes land
+       in the right buffer even if it became active without a prior activation event. */
+    const sessionStartTabId = sender.tab?.id;
+    if (typeof sessionStartTabId === "number") {
+      bindTabToCurrentEngagement(sessionStartTabId);
+    }
+    claimCurrentEngagement();
+    if (typeof sessionStartTabId === "number") {
+      void ensureCaptureInjected(sessionStartTabId);
+    }
     sendResponse({ ok: true });
     return false;
   }
@@ -1759,6 +2465,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     echlyLog("BACKGROUND", "session end broadcast");
     clearSessionIdleTimer();
     chrome.alarms.clear("echly-keepalive");
+    /* Stage 2 — SESSION-END stop-signal (HARD end; the tray auto-closes below).
+       Stop capture and purge the engagement buffer (memory + storage). The Phase-M3
+       lingering-wrappers limitation still applies: the MAIN-world wrappers already
+       installed on open pages can't be cleanly uninstalled from the isolated world —
+       they live in the page realm and die on navigation. They keep running until the
+       page navigates but are harmless: no engagement buffer is reading their pushes. */
+    stopAndPurgeCapture();
     activeSessionId = null;
     globalUIState.sessionId = null;
     globalUIState.sessionTitle = null;
@@ -1802,6 +2515,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     echlyLog("BACKGROUND", "session soft-end broadcast");
     clearSessionIdleTimer();
     chrome.alarms.clear("echly-keepalive");
+    /* Stage 2 — SESSION-END stop-signal (SOFT end; the tray STAYS open). This is the
+       one divergent case: the ended session's engagement buffer is now stale, so we
+       stop + purge it — but because the user is still engaged and may file again, we
+       immediately RE-ARM a fresh engagement (new clean buffer + re-inject capture into
+       the active tab) below. See ECHLY_SESSION_MODE_END for the lingering-wrappers limit. */
+    stopAndPurgeCapture();
     activeSessionId = null;
     globalUIState.sessionId = null;
     globalUIState.sessionTitle = null;
@@ -1824,6 +2543,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sessionPaused: false,
       echlyActive: true,
     });
+    /* Stage 2 — SOFT-END RE-ARM. The tray stays open, so the user is still engaged.
+       stopAndPurgeCapture() above already cleared the old buffer and nulled
+       currentEngagementId. Mint the fresh engagement SYNCHRONOUSLY and unconditionally
+       FIRST — if it were minted only inside the async tab query and that query rejected,
+       currentEngagementId would stay null while cachedEchlyActive=true, and every later
+       flush would be silently dropped (capture armed but contributing nothing). Then bind
+       + re-inject the active tab once the query resolves. */
+    beginEngagement();
+    void (async () => {
+      try {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        const tabId = tabs[0]?.id;
+        if (typeof tabId === "number") {
+          bindTabToCurrentEngagement(tabId);
+          void ensureCaptureInjected(tabId);
+        }
+      } catch (e) {
+        if (ECHLY_DEBUG) console.debug("[ECHLY] soft-end re-arm failed", e);
+      }
+    })();
     broadcastUIState(true);
     setTimeout(() => {
       chrome.tabs.query({}, (tabs) => {
@@ -2092,6 +2831,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           networkRequests?: unknown[];
           networkRequestCount?: number;
           networkErrorCount?: number;
+          // Phase A4: user-actions capture fields. Forwarded as-is to the API.
+          userActions?: unknown[];
+          userActionCount?: number;
         };
         screenshotId?: string;
       };
@@ -2146,10 +2888,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
 
         await getOrRefreshToken();
+        /* Stage 3 — FILE-TIME MERGE. Union the cross-navigation engagement buffer
+           (all pages visited this engagement) with the live snapshot content.tsx
+           already attached to the ticket, deduped by UUID/synthetic key and ordered
+           by timestamp, so the ticket carries the full multi-page timeline rather than
+           just the page the user clicked file on. Resolved from the sender tab's
+           engagement; falls through to the live-only ticket if no engagement is bound. */
+        const mergedTicket = mergeEngagementIntoTicket(
+          resolveEngagementIdForTab(senderTabId),
+          ticket as unknown as Record<string, unknown>
+        );
         const feedbackRes = await createFeedbackInternal({
           sessionId,
           feedbackId,
-          ticket,
+          ticket: mergedTicket as typeof ticket,
           screenshotId,
         });
 

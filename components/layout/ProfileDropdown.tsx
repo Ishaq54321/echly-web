@@ -36,6 +36,7 @@ export function ProfileDropdown() {
           })}
           colorSeed={user?.uid}
           className="h-9 w-9 cursor-pointer"
+          eager
         />
       </button>
       <ProfileCommandPanel

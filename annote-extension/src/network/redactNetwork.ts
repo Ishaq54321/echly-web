@@ -11,6 +11,29 @@
  * values are masked for any sensitive name. Remaining header values are
  * still passed through `redact()` so an inline JWT or email in a custom
  * header still gets caught.
+ *
+ * ─── DOM-attribute privacy does NOT apply to the network surface (Phase R2) ──
+ * The user-actions and console surfaces honor the customer's DOM privacy
+ * markers (`[data-private]` / `.fs-block` / `.fs-mask` / …) because each
+ * captured datum is attributable to a specific DOM Element: an action targets
+ * an element, and a logged value can BE an element. A network request has no
+ * such association. By the time a `fetch()` / `XHR.send()` runs inside our
+ * wrapper there is no reliable element to attribute it to:
+ *   - The call site is JS, not DOM. `document.activeElement` at request time is
+ *     whatever happens to be focused — frequently `<body>`, often unrelated to
+ *     the request (background polling, prefetch, analytics beacons), and
+ *     trivially wrong for any request not triggered by direct user input.
+ *   - Request/response BODIES are opaque strings, not DOM subtrees, so a
+ *     marked element cannot gate body content either.
+ *   - An Error stack pointing at a marked element is not available here.
+ * We therefore deliberately DO NOT implement element-level network gating —
+ * a gate keyed on `document.activeElement` would be a false guarantee that
+ * silently fails for most requests, which is worse than no gate. The HONEST,
+ * real privacy mechanism for network bodies and headers is the capture-time
+ * PII/secret regex redaction in this module (JWTs, emails, cards, phones, API
+ * keys, Authorization/Cookie/Set-Cookie headers, sensitive query params).
+ * That is what protects network data; DOM-attribute privacy is out of scope
+ * for this surface by nature, not by omission.
  */
 
 import { redact } from "../console/redact";
@@ -63,5 +86,12 @@ export function redactBody(body: string | null, _contentType: string | null): st
   // Plain regex scan via the existing pipeline — faster and safer than trying
   // to JSON.parse arbitrary payloads for field-aware redaction. The 5ms
   // per-call performance guard inside redact() applies.
+  //
+  // NOTE (Phase R2): this regex scan IS the privacy mechanism for bodies.
+  // There is intentionally no `getPrivacyTreatment`-style DOM gate here — a
+  // body is an opaque string with no DOM-element association, so a customer's
+  // [data-private]/.fs-mask markers cannot be consulted for it. See the module
+  // header for the full rationale; do not add a fake element gate that would
+  // give a false sense of security.
   return redact(body);
 }

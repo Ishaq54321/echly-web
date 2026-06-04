@@ -20,6 +20,7 @@ import { getSessionsCached, invalidateSessionsCache } from "./cachedSessions";
 import { uploadScreenshot, generateFeedbackId } from "./contentScreenshot";
 import { requestSnapshot as requestConsoleSnapshot } from "./console/bridge";
 import { requestNetworkSnapshot } from "./network/bridge";
+import { requestActionsSnapshot } from "./actions/bridge";
 import CaptureWidget from "@/lib/capture-engine/core/CaptureWidget";
 import type { StructuredFeedback, CaptureContext, FeedbackJob } from "@/lib/capture-engine/core/types";
 import { ExtensionCaptureEnvironment } from "@/lib/capture-engine/ExtensionCaptureEnvironment";
@@ -705,10 +706,12 @@ function ContentApp({ widgetRoot }: ContentAppProps) {
       // AI must NEVER see logs (per spec: pure metadata, not AI input).
       const consoleSnapshot = (context as CaptureContext | null)?.consoleSnapshot ?? null;
       const networkSnapshot = (context as CaptureContext | null)?.networkSnapshot ?? null;
+      const actionsSnapshot = (context as CaptureContext | null)?.actionsSnapshot ?? null;
       const {
         ocrImageDataUrl: _ocrImg,
         consoleSnapshot: _consoleSnap,
         networkSnapshot: _networkSnap,
+        actionsSnapshot: _actionsSnap,
         ...contextForApi
       } = (context ?? {}) as Record<string, unknown>;
       const enrichedContext: CaptureContext = {
@@ -718,6 +721,7 @@ function ContentApp({ widgetRoot }: ContentAppProps) {
       delete (enrichedContext as Record<string, unknown>).ocrImageDataUrl;
       delete (enrichedContext as Record<string, unknown>).consoleSnapshot;
       delete (enrichedContext as Record<string, unknown>).networkSnapshot;
+      delete (enrichedContext as Record<string, unknown>).actionsSnapshot;
 
       type StructureTicket = {
         title?: string;
@@ -864,6 +868,7 @@ function ContentApp({ widgetRoot }: ContentAppProps) {
                           ).length,
                         }
                       : {}),
+                    ...(actionsSnapshot ? { userActions: actionsSnapshot.actions } : {}),
                   },
                   screenshotId: finalScreenshotId,
                 },
@@ -1486,6 +1491,7 @@ function ContentApp({ widgetRoot }: ContentAppProps) {
           captureMode={uiGlobal.captureMode}
           requestConsoleSnapshot={() => requestConsoleSnapshot(500)}
           requestNetworkSnapshot={() => requestNetworkSnapshot(500)}
+          requestActionsSnapshot={() => requestActionsSnapshot(500)}
           onComplete={handleComplete}
           onDelete={handleDelete}
           onUpdate={handleUpdate}

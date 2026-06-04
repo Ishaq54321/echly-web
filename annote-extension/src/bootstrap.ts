@@ -10,6 +10,8 @@
 
 import "./sessionRelay";
 import { installBridgeListener } from "./console/bridge";
+import { installNetworkBridgeListener } from "./network/bridge";
+import { installActionsBridgeListener } from "./actions/bridge";
 
 declare global {
   interface Window {
@@ -68,6 +70,17 @@ if (window.__ECHLY_BOOTSTRAP_LOADED__) {
   // the MAIN script before the next requestSnapshot fires. Must be
   // installed before any widget code runs.
   installBridgeListener();
+  // Sibling listener for the network capture stream. Same contract — cache
+  // the most recent NETWORK_FLUSH_PUSH so a click-time snapshot request after
+  // a hard navigation has a fallback. Phase R8: previously dead code (defined
+  // in network/bridge.ts but never called), so a navigation between capture
+  // and ticket LOST network data with no fallback. Now wired for parity with
+  // console + actions.
+  installNetworkBridgeListener();
+  // Sibling listener for the user-actions capture stream. Same
+  // contract — cache the most recent ACTIONS_FLUSH_PUSH so a click-time
+  // snapshot request after a hard navigation has a fallback.
+  installActionsBridgeListener();
 
   let widgetLoaded = false;
   let widgetLoading: Promise<void> | null = null;

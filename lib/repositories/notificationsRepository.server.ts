@@ -50,6 +50,11 @@ function buildPayload(data: CreateNotificationData): Record<string, unknown> {
     title: data.title,
     read: false,
     createdAt: FieldValue.serverTimestamp(),
+    // Explicit null (not absent) so the activity-digest query
+    // `where("digestedAt", "==", null)` matches this doc — Firestore's `== null`
+    // does NOT match documents where the field is missing. Stamped to a real
+    // timestamp transactionally when the doc is included in a sent digest.
+    digestedAt: null,
   };
   if (data.sessionTitle) payload.sessionTitle = data.sessionTitle;
   if (data.feedbackId) payload.feedbackId = data.feedbackId;
@@ -121,6 +126,7 @@ function rowFromDoc(doc: FirebaseFirestore.QueryDocumentSnapshot): NotificationR
     read: d.read === true,
     readAt: d.readAt?.toMillis?.() ?? null,
     createdAt: d.createdAt?.toMillis?.() ?? null,
+    digestedAt: d.digestedAt?.toMillis?.() ?? null,
     accessRequestId: typeof d.accessRequestId === "string" ? d.accessRequestId : null,
     requestedAccess:
       d.requestedAccess === "view" || d.requestedAccess === "resolve"
@@ -325,6 +331,11 @@ export async function dispatchResolveWithCollapse(args: {
       read: false,
       readAt: null,
       createdAt: FieldValue.serverTimestamp(),
+      // Re-bumping createdAt resurfaces this collapsed notification, so reset
+      // the digest marker too: if it was already included in a prior digest,
+      // the new (higher) count is a fresh update that should appear in the
+      // next digest rather than being silently skipped as already-digested.
+      digestedAt: null,
     });
     for (let i = 1; i < docs.length; i++) {
       batch.delete(docs[i].ref);

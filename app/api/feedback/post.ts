@@ -10,6 +10,11 @@ import type {
   ExceptionEntry,
   Feedback,
   NetworkRequestEntry,
+  UserAction,
+  ElementDescriptor,
+  ActionType,
+  NavigationMethod,
+  ActionVisibilityState,
 } from "@/lib/domain/feedback";
 import {
   getScreenshotByIdRepo,
@@ -74,6 +79,9 @@ export async function POST(req: NextRequest) {
     networkRequests?: unknown;
     networkRequestCount?: unknown;
     networkErrorCount?: unknown;
+    // Phase A4: user-actions capture from the extension's MAIN-world wrapper.
+    userActions?: unknown;
+    userActionCount?: unknown;
   } = {};
 
   try {
@@ -538,6 +546,117 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ─── Phase A4: user-actions capture validation ─────────────────────
+  // Same defense-in-depth pattern as console/network. Element fields are
+  // already redacted at capture time (text post-redaction; masked: true
+  // when withheld). Per-entry shape validation drops malformed entries
+  // individually; combined byte cap drops the whole field rather than
+  // truncating. No PII regex sweep — actions don't carry free-form bodies.
+  const MAX_USER_ACTIONS = 200;
+  const MAX_USER_ACTIONS_TOTAL_BYTES = 100 * 1024;
+  const ALLOWED_ACTION_TYPES = new Set<ActionType>([
+    "click",
+    "navigation",
+    "visibility",
+    "submit",
+    "input",
+    "focus",
+    "blur",
+    "resize",
+  ]);
+  const ALLOWED_NAVIGATION_METHODS = new Set<NavigationMethod>([
+    "pushState",
+    "replaceState",
+    "popstate",
+    "load",
+    "hashchange",
+  ]);
+  const ALLOWED_VISIBILITY_STATES = new Set<ActionVisibilityState>([
+    "visible",
+    "hidden",
+  ]);
+
+  function validateElementDescriptor(value: unknown): ElementDescriptor | null {
+    if (!isPlainObject(value)) return null;
+    if (typeof value.tag !== "string" || value.tag.length === 0) return null;
+    const out: ElementDescriptor = { tag: value.tag };
+    if (typeof value.id === "string") out.id = value.id;
+    if (Array.isArray(value.classes)) {
+      const classes = value.classes.filter((c): c is string => typeof c === "string");
+      if (classes.length > 0) out.classes = classes;
+    }
+    if (isStringRecord(value.attributes)) out.attributes = value.attributes;
+    if (typeof value.text === "string") out.text = value.text;
+    if (value.masked === true) out.masked = true;
+    return out;
+  }
+
+  function validateUserAction(entry: unknown): UserAction | null {
+    if (!isPlainObject(entry)) return null;
+    if (typeof entry.id !== "string" || entry.id.length === 0) return null;
+    if (typeof entry.timestamp !== "number") return null;
+    if (typeof entry.type !== "string" || !ALLOWED_ACTION_TYPES.has(entry.type as ActionType)) {
+      return null;
+    }
+    const out: UserAction = {
+      id: entry.id,
+      type: entry.type as ActionType,
+      timestamp: entry.timestamp,
+    };
+    if (entry.element !== undefined) {
+      const el = validateElementDescriptor(entry.element);
+      if (el) out.element = el;
+    }
+    if (typeof entry.url === "string") out.url = entry.url;
+    if (typeof entry.fromUrl === "string") out.fromUrl = entry.fromUrl;
+    if (
+      typeof entry.navigationMethod === "string" &&
+      ALLOWED_NAVIGATION_METHODS.has(entry.navigationMethod as NavigationMethod)
+    ) {
+      out.navigationMethod = entry.navigationMethod as NavigationMethod;
+    }
+    if (
+      typeof entry.visibilityState === "string" &&
+      ALLOWED_VISIBILITY_STATES.has(entry.visibilityState as ActionVisibilityState)
+    ) {
+      out.visibilityState = entry.visibilityState as ActionVisibilityState;
+    }
+    if (
+      isPlainObject(entry.viewport) &&
+      typeof entry.viewport.width === "number" &&
+      typeof entry.viewport.height === "number"
+    ) {
+      out.viewport = { width: entry.viewport.width, height: entry.viewport.height };
+    }
+    if (typeof entry.fieldLabel === "string") out.fieldLabel = entry.fieldLabel;
+    return out;
+  }
+
+  function validateUserActionArray(raw: unknown): UserAction[] | undefined {
+    if (raw === undefined || raw === null) return undefined;
+    if (!Array.isArray(raw)) {
+      console.warn("[feedback] dropped userActions: not an array");
+      return undefined;
+    }
+    const capped = raw.slice(0, MAX_USER_ACTIONS);
+    const validated: UserAction[] = [];
+    for (const entry of capped) {
+      const v = validateUserAction(entry);
+      if (v !== null) validated.push(v);
+    }
+    if (validated.length === 0) return undefined;
+    const sizeProbe = JSON.stringify(validated);
+    if (sizeProbe.length > MAX_USER_ACTIONS_TOTAL_BYTES) {
+      console.warn(
+        `[feedback] dropped userActions: combined size ${sizeProbe.length} bytes exceeds ${MAX_USER_ACTIONS_TOTAL_BYTES} cap`,
+      );
+      return undefined;
+    }
+    return validated;
+  }
+
+  const validatedUserActions = validateUserActionArray(body.userActions);
+
   // Counters: accept only non-negative integers. Drop the offending field on
   // failure (per spec).
   function validateCount(field: string, raw: unknown): number | undefined {
@@ -554,6 +673,7 @@ export async function POST(req: NextRequest) {
   const validatedWarningCount = validateCount("warningCount", body.warningCount);
   const validatedNetworkRequestCount = validateCount("networkRequestCount", body.networkRequestCount);
   const validatedNetworkErrorCount = validateCount("networkErrorCount", body.networkErrorCount);
+  const validatedUserActionCount = validateCount("userActionCount", body.userActionCount);
 
   let resolvedCreatorName: string | null = null;
   let resolvedCreatorAvatarUrl: string | null = null;
@@ -603,6 +723,10 @@ export async function POST(req: NextRequest) {
     networkRequests: validatedNetworkRequests,
     networkRequestCount: validatedNetworkRequestCount,
     networkErrorCount: validatedNetworkErrorCount,
+    // Phase A4: user-actions capture (post-validation). Same undefined-skip
+    // contract as console/network — quiet pages produce clean docs.
+    userActions: validatedUserActions,
+    userActionCount: validatedUserActionCount,
   };
 
   try {

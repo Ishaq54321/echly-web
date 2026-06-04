@@ -168,6 +168,41 @@ function clearBundleCache(): void {
   bundleResponseCache.clear();
 }
 
+/** Sidebar / Dev Tools layout constants (desktop ≥1024px only). */
+const RAIL_COLLAPSED_WIDTH = 64;
+const SIDEBAR_FULL_WIDTH = 346;
+const DEVTOOLS_DEFAULT_WIDTH = 520;
+const DEVTOOLS_MIN = 360;
+const DEVTOOLS_MAX = 720;
+const CENTER_MIN = 480;
+const DEVTOOLS_WIDTH_STORAGE_KEY = "echly-devtools-width";
+
+function clampDevToolsWidth(value: number): number {
+  if (!Number.isFinite(value)) return DEVTOOLS_DEFAULT_WIDTH;
+  return Math.min(DEVTOOLS_MAX, Math.max(DEVTOOLS_MIN, Math.round(value)));
+}
+
+/** Read persisted Dev Tools width from localStorage; SSR-safe + try/catch. */
+function readPersistedDevToolsWidth(): number {
+  if (typeof window === "undefined") return DEVTOOLS_DEFAULT_WIDTH;
+  try {
+    const raw = window.localStorage.getItem(DEVTOOLS_WIDTH_STORAGE_KEY);
+    if (!raw) return DEVTOOLS_DEFAULT_WIDTH;
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isFinite(parsed)) return DEVTOOLS_DEFAULT_WIDTH;
+    return clampDevToolsWidth(parsed);
+  } catch {
+    return DEVTOOLS_DEFAULT_WIDTH;
+  }
+}
+
+function writePersistedDevToolsWidth(width: number): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(DEVTOOLS_WIDTH_STORAGE_KEY, String(width));
+  } catch {}
+}
+
 /** Broadcast ticket update to extension tray so tray stays in sync. */
 function broadcastTicketUpdated(ticket: { id: string; title: string; description?: string | null; type?: string }) {
   if (typeof window === "undefined" || !("chrome" in window)) return;
@@ -328,6 +363,11 @@ function bundleFeedbackRowToFeedback(
       typeof row.networkRequestCount === "number" ? row.networkRequestCount : undefined,
     networkErrorCount:
       typeof row.networkErrorCount === "number" ? row.networkErrorCount : undefined,
+    userActions: Array.isArray(row.userActions)
+      ? (row.userActions as Feedback["userActions"])
+      : undefined,
+    userActionCount:
+      typeof row.userActionCount === "number" ? row.userActionCount : undefined,
   };
 }
 
@@ -1517,11 +1557,20 @@ export default function SessionPageClient({
   // the rail.
   const [isActivityPanelOpen, setIsActivityPanelOpen] = useState(false);
   // Phase 5: Dev Tools side panel. Sibling of Activity. Mutually exclusive —
-  // opening one closes the other so the right column stays single-purpose
-  // (the layout grid only reserves a single 360px slot).
+  // opening one closes the other so the right column stays single-purpose.
   const [isDevToolsPanelOpen, setIsDevToolsPanelOpen] = useState(false);
+  // Auto-collapses left rail to a 64px icon strip while Dev Tools is open.
+  const [sidebarRailCollapsed, setSidebarRailCollapsed] = useState(false);
+  // Set true when the user manually re-expands the rail while Dev Tools is open;
+  // resets on next Dev Tools open/close cycle.
+  const [userExpandedRailOverride, setUserExpandedRailOverride] = useState(false);
+  const [devToolsWidth, setDevToolsWidth] = useState<number>(() =>
+    readPersistedDevToolsWidth()
+  );
+  const [isDraggingDevTools, setIsDraggingDevTools] = useState(false);
+  const layoutGridRef = useRef<HTMLDivElement | null>(null);
   const [devToolsInitialTab, setDevToolsInitialTab] =
-    useState<DevToolsTabId>("console");
+    useState<DevToolsTabId>("actions");
   const [devToolsInitialFilter, setDevToolsInitialFilter] =
     useState<DevToolsConsoleFilter | undefined>(undefined);
   // Phase N5D: Errors-only on the Network tab when set.
@@ -1546,6 +1595,8 @@ export default function SessionPageClient({
         setIsCommentMode(false);
         setIsActivityPanelOpen(false);
         setIsDevToolsPanelOpen(false);
+        setSidebarRailCollapsed(false);
+        setUserExpandedRailOverride(false);
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -2612,45 +2663,194 @@ export default function SessionPageClient({
       if (next) {
         setIsActivityPanelOpen(false);
         setActiveThreadId(null);
-        // Default entry: Console tab, no preset filter.
-        setDevToolsInitialTab("console");
+        // Default entry: Actions tab (the user-story narrative is the entry
+        // point for Phase A5), no preset filter.
+        setDevToolsInitialTab("actions");
         setDevToolsInitialFilter(undefined);
         setDevToolsInitialNetworkFilter(undefined);
+        setSidebarRailCollapsed(true);
+        setUserExpandedRailOverride(false);
+      } else {
+        setSidebarRailCollapsed(false);
+        setUserExpandedRailOverride(false);
       }
       return next;
     });
   }, []);
 
-  // Phase 5E: header badge jump targets. Each opens Dev Tools (closing
-  // Activity), forces the right tab + filter, and re-keys the panel so a
-  // click while it's already open remounts with the new defaults.
-  const handleJumpToExceptions = useCallback(() => {
-    setIsActivityPanelOpen(false);
-    setActiveThreadId(null);
-    setDevToolsInitialTab("console");
-    setDevToolsInitialFilter(undefined);
-    setDevToolsInitialNetworkFilter(undefined);
-    setDevToolsScrollExceptionsKey((k) => k + 1);
-    setIsDevToolsPanelOpen(true);
+  // The effective collapse state used in rendering. The user can manually
+  // re-expand the rail while Dev Tools stays open via `onExpandRail`.
+  const railIsCollapsed =
+    sidebarRailCollapsed && !userExpandedRailOverride && isDesktopWide;
+
+  const handleExpandRail = useCallback(() => {
+    setUserExpandedRailOverride(true);
   }, []);
 
-  const handleJumpToErrors = useCallback(() => {
-    setIsActivityPanelOpen(false);
-    setActiveThreadId(null);
-    setDevToolsInitialTab("console");
-    setDevToolsInitialFilter("errors");
-    setDevToolsInitialNetworkFilter(undefined);
-    setIsDevToolsPanelOpen(true);
-  }, []);
+  // Width the Dev Tools track gets in the grid. Activity panel always
+  // renders at 360px so existing visuals are preserved; only the Dev Tools
+  // panel uses the dynamic, draggable width.
+  const rightTrackWidth = isDevToolsPanelOpen
+    ? `${devToolsWidth}px`
+    : "360px";
 
-  const handleJumpToNetworkErrors = useCallback(() => {
-    setIsActivityPanelOpen(false);
-    setActiveThreadId(null);
-    setDevToolsInitialTab("network");
-    setDevToolsInitialFilter(undefined);
-    setDevToolsInitialNetworkFilter("errors");
-    setIsDevToolsPanelOpen(true);
-  }, []);
+  // Clamp width so the center column never goes below CENTER_MIN, based on
+  // the current container width. Returns a width safe for the current grid.
+  const clampWidthForContainer = useCallback(
+    (desired: number): number => {
+      const baseClamped = clampDevToolsWidth(desired);
+      const container = layoutGridRef.current;
+      if (!container) return baseClamped;
+      const containerWidth = container.clientWidth;
+      if (!Number.isFinite(containerWidth) || containerWidth <= 0) {
+        return baseClamped;
+      }
+      // Two 14px gaps between three tracks on desktop.
+      const railWidth = railIsCollapsed
+        ? RAIL_COLLAPSED_WIDTH
+        : SIDEBAR_FULL_WIDTH;
+      const gapWidth = 14 * 2;
+      const maxByCenter =
+        containerWidth - railWidth - gapWidth - CENTER_MIN;
+      if (!Number.isFinite(maxByCenter)) return baseClamped;
+      return Math.max(
+        DEVTOOLS_MIN,
+        Math.min(baseClamped, Math.max(DEVTOOLS_MIN, Math.floor(maxByCenter)))
+      );
+    },
+    [railIsCollapsed]
+  );
+
+  // Re-clamp persisted width to current container on resize so a small
+  // window doesn't crush the center column.
+  useEffect(() => {
+    if (!isDesktopWide) return;
+    const handleResize = () => {
+      setDevToolsWidth((prev) => clampWidthForContainer(prev));
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [isDesktopWide, clampWidthForContainer]);
+
+  // Pointer-drag handler for the Dev Tools left-edge resize handle. Uses
+  // requestAnimationFrame to keep width updates smooth; disables the grid
+  // transition + text selection while dragging.
+  const dragStateRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startWidth: number;
+    rafId: number | null;
+    nextWidth: number | null;
+  } | null>(null);
+
+  const handleDragPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!isDesktopWide) return;
+      e.preventDefault();
+      const target = e.currentTarget;
+      try {
+        target.setPointerCapture(e.pointerId);
+      } catch {}
+      dragStateRef.current = {
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startWidth: devToolsWidth,
+        rafId: null,
+        nextWidth: null,
+      };
+      setIsDraggingDevTools(true);
+      if (typeof document !== "undefined") {
+        document.body.style.userSelect = "none";
+      }
+    },
+    [isDesktopWide, devToolsWidth]
+  );
+
+  const handleDragPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const state = dragStateRef.current;
+      if (!state || state.pointerId !== e.pointerId) return;
+      // Handle is on the LEFT edge of Dev Tools: moving pointer LEFT
+      // (negative delta) should WIDEN the panel.
+      const delta = e.clientX - state.startX;
+      const desired = state.startWidth - delta;
+      state.nextWidth = desired;
+      if (state.rafId != null) return;
+      state.rafId = window.requestAnimationFrame(() => {
+        const s = dragStateRef.current;
+        if (!s) return;
+        s.rafId = null;
+        if (s.nextWidth == null) return;
+        const clamped = clampWidthForContainer(s.nextWidth);
+        setDevToolsWidth(clamped);
+      });
+    },
+    [clampWidthForContainer]
+  );
+
+  const endDrag = useCallback(
+    (target: HTMLElement | null, pointerId: number) => {
+      const state = dragStateRef.current;
+      if (!state || state.pointerId !== pointerId) return;
+      if (state.rafId != null) {
+        window.cancelAnimationFrame(state.rafId);
+      }
+      dragStateRef.current = null;
+      setIsDraggingDevTools(false);
+      if (typeof document !== "undefined") {
+        document.body.style.userSelect = "";
+      }
+      if (target) {
+        try {
+          target.releasePointerCapture(pointerId);
+        } catch {}
+      }
+      // Persist the final width using the latest state value.
+      setDevToolsWidth((prev) => {
+        const next = clampWidthForContainer(prev);
+        writePersistedDevToolsWidth(next);
+        return next;
+      });
+    },
+    [clampWidthForContainer]
+  );
+
+  const handleDragPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      endDrag(e.currentTarget, e.pointerId);
+    },
+    [endDrag]
+  );
+
+  const handleDragPointerCancel = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      endDrag(e.currentTarget, e.pointerId);
+    },
+    [endDrag]
+  );
+
+  const handleDragKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (!isDesktopWide) return;
+      const STEP = 16;
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setDevToolsWidth((prev) => {
+          const next = clampWidthForContainer(prev + STEP);
+          writePersistedDevToolsWidth(next);
+          return next;
+        });
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        setDevToolsWidth((prev) => {
+          const next = clampWidthForContainer(prev - STEP);
+          writePersistedDevToolsWidth(next);
+          return next;
+        });
+      }
+    },
+    [isDesktopWide, clampWidthForContainer]
+  );
 
   // Phase 26.7: the MapPin screenshot action toggles click-to-place
   // pin mode. Purely about pin mode — it does NOT open the activity
@@ -3931,15 +4131,6 @@ export default function SessionPageClient({
           sessionAccess?.canResolve ? handleToggleDevTools : undefined
         }
         isDevToolsPanelOpen={isDevToolsPanelOpen}
-        onJumpToExceptions={
-          sessionAccess?.canResolve ? handleJumpToExceptions : undefined
-        }
-        onJumpToErrors={
-          sessionAccess?.canResolve ? handleJumpToErrors : undefined
-        }
-        onJumpToNetworkErrors={
-          sessionAccess?.canResolve ? handleJumpToNetworkErrors : undefined
-        }
         highlightedCommentId={highlightedCommentId}
         comments={comments}
         loadingComments={loadingComments}
@@ -4049,16 +4240,21 @@ export default function SessionPageClient({
           />
         )}
         <div
+          ref={layoutGridRef}
           className="flex-1 min-h-0 overflow-hidden bg-[var(--surface-page)] flex flex-col md:grid"
           style={isMobile ? {
             padding: '0px 0px calc(56px + env(safe-area-inset-bottom))',
           } : {
             gridTemplateColumns: isDesktopWide
-              ? ((isActivityPanelOpen || activeThreadId != null || isDevToolsPanelOpen) ? '346px 1fr 360px' : '346px 1fr')
+              ? ((isActivityPanelOpen || activeThreadId != null || isDevToolsPanelOpen)
+                  ? `${railIsCollapsed ? RAIL_COLLAPSED_WIDTH : SIDEBAR_FULL_WIDTH}px 1fr ${rightTrackWidth}`
+                  : `${railIsCollapsed ? RAIL_COLLAPSED_WIDTH : SIDEBAR_FULL_WIDTH}px 1fr`)
               : ((isActivityPanelOpen || activeThreadId != null || isDevToolsPanelOpen) ? '1fr 360px' : '1fr'),
             gap: '14px',
             padding: '0px 14px 14px',
-            transition: 'grid-template-columns 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+            transition: isDraggingDevTools
+              ? 'none'
+              : 'grid-template-columns 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
           {/* Left card: Ticket list (desktop side panel; mobile shows via mobileTab="captures") */}
@@ -4116,6 +4312,8 @@ export default function SessionPageClient({
             canRenameTitle={isWorkspaceMember}
             onRenameTitle={handleSidebarRenameTitle}
             isWorkspaceMember={isWorkspaceMember}
+            collapsed={railIsCollapsed}
+            onExpandRail={handleExpandRail}
           />
           </aside>
 
@@ -4172,9 +4370,54 @@ export default function SessionPageClient({
                 style={{ animationTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)' }}
               >
                 <div
-                  className="flex flex-col flex-1 min-h-0 bg-[var(--surface)] md:rounded-[14px] overflow-hidden"
+                  className="relative flex flex-col flex-1 min-h-0 bg-[var(--surface)] md:rounded-[14px] overflow-hidden"
                   style={isMobile ? undefined : { boxShadow: 'var(--shadow-panel)' }}
                 >
+                  {isDevToolsPanelOpen && isDesktopWide && (
+                    <div
+                      role="separator"
+                      aria-orientation="vertical"
+                      aria-label="Resize Dev Tools panel"
+                      aria-valuemin={DEVTOOLS_MIN}
+                      aria-valuemax={DEVTOOLS_MAX}
+                      aria-valuenow={devToolsWidth}
+                      tabIndex={0}
+                      onPointerDown={handleDragPointerDown}
+                      onPointerMove={handleDragPointerMove}
+                      onPointerUp={handleDragPointerUp}
+                      onPointerCancel={handleDragPointerCancel}
+                      onKeyDown={handleDragKeyDown}
+                      className="echly-devtools-drag-handle"
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        bottom: 0,
+                        left: 0,
+                        width: 6,
+                        cursor: 'col-resize',
+                        zIndex: 5,
+                        touchAction: 'none',
+                      }}
+                    >
+                      <span
+                        aria-hidden
+                        className="echly-devtools-drag-line"
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          bottom: 0,
+                          left: 2,
+                          width: 2,
+                          background: isDraggingDevTools
+                            ? 'var(--brand)'
+                            : 'transparent',
+                          transition: 'background-color 120ms cubic-bezier(0.4, 0, 0.2, 1)',
+                          borderRadius: 2,
+                          pointerEvents: 'none',
+                        }}
+                      />
+                    </div>
+                  )}
                   {isDevToolsPanelOpen ? (
                     <DevToolsPanel
                       // Re-key on every input that affects entry-time defaults

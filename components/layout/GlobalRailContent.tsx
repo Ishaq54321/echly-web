@@ -334,6 +334,8 @@ export default function GlobalRailContent({
                   <img
                     src={effectiveLogoUrl}
                     alt={displayName}
+                    width={32}
+                    height={32}
                     style={{ width: 32, height: 32, objectFit: "cover" }}
                     onError={() => setLogoError(true)}
                   />
@@ -496,6 +498,8 @@ export default function GlobalRailContent({
                             <img
                               src={ws.logoUrl}
                               alt={ws.name}
+                              width={22}
+                              height={22}
                               className="h-full w-full object-cover"
                             />
                           }
@@ -527,6 +531,8 @@ export default function GlobalRailContent({
                   <img
                     src={effectiveLogoUrl}
                     alt={displayName}
+                    width={32}
+                    height={32}
                     className="h-full w-full object-cover"
                     onError={() => setLogoError(true)}
                   />

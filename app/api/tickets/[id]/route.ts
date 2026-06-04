@@ -348,48 +348,12 @@ export const PATCH = withAuthorization(
         }
         console.log("[Resolve] Repo done:", Date.now() - start, "ms");
 
-        // Ticket-resolved email. Fires only on open → resolved transitions
-        // (not reopen) and only when the reporter is someone other than the
-        // resolver. Fire-and-forget; never blocks the route response.
-        const wasOpen = existingForOwnership.isResolved === false;
-        if (patchStatus === "resolved" && wasOpen) {
-          const reporterUid =
-            typeof existingForOwnership.userId === "string"
-              ? existingForOwnership.userId.trim()
-              : "";
-          if (reporterUid && reporterUid !== actorId) {
-            const ticketTitleForEmail =
-              (typeof existingForOwnership.title === "string"
-                ? existingForOwnership.title.trim()
-                : "") || "a ticket";
-            const sessionNameForEmail =
-              (typeof context.session?.title === "string"
-                ? context.session.title.trim()
-                : "") || "a session";
-            const resolutionNote =
-              typeof body.resolutionNote === "string" &&
-              body.resolutionNote.trim()
-                ? body.resolutionNote.trim()
-                : undefined;
-            const sessionId = existingForOwnership.sessionId;
-            fireAndForget("notification:ticket-resolved-email", async () => {
-              const actor = await resolveActorForActivityEvent(actorId);
-              const { sendTicketResolvedEmail } = await import(
-                "@/lib/email/notificationEmails"
-              );
-              const { ticketUrl } = await import("@/lib/email/urls");
-              await sendTicketResolvedEmail({
-                recipientUid: reporterUid,
-                actorUid: actorId,
-                ticketTitle: ticketTitleForEmail,
-                sessionName: sessionNameForEmail,
-                resolverName: actor.actorName,
-                ticketUrl: ticketUrl(sessionId, id),
-                resolutionNote,
-              });
-            });
-          }
-        }
+        // DIGEST CUTOVER: the instant ticket-resolved email was removed here.
+        // The in-app feedback.resolved notification is still written by
+        // updateFeedbackResolveAndSessionCountersRepo (via
+        // dispatchResolveWithCollapse in feedbackRepository.server.ts), so the
+        // resolve still surfaces in the bell AND flows into the daily activity
+        // digest. Only the inline email send was removed.
       } else {
         const typeIsChanging = "type" in contentUpdates;
         await updateFeedbackRepo(id, contentUpdates, { skipPreRead: !typeIsChanging });
@@ -468,45 +432,46 @@ export const PATCH = withAuthorization(
                 },
               });
 
-              // Phase 5: ticket-assigned email. Only on a real (re)assignment
-              // to someone OTHER than the actor — self-assignment and
-              // unassignment (afterAssigneeId === null) send nothing.
-              // assignmentChanged already guarantees after !== before.
+              // DIGEST CUTOVER: the instant ticket-assigned email was removed.
+              // Assignment previously had NO in-app notification record (only an
+              // activity event + the email), so disabling the email alone would
+              // drop assignments from the digest entirely. We now write a
+              // `ticket.assigned` in-app notification here so the assignee sees
+              // it in the bell AND it flows into the daily activity digest.
+              // Only on a real (re)assignment to someone OTHER than the actor —
+              // self-assignment and unassignment (afterAssigneeId === null)
+              // write nothing. assignmentChanged already guarantees after !==
+              // before.
               if (
                 typeof afterAssigneeId === "string" &&
                 afterAssigneeId.trim() &&
-                afterAssigneeId !== activityActorId
+                afterAssigneeId !== activityActorId &&
+                activityWorkspaceId &&
+                activitySessionId
               ) {
-                const ticketTitleForEmail =
+                const ticketTitleForNotif =
                   (typeof existingForOwnership.title === "string"
                     ? existingForOwnership.title.trim()
                     : "") || "a ticket";
-                const sessionNameForEmail =
-                  (typeof context.session?.title === "string"
-                    ? context.session.title.trim()
-                    : "") || "a session";
                 try {
-                  const { sendTicketAssignedEmail } = await import(
-                    "@/lib/email/notificationEmails"
-                  );
-                  // Cooldown note: ticketAssigned fires here (~line 491),
-                  // BEFORE the description-mention email (~line 568). When the
-                  // same PATCH both reassigns a ticket TO Daniel and mentions
-                  // Daniel in the new description, ticketAssigned lands first
-                  // and the cooldown layer (lib/email/cooldowns.ts) suppresses
-                  // the subsequent mention email — assignment is action-
-                  // required, mention is informational, so assignment wins.
-                  await sendTicketAssignedEmail({
-                    assigneeUid: afterAssigneeId,
-                    actorUid: activityActorId,
-                    assignerName: actor.actorName,
-                    ticketTitle: ticketTitleForEmail,
-                    sessionName: sessionNameForEmail,
+                  await dispatchNotifications({
+                    recipientIds: [afterAssigneeId],
+                    workspaceId: activityWorkspaceId,
                     sessionId: activitySessionId,
+                    sessionTitle: context.session?.title ?? null,
                     feedbackId: id,
+                    type: "ticket.assigned",
+                    actor: {
+                      id: activityActorId,
+                      name: actor.actorName,
+                      photoURL: actor.actorPhotoURL ?? null,
+                    },
+                    title: `${actor.actorName} assigned "${ticketTitleForNotif}" to you`,
+                    entityTitle: ticketTitleForNotif,
+                    body: null,
                   });
                 } catch (err) {
-                  console.error("[ticket-assigned-email] failed:", err);
+                  console.error("[notification:ticket-assigned] failed:", err);
                 }
               }
             }
@@ -557,35 +522,9 @@ export const PATCH = withAuthorization(
                 body: null,
               });
 
-              // Mirror the comment.mention email path so description mentions
-              // also send the mention email (not just an in-app notification).
-              // recipientIds already excludes the actor (self-mention guard
-              // above). The description is rich-text HTML; convert it to plain
-              // text so mention spans render as "@Name" and tags don't leak.
-              const emailSessionName = sessionTitle || "a session";
-              const { sendMentionEmail } = await import(
-                "@/lib/email/notificationEmails"
-              );
-              const { descriptionToPlainText } = await import(
-                "@/lib/email/helpers"
-              );
-              const descriptionPreview = descriptionToPlainText(
-                contentUpdates.description ?? ""
-              );
-              await Promise.allSettled(
-                recipientIds.map((uid) =>
-                  sendMentionEmail({
-                    recipientUid: uid,
-                    actorUid: actorId,
-                    mentionerName: actor.actorName,
-                    ticketTitle: feedbackTitle,
-                    sessionName: emailSessionName,
-                    message: descriptionPreview,
-                    sessionId,
-                    feedbackId: id,
-                  })
-                )
-              );
+              // DIGEST CUTOVER: the instant description-mention email was
+              // removed here. The in-app description.mention notification above
+              // is the source of truth and flows into the daily activity digest.
             });
           }
         }

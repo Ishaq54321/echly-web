@@ -326,12 +326,17 @@ export const SessionWorkspaceRow = memo(function SessionWorkspaceRow({
 
         <div className="flex min-h-[36px] items-center shrink-0 gap-3 md:gap-10 pl-[54px] md:pl-0 transition-[margin] duration-150 md:group-hover:mr-[86px]">
           {(() => {
-            const viewCount = session.viewCount ?? 0;
             const maxVisible = 4;
-            const visibleViewers = recentViewers.slice(0, maxVisible);
-            const remaining = viewCount - visibleViewers.length;
+            // Anonymous viewers (anon_* ids) are excluded ENTIRELY from the
+            // list-view stack: both the avatars and the overflow "+N" reflect
+            // only named viewers. A session viewed only anonymously renders
+            // nothing here (intended). Grid view + detail-page tooltip keep
+            // their total/anonymous counts — they are untouched.
+            const namedViewers = recentViewers.filter((v) => !v.isAnonymous);
+            const visibleViewers = namedViewers.slice(0, maxVisible);
+            const remaining = namedViewers.length - visibleViewers.length;
 
-            if (viewCount === 0 || recentViewers.length === 0) return null;
+            if (namedViewers.length === 0) return null;
 
             return (
               <div
@@ -342,15 +347,11 @@ export const SessionWorkspaceRow = memo(function SessionWorkspaceRow({
                   <UserAvatar
                     key={viewer.id}
                     // Live avatar overrides the stale recentViewers snapshot.
-                    avatarUrl={
-                      viewer.isAnonymous
-                        ? null
-                        : liveViewerAvatars.get(viewer.id) ?? null
-                    }
+                    // The stack is guaranteed non-anonymous here.
+                    avatarUrl={liveViewerAvatars.get(viewer.id) ?? null}
                     name={viewer.displayName}
                     size={28}
                     colorSeed={viewer.id}
-                    isAnonymous={viewer.isAnonymous}
                     className="ring-2 ring-white"
                     style={{ zIndex: maxVisible - i + 1 }}
                   />

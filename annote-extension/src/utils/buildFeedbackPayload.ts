@@ -60,6 +60,19 @@ export function buildFeedbackPayload({
       ? ticket.networkErrorCount
       : undefined;
 
+  // Phase A4: user-actions passthrough. Same contract as console/network —
+  // the canonical entry shape lives in annote-extension/src/actions/types.ts
+  // (mirrored on the domain side as UserAction in lib/domain/feedback.ts).
+  // Server-side validation is the source of truth for the persisted doc.
+  const userActions: unknown[] | undefined =
+    Array.isArray(ticket?.userActions) && ticket.userActions.length > 0
+      ? ticket.userActions
+      : undefined;
+  const userActionCount =
+    typeof ticket?.userActionCount === "number" && ticket.userActionCount > 0
+      ? ticket.userActionCount
+      : undefined;
+
   return {
     sessionId,
     feedbackId,
@@ -92,5 +105,7 @@ export function buildFeedbackPayload({
     networkRequests,
     networkRequestCount,
     networkErrorCount,
+    userActions,
+    userActionCount,
   };
 }

@@ -42,18 +42,64 @@ export function installBridgeListener(): void {
   listenerInstalled = true;
   window.addEventListener("message", (event) => {
     if (event.source !== window) return;
-    const data = event.data as ConsoleFlushPush | undefined;
+    if (event.origin !== "" && event.origin !== window.origin) return;
+    const data = event.data;
     if (!data || typeof data !== "object") return;
+    const typed = data as { type?: unknown };
+    if (typeof typed.type !== "string" || !typed.type.startsWith("ECHLY_")) return;
+    const msg = data as ConsoleFlushPush;
     if (
-      data.source === CONSOLE_BRIDGE_SOURCE_MAIN &&
-      data.type === CONSOLE_FLUSH_PUSH &&
-      data.snapshot &&
-      Array.isArray(data.snapshot.logs) &&
-      Array.isArray(data.snapshot.exceptions)
+      msg.source === CONSOLE_BRIDGE_SOURCE_MAIN &&
+      msg.type === CONSOLE_FLUSH_PUSH &&
+      msg.snapshot &&
+      Array.isArray(msg.snapshot.logs) &&
+      Array.isArray(msg.snapshot.exceptions)
     ) {
-      cachedFlushSnapshot = data.snapshot;
+      cachedFlushSnapshot = msg.snapshot;
+      // Stage 3: forward this page's flush to the service worker so it accumulates
+      // into the cross-navigation engagement buffer. Best-effort: the SW may be
+      // asleep or the channel closed during teardown — swallow any error (the local
+      // cache above is still the click-time fallback). One added side-effect; the
+      // existing caching behavior is unchanged.
+      try {
+        chrome.runtime
+          .sendMessage({
+            type: "ECHLY_CAPTURE_FLUSH",
+            surface: "console",
+            snapshot: msg.snapshot,
+          })
+          .catch(() => {});
+      } catch {
+        // chrome.runtime unavailable (page teardown) — ignore.
+      }
     }
   });
+
+  /* Stage 3 safety-net: a tab killed without a visibilitychange/beforeunload event
+     never fires flushPush, so the SW would miss its tail. The SW's keepalive alarm
+     periodically pokes the active engaged tab with ECHLY_REQUEST_CAPTURE_FLUSH; we
+     respond by pulling a live snapshot from the MAIN buffer and forwarding it to the
+     SW exactly like a flush-push. Best-effort and idempotent (the SW dedupes by id). */
+  try {
+    if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
+      chrome.runtime.onMessage.addListener((req) => {
+        if (req?.type === "ECHLY_REQUEST_CAPTURE_FLUSH") {
+          void requestSnapshot(400).then((snapshot) => {
+            try {
+              chrome.runtime
+                .sendMessage({ type: "ECHLY_CAPTURE_FLUSH", surface: "console", snapshot })
+                .catch(() => {});
+            } catch {
+              // ignore
+            }
+          });
+        }
+        return false;
+      });
+    }
+  } catch {
+    // chrome.runtime unavailable — ignore.
+  }
 }
 
 function genRequestId(): string {
@@ -78,23 +124,27 @@ export function requestSnapshot(timeoutMs = 1000): Promise<ConsoleSnapshot> {
     let settled = false;
     const onMessage = (event: MessageEvent) => {
       if (event.source !== window) return;
-      const data = event.data as ConsoleSnapshotResponse | undefined;
+      if (event.origin !== "" && event.origin !== window.origin) return;
+      const data = event.data;
       if (!data || typeof data !== "object") return;
+      const typed = data as { type?: unknown };
+      if (typeof typed.type !== "string" || !typed.type.startsWith("ECHLY_")) return;
+      const msg = data as ConsoleSnapshotResponse;
       if (
-        data.source === CONSOLE_BRIDGE_SOURCE_MAIN &&
-        data.type === CONSOLE_SNAPSHOT_RESPONSE &&
-        data.requestId === requestId &&
-        data.snapshot &&
-        Array.isArray(data.snapshot.logs) &&
-        Array.isArray(data.snapshot.exceptions)
+        msg.source === CONSOLE_BRIDGE_SOURCE_MAIN &&
+        msg.type === CONSOLE_SNAPSHOT_RESPONSE &&
+        msg.requestId === requestId &&
+        msg.snapshot &&
+        Array.isArray(msg.snapshot.logs) &&
+        Array.isArray(msg.snapshot.exceptions)
       ) {
         if (settled) return;
         settled = true;
         window.removeEventListener("message", onMessage);
         // Also cache as the latest known snapshot in case the next request
         // hits a navigated-away page.
-        cachedFlushSnapshot = data.snapshot;
-        resolve(data.snapshot);
+        cachedFlushSnapshot = msg.snapshot;
+        resolve(msg.snapshot);
       }
     };
     window.addEventListener("message", onMessage);

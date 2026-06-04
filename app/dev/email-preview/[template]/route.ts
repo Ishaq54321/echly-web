@@ -50,6 +50,10 @@ import {
   workspaceDeletedMemberText,
 } from "@/lib/email/templates/workspaceDeletedMember";
 import { refundIssuedEmailHtml, refundIssuedEmailText } from "@/lib/email/templates/refundIssued";
+import {
+  activityDigestEmailHtml,
+  activityDigestEmailText,
+} from "@/lib/email/templates/activityDigest";
 import { commentExcerpt } from "@/lib/email/helpers";
 
 export const dynamic = "force-dynamic";
@@ -467,6 +471,72 @@ const TEMPLATES: Record<string, () => Variant> = {
       receiptUrl: "https://pay.stripe.com/receipts/PLACEHOLDER",
     };
     return { html: refundIssuedEmailHtml(p), text: refundIssuedEmailText(p) };
+  },
+
+  // ── Digest cutover: the one notification-category email ──
+  "activity-digest": () => {
+    const p = {
+      firstName: "Sam",
+      summaryLine: "You have 18 updates across 3 sessions.",
+      dashboardUrl: "https://annote.ai/activity",
+      truncatedNote: null,
+      unsubscribeUrl: PREVIEW_UNSUBSCRIBE_URL,
+      sections: [
+        {
+          sessionTitle: "Homepage redesign feedback",
+          sessionUrl: "https://annote.ai/s/SESSION1",
+          lines: [
+            {
+              summary: "2 mentions from Jordan Lee and Sarah Chen",
+              links: [
+                {
+                  title: "CTA button is below the fold on mobile",
+                  url: "https://annote.ai/s/SESSION1#feedback-abc",
+                },
+              ],
+            },
+            {
+              summary: "12 new comments from 4 people",
+              links: [
+                {
+                  title: "Hero copy is too long",
+                  url: "https://annote.ai/s/SESSION1#feedback-def",
+                },
+                {
+                  title: "Footer links overlap on tablet",
+                  url: "https://annote.ai/s/SESSION1#feedback-ghi",
+                },
+              ],
+            },
+          ],
+        },
+        {
+          sessionTitle: "Acme onboarding flow",
+          sessionUrl: "https://annote.ai/s/SESSION2",
+          lines: [
+            {
+              summary: "1 new ticket from Maya",
+              links: [
+                {
+                  title: "Login button broken on iOS Safari",
+                  url: "https://annote.ai/s/SESSION2#feedback-jkl",
+                },
+              ],
+            },
+            { summary: "3 tickets resolved from Sarah Chen", links: [] },
+          ],
+        },
+        {
+          sessionTitle: "Mobile nav exploration",
+          sessionUrl: "https://annote.ai/s/SESSION3",
+          lines: [{ summary: "2 views", links: [] }],
+        },
+      ],
+    };
+    return {
+      html: activityDigestEmailHtml(p),
+      text: activityDigestEmailText(p),
+    };
   },
 
   "seat-added-no-proration": () => {

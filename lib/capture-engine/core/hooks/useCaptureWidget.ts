@@ -11,6 +11,7 @@ import type {
   CaptureContext,
   ConsoleSnapshot,
   NetworkSnapshot,
+  ActionsSnapshot,
   SessionFeedbackPending,
   VoiceCaptureError,
 } from "../types";
@@ -136,6 +137,7 @@ export function useCaptureWidget({
   onEditTicket,
   requestConsoleSnapshot,
   requestNetworkSnapshot,
+  requestActionsSnapshot,
 }: CaptureWidgetProps) {
   if (typeof window !== "undefined" && !(window as Window & { __ECHLY_CAPTURE_STATE__?: { pending: SessionFeedbackPending | null } }).__ECHLY_CAPTURE_STATE__) {
     (window as Window & { __ECHLY_CAPTURE_STATE__?: { pending: SessionFeedbackPending | null } }).__ECHLY_CAPTURE_STATE__ = {
@@ -1626,14 +1628,15 @@ export function useCaptureWidget({
       lastSessionClickedElementRef.current = targetElement;
       sessionFeedbackPendingRef.current = true;
 
-      // Console + network snapshots — extension only. Run in parallel so the
-      // two 500ms timeouts don't compound. Both bridges resolve (never reject)
-      // within the timeout window even when the MAIN script is unreachable;
-      // capture must not block ticket creation.
+      // Console + network + actions snapshots — extension only. Run in parallel
+      // so the three 500ms timeouts don't compound. All three bridges resolve
+      // (never reject) within the timeout window even when the MAIN script is
+      // unreachable; capture must not block ticket creation.
       let consoleSnapshot: ConsoleSnapshot | null = null;
       let networkSnapshot: NetworkSnapshot | null = null;
-      if (requestConsoleSnapshot || requestNetworkSnapshot) {
-        const [consoleResult, networkResult] = await Promise.all([
+      let actionsSnapshot: ActionsSnapshot | null = null;
+      if (requestConsoleSnapshot || requestNetworkSnapshot || requestActionsSnapshot) {
+        const [consoleResult, networkResult, actionsResult] = await Promise.all([
           requestConsoleSnapshot
             ? requestConsoleSnapshot().catch((err) => {
                 logger.warn("extension", "console_snapshot_failed", err);
@@ -1646,9 +1649,16 @@ export function useCaptureWidget({
                 return null as NetworkSnapshot | null;
               })
             : Promise.resolve(null as NetworkSnapshot | null),
+          requestActionsSnapshot
+            ? requestActionsSnapshot().catch((err) => {
+                logger.warn("extension", "actions_snapshot_failed", err);
+                return null as ActionsSnapshot | null;
+              })
+            : Promise.resolve(null as ActionsSnapshot | null),
         ]);
         consoleSnapshot = consoleResult ?? null;
         networkSnapshot = networkResult ?? null;
+        actionsSnapshot = actionsResult ?? null;
       }
       setPending({
         screenshot: screenshot || undefined,
@@ -1657,6 +1667,7 @@ export function useCaptureWidget({
         targetElement,
         consoleSnapshot,
         networkSnapshot,
+        actionsSnapshot,
       });
       onSessionActivity?.();
     },
@@ -1668,6 +1679,7 @@ export function useCaptureWidget({
       triggerUpgradeShake,
       requestConsoleSnapshot,
       requestNetworkSnapshot,
+      requestActionsSnapshot,
     ]
   );
 
@@ -1731,6 +1743,7 @@ export function useCaptureWidget({
               ...pending.context,
               consoleSnapshot: pending.consoleSnapshot ?? null,
               networkSnapshot: pending.networkSnapshot ?? null,
+              actionsSnapshot: pending.actionsSnapshot ?? null,
             }
           : undefined;
         onComplete(transcript, pending.screenshot ?? null, {
@@ -1840,6 +1853,7 @@ export function useCaptureWidget({
           ...pending.context,
           consoleSnapshot: pending.consoleSnapshot ?? null,
           networkSnapshot: pending.networkSnapshot ?? null,
+          actionsSnapshot: pending.actionsSnapshot ?? null,
         }
       : null;
     const newRecording: Recording = {

@@ -30,10 +30,6 @@ export interface ExecutionViewProps {
   onToggleDevTools?: () => void;
   /** Reflects Dev Tools panel open state so the button can show pressed. */
   isDevToolsPanelOpen?: boolean;
-  /** Phase 5E / N5D: header badge jump-to callbacks (open Dev Tools with preset tab + filter). */
-  onJumpToExceptions?: () => void;
-  onJumpToErrors?: () => void;
-  onJumpToNetworkErrors?: () => void;
   /** Pin-placement mode for the screenshot (driven by the MapPin action). */
   isCommentMode?: boolean;
   /** Toggles screenshot pin-placement mode (Phase 26.7 comment action). */
@@ -132,9 +128,6 @@ function ExecutionViewInner({
   isActivityPanelOpen = false,
   onToggleDevTools,
   isDevToolsPanelOpen = false,
-  onJumpToExceptions,
-  onJumpToErrors,
-  onJumpToNetworkErrors,
   isCommentMode = false,
   onTogglePinMode,
   onExitCommentMode,
@@ -207,15 +200,6 @@ function ExecutionViewInner({
           isPublicReadOnly || isShareSurface ? undefined : onToggleDevTools
         }
         isDevToolsPanelOpen={isDevToolsPanelOpen}
-        onJumpToExceptions={
-          isPublicReadOnly || isShareSurface ? undefined : onJumpToExceptions
-        }
-        onJumpToErrors={
-          isPublicReadOnly || isShareSurface ? undefined : onJumpToErrors
-        }
-        onJumpToNetworkErrors={
-          isPublicReadOnly || isShareSurface ? undefined : onJumpToNetworkErrors
-        }
         onDelete={isShareSurface ? undefined : onDelete}
         readOnly={isPublicReadOnly}
         readOnlyPermissions={isPublicReadOnly ? readOnlyPermissions : undefined}

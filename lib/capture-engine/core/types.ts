@@ -45,6 +45,13 @@ export type NetworkSnapshot = {
   capturedAt: number;
 };
 
+/** Point-in-time snapshot of the extension's MAIN-world user-actions buffer, attached to a single ticket at click time. Third sibling to ConsoleSnapshot/NetworkSnapshot. Phase A3 wires this into the ECHLY_CREATE_FEEDBACK payload; Phase A4 will introduce the canonical UserAction domain type in lib/domain/feedback.ts and tighten the `actions` typing here. Until then, we accept an opaque array so the wiring is type-safe without anticipating A4's exact shape. The extension's authoritative type lives at annote-extension/src/actions/types.ts. */
+export type ActionsSnapshot = {
+  actions: unknown[];
+  capturedAt: number;
+  count: number;
+};
+
 /** Pending session feedback (screenshot + context + optional element position). Screenshot is optional so capture flow can continue when screenshot fails. */
 export type SessionFeedbackPending = {
   screenshot?: string | null;
@@ -56,6 +63,8 @@ export type SessionFeedbackPending = {
   consoleSnapshot?: ConsoleSnapshot | null;
   /** Network requests captured by the extension MAIN-world wrapper up to the click moment. Null when not in extension mode or when the bridge timed out. */
   networkSnapshot?: NetworkSnapshot | null;
+  /** User actions (clicks, navigations, focus/blur, etc.) captured by the extension MAIN-world script up to the click moment. Null when not in extension mode or when the bridge timed out. Phase A3 plumbs this through the payload only — server persistence arrives in A4. */
+  actionsSnapshot?: ActionsSnapshot | null;
 };
 
 /** Context captured with the region (URL, scroll, viewport, selected-element subtree). */
@@ -99,6 +108,8 @@ export type CaptureContext = {
   consoleSnapshot?: ConsoleSnapshot | null;
   /** Network-capture snapshot taken at click time. Sibling to consoleSnapshot — threaded through onComplete for the same reason. Extension mode only. */
   networkSnapshot?: NetworkSnapshot | null;
+  /** User-actions capture snapshot taken at click time. Third sibling — same threading pattern. Extension mode only. Phase A3. */
+  actionsSnapshot?: ActionsSnapshot | null;
 };
 
 export interface Recording {
@@ -275,6 +286,8 @@ export type CaptureWidgetProps = {
   requestConsoleSnapshot?: () => Promise<ConsoleSnapshot>;
   /** Extension: request a snapshot of the MAIN-world network buffer at click time. Sibling of requestConsoleSnapshot. Resolves to null on timeout (~500ms) so ticket creation is never blocked by network capture. Web app leaves this undefined. */
   requestNetworkSnapshot?: () => Promise<NetworkSnapshot | null>;
+  /** Extension: request a snapshot of the MAIN-world user-actions buffer at click time. Third sibling of requestConsoleSnapshot/requestNetworkSnapshot. Resolves to null on timeout (~500ms) so ticket creation is never blocked by actions capture. Web app leaves this undefined. Phase A3. */
+  requestActionsSnapshot?: () => Promise<ActionsSnapshot | null>;
   /** Optional capture environment adapter (extension, dashboard, etc.). When provided, useCaptureWidget uses it instead of direct props/callbacks. */
   environment?: CaptureEnvironment;
   /**

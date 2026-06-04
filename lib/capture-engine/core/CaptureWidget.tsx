@@ -92,6 +92,7 @@ export default function CaptureWidget({
   fetchClient,
   requestConsoleSnapshot,
   requestNetworkSnapshot,
+  requestActionsSnapshot,
 }: CaptureWidgetProps) {
   const [resumeModalOpen, setResumeModalOpen] = useState(false);
   const showResumeModal = resumeModalOpen || (openResumeModalProp ?? false);
@@ -221,6 +222,7 @@ export default function CaptureWidget({
     onEditTicket: setEditingTicketId,
     requestConsoleSnapshot,
     requestNetworkSnapshot,
+    requestActionsSnapshot,
   });
 
   /** Session limit: prop (from parent e.g. extension) takes precedence; otherwise use hook state (set when startSession returns limitReached). */

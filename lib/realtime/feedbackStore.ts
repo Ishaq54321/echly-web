@@ -229,6 +229,11 @@ function mapFeedbackFromSnap(snap: QueryDocumentSnapshot<DocumentData>): Feedbac
       typeof data.networkRequestCount === "number" ? data.networkRequestCount : undefined,
     networkErrorCount:
       typeof data.networkErrorCount === "number" ? data.networkErrorCount : undefined,
+    userActions: Array.isArray(data.userActions)
+      ? (data.userActions as Feedback["userActions"])
+      : undefined,
+    userActionCount:
+      typeof data.userActionCount === "number" ? data.userActionCount : undefined,
   };
 }
 

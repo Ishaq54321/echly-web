@@ -198,6 +198,29 @@ await esbuild.build({
   absWorkingDir: root,
 });
 
+// MAIN-world user-actions capture: third sibling bundle. Listens for click /
+// submit / input / focus / blur / visibility / resize / SPA-navigation events
+// and pushes redacted UserAction entries into a per-realm ring buffer. Same
+// constraints as the console + network MAIN-world bundles — no chrome.runtime,
+// no cross-realm imports. A3 will wire the postMessage bridge and the
+// background.ts injection on top of this file.
+await esbuild.build({
+  entryPoints: [path.join(extDir, "src", "actions", "mainWorldActions.ts")],
+  bundle: true,
+  format: "iife",
+  outfile: path.join(outDir, "mainWorldActions.js"),
+  platform: "browser",
+  target: "chrome111",
+  minify: true,
+  treeShaking: true,
+  sourcemap: false,
+  loader: {
+    ".ts": "ts",
+  },
+  define,
+  absWorkingDir: root,
+});
+
 // Parallel-build asset sync. esbuild only emits the four JS bundles; the
 // loaded-unpacked extension also needs manifest, icons/fonts, the postcss-
 // built popup.css, and the extension-fonts.css that the css script

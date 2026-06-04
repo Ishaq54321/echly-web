@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useState } from "react";
 
 export const PUBLIC_NAV_HEIGHT = 60;
 
@@ -18,7 +19,11 @@ export default function PublicSessionNav({
   brandingEnabled = false,
   brandingResolved = false,
 }: PublicSessionNavProps = {}) {
-  const whitelabel = Boolean(brandLogoUrl && brandingEnabled);
+  const [brandLogoError, setBrandLogoError] = useState(false);
+  // Fix 5: a broken brand logo URL falls back to the default Annote wordmark
+  // rather than showing a broken-image icon. (Brand logos have variable aspect
+  // ratios, so we intentionally keep width:auto — no fixed width attribute.)
+  const whitelabel = Boolean(brandLogoUrl && brandingEnabled && !brandLogoError);
 
   return (
     <>
@@ -59,9 +64,12 @@ export default function PublicSessionNav({
             <img
               src={brandLogoUrl!}
               alt="Brand"
+              height={28}
               style={{ height: 28, width: "auto", display: "block" }}
               fetchPriority="high"
               loading="eager"
+              decoding="async"
+              onError={() => setBrandLogoError(true)}
             />
           </div>
         ) : (

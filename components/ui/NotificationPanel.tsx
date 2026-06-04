@@ -25,6 +25,7 @@ import {
 import type { NotificationRow, NotificationType } from "@/lib/domain/notification";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useWorkspaceStore } from "@/lib/client/workspaceStore";
+import { useUserAvatars } from "@/lib/hooks/useUserAvatars";
 
 function getBadgeClass(type: NotificationType | string): string {
   switch (type) {
@@ -39,10 +40,13 @@ function getBadgeClass(type: NotificationType | string): string {
       return "badge-resolved";
     case "feedback.reopened":
       return "badge-feedback";
+    case "ticket.assigned":
+      return "badge-feedback";
     case "invite.accepted":
     case "invite.sent":
       return "badge-invite";
     case "session.shared":
+    case "session.opened":
       return "badge-invite";
     case "access_request.approved":
       return "badge-access";
@@ -69,10 +73,13 @@ function getTypeIcon(type: NotificationType | string) {
       return <Check {...props} />;
     case "feedback.reopened":
       return <RotateCcw {...props} />;
+    case "ticket.assigned":
+      return <UserPlus {...props} />;
     case "invite.accepted":
     case "invite.sent":
       return <UserPlus {...props} />;
     case "session.shared":
+    case "session.opened":
       return <Share2 {...props} />;
     case "access_request.approved":
     case "access_request.rejected":
@@ -240,6 +247,20 @@ function renderNotificationText(n: NotificationRow): React.ReactNode {
         <>
           <strong>{actorName}</strong> shared{" "}
           <span className="notif-session-name">{sessionTitle}</span> with you
+        </>
+      );
+    case "session.opened":
+      return (
+        <>
+          <strong>{actorName}</strong> opened{" "}
+          <span className="notif-session-name">{sessionTitle}</span>
+        </>
+      );
+    case "ticket.assigned":
+      return (
+        <>
+          <strong>{actorName}</strong> assigned{" "}
+          <span className="notif-session-name">{n.entityTitle || "a ticket"}</span> to you
         </>
       );
     case "access_request.pending":
@@ -459,6 +480,27 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
     [visibleNotifications]
   );
 
+  // Tier 2: notification actor photos are denormalized at notification-creation
+  // time and /api/notifications does NOT re-resolve them (unlike
+  // /api/activity-feed), so they go stale when an actor changes their photo.
+  // Resolve each actor's avatar LIVE by uid through the userProfiles mirror and
+  // use (live ?? snapshot) precedence at render. Read-only — no change to the
+  // notification data model, write path, or the unread-count onSnapshot.
+  const actorAvatars = useUserAvatars(
+    useMemo(
+      () => visibleNotifications.map((n) => n.actor?.id),
+      [visibleNotifications]
+    )
+  );
+  const liveActorPhoto = useCallback(
+    (actor: { id?: string | null; photoURL?: string | null } | null | undefined) => {
+      const uid = actor?.id ?? null;
+      const live = uid ? actorAvatars.get(uid) ?? null : null;
+      return live ?? actor?.photoURL ?? null;
+    },
+    [actorAvatars]
+  );
+
   const handleItemClick = useCallback(
     (n: NotificationRow) => {
       if (!n.read) {
@@ -593,7 +635,7 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
       >
         <div className="notif-avatar">
           <UserAvatar
-            photoURL={n.actor?.photoURL || null}
+            photoURL={liveActorPhoto(n.actor)}
             name={n.actor?.name}
             colorSeed={n.actor?.id}
             alt={n.actor?.name || "Notification"}
@@ -692,7 +734,7 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
       >
         <div className="notif-avatar">
           <UserAvatar
-            photoURL={latest.actor?.photoURL || null}
+            photoURL={liveActorPhoto(latest.actor)}
             name={latest.actor?.name}
             colorSeed={latest.actor?.id}
             alt={latest.actor?.name || "Notification"}

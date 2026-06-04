@@ -59,6 +59,96 @@ export const dynamic = "force-dynamic";
 
 const MAX_NAME_LEN = 50;
 
+/** Trim a value to a non-empty string, else null. */
+function trimToNull(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+/**
+ * Fix 1c — resolve the SIGNED-IN user's own avatar with the canonical priority:
+ *   custom uploaded avatar (firebasestorage) > live Auth photoURL > stored snapshot.
+ *
+ * `liveAuthPhotoURL` is userRecord.photoURL from getAuth().getUser() — the live
+ * Firebase Auth photo. The hasCustomAvatar guard (firebasestorage signal,
+ * matching usersRepository.server.ts) ensures a Google photo never out-ranks an
+ * upload.
+ */
+function resolveSelfAvatarUrl(
+  data: Record<string, unknown>,
+  liveAuthPhotoURL: string | null | undefined
+): string | null {
+  const storedAvatarUrl = trimToNull(data.avatarUrl);
+  const storedPhotoURL = trimToNull(data.photoURL);
+  const live = trimToNull(liveAuthPhotoURL);
+
+  const hasCustomAvatar = Boolean(
+    storedAvatarUrl && storedAvatarUrl.includes("firebasestorage")
+  );
+  if (hasCustomAvatar) return storedAvatarUrl;
+
+  // No custom upload: live Auth photo wins over the stale snapshot.
+  return live ?? storedAvatarUrl ?? storedPhotoURL;
+}
+
+/**
+ * Fix 1b — refresh-on-login for the EXISTING-user path.
+ *
+ * ensureUserRepo's shouldRefreshGooglePhoto only runs for fresh signups / the
+ * edge-case recovery path; returning users with a workspace short-circuit in
+ * ensureUserAndRespond before ensureUserRepo is ever called. So the live Google
+ * photo never reached them — the reported stale-avatar bug. This mirrors the
+ * exact guard semantics from usersRepository.server.ts (hasCustomAvatar via the
+ * `firebasestorage` signal) so a custom uploaded avatar is NEVER overwritten by
+ * the Google photo. We hotlink Google's CDN URL — no re-hosting to Storage.
+ *
+ * Returns the avatar URL to report to the client (refreshed when applicable,
+ * else the stored snapshot). Best-effort: a write failure never blocks the
+ * ensure-user response.
+ */
+async function refreshGooglePhotoForExistingUser(
+  uid: string,
+  data: Record<string, unknown>,
+  livePhotoURL: string | null | undefined
+): Promise<string | null> {
+  const storedAvatarUrl =
+    typeof data.avatarUrl === "string" && data.avatarUrl.trim()
+      ? data.avatarUrl.trim()
+      : null;
+  const storedPhotoURL =
+    typeof data.photoURL === "string" && data.photoURL.trim()
+      ? data.photoURL.trim()
+      : null;
+
+  // Same signal as ensureUserRepo: a custom upload lives in Firebase Storage.
+  const hasCustomAvatar = Boolean(
+    storedAvatarUrl && storedAvatarUrl.includes("firebasestorage")
+  );
+
+  const live = typeof livePhotoURL === "string" ? livePhotoURL.trim() : "";
+  const shouldRefresh =
+    !hasCustomAvatar && live !== "" && live !== storedPhotoURL;
+
+  if (!shouldRefresh) {
+    // No change (or a protected custom upload): report the stored value,
+    // collapsing avatarUrl → photoURL to match resolveUserAvatar's ladder.
+    return storedAvatarUrl ?? storedPhotoURL;
+  }
+
+  try {
+    await adminDb.doc(`users/${uid}`).set(
+      { photoURL: live, avatarUrl: live, updatedAt: FieldValue.serverTimestamp() },
+      { merge: true }
+    );
+    // Keep the public mirror (userProfiles/{uid}) in step so other users'
+    // realtime listeners see the refreshed photo too.
+    await mirrorUserProfileFromUserDoc(uid);
+  } catch (e) {
+    console.warn("POST /api/users: Google photo refresh failed (non-fatal)", e);
+    return storedAvatarUrl ?? storedPhotoURL;
+  }
+  return live;
+}
+
 /** GET /api/users — return current user data including authProvider. */
 export async function GET(req: NextRequest) {
   let user;
@@ -98,17 +188,15 @@ export async function GET(req: NextRequest) {
         firstName,
         lastName,
         displayName: composed,
-        // Match resolveUserAvatar's fallback ladder (avatarUrl → photoURL) so
-        // the self-profile endpoint is consistent with every other avatar
-        // resolution in the app. Without this, a Google OAuth user who never
-        // uploaded a custom photo (only photoURL set) sees null on their own
-        // profile.
-        avatarUrl:
-          (typeof data.avatarUrl === "string" && data.avatarUrl.trim()
-            ? data.avatarUrl.trim()
-            : typeof data.photoURL === "string" && data.photoURL.trim()
-              ? data.photoURL.trim()
-              : null),
+        // Fix 1c: prefer the user's own avatar by priority
+        //   custom uploaded avatar (firebasestorage) > live Auth photoURL > stored snapshot
+        // userRecord.photoURL is the LIVE Firebase Auth photo (current Google
+        // CDN URL for Google users). When the user has NO custom upload we
+        // surface that live value over the possibly-stale Firestore snapshot;
+        // when they DO have a custom upload the firebasestorage avatarUrl wins,
+        // so a Google photo can never clobber an upload. Collapses avatarUrl →
+        // photoURL to match resolveUserAvatar's ladder for the no-photo case.
+        avatarUrl: resolveSelfAvatarUrl(data, userRecord.photoURL),
         authProvider,
         onboardingStep,
         onboardingCompleted,
@@ -162,7 +250,13 @@ const inFlightEnsureUser = new Map<string, Promise<NextResponse>>();
 
 async function ensureUserAndRespond(
   req: NextRequest,
-  user: { uid: string; email?: string | null; displayName?: string | null }
+  user: {
+    uid: string;
+    email?: string | null;
+    displayName?: string | null;
+    /** Live Google photo from the ID token's `picture` claim (Fix 1b). */
+    photoURL?: string | null;
+  }
 ): Promise<NextResponse> {
   try {
     const existingSnap = await adminDb.doc(`users/${user.uid}`).get();
@@ -172,6 +266,14 @@ async function ensureUserAndRespond(
         typeof data.workspaceId === "string" ? data.workspaceId.trim() : "";
       const firstName = typeof data.firstName === "string" ? data.firstName : "";
       const lastName = typeof data.lastName === "string" ? data.lastName : "";
+      // Fix 1b: refresh-on-login. Returning users never reached ensureUserRepo's
+      // refresh logic, so their Google photo went stale. hasCustomAvatar guard
+      // preserved (see helper) — uploads are never clobbered.
+      const resolvedAvatarUrl = await refreshGooglePhotoForExistingUser(
+        user.uid,
+        data,
+        user.photoURL
+      );
       if (storedWorkspaceId) {
         const memberships: string[] = Array.isArray(data.workspaceMemberships)
           ? (data.workspaceMemberships as unknown[]).filter(
@@ -211,7 +313,7 @@ async function ensureUserAndRespond(
         return apiSuccess(
           {
             workspaceId: activeWorkspaceId,
-            avatarUrl: (data.avatarUrl as string | undefined) ?? null,
+            avatarUrl: resolvedAvatarUrl,
             firstName,
             lastName,
             displayName: composeFullName(firstName, lastName),
@@ -232,7 +334,7 @@ async function ensureUserAndRespond(
       return apiSuccess(
         {
           workspaceId: null,
-          avatarUrl: (data.avatarUrl as string | undefined) ?? null,
+          avatarUrl: resolvedAvatarUrl,
           firstName,
           lastName,
           displayName: composeFullName(firstName, lastName),
@@ -247,6 +349,10 @@ async function ensureUserAndRespond(
       uid: user.uid,
       email: user.email ?? null,
       authDisplayName: user.displayName ?? null,
+      // Fix 1b: feed the live Google photo so shouldRefreshGooglePhoto can seed
+      // a fresh signup's avatar. The hasCustomAvatar guard inside ensureUserRepo
+      // (firebasestorage check) still protects any custom upload.
+      photoURL: user.photoURL ?? null,
     });
     let claimsChanged = false;
     if (workspaceId) {

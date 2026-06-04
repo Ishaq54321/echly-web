@@ -17,10 +17,19 @@ export interface DecodedIdToken {
   [key: string]: unknown;
 }
 
-/** Normalized user from requireAuth(); use only uid and email. */
+/** Normalized user from requireAuth(); use only uid, email, and photoURL. */
 export interface AuthUser {
   uid: string;
   email?: string;
+  /**
+   * Live Google profile photo from the decoded ID token's `picture` claim
+   * (Google OAuth users only; undefined for password/extension auth). Additive
+   * field — existing callers that only read uid/email are unaffected. Used by
+   * POST/GET /api/users to feed the refresh-on-login path (shouldRefreshGooglePhoto
+   * in usersRepository.server.ts) so a Google user's avatar tracks their current
+   * Google photo without re-hosting it.
+   */
+  photoURL?: string;
 }
 
 export async function verifyIdToken(token: string): Promise<DecodedIdToken> {
@@ -104,7 +113,16 @@ export async function requireAuth(request: Request): Promise<AuthUser> {
     const token = authHeader.slice(7).trim();
     try {
       const decoded = await verifyIdToken(token);
-      user = { uid: decoded.uid, email: decoded.email };
+      // `picture` is the OIDC standard claim Firebase populates with the
+      // Google profile photo URL (lh3.googleusercontent.com) for Google OAuth
+      // users. It's the LIVE photo as of the user's last Google sign-in, so
+      // surfacing it lets the refresh-on-login path detect a changed photo.
+      // Absent for password/extension auth — stays undefined there.
+      const picture =
+        typeof decoded.picture === "string" && decoded.picture.trim()
+          ? decoded.picture.trim()
+          : undefined;
+      user = { uid: decoded.uid, email: decoded.email, photoURL: picture };
     } catch {
       const decoded = await verifyExtensionToken(token);
       if (decoded) {

@@ -71,38 +71,6 @@ const ROLE_OPTIONS: ShareDropdownOption[] = [
   { value: "resolve", label: "Can resolve", dot: "resolver" },
 ];
 
-function emailInitial(email: string): string {
-  const t = email.trim();
-  if (!t) return "?";
-  const ch = t[0];
-  return ch ? ch.toUpperCase() : "?";
-}
-
-function MemberAvatar({
-  avatarUrl,
-  alt,
-  initial,
-}: {
-  avatarUrl?: string | null;
-  alt: string;
-  initial: string;
-}) {
-  const [imageError, setImageError] = useState(false);
-
-  if (!avatarUrl || imageError) {
-    return <span className="share-user-avatar-initial">{initial}</span>;
-  }
-
-  return (
-    <img
-      src={avatarUrl}
-      alt={alt}
-      className="w-full h-full object-cover rounded-full"
-      onError={() => setImageError(true)}
-    />
-  );
-}
-
 function memberSubtitle(item: ShareItem): string {
   const kind = item.type === "member" ? "Member" : "Invite";
   const st = item.status === "active" ? "Active" : "Pending";
@@ -434,13 +402,17 @@ export function ShareModal({
                       >
                         <div className="flex items-center justify-between gap-3">
                         <div className="share-member-info">
-                          <div className="share-user-avatar" aria-hidden>
-                            <MemberAvatar
-                              avatarUrl={item.avatarUrl}
-                              alt={item.email}
-                              initial={emailInitial(item.email)}
-                            />
-                          </div>
+                          {/* Fix 5: consolidated onto the canonical UserAvatar
+                              (was a bespoke MemberAvatar <img>). size=30 matches
+                              the .share-user-avatar box; initialsClassName keeps
+                              the existing grey-chip fallback look. */}
+                          <UserAvatar
+                            avatarUrl={item.avatarUrl}
+                            name={item.email}
+                            size={30}
+                            alt={item.email}
+                            initialsClassName="share-user-avatar share-user-avatar-initial"
+                          />
                           <div className="min-w-0 flex-1">
                             <span className="share-user-email">{item.email}</span>
                             <p>{memberSubtitle(item)}</p>

@@ -47,7 +47,7 @@ export function TicketActivityPanel({
   const visible = events.filter((e) => KNOWN_EVENTS.has(e.eventType));
 
   return (
-    <div className="ticket-activity-panel">
+    <div className="ticket-activity-panel" style={{ width: "100%" }}>
       <div className="ticket-activity-header">
         <h3 className="ticket-activity-title">Activity</h3>
         <button
@@ -102,6 +102,13 @@ function ActivityList({ events }: { events: ActivityEvent[] }) {
 }
 
 function ActivityRow({ event }: { event: ActivityEvent }) {
+  // Tier 2: the activityEvents onSnapshot listener (useTicketActivity ->
+  // ticketActivityStore) carries the denormalized event.actor.photoURL frozen
+  // at write time. Resolve the actor's avatar LIVE by uid so it tracks their
+  // current photo; fall back to the snapshot for the first frame / when the
+  // live read is denied. Mirrors the CommentItem precedence (live ?? snapshot).
+  const liveActorAvatar = useUserAvatar(event.actor?.id ?? null);
+  const resolvedActorAvatar = liveActorAvatar ?? event.actor?.photoURL ?? null;
   return (
     <div className="ticket-activity-row">
       {event.eventType === "feedback.created" ? (
@@ -110,7 +117,7 @@ function ActivityRow({ event }: { event: ActivityEvent }) {
         </div>
       ) : (
         <UserAvatar
-          avatarUrl={event.actor?.photoURL ?? null}
+          avatarUrl={resolvedActorAvatar}
           name={event.actor?.name ?? null}
           size={28}
           colorSeed={event.actor?.id ?? null}

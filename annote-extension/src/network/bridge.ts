@@ -7,12 +7,24 @@
  *
  * Two paths:
  *   1. requestNetworkSnapshot() — request/response with a unique requestId.
- *      Used at click time. Resolves to null on timeout (never throws) so log
- *      capture cannot block ticket creation.
+ *      Used at click time. On timeout we fall back to the cached flush
+ *      snapshot if we have one, else null. We never reject — network capture
+ *      MUST NOT block ticket creation.
  *   2. installNetworkBridgeListener() — passive listener for
- *      ECHLY_NETWORK_FLUSH_PUSH events; forwards them to the service worker so
- *      a buffer flush on visibilitychange/beforeunload isn't lost when the
- *      page tears down before a ticket is filed.
+ *      ECHLY_NETWORK_FLUSH_PUSH events that the MAIN script fires on
+ *      visibilitychange/beforeunload. The most recent push is cached so
+ *      requestNetworkSnapshot has something to fall back to during a hard
+ *      navigation that tears down the MAIN script before the next request.
+ *
+ * Phase R8 — wiring + parity: this listener was dead code (defined, never
+ * called; the architecture audit flagged it). It is now installed from
+ * bootstrap.ts alongside the console and actions listeners. It previously
+ * forwarded ECHLY_NETWORK_FLUSH to the service worker, but no SW handler for
+ * that message exists (and console/actions never forwarded — they cache in
+ * the isolated world). We deliberately bring network to PARITY with its two
+ * siblings: cache the latest flush snapshot locally and use it as the
+ * requestNetworkSnapshot timeout fallback. SW-side aggregation of flushes is
+ * a separate future phase; routing to a non-existent handler was a no-op.
  */
 
 import type {
@@ -27,6 +39,81 @@ import {
   NETWORK_SNAPSHOT_REQUEST,
   NETWORK_SNAPSHOT_RESPONSE,
 } from "./types";
+
+let cachedFlushSnapshot: NetworkSnapshot | null = null;
+let listenerInstalled = false;
+
+/**
+ * Listen for ECHLY_NETWORK_FLUSH_PUSH messages (fired by the MAIN script on
+ * visibilitychange / beforeunload) and cache the most recent snapshot in the
+ * isolated world, so requestNetworkSnapshot() can fall back to it when its
+ * own request times out (e.g. the MAIN script was torn down by a hard
+ * navigation but flushed before unload). Mirrors console/bridge.ts
+ * installBridgeListener and actions/bridge.ts installActionsBridgeListener.
+ */
+export function installNetworkBridgeListener(): void {
+  if (listenerInstalled) return;
+  if (typeof window === "undefined") return;
+  listenerInstalled = true;
+  window.addEventListener("message", (event) => {
+    if (event.source !== window) return;
+    if (event.origin !== "" && event.origin !== window.origin) return;
+    const data = event.data;
+    if (!data || typeof data !== "object") return;
+    const typed = data as { type?: unknown };
+    if (typeof typed.type !== "string" || !typed.type.startsWith("ECHLY_")) return;
+    const msg = data as NetworkFlushPush;
+    if (
+      msg.source === NETWORK_BRIDGE_SOURCE_MAIN &&
+      msg.type === NETWORK_FLUSH_PUSH &&
+      msg.snapshot &&
+      Array.isArray(msg.snapshot.requests)
+    ) {
+      cachedFlushSnapshot = msg.snapshot;
+      // Stage 3: forward this page's flush to the service worker so it accumulates
+      // into the cross-navigation engagement buffer. Best-effort; swallow errors
+      // (SW asleep / channel closed). The local cache above remains the click-time
+      // fallback. Supersedes the old (removed) dead-code SW forward this bridge once
+      // had — that targeted a non-existent handler; ECHLY_CAPTURE_FLUSH is now real.
+      try {
+        chrome.runtime
+          .sendMessage({
+            type: "ECHLY_CAPTURE_FLUSH",
+            surface: "network",
+            snapshot: msg.snapshot,
+          })
+          .catch(() => {});
+      } catch {
+        // chrome.runtime unavailable (page teardown) — ignore.
+      }
+    }
+  });
+
+  /* Stage 3 safety-net: respond to the SW's ECHLY_REQUEST_CAPTURE_FLUSH poke by
+     pulling a live snapshot and forwarding it, so a tab killed without an unload
+     event still contributes. Best-effort; the SW dedupes by request id. */
+  try {
+    if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
+      chrome.runtime.onMessage.addListener((req) => {
+        if (req?.type === "ECHLY_REQUEST_CAPTURE_FLUSH") {
+          void requestNetworkSnapshot(400).then((snapshot) => {
+            if (!snapshot) return;
+            try {
+              chrome.runtime
+                .sendMessage({ type: "ECHLY_CAPTURE_FLUSH", surface: "network", snapshot })
+                .catch(() => {});
+            } catch {
+              // ignore
+            }
+          });
+        }
+        return false;
+      });
+    }
+  } catch {
+    // chrome.runtime unavailable — ignore.
+  }
+}
 
 function genRequestId(): string {
   try {
@@ -50,19 +137,26 @@ export function requestNetworkSnapshot(
     let settled = false;
     const onMessage = (event: MessageEvent) => {
       if (event.source !== window) return;
-      const data = event.data as NetworkSnapshotResponse | undefined;
+      if (event.origin !== "" && event.origin !== window.origin) return;
+      const data = event.data;
       if (!data || typeof data !== "object") return;
+      const typed = data as { type?: unknown };
+      if (typeof typed.type !== "string" || !typed.type.startsWith("ECHLY_")) return;
+      const msg = data as NetworkSnapshotResponse;
       if (
-        data.source === NETWORK_BRIDGE_SOURCE_MAIN &&
-        data.type === NETWORK_SNAPSHOT_RESPONSE &&
-        data.requestId === requestId &&
-        data.snapshot &&
-        Array.isArray(data.snapshot.requests)
+        msg.source === NETWORK_BRIDGE_SOURCE_MAIN &&
+        msg.type === NETWORK_SNAPSHOT_RESPONSE &&
+        msg.requestId === requestId &&
+        msg.snapshot &&
+        Array.isArray(msg.snapshot.requests)
       ) {
         if (settled) return;
         settled = true;
         window.removeEventListener("message", onMessage);
-        resolve(data.snapshot);
+        // Also cache as the latest known snapshot in case the next request
+        // hits a navigated-away page (parity with console/actions bridges).
+        cachedFlushSnapshot = msg.snapshot;
+        resolve(msg.snapshot);
       }
     };
     window.addEventListener("message", onMessage);
@@ -74,7 +168,11 @@ export function requestNetworkSnapshot(
       } catch {
         // ignore
       }
-      resolve(null);
+      // Fall back to the cached flush snapshot if we have one (MAIN script
+      // torn down by hard navigation but flushed before unload). null when
+      // we've never seen a flush — the actions surface treats absence as "no
+      // data" the same way.
+      resolve(cachedFlushSnapshot);
     }, timeoutMs);
 
     try {
@@ -88,50 +186,7 @@ export function requestNetworkSnapshot(
       );
     } catch {
       // postMessage shouldn't throw in practice; if it does, the timeout
-      // path resolves null.
+      // path resolves with the cached (or null) snapshot.
     }
   });
-}
-
-/**
- * Listen for ECHLY_NETWORK_FLUSH_PUSH messages (fired by the MAIN script on
- * visibilitychange / beforeunload) and forward them to the service worker.
- * Fire-and-forget — the service worker handler is a stub for now; persistence
- * is wired in a later polish phase.
- */
-export function installNetworkBridgeListener(): () => void {
-  if (typeof window === "undefined") {
-    return () => {};
-  }
-  const onMessage = (event: MessageEvent) => {
-    if (event.source !== window) return;
-    const data = event.data as NetworkFlushPush | undefined;
-    if (!data || typeof data !== "object") return;
-    if (
-      data.source !== NETWORK_BRIDGE_SOURCE_MAIN ||
-      data.type !== NETWORK_FLUSH_PUSH ||
-      !data.snapshot ||
-      !Array.isArray(data.snapshot.requests)
-    ) {
-      return;
-    }
-    try {
-      chrome.runtime
-        .sendMessage({ type: "ECHLY_NETWORK_FLUSH", snapshot: data.snapshot })
-        .catch(() => {
-          // SW may be inactive or the message handler is the no-op stub;
-          // either way, dropping is acceptable for the flush path.
-        });
-    } catch {
-      // chrome.runtime missing (e.g. orphaned content script post-update).
-    }
-  };
-  window.addEventListener("message", onMessage);
-  return () => {
-    try {
-      window.removeEventListener("message", onMessage);
-    } catch {
-      // ignore
-    }
-  };
 }

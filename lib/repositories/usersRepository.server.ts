@@ -419,13 +419,16 @@ export interface UserDoc {
    * Tracks email sends so retries / duplicate triggers don't re-send. Each
    * key is set to the server timestamp of the first send.
    *
-   * `cooldowns` holds per-(actor, eventType) stamps used by
-   * lib/email/cooldowns.ts to suppress burst-driven storms (e.g. one user
-   * resolving 100 tickets to the same reporter). Keys are encoded as
-   * `${actorUid}_${eventType}` and overwritten on each successful send.
+   * @deprecated `cooldowns` — DEAD FIELD as of the digest cutover. It held
+   * per-(actor, eventType) stamps for the old 30-minute instant-notification
+   * email cooldown (lib/email/cooldowns.ts, now removed). Nothing reads or
+   * writes it anymore; the daily activity digest replaced instant notification
+   * emails entirely. Existing values on user docs are harmless and left in
+   * place (no migration); the field stays typed only so old docs still parse.
    */
   emailSends?: {
     welcome?: Timestamp;
+    /** @deprecated dead — see emailSends doc above. */
     cooldowns?: Record<string, Timestamp>;
     // Future: day1Capture, day3Sessions, day7InviteTeam, day14CheckIn, inactivity
   };

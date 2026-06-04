@@ -39,4 +39,6 @@ export interface FeedbackItemShape {
   exceptionCount?: number;
   /** Phase N5D: failed network requests captured for this ticket. */
   networkErrorCount?: number;
+  /** Phase A5: captured user-action count (clicks, navigation, inputs, …). */
+  userActionCount?: number;
 }

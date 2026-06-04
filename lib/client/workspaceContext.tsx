@@ -171,6 +171,37 @@ function normalizeWorkspaceId(value: string | null | undefined): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+/**
+ * Fix 2 — resolve the signed-in user's OWN avatar with the precedence:
+ *   custom uploaded avatar > live Firebase Auth photo > stale fetched snapshot.
+ *
+ * - `fetchedAvatarUrl` is the value from POST /api/users (users/{uid}.avatarUrl).
+ *   It holds EITHER a custom upload (a Firebase Storage signed URL) OR a Google
+ *   photo snapshot, indistinguishably — except by host: a custom upload always
+ *   lives in Firebase Storage. That `firebasestorage` substring is the reliable
+ *   signal (same one the server uses for hasCustomAvatar).
+ * - `authPhotoUrl` is the LIVE Firebase Auth session photo (user.photoURL),
+ *   available on the first auth callback — before POST resolves — so preferring
+ *   it for non-custom avatars makes first paint already correct and removes the
+ *   current→stale reflash.
+ *
+ * Rule: a custom upload always wins (never clobbered by Google). Otherwise the
+ * live auth photo wins over the snapshot. Falls back to the snapshot only when
+ * there is no live photo (e.g. password users mid-load, or once a refreshed
+ * snapshot has caught up — both resolve to the same URL, so no swap).
+ */
+function isCustomUpload(url: string | null | undefined): boolean {
+  return typeof url === "string" && url.includes("firebasestorage");
+}
+
+function resolveOwnAvatarUrl(
+  fetchedAvatarUrl: string | null,
+  authPhotoUrl: string | null
+): string | null {
+  if (isCustomUpload(fetchedAvatarUrl)) return fetchedAvatarUrl;
+  return authPhotoUrl ?? fetchedAvatarUrl;
+}
+
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 
 /**
@@ -769,7 +800,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       switchWorkspace,
       isLoadingWorkspaces,
       refreshMemberships,
-      avatarUrl: avatarUrl ?? authPhotoUrl,
+      // Fix 2: custom upload > live auth photo > stale snapshot (see
+      // resolveOwnAvatarUrl). Prevents the current→stale own-avatar reflash for
+      // Google users while never clobbering a custom upload.
+      avatarUrl: resolveOwnAvatarUrl(avatarUrl, authPhotoUrl),
       updateAvatarUrl,
       workspaceDocLoading,
       hintWorkspaceName,

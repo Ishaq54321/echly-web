@@ -99,6 +99,12 @@ export function serializeTicket(ticket: Feedback, access: AccessContext): Record
     ...(typeof ticket.networkErrorCount === "number"
       ? { networkErrorCount: ticket.networkErrorCount }
       : {}),
+    // Phase A4: user-actions capture. Mirror console/network: redacted at
+    // capture time, safe for all viewers with read access, omit when absent.
+    ...(ticket.userActions ? { userActions: ticket.userActions } : {}),
+    ...(typeof ticket.userActionCount === "number"
+      ? { userActionCount: ticket.userActionCount }
+      : {}),
   };
 }
 

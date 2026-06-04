@@ -34,14 +34,17 @@ export type DevToolsFeedback = Partial<
     | "networkRequests"
     | "networkRequestCount"
     | "networkErrorCount"
+    | "userActions"
+    | "userActionCount"
   >
 >;
 import { Tabs, type TabsItem } from "@/components/ui/Tabs";
+import { ActionsTabContent } from "@/components/session/feedbackDetail/devtools/ActionsTabContent";
 import { ConsoleTabContent } from "@/components/session/feedbackDetail/devtools/ConsoleTabContent";
 import { MetadataTabContent } from "@/components/session/feedbackDetail/devtools/MetadataTabContent";
 import { NetworkTabContent } from "@/components/session/feedbackDetail/devtools/NetworkTabContent";
 
-export type DevToolsTabId = "console" | "network" | "metadata";
+export type DevToolsTabId = "actions" | "console" | "network" | "metadata";
 export type DevToolsConsoleFilter = "errors" | "warnings" | "all";
 export type DevToolsNetworkFilter = "errors";
 
@@ -67,7 +70,7 @@ export interface DevToolsPanelProps {
 export function DevToolsPanel({
   feedback,
   onClose,
-  initialTab = "console",
+  initialTab = "actions",
   initialFilter,
   initialNetworkFilter,
   scrollToExceptions = false,
@@ -79,13 +82,14 @@ export function DevToolsPanel({
   const [activeTab, setActiveTab] = useState<DevToolsTabId>(initialTab);
 
   const tabs: TabsItem[] = [
+    { id: "actions", label: "Actions" },
     { id: "console", label: "Console" },
     { id: "network", label: "Network" },
     { id: "metadata", label: "Metadata" },
   ];
 
   return (
-    <div className="ticket-activity-panel">
+    <div className="ticket-activity-panel" style={{ width: "100%" }}>
       <div className="ticket-activity-header">
         <h3 className="ticket-activity-title">Dev Tools</h3>
         <button
@@ -110,6 +114,13 @@ export function DevToolsPanel({
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto">
+        <DevToolsTabPanel id="actions" activeId={activeTab}>
+          <ActionsTabContent
+            userActions={feedback?.userActions}
+            userActionCount={feedback?.userActionCount}
+          />
+        </DevToolsTabPanel>
+
         <DevToolsTabPanel id="console" activeId={activeTab}>
           <ConsoleTabContent
             consoleLogs={feedback?.consoleLogs}

@@ -32,6 +32,12 @@ export interface UserAvatarProps {
   isAnonymous?: boolean;
   /** Optional override for the initials chip styling. Overrides colorSeed bg. */
   initialsClassName?: string;
+  /**
+   * Set for above-the-fold avatars (e.g. the viewer's own avatar in the top
+   * bar) to load eagerly. Defaults to lazy loading, which suits avatars inside
+   * lists/stacks/feeds. (Fix 4 — image sizing / decode-swap.)
+   */
+  eager?: boolean;
 }
 
 function resolveImageSrc(
@@ -63,9 +69,10 @@ export function UserAvatar({
   colorSeed,
   className = "",
   style,
-  alt = "User avatar",
+  alt,
   isAnonymous = false,
   initialsClassName,
+  eager = false,
 }: UserAvatarProps) {
   const src = resolveImageSrc(avatarUrl, image, photoURL);
   const [imgError, setImgError] = useState(false);
@@ -76,6 +83,9 @@ export function UserAvatar({
 
   const showImage = Boolean(src) && !imgError && !isAnonymous;
   const label = name?.trim() ?? "";
+  // Fix 7: prefer the person's name for alt text so screen readers announce who
+  // the avatar belongs to; fall back to the generic label when no name is set.
+  const resolvedAlt = alt ?? (label ? `${label}'s avatar` : "User avatar");
 
   const sizeStyle: CSSProperties | undefined =
     typeof size === "number"
@@ -103,9 +113,16 @@ export function UserAvatar({
       <span className={wrapperClass} style={{ ...sizeStyle, ...style }}>
         <img
           src={src}
-          alt={alt}
+          alt={resolvedAlt}
           onError={() => setImgError(true)}
           className="h-full w-full object-cover"
+          // Fix 4: reserve layout + avoid sync decode jank. width/height are set
+          // when a numeric size is known (the wrapper already fixes the box, so
+          // the image swaps in place rather than reflowing). Lazy by default for
+          // list/stack avatars; callers pass `eager` for above-the-fold ones.
+          {...(typeof size === "number" ? { width: size, height: size } : {})}
+          loading={eager ? "eager" : "lazy"}
+          decoding="async"
         />
       </span>
     );

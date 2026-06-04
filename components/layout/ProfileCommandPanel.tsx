@@ -370,6 +370,7 @@ export function ProfileCommandPanel({
                 name={displayName}
                 colorSeed={user?.uid}
                 size={44}
+                eager
               />
               <span
                 style={{

@@ -50,6 +50,52 @@ export interface ExceptionEntry {
   type: "error" | "unhandledrejection";
 }
 
+/** User-action type union. Domain copy — must stay in lockstep with annote-extension/src/actions/types.ts. */
+export type ActionType =
+  | "click"
+  | "navigation"
+  | "visibility"
+  | "submit"
+  | "input"
+  | "focus"
+  | "blur"
+  | "resize";
+
+/** Navigation sub-classification for type === "navigation". */
+export type NavigationMethod =
+  | "pushState"
+  | "replaceState"
+  | "popstate"
+  | "load"
+  | "hashchange";
+
+export type ActionVisibilityState = "visible" | "hidden";
+
+/** Jam-style element identification captured at click/submit/focus/blur/input time. Free-form `text` is post-redaction and truncated; `masked` true means a privacy attribute matched and details were withheld. Domain copy — must stay in lockstep with annote-extension/src/actions/types.ts. */
+export interface ElementDescriptor {
+  tag: string;
+  id?: string;
+  classes?: string[];
+  attributes?: Record<string, string>;
+  text?: string;
+  masked?: boolean;
+}
+
+/** A single user-action entry captured by the extension's MAIN-world wrapper and persisted with a ticket. Many fields are optional — each ActionType populates a different subset. Domain copy — must stay in lockstep with annote-extension/src/actions/types.ts. */
+export interface UserAction {
+  id: string;
+  type: ActionType;
+  timestamp: number;
+  element?: ElementDescriptor;
+  url?: string;
+  fromUrl?: string;
+  navigationMethod?: NavigationMethod;
+  visibilityState?: ActionVisibilityState;
+  viewport?: { width: number; height: number };
+  /** For input events: name / label / type — never the value typed. */
+  fieldLabel?: string;
+}
+
 /** Single network request captured by the extension's MAIN-world fetch/XHR wrapper and persisted with a ticket. Domain copy — the extension keeps its own bundler-isolated copy in annote-extension/src/network/types.ts; field names must stay in lockstep. Headers and bodies are redacted at the extension's capture site before they reach this type. */
 export interface NetworkRequestEntry {
   id: string;
@@ -167,6 +213,11 @@ export interface Feedback {
   networkRequestCount?: number;
   /** Denormalized count of networkRequests where errored === true OR status >= 400. */
   networkErrorCount?: number;
+
+  /** User-action capture (Phase A4). Elements are redacted at the extension's capture site (`text` post-redaction, `masked: true` when withheld). Omitted when no MAIN-world snapshot was attached at click time or when the page had no captured actions. */
+  userActions?: UserAction[] | null;
+  /** Denormalized count of userActions. Used for the A5 header badge / Actions tab placeholder. */
+  userActionCount?: number;
 }
 
 /** Returns explicit status for a feedback item. Use instead of !isResolved. */

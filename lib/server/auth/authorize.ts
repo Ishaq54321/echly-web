@@ -56,7 +56,7 @@ async function userFromBearerToken(token: string): Promise<AuthorizedRequestUser
       typeof decodedName === "string" && decodedName.trim() !== ""
         ? decodedName.trim()
         : null;
-    return { uid, email, displayName };
+    return { uid, email, displayName, photoURL: pictureFromDecoded(decoded) };
   } catch {
     const payload = peekJwtPayload(token);
     if (payload?.type === "extension") {
@@ -78,7 +78,7 @@ async function userFromBearerToken(token: string): Promise<AuthorizedRequestUser
         typeof dName === "string" && dName.trim() !== ""
           ? dName.trim()
           : null;
-      return { uid, email, displayName };
+      return { uid, email, displayName, photoURL: pictureFromDecoded(d) };
     } catch {
       return null;
     }
@@ -105,7 +105,26 @@ export class UnauthorizedError extends Error {
   }
 }
 
-export type AuthorizedRequestUser = { uid: string; email?: string; displayName?: string | null };
+export type AuthorizedRequestUser = {
+  uid: string;
+  email?: string;
+  displayName?: string | null;
+  /**
+   * Live Google profile photo from the decoded ID token's `picture` claim
+   * (Google OAuth users only; undefined for password/extension/session auth).
+   * Additive — callers reading only uid/email/displayName are unaffected.
+   * POST/GET /api/users feed this into the refresh-on-login path
+   * (shouldRefreshGooglePhoto in usersRepository.server.ts) so a Google user's
+   * avatar tracks their current Google photo without re-hosting it to Storage.
+   */
+  photoURL?: string | null;
+};
+
+/** Read the OIDC `picture` claim (Google profile photo URL) off a decoded token. */
+function pictureFromDecoded(decoded: unknown): string | null {
+  const pic = (decoded as { picture?: unknown } | null)?.picture;
+  return typeof pic === "string" && pic.trim() !== "" ? pic.trim() : null;
+}
 
 export async function requireAuth(req: Request): Promise<AuthorizedRequestUser> {
   const extensionToken = req.headers.get("x-extension-token")?.trim() ?? "";

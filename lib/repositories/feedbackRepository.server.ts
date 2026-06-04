@@ -9,6 +9,7 @@ import type {
   Feedback,
   NetworkRequestEntry,
   StructuredFeedback,
+  UserAction,
 } from "@/lib/domain/feedback";
 import {
   decrementInsightsOnFeedbackDeleteRepo,
@@ -66,6 +67,8 @@ const feedbackPayload = (
     networkRequests?: NetworkRequestEntry[];
     networkRequestCount?: number;
     networkErrorCount?: number;
+    userActions?: UserAction[];
+    userActionCount?: number;
   };
   const consoleFields: Record<string, unknown> = {};
   if (Array.isArray(consoleExtras.consoleLogs) && consoleExtras.consoleLogs.length > 0) {
@@ -100,6 +103,17 @@ const feedbackPayload = (
     networkFields.networkErrorCount = consoleExtras.networkErrorCount;
   }
 
+  // Phase A4: user-actions capture. Same undefined-skip contract — Firestore
+  // rejects `undefined`, so we omit the field rather than writing it as null
+  // when no capture snapshot was attached.
+  const actionsFields: Record<string, unknown> = {};
+  if (Array.isArray(consoleExtras.userActions) && consoleExtras.userActions.length > 0) {
+    actionsFields.userActions = consoleExtras.userActions;
+  }
+  if (typeof consoleExtras.userActionCount === "number" && consoleExtras.userActionCount > 0) {
+    actionsFields.userActionCount = consoleExtras.userActionCount;
+  }
+
   return {
     userId,
     sessionId,
@@ -129,6 +143,7 @@ const feedbackPayload = (
     creatorAvatarUrl: (data as { creatorAvatarUrl?: string | null }).creatorAvatarUrl ?? null,
     ...consoleFields,
     ...networkFields,
+    ...actionsFields,
   };
 };
 
@@ -151,6 +166,8 @@ export function feedbackFromCreateInsert(args: {
     networkRequests?: NetworkRequestEntry[];
     networkRequestCount?: number;
     networkErrorCount?: number;
+    userActions?: UserAction[];
+    userActionCount?: number;
   };
   return {
     id: args.id,
@@ -208,6 +225,13 @@ export function feedbackFromCreateInsert(args: {
       : {}),
     ...(typeof consoleExtras.networkErrorCount === "number" && consoleExtras.networkErrorCount > 0
       ? { networkErrorCount: consoleExtras.networkErrorCount }
+      : {}),
+    // Phase A4: user-actions capture. Same undefined-skip semantics.
+    ...(Array.isArray(consoleExtras.userActions) && consoleExtras.userActions.length > 0
+      ? { userActions: consoleExtras.userActions }
+      : {}),
+    ...(typeof consoleExtras.userActionCount === "number" && consoleExtras.userActionCount > 0
+      ? { userActionCount: consoleExtras.userActionCount }
       : {}),
   };
 }
@@ -959,6 +983,13 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
       : {}),
     ...(typeof data.networkErrorCount === "number" && data.networkErrorCount > 0
       ? { networkErrorCount: data.networkErrorCount }
+      : {}),
+    // Phase A4: optional; only include if persisted.
+    ...(Array.isArray(data.userActions) && data.userActions.length > 0
+      ? { userActions: data.userActions as UserAction[] }
+      : {}),
+    ...(typeof data.userActionCount === "number" && data.userActionCount > 0
+      ? { userActionCount: data.userActionCount }
       : {}),
   };
 }
