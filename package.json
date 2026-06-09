@@ -20,7 +20,7 @@
     "build:extension:local": "cross-env NODE_ENV=development ECHLY_WEB_APP_URL=http://localhost:3000 ECHLY_EXT_OUT_DIR=annote-extension-local npm run build:extension",
     "test:shared": "node --import tsx --test annote-extension/src/shared/privacy.test.ts",
     "test:console": "node --import tsx --test annote-extension/src/console/redact.test.ts annote-extension/src/console/stringify.test.ts",
-    "test:network": "node --import tsx --test annote-extension/src/network/redactNetwork.test.ts annote-extension/src/network/buffer.test.ts",
+    "test:network": "node --import tsx --test annote-extension/src/network/redactNetwork.test.ts annote-extension/src/network/buffer.test.ts annote-extension/src/network/denylist.test.ts",
     "test:actions": "node --import tsx --test annote-extension/src/actions/redactAction.test.ts annote-extension/src/actions/buffer.test.ts annote-extension/src/actions/denylist.test.ts",
     "test:extension": "npm run test:shared && npm run test:console && npm run test:network && npm run test:actions"
   },

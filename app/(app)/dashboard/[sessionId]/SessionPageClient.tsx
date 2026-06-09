@@ -2648,10 +2648,28 @@ export default function SessionPageClient({
     setIsActivityPanelOpen((prev) => {
       const next = !prev;
       if (!next) setActiveThreadId(null);
-      // Mutual exclusion: opening Activity closes Dev Tools.
-      if (next) setIsDevToolsPanelOpen(false);
+      // Mutual exclusion: opening Activity closes Dev Tools — and restores the
+      // sidebar (same symmetric rule as any other Dev Tools close path).
+      if (next) {
+        setIsDevToolsPanelOpen(false);
+        setSidebarRailCollapsed(false);
+        setUserExpandedRailOverride(false);
+      }
       return next;
     });
+  }, []);
+
+  // Symmetric rule for Dev Tools: open → rail collapses to 64px; closed →
+  // sidebar restores to its expanded width. This helper is the single close
+  // path so every way of closing Dev Tools (top-right ×, toggle, Activity
+  // open, Escape) restores the sidebar identically. The restore is
+  // UNCONDITIONAL — even if the user had manually collapsed the sidebar
+  // before opening Dev Tools, closing expands it. We choose predictable
+  // symmetry over tracking the pre-open state.
+  const closeDevTools = useCallback(() => {
+    setIsDevToolsPanelOpen(false);
+    setSidebarRailCollapsed(false);
+    setUserExpandedRailOverride(false);
   }, []);
 
   // Phase 5: Dev Tools toggle. Mirrors handleToggleActivity — first click
@@ -2671,6 +2689,7 @@ export default function SessionPageClient({
         setSidebarRailCollapsed(true);
         setUserExpandedRailOverride(false);
       } else {
+        // Symmetric restore on close (see closeDevTools).
         setSidebarRailCollapsed(false);
         setUserExpandedRailOverride(false);
       }
@@ -4430,7 +4449,8 @@ export default function SessionPageClient({
                       initialNetworkFilter={devToolsInitialNetworkFilter}
                       scrollToExceptions={devToolsScrollExceptionsKey > 0}
                       onClose={() => {
-                        setIsDevToolsPanelOpen(false);
+                        // Top-right collapse/close icon → restore the sidebar.
+                        closeDevTools();
                         if (isMobile) setMobileTab("session");
                       }}
                     />

@@ -11,8 +11,11 @@
  *
  * What this script CAPTURES:
  *  - click, submit, focus, blur, input (field edited, NEVER value)
- *  - visibilitychange, resize
+ *  - resize
  *  - SPA navigation (pushState/replaceState/popstate/hashchange)
+ *
+ * NOTE: visibilitychange is observed ONLY as a flush trigger (see flushPush),
+ * NOT recorded as a UserAction — tab-visibility rows were judged noise.
  *
  * What this script does NOT do (deferred phases):
  *  - postMessage bridge to the isolated world (Phase A3)
@@ -31,7 +34,12 @@
  */
 
 import { ActionBuffer } from "./buffer";
-import { CAPTURED_ATTRIBUTES, isAnnoteElement, isNoisyTag } from "./denylist";
+import {
+  CAPTURED_ATTRIBUTES,
+  isAnnoteComposedPath,
+  isAnnoteElement,
+  isNoisyTag,
+} from "./denylist";
 import { getPrivacyTreatment } from "../shared/privacy";
 import { redactAttributes, redactElementText, redactUrl } from "./redactAction";
 import type {
@@ -40,7 +48,6 @@ import type {
   ElementDescriptor,
   NavigationMethod,
   UserAction,
-  VisibilityState as ActionVisibilityState,
 } from "./types";
 import {
   ACTIONS_BRIDGE_SOURCE_ISOLATED,
@@ -162,6 +169,26 @@ declare global {
     const t = event.target;
     if (t && (t as Element).nodeType === 1) return t as Element;
     return null;
+  }
+
+  // ─── Annote-UI self-event guard (Fix B) ────────────────────────
+  // resolveTarget returns composedPath()[0] — the node DEEP INSIDE our shadow
+  // tree — so an isAnnoteElement(target) check that only walks parentElement
+  // dies at the shadow root and never reaches the light-DOM host, and the tray
+  // buttons get captured. Checking the whole composed path for our host marker
+  // is boundary-proof: the host (#echly-shadow-host / [data-annote-ui]) is
+  // always in the path of any event originating inside the widget. Specific to
+  // our markers, so a foreign page Web Component's shadow root is NOT skipped.
+  // One guard, applied at the top of every handler below.
+  function isAnnoteEvent(event: Event): boolean {
+    try {
+      if (typeof event.composedPath === "function") {
+        return isAnnoteComposedPath(event.composedPath());
+      }
+    } catch {
+      // fall through — rely on the per-target isAnnoteElement fallback
+    }
+    return false;
   }
 
   // ─── Element descriptor ────────────────────────────────────────
@@ -365,6 +392,7 @@ declare global {
   // ─── Click ─────────────────────────────────────────────────────
   function onClick(event: Event): void {
     try {
+      if (isAnnoteEvent(event)) return;
       const target = resolveTarget(event);
       if (!target) return;
       if (isAnnoteElement(target)) return;
@@ -384,6 +412,7 @@ declare global {
   // ─── Submit ────────────────────────────────────────────────────
   function onSubmit(event: Event): void {
     try {
+      if (isAnnoteEvent(event)) return;
       const target = resolveTarget(event);
       if (!target) return;
       if (isAnnoteElement(target)) return;
@@ -410,6 +439,7 @@ declare global {
 
   function onInput(event: Event): void {
     try {
+      if (isAnnoteEvent(event)) return;
       const target = resolveTarget(event);
       if (!target) return;
       if (isAnnoteElement(target)) return;
@@ -455,6 +485,7 @@ declare global {
 
   function onFocusIn(event: Event): void {
     try {
+      if (isAnnoteEvent(event)) return;
       const target = resolveTarget(event);
       if (!target) return;
       if (isAnnoteElement(target)) return;
@@ -478,6 +509,7 @@ declare global {
 
   function onFocusOut(event: Event): void {
     try {
+      if (isAnnoteEvent(event)) return;
       const target = resolveTarget(event);
       if (!target) return;
       if (isAnnoteElement(target)) return;
@@ -513,18 +545,13 @@ declare global {
   }
 
   // ─── Visibility ────────────────────────────────────────────────
-  function onVisibility(): void {
-    try {
-      const state = document.visibilityState as ActionVisibilityState;
-      pushAction({
-        type: "visibility",
-        timestamp: Date.now(),
-        visibilityState: state,
-      });
-    } catch {
-      // swallow
-    }
-  }
+  // Tab-visibility transitions are deliberately NOT recorded as UserActions —
+  // "Switched away from tab" / "Returned to tab" rows were judged pure noise
+  // and removed. The visibilitychange→hidden flush trigger (see flushPush
+  // near the bottom of this file) is a SEPARATE listener and is intentionally
+  // left intact: it drives cross-navigation persistence to the SW and must
+  // keep firing. Do not re-add an addAction call here. The "visibility" type
+  // remains defined (dead) in types.ts so old stored tickets still validate.
 
   // ─── Resize (debounced) ────────────────────────────────────────
   let resizeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -648,7 +675,8 @@ declare global {
     // document-level capture listener.
     document.addEventListener("focusin", onFocusIn, captureOpts);
     document.addEventListener("focusout", onFocusOut, captureOpts);
-    document.addEventListener("visibilitychange", onVisibility, passiveOpts);
+    // NOTE: no visibilitychange listener for action-recording — see the
+    // Visibility section above. The flush-on-hidden listener below is separate.
     window.addEventListener("resize", onResize, passiveOpts);
     window.addEventListener("popstate", onPopState, passiveOpts);
     window.addEventListener("hashchange", onHashChange, passiveOpts);

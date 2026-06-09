@@ -59,6 +59,15 @@ export const CONSOLE_DENYLIST: readonly RegExp[] = Object.freeze([
 
   // Chrome extension content-script noise that isn't ours.
   /chrome-extension:\/\//,
+
+  // Our OWN extension's stray logs, should any reach the page realm (Fix C-lite,
+  // belt-and-suspenders). Anchored to the start so only our prefixes match, not
+  // an arbitrary mention of the word elsewhere in a page's log line. NOTE: the
+  // intentional synthetic capture watermarks ("[Annote] Console capture paused…"
+  // / "resumed.") are written straight to the buffer via buffer.addLog and never
+  // pass through this denylist, so they still surface as designed.
+  /^\[ECHLY\]/,
+  /^\[Annote\]/,
 ]);
 
 export function isDenylisted(message: string): boolean {

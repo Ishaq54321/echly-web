@@ -1339,7 +1339,9 @@ function ContentApp({ widgetRoot }: ContentAppProps) {
               <img
                 src={chrome.runtime.getURL("assets/annote-logo-icon.svg")}
                 alt="Annote"
-                style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                width={30}
+                height={30}
+                style={{ width: 30, height: 30, objectFit: "contain" }}
               />
             </div>
             <div className="auth-check-bar-wrap">
@@ -1682,6 +1684,22 @@ function mountReactApp(host: HTMLDivElement): void {
   logger.debug("extension", "mounting_widget_root");
   const reactRoot = createRoot(container);
   reactRoot.render(<ContentApp widgetRoot={container} />);
+
+  // Fix 3.4: signal the real first paint so bootstrap can remove its skeleton with no
+  // flash. ECHLY_WIDGET_READY (dispatched synchronously at widget entry) fires BEFORE
+  // React commits, so it's the wrong swap point. A double-rAF lands AFTER the first
+  // commit has painted: the first rAF runs before paint, the second after it — so by the
+  // time we dispatch, the real "Connecting…" pill is on screen and the skeleton can drop
+  // out from under it. This is purely a UI-handoff signal; it gates nothing else.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (ECHLY_DEBUG) {
+        const t = typeof performance !== "undefined" ? performance.now().toFixed(1) : "?";
+        console.log(`[ECHLY PERF] widget: first paint committed @${t}ms`);
+      }
+      window.dispatchEvent(new CustomEvent("ECHLY_WIDGET_PAINTED"));
+    });
+  });
 }
 
 function normalizeGlobalState(state: GlobalUIState | undefined): GlobalUIState | null {
@@ -1823,6 +1841,11 @@ function installHostPositionUpdater(host: HTMLDivElement): void {
 (function widgetEntry() {
   if (window.__ECHLY_WIDGET_LOADED__) return;
   window.__ECHLY_WIDGET_LOADED__ = true;
+  if (ECHLY_DEBUG) {
+    // Module finished downloading + parsing and is now executing — the "import end" mark.
+    const t = typeof performance !== "undefined" ? performance.now().toFixed(1) : "?";
+    console.log(`[ECHLY PERF] widget: bundle executing (import end) @${t}ms`);
+  }
   injectWidgetUI();
   // Signal the bootstrap immediately instead of letting it poll the
   // __ECHLY_WIDGET_LOADED__ flag. The flag stays set above for any

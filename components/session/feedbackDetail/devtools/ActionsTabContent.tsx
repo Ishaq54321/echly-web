@@ -363,6 +363,116 @@ function isLowSignal(action: UserAction): boolean {
   return true;
 }
 
+// ─── Render-time focus/blur pairing (Fix D) ──────────────────────
+// Capture emits focus and blur as TWO separate UserActions, so every field
+// interaction shows as a "Selected …"/"Left …" pair and the timeline reads
+// twice as long as the interaction count. This is a PRESENTATION-only fix: at
+// render time we pair each focus with the next blur on the SAME element and
+// show them as ONE row. Capture, buffers, the watermark, userActionCount, and
+// the stored data are all untouched — unpaired focus or blur rows (no partner)
+// render exactly as before.
+
+/** A render row is either a passthrough action or a merged focus+blur pair. */
+type RenderRow =
+  | { kind: "single"; key: string; action: UserAction }
+  | { kind: "focusPair"; key: string; focus: UserAction; blur: UserAction };
+
+/** Structural signature of an element descriptor — our "same element" handle,
+ *  since captured actions carry no live DOM identity. Two focus/blur actions
+ *  are treated as the same element when their signatures match. A descriptor
+ *  with no distinguishing detail still yields a stable (tag-only) signature;
+ *  pairing then matches the nearest such focus/blur, which is the desired
+ *  behavior for anonymous fields. Returns null when there's no element at all
+ *  (such actions never pair). */
+function elementSignature(el: ElementDescriptor | undefined): string | null {
+  if (!el) return null;
+  const attrs = el.attributes ?? {};
+  const attrSig = Object.keys(attrs)
+    .sort()
+    .map((k) => `${k}=${attrs[k]}`)
+    .join(",");
+  return [
+    el.masked ? "M" : "",
+    (el.tag || "").toLowerCase(),
+    el.id ?? "",
+    (el.classes ?? []).join("."),
+    attrSig,
+    el.text ?? "",
+  ].join("|");
+}
+
+/**
+ * Pair focus→blur on the same element into single rows over a time-sorted
+ * action list. Algorithm: scan in order; on a focus, remember it as "open" for
+ * its element signature; on a blur, if there's an open focus for the same
+ * signature, emit ONE focusPair (focus + this blur) and clear it; otherwise the
+ * blur is unpaired. Any focus still open at the end is emitted as a lone focus.
+ * All non-focus/blur actions pass straight through. Order is preserved by the
+ * focus's (earlier) timestamp — the pair occupies the focus's slot. O(n).
+ *
+ * Mode-independent: the SAME rows render in readable and technical view (only
+ * the row's TEXT differs by mode), so search/filter results don't shift when
+ * the user toggles modes.
+ */
+function pairFocusBlur(actions: UserAction[]): RenderRow[] {
+  const rows: RenderRow[] = [];
+  // signature → index in `rows` of the open (not-yet-paired) focus row.
+  const openFocusRowIndex = new Map<string, number>();
+
+  for (const action of actions) {
+    if (action.type === "focus") {
+      const sig = elementSignature(action.element);
+      const rowIdx = rows.length;
+      rows.push({ kind: "single", key: action.id, action });
+      // A new focus on a signature supersedes any still-open one (the prior
+      // focus simply never got a blur — it stays a lone focus row).
+      if (sig != null) openFocusRowIndex.set(sig, rowIdx);
+      continue;
+    }
+    if (action.type === "blur") {
+      const sig = elementSignature(action.element);
+      const openIdx = sig != null ? openFocusRowIndex.get(sig) : undefined;
+      if (sig != null && openIdx != null) {
+        const open = rows[openIdx];
+        if (open && open.kind === "single" && open.action.type === "focus") {
+          rows[openIdx] = {
+            kind: "focusPair",
+            key: open.action.id,
+            focus: open.action,
+            blur: action,
+          };
+          openFocusRowIndex.delete(sig);
+          continue;
+        }
+        openFocusRowIndex.delete(sig);
+      }
+      // Unpaired blur → passthrough row.
+      rows.push({ kind: "single", key: action.id, action });
+      continue;
+    }
+    rows.push({ kind: "single", key: action.id, action });
+  }
+
+  return rows;
+}
+
+/** Optional held-duration label for a focus→blur pair, e.g. "0:03". Only shown
+ *  when ≥1s so sub-second tab-throughs stay clean. */
+function pairDurationLabel(focus: UserAction, blur: UserAction): string | null {
+  const ms = blur.timestamp - focus.timestamp;
+  if (!Number.isFinite(ms) || ms < 1000) return null;
+  return formatElapsed(ms);
+}
+
+/** Readable text for a merged focus/blur row: the focus identifier with the
+ *  "Selected" verb, plus an optional held-duration. */
+function buildPairReadableDescription(focus: UserAction, blur: UserAction): string {
+  const { text, quoted } = readableElementIdentifier(focus.element);
+  const base = quoted ? `Selected "${text}"` : `Selected ${text}`;
+  const dur = pairDurationLabel(focus, blur);
+  return dur ? `${base} (held ${dur})` : base;
+}
+
 /** Clipboard-friendly single-line summary for a row. Format follows the
  *  visible representation in the current view mode. */
 function formatActionForClipboard(action: UserAction, mode: ViewMode): string {
@@ -378,6 +488,41 @@ function formatActionForClipboard(action: UserAction, mode: ViewMode): string {
       : "";
   const text = `${parts.prefix}${chip}${parts.suffix ?? ""}`.trim();
   return `[${formatAbs(action.timestamp)}] ${text}`;
+}
+
+/** Clipboard summary for a merged focus/blur pair. Readable mirrors the visible
+ *  row; technical shows the element chip with both timestamps (focus → blur). */
+function formatPairForClipboard(focus: UserAction, blur: UserAction, mode: ViewMode): string {
+  if (mode === "readable") {
+    return `[${formatAbs(focus.timestamp)}] ${buildPairReadableDescription(focus, blur)}`;
+  }
+  const chip = renderElementDescriptor(focus.element);
+  return `[${formatAbs(focus.timestamp)}–${formatAbs(blur.timestamp)}] Focused ${chip}`.trim();
+}
+
+/** Text used for search matching of a render row, in BOTH representations so a
+ *  query works regardless of the active view mode. */
+function rowSearchText(row: RenderRow): string {
+  if (row.kind === "focusPair") {
+    const chip = renderElementDescriptor(row.focus.element);
+    return `${buildPairReadableDescription(row.focus, row.blur)} Focused ${chip}`.toLowerCase();
+  }
+  const a = row.action;
+  const parts = buildDescriptionParts(a);
+  const descriptor =
+    parts.chipKind === "element"
+      ? renderElementDescriptor(a.element)
+      : parts.chipKind === "url"
+      ? parts.chipText ?? ""
+      : "";
+  const technical = `${parts.prefix} ${descriptor} ${parts.suffix ?? ""}`;
+  return `${technical} ${buildReadableDescription(a)}`.toLowerCase();
+}
+
+/** A render row's representative action for group-filtering / timestamp. For a
+ *  pair it's the focus (which carries the row's slot + group "other"). */
+function rowPrimaryAction(row: RenderRow): UserAction {
+  return row.kind === "focusPair" ? row.focus : row.action;
 }
 
 function actionIcon(action: UserAction): React.ReactNode {
@@ -426,7 +571,25 @@ export function ActionsTabContent({
     () => [...all].sort((a, b) => a.timestamp - b.timestamp),
     [all]
   );
-  const baseTs = sorted.length > 0 ? sorted[0].timestamp : 0;
+
+  // Tab-visibility events ("Switched away from tab" / "Returned to tab") are
+  // noise and were removed from capture. Old stored tickets still carry them in
+  // userActions, so we filter them out here BEFORE any render pass — in both
+  // readable and technical modes. This runs ahead of pairFocusBlur so a
+  // focus/blur pair that previously straddled a visibility row now pairs
+  // correctly. The header badge still shows the raw stored userActionCount
+  // (which includes these historical visibility entries on old tickets) — that
+  // discrepancy is acceptable; we do NOT recompute stored counts.
+  const visible = React.useMemo(
+    () => sorted.filter((a) => a.type !== "visibility"),
+    [sorted]
+  );
+  const baseTs = visible.length > 0 ? visible[0].timestamp : 0;
+
+  // Fix D: collapse focus→blur pairs into single render rows. Presentation only
+  // — the stored data behind it is unchanged; the count badge below still
+  // reflects the raw userActionCount.
+  const rows = React.useMemo(() => pairFocusBlur(visible), [visible]);
 
   const [group, setGroup] = React.useState<Group>("all");
   const [rawSearch, setRawSearch] = React.useState("");
@@ -469,41 +632,35 @@ export function ActionsTabContent({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Filter-chip counts operate on the post-filter (visibility-stripped) list,
+  // so "Other" and "All" don't tally the removed tab-visibility rows.
   const counts = React.useMemo(() => {
     let clicks = 0;
     let nav = 0;
     let inputs = 0;
     let other = 0;
-    for (const a of sorted) {
+    for (const a of visible) {
       const g = actionGroup(a.type);
       if (g === "click") clicks += 1;
       else if (g === "navigation") nav += 1;
       else if (g === "input") inputs += 1;
       else other += 1;
     }
-    return { all: sorted.length, click: clicks, navigation: nav, input: inputs, other };
-  }, [sorted]);
+    return { all: visible.length, click: clicks, navigation: nav, input: inputs, other };
+  }, [visible]);
 
-  // Search matches against BOTH representations so a query works regardless
-  // of mode — picking "the less-surprising behavior" per the spec.
+  // Filter/search operate on the PAIRED render rows (Fix D). Group membership
+  // uses the row's primary action (a focus/blur pair sits in "other" via its
+  // focus). Search matches BOTH representations so a query works regardless of
+  // the active view mode — picking "the less-surprising behavior" per the spec.
   const filtered = React.useMemo(() => {
     const q = search.trim().toLowerCase();
-    return sorted.filter((a) => {
-      if (!isVisible(a, group)) return false;
+    return rows.filter((row) => {
+      if (!isVisible(rowPrimaryAction(row), group)) return false;
       if (!q) return true;
-      const parts = buildDescriptionParts(a);
-      const descriptor =
-        parts.chipKind === "element"
-          ? renderElementDescriptor(a.element)
-          : parts.chipKind === "url"
-          ? parts.chipText ?? ""
-          : "";
-      const technical =
-        `${parts.prefix} ${descriptor} ${parts.suffix ?? ""}`.toLowerCase();
-      const readable = buildReadableDescription(a).toLowerCase();
-      return technical.includes(q) || readable.includes(q);
+      return rowSearchText(row).includes(q);
     });
-  }, [sorted, group, search]);
+  }, [rows, group, search]);
 
   const anyFilterActive = group !== "all" || search.length > 0;
 
@@ -846,7 +1003,7 @@ export function ActionsTabContent({
       </div>
 
       <div className="pb-6">
-        {sorted.length === 0 ? (
+        {visible.length === 0 ? (
           <div className="px-4 pt-6 pb-2">
             <CanvasEmptyState
               illustration={<NoActivityIllu />}
@@ -869,20 +1026,36 @@ export function ActionsTabContent({
               role="group"
               aria-label="Captured user actions"
             >
-              {filtered.map((a) => (
-                <ActionRow
-                  key={a.id}
-                  action={a}
-                  baseTs={baseTs}
-                  viewMode={viewMode}
-                  onCopy={() =>
-                    copyToClipboard(
-                      formatActionForClipboard(a, viewMode),
-                      "Copied"
-                    )
-                  }
-                />
-              ))}
+              {filtered.map((row) =>
+                row.kind === "focusPair" ? (
+                  <PairRow
+                    key={row.key}
+                    focus={row.focus}
+                    blur={row.blur}
+                    baseTs={baseTs}
+                    viewMode={viewMode}
+                    onCopy={() =>
+                      copyToClipboard(
+                        formatPairForClipboard(row.focus, row.blur, viewMode),
+                        "Copied"
+                      )
+                    }
+                  />
+                ) : (
+                  <ActionRow
+                    key={row.key}
+                    action={row.action}
+                    baseTs={baseTs}
+                    viewMode={viewMode}
+                    onCopy={() =>
+                      copyToClipboard(
+                        formatActionForClipboard(row.action, viewMode),
+                        "Copied"
+                      )
+                    }
+                  />
+                )
+              )}
             </div>
           </div>
         )}
@@ -1120,6 +1293,89 @@ function TechnicalRowBody({ action }: { action: UserAction }) {
       {parts.suffix ? (
         <span className="actab-desc-text">{parts.suffix}</span>
       ) : null}
+    </div>
+  );
+}
+
+/** A merged focus→blur interaction rendered as ONE row (Fix D). Mirrors
+ *  ActionRow's layout; the time column and icon come from the focus, the body
+ *  shows the merged description (readable: "Selected …"; technical: the element
+ *  chip with both focus & blur timestamps surfaced via title + held-duration). */
+function PairRow({
+  focus,
+  blur,
+  baseTs,
+  viewMode,
+  onCopy,
+}: {
+  focus: UserAction;
+  blur: UserAction;
+  baseTs: number;
+  viewMode: ViewMode;
+  onCopy: () => void;
+}) {
+  const elapsed = formatElapsed(Math.max(0, focus.timestamp - baseTs));
+  const absLabel = formatAbs(focus.timestamp);
+  const blurAbs = formatAbs(blur.timestamp);
+  // A pair inherits the focus's low-signal styling (same element, same rule).
+  const lowSignal = isLowSignal(focus);
+
+  return (
+    <div
+      className={`actab-row${lowSignal ? " is-low-signal" : ""}`}
+      role="button"
+      tabIndex={0}
+      onClick={onCopy}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onCopy();
+        }
+      }}
+      aria-label={`focus interaction from ${absLabel} to ${blurAbs}. Click to copy.`}
+    >
+      <div className="actab-time" title={`${absLabel} – ${blurAbs}`}>
+        {elapsed}
+      </div>
+      <div className="actab-icon">{actionIcon(focus)}</div>
+      {viewMode === "readable" ? (
+        <PairReadableRowBody focus={focus} blur={blur} />
+      ) : (
+        <PairTechnicalRowBody focus={focus} blur={blur} />
+      )}
+    </div>
+  );
+}
+
+function PairReadableRowBody({ focus, blur }: { focus: UserAction; blur: UserAction }) {
+  const text = buildPairReadableDescription(focus, blur);
+  return (
+    <div className="actab-readable" title={text}>
+      {text}
+    </div>
+  );
+}
+
+function PairTechnicalRowBody({ focus, blur }: { focus: UserAction; blur: UserAction }) {
+  const elementChip = focus.element ? renderElementDescriptor(focus.element) : null;
+  const dur = pairDurationLabel(focus, blur);
+
+  return (
+    <div className="actab-desc">
+      <span className="actab-desc-text">Focused</span>
+      {elementChip != null ? (
+        <span
+          className={`actab-element${focus.element?.masked ? " is-masked" : ""}`}
+          title={
+            focus.element?.masked
+              ? "Element details withheld for privacy"
+              : elementChip
+          }
+        >
+          {elementChip}
+        </span>
+      ) : null}
+      {dur ? <span className="actab-desc-text">{`· held ${dur}`}</span> : null}
     </div>
   );
 }

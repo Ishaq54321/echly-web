@@ -9412,9 +9412,10 @@ h6 [data-ai-touched="true"] {
   animation: echly-auth-logo-breathe 2s ease-in-out infinite;
 }
 
-.echly-v2 .auth-check-logo svg {
-  width: 20px;
-  height: 20px;
+.echly-v2 .auth-check-logo svg,
+.echly-v2 .auth-check-logo img {
+  width: 30px;
+  height: 30px;
 }
 
 .echly-v2 .auth-check-bar-wrap {

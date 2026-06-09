@@ -159,6 +159,20 @@ function isDocLike(entry: NetworkRequestEntry): boolean {
   return ct.includes("html");
 }
 
+/** Nearest scrollable ancestor (the panel's overflow-y-auto wrapper). Used to
+ *  save/restore list scroll position across the list↔detail swap. */
+function findScrollParent(node: HTMLElement | null): HTMLElement | null {
+  let el = node?.parentElement ?? null;
+  while (el) {
+    const overflowY = window.getComputedStyle(el).overflowY;
+    if ((overflowY === "auto" || overflowY === "scroll") && el.scrollHeight > el.clientHeight) {
+      return el;
+    }
+    el = el.parentElement;
+  }
+  return null;
+}
+
 /* ------------------------------------------------------------------ */
 /* Main                                                                */
 /* ------------------------------------------------------------------ */
@@ -194,12 +208,19 @@ export function NetworkTabContent({
   const search = useDebounced(rawSearch, 100);
   const searchInputRef = React.useRef<HTMLInputElement | null>(null);
 
-  // Drawer state — owned here per the N5C contract.
+  // Detail state — owned here per the N5C contract. Selecting a row replaces
+  // the list with a full-panel-width detail view (back affordance returns to
+  // the list). This is an in-flow swap, not an overlay, so the detail always
+  // spans the panel content width across the 360–720px resize range.
   const [selectedEntryId, setSelectedEntryId] = React.useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
-  // Remembers the row element that opened the drawer so focus can be
+  // Remembers the row element that opened the detail so focus can be
   // restored on close (a11y polish — N5E).
   const lastFocusedRef = React.useRef<HTMLElement | null>(null);
+  // Saved list scroll position so back returns the user to where they were.
+  // The scroll owner is the panel's scroll ancestor (DevToolsPanel's
+  // overflow-y-auto wrapper), found by walking up from the tab root.
+  const savedScrollTopRef = React.useRef(0);
 
   const selectedEntry = React.useMemo(
     () => all.find((entry) => entry.id === selectedEntryId) ?? null,
@@ -222,6 +243,10 @@ export function NetworkTabContent({
       if (active instanceof HTMLElement) {
         lastFocusedRef.current = active;
       }
+      // Remember list scroll position so back returns the user to where they
+      // were (cheap — single number read here, reapplied on close).
+      savedScrollTopRef.current =
+        findScrollParent(tabRootRef.current)?.scrollTop ?? 0;
       setSelectedEntryId(entry.id);
       setIsDrawerOpen(true);
     },
@@ -230,14 +255,16 @@ export function NetworkTabContent({
 
   const handleDrawerClose = React.useCallback(() => {
     setIsDrawerOpen(false);
-    // Restore focus to the row that opened the drawer. Defer one frame so
-    // the drawer's close-button blur and slide-out kick off first.
+    // Restore focus to the row that opened the detail, and the prior list
+    // scroll position. Defer one frame so the list has re-rendered first.
     const el = lastFocusedRef.current;
-    if (el && document.body.contains(el)) {
-      requestAnimationFrame(() => el.focus());
-    }
-    // Keep selectedEntryId so reopening keeps the same row marked selected,
-    // and so the slide-out animation has something to render.
+    const top = savedScrollTopRef.current;
+    requestAnimationFrame(() => {
+      const scroller = findScrollParent(tabRootRef.current);
+      if (scroller) scroller.scrollTop = top;
+      if (el && document.body.contains(el)) el.focus();
+    });
+    // Keep selectedEntryId so reopening keeps the same row marked selected.
   }, []);
 
   // Shared toast (lifted from Console's pattern). The drawer uses this too
@@ -256,26 +283,7 @@ export function NetworkTabContent({
     };
   }, []);
 
-  // Click-outside-the-drawer (within this tab) closes it.
   const tabRootRef = React.useRef<HTMLDivElement | null>(null);
-  React.useEffect(() => {
-    if (!isDrawerOpen) return;
-    function onClick(e: MouseEvent) {
-      const root = tabRootRef.current;
-      if (!root) return;
-      const target = e.target as Node;
-      if (!root.contains(target)) return; // click outside the tab — let outer UI handle
-      const drawerEl = root.querySelector(".netdrawer");
-      if (drawerEl && drawerEl.contains(target)) return; // inside drawer
-      // Clicking a row in the list is part of the list — let the row's click
-      // handler swap content instead of closing. Detect via .nettab-row.
-      const rowEl = (target as HTMLElement).closest?.(".nettab-row");
-      if (rowEl) return;
-      handleDrawerClose();
-    }
-    window.addEventListener("mousedown", onClick);
-    return () => window.removeEventListener("mousedown", onClick);
-  }, [isDrawerOpen, handleDrawerClose]);
 
   // Live per-filter counts (computed against ALL entries, not the filtered set,
   // so the badge on each chip reflects the universe — not how the current
@@ -575,96 +583,103 @@ export function NetworkTabContent({
         }
       `}</style>
 
-      <div className="px-4 pt-4 pb-3">
-        <FilterBar
-          filters={filters}
-          counts={counts}
-          anyFilterActive={anyFilterActive}
-          onToggleAll={toggleAll}
-          onToggleErrors={toggleErrors}
-          onToggleSource={toggleSource}
-          onToggleDoc={toggleDoc}
+      {/* Full-width detail replaces the list when a row is selected (in-flow
+          swap, not an overlay) so it spans the panel content width at every
+          width in the 360–720px resize range. Back returns to the list. */}
+      {isDrawerOpen && selectedEntry ? (
+        <NetworkRequestDrawer
+          entry={selectedEntry}
+          isOpen={isDrawerOpen}
+          onClose={handleDrawerClose}
+          onToast={showToast}
         />
-
-        <div className="relative mt-3">
-          <input
-            ref={searchInputRef}
-            type="text"
-            value={rawSearch}
-            onChange={(e) => setRawSearch(e.target.value)}
-            placeholder="Filter URLs"
-            aria-label="Filter network requests by URL"
-            className="nettab-search"
-            spellCheck={false}
-            autoComplete="off"
-          />
-          {rawSearch ? (
-            <button
-              type="button"
-              className="nettab-search-clear"
-              aria-label="Clear search"
-              onClick={() => {
-                setRawSearch("");
-                searchInputRef.current?.focus();
-              }}
-            >
-              <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden fill="none">
-                <path
-                  d="M1.5 1.5L8.5 8.5M8.5 1.5L1.5 8.5"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="pb-6">
-        {all.length === 0 ? (
-          <div className="px-4 pt-6 pb-2">
-            <CanvasEmptyState
-              illustration={<NoActivityIllu />}
-              title="No network activity captured for this ticket."
-              description="Network requests during the page session will appear here."
-              density="compact"
+      ) : (
+        <>
+          <div className="px-4 pt-4 pb-3">
+            <FilterBar
+              filters={filters}
+              counts={counts}
+              anyFilterActive={anyFilterActive}
+              onToggleAll={toggleAll}
+              onToggleErrors={toggleErrors}
+              onToggleSource={toggleSource}
+              onToggleDoc={toggleDoc}
             />
-          </div>
-        ) : indexedFiltered.length === 0 ? (
-          <FilterEmptyState onClear={resetFilters} total={totalCount} />
-        ) : (
-          <div>
-            <div className="nettab-header-row" aria-hidden="true">
-              <div className="nettab-header-cell-num">#</div>
-              <div>Status</div>
-              <div>Method</div>
-              <div>Name</div>
-              <div>Domain</div>
-              <div>Type</div>
-              <div className="nettab-header-cell-time">Time</div>
-            </div>
-            <div className="nettab-list" role="group" aria-label="Captured network requests">
-              {indexedFiltered.map(({ entry, originalIndex }) => (
-                <RequestRow
-                  key={entry.id}
-                  entry={entry}
-                  rowNumber={originalIndex + 1}
-                  isSelected={selectedRowIndex === originalIndex}
-                  onSelect={() => handleRowSelect(entry)}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
 
-      <NetworkRequestDrawer
-        entry={selectedEntry}
-        isOpen={isDrawerOpen}
-        onClose={handleDrawerClose}
-        onToast={showToast}
-      />
+            <div className="relative mt-3">
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={rawSearch}
+                onChange={(e) => setRawSearch(e.target.value)}
+                placeholder="Filter URLs"
+                aria-label="Filter network requests by URL"
+                className="nettab-search"
+                spellCheck={false}
+                autoComplete="off"
+              />
+              {rawSearch ? (
+                <button
+                  type="button"
+                  className="nettab-search-clear"
+                  aria-label="Clear search"
+                  onClick={() => {
+                    setRawSearch("");
+                    searchInputRef.current?.focus();
+                  }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden fill="none">
+                    <path
+                      d="M1.5 1.5L8.5 8.5M8.5 1.5L1.5 8.5"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="pb-6">
+            {all.length === 0 ? (
+              <div className="px-4 pt-6 pb-2">
+                <CanvasEmptyState
+                  illustration={<NoActivityIllu />}
+                  title="No network activity captured for this ticket."
+                  description="Network requests during the page session will appear here."
+                  density="compact"
+                />
+              </div>
+            ) : indexedFiltered.length === 0 ? (
+              <FilterEmptyState onClear={resetFilters} total={totalCount} />
+            ) : (
+              <div>
+                <div className="nettab-header-row" aria-hidden="true">
+                  <div className="nettab-header-cell-num">#</div>
+                  <div>Status</div>
+                  <div>Method</div>
+                  <div>Name</div>
+                  <div>Domain</div>
+                  <div>Type</div>
+                  <div className="nettab-header-cell-time">Time</div>
+                </div>
+                <div className="nettab-list" role="group" aria-label="Captured network requests">
+                  {indexedFiltered.map(({ entry, originalIndex }) => (
+                    <RequestRow
+                      key={entry.id}
+                      entry={entry}
+                      rowNumber={originalIndex + 1}
+                      isSelected={selectedRowIndex === originalIndex}
+                      onSelect={() => handleRowSelect(entry)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       <div aria-live="polite" aria-atomic="true">
         {toast ? (

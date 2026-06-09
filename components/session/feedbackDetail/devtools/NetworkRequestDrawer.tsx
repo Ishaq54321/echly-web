@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { X, Copy, Scissors } from "lucide-react";
+import { ArrowLeft, Copy, Scissors } from "lucide-react";
 import type { NetworkRequestEntry } from "@/lib/domain/feedback";
 import { Tabs, type TabsItem } from "@/components/ui/Tabs";
 
@@ -244,42 +244,25 @@ export function NetworkRequestDrawer({
     };
   }, []);
 
-  // ESC closes; Tab is trapped inside the drawer when open.
+  // ESC returns to the list. No Tab trap: the detail is a full-width in-flow
+  // view (not a modal overlay), so Tab should move naturally between it and
+  // the panel's tab bar above.
   React.useEffect(() => {
     if (!isOpen) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.preventDefault();
         onClose();
-        return;
-      }
-      if (e.key === "Tab") {
-        const root = drawerRef.current;
-        if (!root) return;
-        const focusables = root.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"]), input:not([disabled]), textarea:not([disabled]), select:not([disabled])'
-        );
-        if (focusables.length === 0) return;
-        const first = focusables[0];
-        const last = focusables[focusables.length - 1];
-        const active = document.activeElement as HTMLElement | null;
-        if (e.shiftKey && active === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && active === last) {
-          e.preventDefault();
-          first.focus();
-        }
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [isOpen, onClose]);
 
-  // Focus the close button when the drawer opens.
+  // Focus the Back button when the detail opens so keyboard users land on the
+  // return affordance.
   React.useEffect(() => {
     if (isOpen) {
-      // Defer until after the slide-in begins.
       const id = window.setTimeout(() => closeBtnRef.current?.focus(), 50);
       return () => window.clearTimeout(id);
     }
@@ -330,35 +313,49 @@ export function NetworkRequestDrawer({
   return (
     <>
       <style>{`
+        /* Full-width, in-flow detail view (not an overlay). Spans the whole
+           Dev Tools panel content width at every panel width. A short fade-in
+           on entry replaces the old slide-in drawer animation. */
         .netdrawer {
-          position: absolute;
-          top: 0;
-          right: 0;
-          bottom: 0;
-          width: 65%;
-          min-width: 320px;
+          width: 100%;
           background: var(--surface);
-          border-left: 1px solid var(--border);
-          box-shadow: -8px 0 24px -12px rgba(21, 16, 31, 0.10);
           display: flex;
           flex-direction: column;
-          z-index: 4;
-          transform: translateX(100%);
-          transition: transform 280ms ${SPRING};
+          animation: netdrawer-enter 200ms ease both;
         }
-        .netdrawer.is-open {
-          transform: translateX(0);
-        }
-        .netdrawer.is-closing {
-          transform: translateX(100%);
-          transition: transform 220ms ease-out;
+        @keyframes netdrawer-enter {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
         @media (prefers-reduced-motion: reduce) {
-          .netdrawer,
-          .netdrawer.is-closing,
-          .netdrawer.is-open {
-            transition: none !important;
+          .netdrawer {
+            animation: none !important;
           }
+        }
+
+        .netdrawer-back {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          height: 26px;
+          padding: 0 10px 0 6px;
+          background: transparent;
+          border: none;
+          color: var(--text-secondary);
+          font-size: 12.5px;
+          font-weight: 500;
+          font-family: inherit;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: background-color 120ms ease, color 120ms ease;
+        }
+        .netdrawer-back:hover {
+          background: var(--surface-hover);
+          color: var(--text-heading);
+        }
+        .netdrawer-back:focus-visible {
+          outline: 2px solid var(--brand);
+          outline-offset: 2px;
         }
 
         .netdrawer-header {
@@ -378,28 +375,6 @@ export function NetworkRequestDrawer({
           color: var(--text-tertiary);
           font-variant-numeric: tabular-nums;
         }
-        .netdrawer-close {
-          width: 32px;
-          height: 32px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          background: transparent;
-          border: none;
-          color: var(--text-tertiary);
-          border-radius: 6px;
-          cursor: pointer;
-          transition: background-color 120ms ease, color 120ms ease;
-        }
-        .netdrawer-close:hover {
-          background: var(--surface-hover);
-          color: var(--text-heading);
-        }
-        .netdrawer-close:focus-visible {
-          outline: 2px solid var(--brand);
-          outline-offset: 2px;
-        }
-
         .netdrawer-identifier {
           display: flex;
           align-items: flex-start;
@@ -426,7 +401,12 @@ export function NetworkRequestDrawer({
           font-size: 12px;
           color: var(--text-heading);
           line-height: 1.5;
-          word-break: break-all;
+          /* Single truncated line — long URLs (e.g. the GA beacon) never wrap
+             character-by-character over dozens of lines. Full value is on the
+             title tooltip and the adjacent Copy button. */
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
           min-width: 0;
         }
         .netdrawer-icon-btn {
@@ -547,9 +527,9 @@ export function NetworkRequestDrawer({
         }
 
         .netdrawer-body {
-          flex: 1;
-          min-height: 0;
-          overflow-y: auto;
+          /* In-flow: the Dev Tools panel owns scrolling, so the body grows
+             naturally rather than scrolling within a fixed-height drawer. */
+          flex: 1 1 auto;
         }
         .netdrawer-body-inner {
           padding: 16px;
@@ -687,9 +667,8 @@ export function NetworkRequestDrawer({
 
       <div
         ref={drawerRef}
-        className={`netdrawer ${isOpen ? "is-open" : "is-closing"}`}
-        role="dialog"
-        aria-modal="false"
+        className="netdrawer"
+        role="region"
         aria-label="Network request details"
       >
         {e ? (
@@ -811,19 +790,19 @@ function DrawerHeader({
   return (
     <div className="netdrawer-header">
       <div className="netdrawer-header-row">
-        <span />
-        <div className="flex items-center gap-3">
-          {rel ? <span className="netdrawer-timestamp">captured {rel}</span> : null}
-          <button
-            ref={closeBtnRef}
-            type="button"
-            className="netdrawer-close"
-            aria-label="Close request details"
-            onClick={onClose}
-          >
-            <X size={16} strokeWidth={1.75} />
-          </button>
-        </div>
+        {/* Back-to-list affordance replaces the old × — the detail is a
+            full-width view swapped in over the list, not an overlay. */}
+        <button
+          ref={closeBtnRef}
+          type="button"
+          className="netdrawer-back"
+          aria-label="Back to request list"
+          onClick={onClose}
+        >
+          <ArrowLeft size={15} strokeWidth={1.75} aria-hidden />
+          <span>Back</span>
+        </button>
+        {rel ? <span className="netdrawer-timestamp">captured {rel}</span> : null}
       </div>
 
       <div className="netdrawer-identifier">
@@ -839,7 +818,7 @@ function DrawerHeader({
         <span className="netdrawer-badge" style={{ color: methodHex }}>
           {entry.method.toUpperCase()}
         </span>
-        <span className="netdrawer-url">{entry.url}</span>
+        <span className="netdrawer-url" title={entry.url}>{entry.url}</span>
         <button
           type="button"
           className="netdrawer-icon-btn"

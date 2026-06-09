@@ -82,6 +82,26 @@ export const NETWORK_DENYLIST: readonly NetworkDenylistPattern[] = Object.freeze
 ]);
 
 /**
+ * GA4 Measurement Protocol wire-format check. Catches first-party-proxied
+ * (server-side GTM) beacons the host patterns can't see — they ride the
+ * customer's own origin, so hostname matching never fires. We fingerprint the
+ * GA4 collect payload itself: protocol version `v=2` plus a `G-`-prefixed
+ * measurement id (`tid`). Both must be present, so a real first-party API call
+ * that merely happens to carry one of these params is not affected.
+ *
+ * Deliberately GA4-only: Segment / Plausible / Fathom / PostHog proxied forms
+ * were assessed and rejected for false-positive risk (see diagnosis). Uses
+ * `parsed.searchParams` (order-independent, no regex backtracking) to preserve
+ * the file's linear-time invariant.
+ */
+export function isProxiedAnalyticsBeacon(parsed: URL): boolean {
+  return (
+    parsed.searchParams.get("v") === "2" &&
+    /^G-/.test(parsed.searchParams.get("tid") ?? "")
+  );
+}
+
+/**
  * Returns true if the URL should be excluded from network capture.
  *
  * Same-origin requests are never denied — protects against false positives on
@@ -93,6 +113,11 @@ export function isNetworkDenylisted(url: string): boolean {
   if (!url) return false;
   try {
     const parsed = new URL(url, typeof window !== "undefined" ? window.location.href : "http://localhost/");
+
+    // GA4 Measurement Protocol beacons are denied even when proxied through
+    // the host's own origin — checked BEFORE the same-origin escape below,
+    // which would otherwise let first-party-proxied analytics through.
+    if (isProxiedAnalyticsBeacon(parsed)) return true;
 
     // Same-origin escape hatch: never deny first-party requests.
     if (typeof window !== "undefined" && window.location && parsed.origin === window.location.origin) {

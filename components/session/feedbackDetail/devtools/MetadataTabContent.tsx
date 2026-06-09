@@ -54,12 +54,6 @@ function useNow(intervalMs = 30_000): number {
   return now;
 }
 
-function truncateIdSuffix(id: string, lastN = 8): string {
-  if (!id) return "";
-  if (id.length <= lastN) return id;
-  return `...${id.slice(-lastN)}`;
-}
-
 function isExternalUrl(url: string): boolean {
   return /^https?:\/\//i.test(url);
 }
@@ -102,8 +96,6 @@ export function MetadataTabContent({ feedback }: MetadataTabContentProps) {
   const sh = feedback?.screenHeight ?? null;
   const dpr = feedback?.devicePixelRatio ?? null;
   const ts = feedback?.clientTimestamp ?? null;
-  const sessionId = feedback?.sessionId?.trim() ?? "";
-  const workspaceId = feedback?.workspaceId?.trim() ?? "";
 
   const tsDate = clientTimestampToDate(ts as never);
   const hasViewport =
@@ -217,52 +209,6 @@ export function MetadataTabContent({ feedback }: MetadataTabContentProps) {
         <span className="devtools-meta-value" title={abs}>
           {rel || abs}
         </span>
-      </MetaRow>
-    );
-  }
-
-  if (sessionId) {
-    rows.push(
-      <MetaRow key="sessionId" label="Session ID">
-        <span
-          className="devtools-meta-value devtools-meta-value-mono"
-          title={sessionId}
-        >
-          {truncateIdSuffix(sessionId)}
-        </span>
-        <RowActions>
-          <button
-            type="button"
-            className="devtools-meta-icon-btn"
-            aria-label="Copy session ID"
-            onClick={() => copyToClipboard(sessionId)}
-          >
-            <Copy size={12} strokeWidth={1.75} />
-          </button>
-        </RowActions>
-      </MetaRow>
-    );
-  }
-
-  if (workspaceId) {
-    rows.push(
-      <MetaRow key="workspaceId" label="Workspace ID">
-        <span
-          className="devtools-meta-value devtools-meta-value-mono"
-          title={workspaceId}
-        >
-          {truncateIdSuffix(workspaceId)}
-        </span>
-        <RowActions>
-          <button
-            type="button"
-            className="devtools-meta-icon-btn"
-            aria-label="Copy workspace ID"
-            onClick={() => copyToClipboard(workspaceId)}
-          >
-            <Copy size={12} strokeWidth={1.75} />
-          </button>
-        </RowActions>
       </MetaRow>
     );
   }

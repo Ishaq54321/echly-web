@@ -15,8 +15,131 @@ import type { NetworkRequestEntry } from "./network/types";
 import type { UserAction } from "./actions/types";
 
 const LOGIN_URL = `${WEB_APP_URL}/login`;
-/** Extension token TTL from backend is 15m; treat as valid for 14 min to avoid edge expiry. */
+/**
+ * Extension token TTL. The backend signs the JWT with `.setExpirationTime("15m")`
+ * (app/api/extension/session/route.ts), so 15m is a HARD server-side ceiling — the
+ * server 401s the token the moment its `exp` passes. We treat it as valid for 14 min
+ * (1-min skew margin) and MUST NOT raise past 15m: a longer client TTL would make us
+ * present an already-expired JWT and every API call would 401. (The 55-min figure used
+ * by the web app's authFetch is its Firebase ID token — a different token, 1h lifetime —
+ * not this extension JWT.) To extend this, change `setExpirationTime` server-side first.
+ */
 const EXTENSION_TOKEN_TTL_MS = 14 * 60 * 1000;
+
+/**
+ * chrome.storage.local key holding the persisted extension token + its absolute expiry.
+ * chrome.storage.local is extension-private (only this extension's contexts can read it),
+ * so persisting the short-lived (≤15m) extension token here matches the web app's
+ * precedent of caching its own short-lived token client-side. Persisting lets a cold
+ * service-worker restart rehydrate the token from storage instead of doing a blocking
+ * network refresh on the widget-open path (see the startup IIFE + getOrRefreshToken).
+ */
+const PERSISTED_TOKEN_KEY = "echlyExtensionToken";
+
+/**
+ * Persisted-user shape. We store the SAME minimal fields the session endpoint / broker
+ * supply (the only ones ever populated: name and photoURL are always null from those
+ * sources). Restoring this on rehydrate is essential — hydrateAuthState gates auth on
+ * sw.currentUser?.uid, so a token-only rehydrate would read as UNauthenticated and pop a
+ * spurious login tab for a genuinely-signed-in user on the first open after a cold SW.
+ */
+type PersistedUser = { uid: string; email: string | null; workspaceName: string | null };
+type PersistedToken = { token: string; expiresAt: number; user: PersistedUser | null };
+
+/**
+ * Mirror the in-memory token (and the user it authenticates) to chrome.storage.local.
+ * `expiresAt` is the absolute mint-time expiry (already ≤ the JWT's 15m exp because mint
+ * happens right after the server signs it), so a later rehydrate respects the real
+ * remaining lifetime rather than resetting the clock. Fire-and-forget — never block a
+ * token mint on the write.
+ */
+function persistTokenToStorage(token: string, expiresAt: number, user: PersistedUser | null): void {
+  const value: PersistedToken = { token, expiresAt, user };
+  chrome.storage.local.set({ [PERSISTED_TOKEN_KEY]: value }).catch((err) => {
+    if (ECHLY_DEBUG) console.debug("[ECHLY] persist token failed", err);
+  });
+}
+
+/** Derive the persisted-user payload from the current in-memory user (null if none). */
+function persistedUserFromCurrent(): PersistedUser | null {
+  const u = sw.currentUser;
+  if (!u?.uid) return null;
+  return { uid: u.uid, email: u.email ?? null, workspaceName: u.workspaceName ?? null };
+}
+
+/**
+ * Remove the persisted token. MUST be called at every in-memory invalidation site
+ * (sign-out / auth-invalid / workspace-switch / refresh failure) so a signed-out or
+ * de-authed user cannot have a live token resurrected from storage on the next SW boot.
+ */
+function clearPersistedToken(): void {
+  chrome.storage.local.remove(PERSISTED_TOKEN_KEY).catch((err) => {
+    if (ECHLY_DEBUG) console.debug("[ECHLY] clear persisted token failed", err);
+  });
+}
+
+/**
+ * Adopt a persisted token into the in-memory module vars at startup, IF it is well-formed
+ * and not yet expired (with the same 1-min skew margin used everywhere else, so we never
+ * adopt a token that's about to die on the very next request). An expired/garbage entry is
+ * ignored (and proactively cleared) so getOrRefreshToken falls through to a fresh refresh.
+ * Note: `value` is `unknown` because it comes straight from storage — validate before trust.
+ */
+function rehydratePersistedToken(value: unknown): void {
+  const SKEW_MS = 60 * 1000;
+  if (
+    value &&
+    typeof value === "object" &&
+    typeof (value as PersistedToken).token === "string" &&
+    (value as PersistedToken).token.length > 0 &&
+    typeof (value as PersistedToken).expiresAt === "number"
+  ) {
+    const { token, expiresAt, user } = value as PersistedToken;
+    if (Date.now() < expiresAt - SKEW_MS) {
+      extensionToken = token;
+      extensionTokenExpiresAt = expiresAt;
+      setExtensionToken(token);
+      sw.extensionToken = token;
+      // Restore the user too, so hydrateAuthState (which requires sw.currentUser?.uid)
+      // reports authenticated on the warm path without a network refresh. Without this,
+      // the rehydrated token is useless and every cold-start open would still hit /session.
+      if (user && typeof user.uid === "string" && user.uid.length > 0) {
+        sw.currentUser = {
+          uid: user.uid,
+          name: null,
+          email: user.email ?? null,
+          photoURL: null,
+          workspaceName: user.workspaceName ?? null,
+        };
+        cachedSessionUser = sw.currentUser;
+      }
+      if (ECHLY_DEBUG) {
+        console.log(
+          `[ECHLY] rehydrated extension token + user from storage (~${Math.round((expiresAt - Date.now()) / 1000)}s left)`
+        );
+      }
+      return;
+    }
+  }
+  // Nothing usable — make sure no stale entry lingers.
+  if (value) clearPersistedToken();
+}
+
+/**
+ * ── Open-path latency instrumentation ──────────────────────────────────────────
+ * Six marks from the perf-audit measurement recipe, emitted only when ECHLY_DEBUG.
+ * `perfMark` logs the delta from the run's t0 (handler entry) so a warm/cold/cold-token
+ * open can be read off the console without external tooling. Zero cost when debug is off.
+ */
+function perfMark(label: string, t0: number): void {
+  if (!ECHLY_DEBUG) return;
+  // performance.now() is monotonic and available in SW; falls back to 0 offset if absent.
+  const now = typeof performance !== "undefined" ? performance.now() : t0;
+  console.log(`[ECHLY PERF] ${label} +${(now - t0).toFixed(1)}ms`);
+}
+function perfNow(): number {
+  return typeof performance !== "undefined" ? performance.now() : 0;
+}
 
 async function openOrFocusLoginTab(): Promise<void> {
   const tabs = await chrome.tabs.query({});
@@ -38,6 +161,9 @@ function clearAuthState(): void {
   sw.currentUser = null;
   cachedSessionUser = null;
   setExtensionToken(null);
+  // Wipe the storage copy too, so a cold SW boot can't rehydrate a token the
+  // server just rejected / a signed-out user no longer owns.
+  clearPersistedToken();
 }
 
 function logMessageDeliveryError(context: string, error: unknown): void {
@@ -81,6 +207,18 @@ async function sendMessageWithRetry(
   }
 }
 
+/**
+ * Fix 3.1: fire-and-forget "the widget is opening" ping. Sent as the VERY FIRST thing on
+ * every explicit-open entry point — before requireAuthForExplicitOpen and every await — so
+ * bootstrap can paint a static skeleton within a frame of the click, while the SW is still
+ * resolving auth and the widget bundle is still downloading. Errors (tab has no bootstrap,
+ * chrome:// page, tab gone) are swallowed silently: this is pure best-effort UI warming.
+ */
+function sendOpeningSignal(tabId: number | undefined): void {
+  if (typeof tabId !== "number") return;
+  chrome.tabs.sendMessage(tabId, { type: "ECHLY_OPENING" }).catch(() => { /* no bootstrap / restricted page */ });
+}
+
 if (ECHLY_DEBUG) console.log("[EXTENSION] background ready", API_BASE);
 
 /** Verify dashboard session (cookie) is still valid. Does not use extension token. */
@@ -110,34 +248,40 @@ async function startSessionInActiveTab(): Promise<void> {
     .catch((error) => logMessageDeliveryError("ECHLY_START_SESSION", error));
 }
 
-chrome.action.onClicked.addListener(() => {
-  chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-    const tab = tabs[0];
-    if (tab?.id) sw.lastUserTabId = tab.id;
+chrome.action.onClicked.addListener((tab) => {
+  // onClicked hands us the clicked tab directly — no tabs.query needed (Fix 4.1).
+  const tabId = tab?.id;
+  if (typeof tabId === "number") sw.lastUserTabId = tabId;
 
-    if (trayOpen) {
-      globalUIState.visible = false;
-      globalUIState.expanded = false;
-      trayOpen = false;
-      cachedEchlyActive = false;
-      /* Stage 2 — TRAY-CLOSE stop-signal (icon-toggle-off path). The user fully
-         closed the tray, so they are no longer engaged: stop capture and purge the
-         engagement buffer (memory + storage). Per the locked design we deliberately
-         LEAVE any active session as-is (orphaned, matching today's behavior) rather
-         than auto-ending it. */
-      stopAndPurgeCapture();
-      await chrome.storage.local.set({ echlyActive: false });
-      broadcastUIState();
-      if (tab?.id) {
-        chrome.tabs
-          .sendMessage(tab.id, { type: "ECHLY_CLOSE_WIDGET" })
-          .catch((error) => logMessageDeliveryError("ECHLY_CLOSE_WIDGET", error));
-      }
-      return;
+  // trayOpen is a synchronous module flag, so we can branch open-vs-close before any
+  // await. On the OPEN path, fire ECHLY_OPENING as the very first thing so bootstrap
+  // paints the skeleton immediately, in parallel with auth + the widget bundle load.
+  if (!trayOpen) {
+    sendOpeningSignal(tabId);
+    void openRecorderUI(tabId);
+    return;
+  }
+
+  // CLOSE path (tray was open): toggle off. No skeleton involved.
+  void (async () => {
+    globalUIState.visible = false;
+    globalUIState.expanded = false;
+    trayOpen = false;
+    cachedEchlyActive = false;
+    /* Stage 2 — TRAY-CLOSE stop-signal (icon-toggle-off path). The user fully
+       closed the tray, so they are no longer engaged: stop capture and purge the
+       engagement buffer (memory + storage). Per the locked design we deliberately
+       LEAVE any active session as-is (orphaned, matching today's behavior) rather
+       than auto-ending it. */
+    stopAndPurgeCapture();
+    await chrome.storage.local.set({ echlyActive: false });
+    broadcastUIState();
+    if (typeof tabId === "number") {
+      chrome.tabs
+        .sendMessage(tabId, { type: "ECHLY_CLOSE_WIDGET" })
+        .catch((error) => logMessageDeliveryError("ECHLY_CLOSE_WIDGET", error));
     }
-
-    await openRecorderUI();
-  });
+  })();
 });
 
 type StoredUser = { uid: string; name: string | null; email: string | null; photoURL: string | null; workspaceName: string | null };
@@ -196,9 +340,14 @@ sw.lastUserTabId = null;
 let activeSessionId: string | null = null;
 let activeOwnerTabId: number | null = null;
 
-/** In-memory extension token (from auth broker page). Never stored in chrome.storage or localStorage. */
+/**
+ * In-memory extension token (from auth broker page or /api/extension/session).
+ * ALSO mirrored to chrome.storage.local under PERSISTED_TOKEN_KEY (extension-private)
+ * so a cold service-worker restart can rehydrate it without a blocking network refresh
+ * on the widget-open path. Every mint writes through; every invalidation clears both.
+ */
 let extensionToken: string | null = null;
-/** When the in-memory token expires (timestamp). */
+/** When the in-memory token expires (absolute timestamp, ms). Persisted alongside the token. */
 let extensionTokenExpiresAt: number | null = null;
 /** Cached user from last successful session response; used for ECHLY_GET_AUTH_STATE. */
 let cachedSessionUser: StoredUser | null = null;
@@ -679,40 +828,38 @@ function persistSessionLifecycleState(): void {
   });
 }
 
-async function initializeSessionState(): Promise<void> {
-  return new Promise<void>((resolve) => {
-    chrome.storage.local.get(
-      ["activeSessionId", "sessionModeActive", "sessionPaused"],
-      (result: { activeSessionId?: string; sessionModeActive?: boolean; sessionPaused?: boolean }) => {
-        activeSessionId =
-          typeof result.activeSessionId === "string"
-            ? result.activeSessionId
-            : null;
+/**
+ * Hydrate session state from already-read storage values. The caller (startup IIFE)
+ * batches activeSessionId/sessionModeActive/sessionPaused into its single storage.get
+ * (Fix 4.2) and passes them here, so this no longer does its own redundant read.
+ */
+async function initializeSessionState(result: {
+  activeSessionId?: string;
+  sessionModeActive?: boolean;
+  sessionPaused?: boolean;
+}): Promise<void> {
+  activeSessionId =
+    typeof result.activeSessionId === "string" ? result.activeSessionId : null;
 
-        globalUIState.sessionId = activeSessionId;
-        globalUIState.sessionModeActive = result.sessionModeActive === true;
-        globalUIState.sessionPaused = result.sessionPaused === true;
+  globalUIState.sessionId = activeSessionId;
+  globalUIState.sessionModeActive = result.sessionModeActive === true;
+  globalUIState.sessionPaused = result.sessionPaused === true;
 
-        const isColdStartRestart = activeSessionId != null && globalUIState.lastSyncedAt == null;
-        const shouldReloadPointers = isColdStartRestart;
+  const isColdStartRestart = activeSessionId != null && globalUIState.lastSyncedAt == null;
+  const shouldReloadPointers = isColdStartRestart;
 
-        if (shouldReloadPointers) {
-          void rehydrateSession(activeSessionId!).finally(() => {
-            resolve();
-          });
-        } else {
-          globalUIState.sessionModeActive = false;
-          globalUIState.totalCount = 0;
-          globalUIState.openCount = 0;
-          globalUIState.resolvedCount = 0;
-          resetPaginationState();
-          globalUIState.lastSyncedAt = null;
-          globalUIState.lastPaginationAt = null;
-          resolve();
-        }
-      }
-    );
-  });
+  if (shouldReloadPointers) {
+    await rehydrateSession(activeSessionId!).catch(() => { /* logged in rehydrateSession */ });
+    return;
+  }
+
+  globalUIState.sessionModeActive = false;
+  globalUIState.totalCount = 0;
+  globalUIState.openCount = 0;
+  globalUIState.resolvedCount = 0;
+  resetPaginationState();
+  globalUIState.lastSyncedAt = null;
+  globalUIState.lastPaginationAt = null;
 }
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -762,11 +909,22 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 (async () => {
   try {
+    // Fix 4.2: one batched read for everything startup needs — the token rehydrate
+    // (Fix 1.2), the engagement/tray flags, and the session keys that
+    // initializeSessionState used to fetch in a second round-trip.
     const stored = await chrome.storage.local.get([
       "echlyActive",
       "activeSessionId",
       "sessionModeActive",
+      "sessionPaused",
+      PERSISTED_TOKEN_KEY,
     ]);
+
+    // Fix 1.2: rehydrate the extension token into the module vars BEFORE anything on
+    // the open path can call getOrRefreshToken. Only adopt it if still unexpired — an
+    // expired persisted token must fall through to a fresh network refresh, not be
+    // trusted. After this, a warm-ish cold SW returns the token instantly (no fetch).
+    rehydratePersistedToken(stored?.[PERSISTED_TOKEN_KEY]);
 
     cachedEchlyActive = !!stored?.echlyActive;
     if (stored?.echlyActive) {
@@ -775,7 +933,11 @@ chrome.alarms.onAlarm.addListener((alarm) => {
       globalUIState.expanded = true;
     }
 
-    await initializeSessionState();
+    await initializeSessionState({
+      activeSessionId: typeof stored?.activeSessionId === "string" ? stored.activeSessionId : undefined,
+      sessionModeActive: stored?.sessionModeActive === true,
+      sessionPaused: stored?.sessionPaused === true,
+    });
 
     broadcastUIState();
 
@@ -819,9 +981,17 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 })();
 
 /**
+ * Single-flight guard for the network token refresh. When the open path resolves auth
+ * in parallel (Fix 2) the widget's own GET_AUTH_STATE can land while requireAuthForExplicitOpen
+ * is still mid-refresh; without this guard a cold SW would fire two POST /api/extension/session
+ * round-trips. Both callers now await the same in-flight promise. Cleared in `finally`.
+ */
+let tokenRefreshInFlight: Promise<string> | null = null;
+
+/**
  * Single token path:
  * - valid in-memory token -> return
- * - expired/missing token -> refresh from extension session endpoint
+ * - expired/missing token -> refresh from extension session endpoint (single-flight)
  * - any failure -> throw NOT_AUTHENTICATED
  */
 async function getOrRefreshToken(): Promise<string> {
@@ -837,6 +1007,16 @@ async function getOrRefreshToken(): Promise<string> {
     return extensionToken;
   }
 
+  // Coalesce concurrent refreshes into one network round-trip.
+  if (tokenRefreshInFlight) return tokenRefreshInFlight;
+  tokenRefreshInFlight = refreshTokenFromServer().finally(() => {
+    tokenRefreshInFlight = null;
+  });
+  return tokenRefreshInFlight;
+}
+
+/** Network token refresh. Only ever invoked via getOrRefreshToken's single-flight guard. */
+async function refreshTokenFromServer(): Promise<string> {
   const res = await fetch(`${API_BASE}/api/extension/session`, {
     method: "POST",
     cache: "no-store",
@@ -875,6 +1055,9 @@ async function getOrRefreshToken(): Promise<string> {
     };
     cachedSessionUser = sw.currentUser;
   }
+  // Persist token + user together (after currentUser is set) so a cold-SW rehydrate
+  // restores both and reads as authenticated without a network refresh.
+  persistTokenToStorage(token, extensionTokenExpiresAt, persistedUserFromCurrent());
   return token;
 }
 
@@ -1179,6 +1362,36 @@ type EngagementException = ExceptionEntry;
 type EngagementNetwork = NetworkRequestEntry;
 type EngagementAction = UserAction;
 
+/**
+ * Per-engagement ACTIONS WATERMARK (userActions only). Within one engagement, each
+ * filed ticket's userActions should contain ONLY the actions that occurred AFTER the
+ * previous successfully-filed ticket — so ticket 2+ doesn't repeat ticket 1's journey.
+ *
+ * This is a FILTER applied at the file-time merge, NOT a buffer-clear: the SW
+ * engagement buffer's `actions` array and the MAIN-world ActionBuffer are left intact
+ * (console/network are deliberately NOT watermarked — they keep the full engagement
+ * window). The watermark advances ONLY after a ticket is successfully created; a failed
+ * submission leaves it untouched so a retry re-includes the same actions.
+ *
+ * `timestamp` is the max timestamp among the actions included in the last filed ticket.
+ * `includedIds` are the UUIDs of those included actions whose timestamp EQUALS the
+ * watermark timestamp — the millisecond-collision tiebreak so same-ms actions filed in
+ * the previous ticket aren't re-emitted while same-ms actions that arrived later still
+ * pass. Capped small (it only needs same-ms ids).
+ *
+ * null = no watermark yet → the engagement's first ticket keeps full history. A fresh
+ * engagement (tray re-open, soft-end re-arm) starts with a new buffer whose watermark is
+ * null, and the watermark is purged for free when the engagement buffer is purged.
+ */
+interface ActionsWatermark {
+  timestamp: number;
+  includedIds: Set<string>;
+}
+
+/** Cap on the same-ms tiebreak id set; a single millisecond can only realistically hold
+ *  a handful of distinct actions, so this is generous. */
+const ACTIONS_WATERMARK_MAX_IDS = 32;
+
 interface EngagementBuffer {
   logs: EngagementConsoleLog[];
   exceptions: EngagementException[];
@@ -1186,17 +1399,68 @@ interface EngagementBuffer {
   actions: EngagementAction[];
   /** True once ECHLY_SESSION_MODE_START claimed this engagement; gates persistence. */
   claimed: boolean;
+  /** Per-engagement userActions watermark; null until the first ticket is filed. NOT
+   *  persisted to storage — see persistEngagementBuffer / restorePersistedEngagement. */
+  actionsWatermark: ActionsWatermark | null;
 }
 
 /** tabId → engagement id. One engagement per engaged tray; all tabs the user
  *  visits during that engagement share the same id (set on tab activation /
  *  navigation re-arm so every engaged tab forwards into the same buffer). */
 const tabEngagementIds = new Map<number, string>();
-/** engagement id → accumulated cross-navigation buffer (memory-resident). */
+/**
+ * Buffer key → accumulated buffer (memory-resident).
+ *
+ * PRIVACY-CRITICAL KEY SHAPE: the key is `${engagementId}:${tabId}`, NOT the
+ * engagement id alone. Each engaged tab gets its OWN bucket so a ticket filed
+ * on tab B never inherits tab A's actions/logs/requests (the cross-tab leak fix
+ * — Fix A). Same-tab cross-navigation continuity is preserved for free because
+ * a tab keeps its id across navigation, so an X→Y journey in ONE tab keeps one
+ * bucket (the engagement id is stable across navigation; it only changes on a
+ * tray re-open or soft-end re-arm). Buckets are minted lazily on first flush;
+ * `beginEngagement` no longer pre-creates one under the bare engagement id.
+ *
+ * SW-MEMORY NOTE: eviction caps (count/byte/age) now apply per-tab-bucket, so
+ * total resident capture memory ≈ (per-surface caps) × (engaged tabs in the
+ * engagement). With the 200-entry / 256 KiB-per-bucket caps that is bounded and
+ * acceptable for realistic engaged-tab counts.
+ */
 const engagementBuffers = new Map<string, EngagementBuffer>();
+
+/** The per-tab bucket key. Engagement id + tab id — see engagementBuffers. */
+function bufferKey(engagementId: string, tabId: number): string {
+  return `${engagementId}:${tabId}`;
+}
+
+/** Prefix that matches every per-tab bucket key of one engagement. Used by the
+ *  purge sweep and by per-engagement fan-outs (claim/persist). The trailing ":"
+ *  prevents `eng-1` from matching `eng-12`'s keys. */
+function engagementKeyPrefix(engagementId: string): string {
+  return `${engagementId}:`;
+}
+
+/** All live bucket keys belonging to one engagement (any tab). */
+function bucketKeysForEngagement(engagementId: string): string[] {
+  const prefix = engagementKeyPrefix(engagementId);
+  const out: string[] = [];
+  for (const key of engagementBuffers.keys()) {
+    if (key.startsWith(prefix)) out.push(key);
+  }
+  return out;
+}
 /** The engagement id for the CURRENT tray engagement. Minted at tray-open,
  *  re-minted on soft-end re-arm; null when no tray is engaged. */
 let currentEngagementId: string | null = null;
+
+/**
+ * Engagement ids that have been CLAIMED (session committed → persistable).
+ * Claim is an engagement-level property, but buckets are now per-tab and minted
+ * lazily (Fix A), so a tab whose first flush lands AFTER session-start would
+ * otherwise miss the one-shot claim and never persist. Tracking the claim here
+ * lets every bucket — current or future — of a claimed engagement inherit
+ * `claimed: true` at creation/merge time. Cleared per engagement on purge.
+ */
+const claimedEngagementIds = new Set<string>();
 
 function genEngagementId(): string {
   try {
@@ -1210,7 +1474,7 @@ function genEngagementId(): string {
 }
 
 function emptyEngagementBuffer(): EngagementBuffer {
-  return { logs: [], exceptions: [], network: [], actions: [], claimed: false };
+  return { logs: [], exceptions: [], network: [], actions: [], claimed: false, actionsWatermark: null };
 }
 
 /** Stable dedup key per surface. Network + actions carry their own UUID; console
@@ -1233,7 +1497,10 @@ function exceptionKey(e: EngagementException): string {
 function beginEngagement(tabId?: number): string {
   const id = genEngagementId();
   currentEngagementId = id;
-  engagementBuffers.set(id, emptyEngagementBuffer());
+  // Buckets are keyed per-tab (`${engagementId}:${tabId}`) and minted lazily on
+  // the tab's first flush (mergeFlushIntoEngagement) — do NOT pre-create one
+  // under the bare engagement id, or it becomes an unreachable orphan that the
+  // composite-key reads never find.
   if (typeof tabId === "number") tabEngagementIds.set(tabId, id);
   // Start the coarse safety-net flush alarm for this engagement (idempotent —
   // chrome.alarms.create replaces an existing alarm of the same name).
@@ -1337,11 +1604,14 @@ function oldestSurface(buf: EngagementBuffer): "logs" | "exceptions" | "network"
   return best;
 }
 
-/** Merge an incoming flush snapshot into the engagement buffer, deduped per
- *  surface, then evict and (if claimed) persist. `surface` selects which arrays
- *  in the snapshot are relevant; we tolerate a snapshot carrying any subset. */
+/** Merge an incoming flush snapshot into the per-tab engagement bucket, deduped
+ *  per surface, then evict and (if claimed) persist. The bucket is keyed by
+ *  `${engagementId}:${tabId}` so each tab accumulates in isolation (Fix A —
+ *  prevents the cross-tab privacy leak). `surface` selects which arrays in the
+ *  snapshot are relevant; we tolerate a snapshot carrying any subset. */
 function mergeFlushIntoEngagement(
   engagementId: string,
+  tabId: number,
   snapshot: {
     logs?: EngagementConsoleLog[];
     exceptions?: EngagementException[];
@@ -1349,10 +1619,16 @@ function mergeFlushIntoEngagement(
     actions?: EngagementAction[];
   }
 ): void {
-  let buf = engagementBuffers.get(engagementId);
+  const key = bufferKey(engagementId, tabId);
+  let buf = engagementBuffers.get(key);
   if (!buf) {
     buf = emptyEngagementBuffer();
-    engagementBuffers.set(engagementId, buf);
+    engagementBuffers.set(key, buf);
+  }
+  // A late-arriving tab in an already-claimed engagement must persist too —
+  // inherit the engagement's claim so its mirror survives an SW eviction.
+  if (!buf.claimed && claimedEngagementIds.has(engagementId)) {
+    buf.claimed = true;
   }
 
   if (Array.isArray(snapshot.logs) && snapshot.logs.length > 0) {
@@ -1387,25 +1663,38 @@ function mergeFlushIntoEngagement(
   }
 
   evictEngagementBuffer(buf);
-  if (buf.claimed) void persistEngagementBuffer(engagementId);
+  if (buf.claimed) void persistEngagementBuffer(key);
 }
 
 /** Mark the current engagement claimed (session committed) and flush its
- *  current memory state to disk. Idempotent. */
+ *  current memory state to disk. Idempotent. Fans out over EVERY per-tab bucket
+ *  of the current engagement so each tab's mirror is independently persistable —
+ *  the privacy isolation (Fix A) must survive an SW eviction + cold-start
+ *  restore, otherwise a restore would re-merge all tabs into one bucket. */
 function claimCurrentEngagement(): void {
   if (currentEngagementId == null) return;
-  const buf = engagementBuffers.get(currentEngagementId);
-  if (!buf) return;
-  buf.claimed = true;
-  void persistEngagementBuffer(currentEngagementId);
+  // Record the engagement-level claim so buckets minted later (a tab whose first
+  // flush arrives after session-start) inherit it in mergeFlushIntoEngagement.
+  claimedEngagementIds.add(currentEngagementId);
+  const keys = bucketKeysForEngagement(currentEngagementId);
+  for (const key of keys) {
+    const buf = engagementBuffers.get(key);
+    if (!buf) continue;
+    buf.claimed = true;
+    void persistEngagementBuffer(key);
+  }
 }
 
-async function persistEngagementBuffer(engagementId: string): Promise<void> {
-  const buf = engagementBuffers.get(engagementId);
+/** Persist ONE per-tab bucket. `mapKey` is the composite `${eng}:${tabId}`
+ *  engagementBuffers map key; the storage key mirrors it 1:1 under
+ *  ENGAGEMENT_STORAGE_PREFIX so a cold-start restore rebuilds the same per-tab
+ *  partitioning. */
+async function persistEngagementBuffer(mapKey: string): Promise<void> {
+  const buf = engagementBuffers.get(mapKey);
   if (!buf || !buf.claimed) return;
   try {
     await chrome.storage.local.set({
-      [ENGAGEMENT_STORAGE_PREFIX + engagementId]: {
+      [ENGAGEMENT_STORAGE_PREFIX + mapKey]: {
         logs: buf.logs,
         exceptions: buf.exceptions,
         network: buf.network,
@@ -1429,71 +1718,135 @@ function removeStorageKey(key: string): void {
   }
 }
 
+/** Split a persisted bucket storage key back into its (engagementId, tabId)
+ *  parts. The stored key is `${PREFIX}${engagementId}:${tabId}`; engagement ids
+ *  never contain ":" (see genEngagementId), so the LAST ":" separates the tab
+ *  id. Returns null for any malformed/legacy key (e.g. a pre-Fix-A key with no
+ *  tab segment), so such orphans are dropped rather than mis-adopted. */
+function parseBucketStorageKey(
+  storageKey: string
+): { engagementId: string; tabId: number } | null {
+  const composite = storageKey.slice(ENGAGEMENT_STORAGE_PREFIX.length);
+  const lastColon = composite.lastIndexOf(":");
+  if (lastColon <= 0 || lastColon === composite.length - 1) return null;
+  const engagementId = composite.slice(0, lastColon);
+  const tabId = Number(composite.slice(lastColon + 1));
+  if (!Number.isInteger(tabId)) return null;
+  return { engagementId, tabId };
+}
+
 /**
  * Cold-start restore (Stage 4 persist-guard companion). In-memory engagement
  * buffers and currentEngagementId are lost when the SW is evicted. Only CLAIMED
  * engagements were ever mirrored to chrome.storage.local, so on restart we adopt
- * the persisted (claimed) buffer — if one exists — as the current engagement so a
+ * the persisted (claimed) buckets — if any exist — as the current engagement so a
  * ticket filed after the restart still carries the pre-restart journey. There is
- * at most one persisted engagement at a time (both stop-signals remove it).
+ * at most one persisted engagement at a time (both stop-signals purge it), but it
+ * now spans MULTIPLE per-tab storage keys (Fix A), so we adopt every bucket of the
+ * single adopted engagement and keep them partitioned per tab — the cross-tab
+ * isolation survives the restore (a restore must NOT collapse tabs into one bucket).
  * Returns the adopted engagement id, or null if nothing was persisted/adoptable.
  *
  * FRESHNESS GATE (defense-in-depth for the rare case a stop-signal's fire-and-forget
- * storage.remove was lost): after eviction, if the persisted buffer is entirely empty
- * (every entry aged past the 10-min window — i.e. a stale mirror from a long-dead
- * engagement), we do NOT adopt it; we delete the orphan and return null so a fresh
- * engagement is minted instead. A recently-ended session's sub-10-min entries would
- * survive eviction, but the in-memory delete on stop is synchronous and the remove is
- * dispatched before the handler returns, so the realistic loss window is negligible.
+ * storage.remove was lost): after eviction, buckets that are entirely empty (every
+ * entry aged past the 10-min window — a stale mirror from a long-dead engagement) are
+ * dropped. If EVERY bucket of the adopted engagement is empty we adopt nothing and
+ * return null so a fresh engagement is minted instead. A recently-ended session's
+ * sub-10-min entries would survive eviction, but the in-memory delete on stop is
+ * synchronous and the remove is dispatched before the handler returns, so the
+ * realistic loss window is negligible.
  */
 async function restorePersistedEngagement(boundTabId?: number): Promise<string | null> {
   try {
     const all = await chrome.storage.local.get(null);
     const keys = Object.keys(all).filter((k) => k.startsWith(ENGAGEMENT_STORAGE_PREFIX));
     if (keys.length === 0) return null;
-    // Defensive: if more than one slipped through, keep the first and drop the rest.
-    const [adopt, ...stale] = keys;
-    for (const k of stale) removeStorageKey(k);
-    const engagementId = adopt.slice(ENGAGEMENT_STORAGE_PREFIX.length);
-    const raw = all[adopt] as Partial<EngagementBuffer> | undefined;
-    const buf: EngagementBuffer = {
-      logs: Array.isArray(raw?.logs) ? raw!.logs! : [],
-      exceptions: Array.isArray(raw?.exceptions) ? raw!.exceptions! : [],
-      network: Array.isArray(raw?.network) ? raw!.network! : [],
-      actions: Array.isArray(raw?.actions) ? raw!.actions! : [],
-      claimed: true,
-    };
-    evictEngagementBuffer(buf);
-    const isEmpty =
-      buf.logs.length === 0 &&
-      buf.exceptions.length === 0 &&
-      buf.network.length === 0 &&
-      buf.actions.length === 0;
-    if (isEmpty) {
-      // Stale orphan mirror — drop it and mint fresh instead of adopting.
-      removeStorageKey(adopt);
-      return null;
+
+    // Group persisted bucket keys by engagement id. There should be exactly one
+    // engagement; if more slipped through, adopt the first and drop the others'
+    // storage keys. Legacy/malformed keys (no tab segment) are dropped outright.
+    let adoptedEngagementId: string | null = null;
+    const adoptKeys: string[] = [];
+    for (const storageKey of keys) {
+      const parsed = parseBucketStorageKey(storageKey);
+      if (!parsed) {
+        removeStorageKey(storageKey);
+        continue;
+      }
+      if (adoptedEngagementId == null) adoptedEngagementId = parsed.engagementId;
+      if (parsed.engagementId === adoptedEngagementId) {
+        adoptKeys.push(storageKey);
+      } else {
+        // A second engagement's stale mirror — drop it.
+        removeStorageKey(storageKey);
+      }
     }
-    engagementBuffers.set(engagementId, buf);
-    currentEngagementId = engagementId;
-    if (typeof boundTabId === "number") tabEngagementIds.set(boundTabId, engagementId);
-    return engagementId;
+    if (adoptedEngagementId == null || adoptKeys.length === 0) return null;
+
+    let adoptedAny = false;
+    for (const storageKey of adoptKeys) {
+      const parsed = parseBucketStorageKey(storageKey);
+      if (!parsed) continue;
+      const raw = all[storageKey] as Partial<EngagementBuffer> | undefined;
+      const buf: EngagementBuffer = {
+        logs: Array.isArray(raw?.logs) ? raw!.logs! : [],
+        exceptions: Array.isArray(raw?.exceptions) ? raw!.exceptions! : [],
+        network: Array.isArray(raw?.network) ? raw!.network! : [],
+        actions: Array.isArray(raw?.actions) ? raw!.actions! : [],
+        claimed: true,
+        // Watermark is intentionally NOT persisted (Set isn't JSON-serializable and the
+        // cut is a memory-only filter). A cold-start restore therefore begins with no
+        // watermark — the first ticket filed post-restart keeps the full restored journey.
+        actionsWatermark: null,
+      };
+      evictEngagementBuffer(buf);
+      const isEmpty =
+        buf.logs.length === 0 &&
+        buf.exceptions.length === 0 &&
+        buf.network.length === 0 &&
+        buf.actions.length === 0;
+      if (isEmpty) {
+        // Stale orphan mirror for this tab — drop it.
+        removeStorageKey(storageKey);
+        continue;
+      }
+      engagementBuffers.set(bufferKey(adoptedEngagementId, parsed.tabId), buf);
+      // Re-bind the tab that produced this bucket so a flush from a still-open
+      // page lands back in its own restored bucket rather than minting a new one.
+      tabEngagementIds.set(parsed.tabId, adoptedEngagementId);
+      adoptedAny = true;
+    }
+
+    if (!adoptedAny) return null;
+    currentEngagementId = adoptedEngagementId;
+    // Adopted buckets were CLAIMED; record the engagement-level claim so a
+    // post-restore late-arriving tab also persists (mirrors claimCurrentEngagement).
+    claimedEngagementIds.add(adoptedEngagementId);
+    if (typeof boundTabId === "number") tabEngagementIds.set(boundTabId, adoptedEngagementId);
+    return adoptedEngagementId;
   } catch (e) {
     if (ECHLY_DEBUG) console.debug("[ECHLY] restore persisted engagement failed", e);
     return null;
   }
 }
 
-/** Snapshot of an engagement's accumulated cross-page entries, used at file-time. */
-function getEngagementSnapshot(engagementId: string | null): {
+/** Snapshot of ONE TAB's accumulated cross-navigation entries within an
+ *  engagement, used at file-time. Reads ONLY the filing tab's bucket
+ *  (`${engagementId}:${tabId}`) so the ticket can never inherit a sibling tab's
+ *  activity (Fix A — the cross-tab privacy leak). Same-tab navigation history
+ *  is fully present because all of that tab's pages share this one bucket. */
+function getEngagementSnapshot(
+  engagementId: string | null,
+  tabId: number | undefined
+): {
   logs: EngagementConsoleLog[];
   exceptions: EngagementException[];
   network: EngagementNetwork[];
   actions: EngagementAction[];
 } {
   const empty = { logs: [], exceptions: [], network: [], actions: [] };
-  if (engagementId == null) return empty;
-  const buf = engagementBuffers.get(engagementId);
+  if (engagementId == null || typeof tabId !== "number") return empty;
+  const buf = engagementBuffers.get(bufferKey(engagementId, tabId));
   if (!buf) return empty;
   evictEngagementBuffer(buf);
   return {
@@ -1519,9 +1872,10 @@ function getEngagementSnapshot(engagementId: string | null): {
  */
 function mergeEngagementIntoTicket(
   engagementId: string | null,
+  tabId: number | undefined,
   ticket: Record<string, unknown>
 ): Record<string, unknown> {
-  const eng = getEngagementSnapshot(engagementId);
+  const eng = getEngagementSnapshot(engagementId, tabId);
 
   const liveLogs = Array.isArray(ticket.consoleLogs) ? (ticket.consoleLogs as EngagementConsoleLog[]) : [];
   const liveExceptions = Array.isArray(ticket.exceptions) ? (ticket.exceptions as EngagementException[]) : [];
@@ -1545,7 +1899,25 @@ function mergeEngagementIntoTicket(
   const logs = dedupBy([...eng.logs, ...liveLogs], consoleLogKey).sort(byTs);
   const exceptions = dedupBy([...eng.exceptions, ...liveExceptions], exceptionKey).sort(byTs);
   const network = dedupBy([...eng.network, ...liveNetwork], (e) => e.id).sort(byTs);
-  const actions = dedupBy([...eng.actions, ...liveActions], (e) => e.id).sort(byTs);
+  const allActions = dedupBy([...eng.actions, ...liveActions], (e) => e.id).sort(byTs);
+
+  /* ACTIONS WATERMARK FILTER (userActions ONLY). Console/network above are untouched —
+     they keep the full engagement window. After producing the merged, deduped,
+     time-ordered actions list, drop everything at-or-before the previous filed ticket's
+     cut: keep actions whose timestamp is AFTER the watermark, plus same-ms actions that
+     were NOT already included last time (includedIds tiebreak). No watermark → keep all.
+     The watermark only advances on a SUCCESSFUL file (see advanceActionsWatermark at the
+     ECHLY_CREATE_FEEDBACK success site), so a failed/retried submission re-includes the
+     same actions. */
+  const wm =
+    engagementId != null && typeof tabId === "number"
+      ? engagementBuffers.get(bufferKey(engagementId, tabId))?.actionsWatermark ?? null
+      : null;
+  const actions = wm == null
+    ? allActions
+    : allActions.filter(
+        (a) => a.timestamp > wm.timestamp || (a.timestamp === wm.timestamp && !wm.includedIds.has(a.id))
+      );
 
   const merged: Record<string, unknown> = { ...ticket };
 
@@ -1566,6 +1938,13 @@ function mergeEngagementIntoTicket(
         (typeof r.status === "number" && r.status >= 400 && r.status < 600)
     ).length;
   }
+  // userActions / userActionCount reflect the FILTERED (post-watermark) list. When the
+  // filter leaves zero actions (a ticket with no new journey beyond its own filing click,
+  // which itself post-dates the watermark and so survives), we still want the ticket to
+  // carry an accurate count — but to match the existing console/network passthrough
+  // contract we only override when there is something to attach. An empty filtered list
+  // means the live ticket already carried the right (small) actions; leaving it as-is is
+  // fine because the watermark guarantees the filing click is newer than the cut.
   if (actions.length > 0) {
     merged.userActions = actions;
     merged.userActionCount = actions.length;
@@ -1574,15 +1953,80 @@ function mergeEngagementIntoTicket(
   return merged;
 }
 
-/** Fully purge one engagement: in-memory buffer, every tab binding pointing at
- *  it, and the persisted storage mirror. Used by both stop-signals. */
+/**
+ * Advance the engagement's actions watermark after a SUCCESSFUL ticket creation.
+ * `includedActions` is the exact (filtered) list that was filed. The new watermark
+ * timestamp is the max timestamp among those actions, and includedIds is the set of
+ * filed-action ids AT that exact timestamp (the same-ms tiebreak). If the filed ticket
+ * included zero actions, the watermark does NOT advance. Called only on the success path
+ * so a failed/retried submission keeps including the same actions.
+ */
+function advanceActionsWatermark(
+  engagementId: string | null,
+  tabId: number | undefined,
+  includedActions: EngagementAction[]
+): void {
+  if (engagementId == null || typeof tabId !== "number") return;
+  if (!Array.isArray(includedActions) || includedActions.length === 0) return;
+  // Per-tab watermark: the cut advances only for the bucket that was actually
+  // filed from, so each tab tracks its own "already filed" boundary (Fix A).
+  const buf = engagementBuffers.get(bufferKey(engagementId, tabId));
+  if (!buf) return;
+
+  let maxTs = -Infinity;
+  for (const a of includedActions) {
+    if (a && typeof a.timestamp === "number" && a.timestamp > maxTs) maxTs = a.timestamp;
+  }
+  if (!Number.isFinite(maxTs)) return;
+
+  const idsAtMax = includedActions
+    .filter((a) => a && a.timestamp === maxTs && typeof a.id === "string")
+    .map((a) => a.id);
+  // Same-ms collisions are rare; cap defensively so a pathological burst can't grow the
+  // set unbounded. Keeping the first N is sufficient — the watermark timestamp already
+  // excludes everything strictly older.
+  const includedIds = new Set(idsAtMax.slice(0, ACTIONS_WATERMARK_MAX_IDS));
+
+  // Never move the watermark backwards (e.g. an out-of-order retry whose merged list is
+  // somehow older); only advance.
+  if (buf.actionsWatermark != null && maxTs < buf.actionsWatermark.timestamp) return;
+  buf.actionsWatermark = { timestamp: maxTs, includedIds };
+}
+
+/** Fully purge one engagement: EVERY per-tab in-memory bucket
+ *  (`${engagementId}:*`), every tab binding pointing at it, and every persisted
+ *  per-tab storage mirror. Used by both stop-signals. Iterating by prefix is
+ *  required now that buckets are per-tab (Fix A) — deleting the bare engagement
+ *  id would leave each tab's bucket resident and leak into a re-armed engagement. */
 function purgeEngagement(engagementId: string | null): void {
   if (engagementId == null) return;
-  engagementBuffers.delete(engagementId);
+  // Engagement-level claim flag.
+  claimedEngagementIds.delete(engagementId);
+  // In-memory per-tab buckets.
+  for (const key of bucketKeysForEngagement(engagementId)) {
+    engagementBuffers.delete(key);
+  }
+  // Tab bindings.
   for (const [tabId, id] of tabEngagementIds) {
     if (id === engagementId) tabEngagementIds.delete(tabId);
   }
-  removeStorageKey(ENGAGEMENT_STORAGE_PREFIX + engagementId);
+  // Persisted per-tab storage mirrors. We don't know which tab ids were
+  // persisted, so enumerate storage keys under this engagement's prefix and
+  // remove each. Best-effort + async; the in-memory delete above is the
+  // synchronous guarantee the purge invariant relies on.
+  try {
+    const storagePrefix = ENGAGEMENT_STORAGE_PREFIX + engagementKeyPrefix(engagementId);
+    void chrome.storage.local
+      .get(null)
+      .then((all) => {
+        for (const k of Object.keys(all)) {
+          if (k.startsWith(storagePrefix)) removeStorageKey(k);
+        }
+      })
+      .catch(() => {});
+  } catch {
+    // chrome.storage unavailable — ignore.
+  }
 }
 
 /**
@@ -1613,35 +2057,47 @@ function stopAndPurgeCapture(engagementId: string | null = currentEngagementId):
   }
 }
 
-async function openWidgetInActiveTab(): Promise<void> {
+/**
+ * Paint the widget into a known tab: ensure bootstrap is present, then tell it to open.
+ * This is the part of an open that produces visible UI (the loading pill / tray). It does
+ * NOT commit engagement state or arm capture — that is commitOpenEngagement, gated on auth.
+ * Returns the tabId on success so the caller can commit against the same tab, or null if the
+ * tab is gone / un-injectable.
+ *
+ * Fix 4.1: tabId is passed in (onClicked / the message handlers already resolved it) instead
+ * of a second tabs.query here.
+ */
+async function paintWidgetInTab(tabId: number | undefined): Promise<number | null> {
+  if (typeof tabId !== "number") {
+    console.warn("[ECHLY BG] No active tab to paint widget into");
+    return null;
+  }
+  const injected = await ensureContentScriptInjected(tabId);
+  if (!injected) {
+    console.warn("[ECHLY BG] Could not inject widget into tab", tabId);
+    return null;
+  }
+  await sendMessageWithRetry(tabId, { type: "ECHLY_OPEN_WIDGET" });
+  return tabId;
+}
+
+/**
+ * Commit the engagement side of an authenticated open: persist the engaged flag and arm
+ * capture. Split out of the old openWidgetInActiveTab so it only runs AFTER auth succeeds —
+ * preserving today's invariant that capture never arms for an unauthenticated open. The
+ * capture inject (ensureCaptureInjected) stays exactly where it was relative to a successful
+ * open; nothing about capture timing changes.
+ *
+ * Fix 4.1: the independent storage write + (already-done) injection no longer serialize — the
+ * echlyActive persist is fire-and-forget since nothing here awaits its completion.
+ */
+function commitOpenEngagement(tabId: number): void {
   cachedEchlyActive = true;
-  await chrome.storage.local.set({ echlyActive: true });
+  void chrome.storage.local.set({ echlyActive: true });
 
   globalUIState.visible = true;
   globalUIState.expanded = true;
-
   broadcastUIState();
-
-  const tabs = await chrome.tabs.query({
-    active: true,
-    currentWindow: true,
-  });
-
-  const tabId = tabs[0]?.id;
-
-  if (!tabId) {
-    console.warn("[ECHLY BG] No active tab found");
-    return;
-  }
-
-  const injected = await ensureContentScriptInjected(tabId);
-
-  if (!injected) {
-    console.warn("[ECHLY BG] Could not inject widget into tab", tabId);
-    return;
-  }
-
-  await sendMessageWithRetry(tabId, { type: "ECHLY_OPEN_WIDGET" });
 
   /* Stage 1 — ARM capture at tray-open. Capture now follows engagement, not the
      session: the moment the tray opens, the user is "engaged" and we install the
@@ -1659,24 +2115,80 @@ async function openWidgetInActiveTab(): Promise<void> {
   void ensureCaptureInjected(tabId);
 }
 
+/**
+ * Explicit-open orchestration (icon click / ECHLY_OPEN_WIDGET / OPEN_RECORDER).
+ *
+ * Fix 2: the widget does NOT need auth resolved to paint — it mounts to authState
+ * "loading" and resolves auth itself via GET_AUTH_STATE. So we:
+ *   1. optimistically flip the transient UI flag + start painting (inject + ECHLY_OPEN_WIDGET)
+ *      so the widget bundle download overlaps the auth round-trip, and
+ *   2. resolve auth IN PARALLEL (requireAuthForExplicitOpen runs without an early await).
+ * requireAuthForExplicitOpen still fires the login-tab redirect on failure (unchanged), and
+ * its getAuthStateResponse shares the single-flight token refresh with the widget's own
+ * GET_AUTH_STATE (Fix 2.3) — cold opens do one network refresh, not two.
+ *
+ * The engaged flag (echlyActive) + capture are committed ONLY on auth success, so an
+ * unauthenticated open neither persists "engaged" nor arms capture — exactly as before.
+ */
 async function openRecorderUI(tabId?: number): Promise<boolean> {
-  if (typeof tabId === "number") {
-    sw.lastUserTabId = tabId;
+  // Open-path latency t0 (≈ handler entry). All marks below are deltas from here.
+  const t0 = perfNow();
+  perfMark("t0 openRecorderUI entry", t0);
+
+  const resolvedTabId =
+    typeof tabId === "number" ? tabId : (await getActiveTabIdForBroadcast()) ?? undefined;
+  if (typeof resolvedTabId === "number") {
+    sw.lastUserTabId = resolvedTabId;
   }
 
-  const authenticated = await requireAuthForExplicitOpen();
+  // Optimistic UI: flip the transient visible/expanded flags and broadcast so the widget,
+  // once it mounts, runs its visible-gated GET_AUTH_STATE. This does NOT set cachedEchlyActive
+  // (the persistent engaged flag), so no cross-tab auto-mount or capture fires off this alone.
+  trayOpen = true;
+  globalUIState.visible = true;
+  globalUIState.expanded = true;
+  broadcastUIState();
+
+  // Kick off auth + paint concurrently. Neither awaits the other.
+  perfMark("auth start", t0);
+  const authPromise = requireAuthForExplicitOpen().then((r) => {
+    // t_authEnd − t_authStart ≈ 0 here means Fix 1's rehydrated token avoided the network
+    // refresh (the cold-token win). A non-trivial delta means a real POST /session ran.
+    perfMark("auth end", t0);
+    return r;
+  });
+  const paintPromise = paintWidgetInTab(resolvedTabId).then((r) => {
+    perfMark("open sent (ECHLY_OPEN_WIDGET → tab)", t0);
+    return r;
+  });
+
+  const authenticated = await authPromise;
   if (!authenticated) {
+    // Unauthenticated: requireAuthForExplicitOpen already opened the login tab — that is
+    // EXACTLY today's effect (icon-click while signed-out → login tab, no tray shown). Roll
+    // back the optimistic UI so no phantom "engaged" tray persists, and explicitly tear down
+    // the skeleton + any widget host the parallel paint mounted (bootstrap's ECHLY_CLOSE_WIDGET
+    // handler removes the skeleton AND hides the host) so the ONLY unauth surface is the login
+    // tab, matching pre-change behavior. The widget's own "Sign in" pill (content.tsx) still
+    // covers any non-gated open path; it just isn't the icon-click path's UX.
     trayOpen = false;
     globalUIState.visible = false;
     globalUIState.expanded = false;
     cachedEchlyActive = false;
-    await chrome.storage.local.set({ echlyActive: false });
+    void chrome.storage.local.set({ echlyActive: false });
     broadcastUIState();
+    if (typeof resolvedTabId === "number") {
+      chrome.tabs
+        .sendMessage(resolvedTabId, { type: "ECHLY_CLOSE_WIDGET" })
+        .catch(() => { /* tab gone / no bootstrap — nothing to tear down */ });
+    }
     return false;
   }
 
-  trayOpen = true;
-  await openWidgetInActiveTab();
+  // Authenticated: make sure the paint landed (resolve the same tab), then commit engagement.
+  const paintedTabId = await paintPromise;
+  if (paintedTabId == null) return false;
+  commitOpenEngagement(paintedTabId);
   return true;
 }
 
@@ -1858,6 +2370,10 @@ async function handleWorkspaceSwitch(): Promise<void> {
   extensionTokenExpiresAt = null;
   setExtensionToken(null);
   sw.extensionToken = null;
+  // Drop the persisted copy too — the next boot must re-fetch so the token
+  // re-resolves to the (possibly switched) active workspace, not the stale one.
+  // (currentUser/cachedSessionUser are intentionally kept: same user, new workspace.)
+  clearPersistedToken();
 
   try {
     const tabs = await chrome.tabs.query({});
@@ -1947,8 +2463,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
        the current engagement, or it would bleed into a freshly re-armed engagement. */
     const surface = (request as { surface?: string }).surface;
     const snapshot = (request as { snapshot?: unknown }).snapshot;
-    const engagementId = resolveEngagementIdForTab(sender.tab?.id, true);
-    if (engagementId != null && snapshot && typeof snapshot === "object") {
+    const flushTabId = sender.tab?.id;
+    const engagementId = resolveEngagementIdForTab(flushTabId, true);
+    // requireBound guarantees a bound tab, so flushTabId is a number whenever
+    // engagementId != null — but assert it so the per-tab bucket key is sound.
+    if (engagementId != null && typeof flushTabId === "number" && snapshot && typeof snapshot === "object") {
       const snap = snapshot as {
         logs?: EngagementConsoleLog[];
         exceptions?: EngagementException[];
@@ -1956,11 +2475,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         actions?: EngagementAction[];
       };
       if (surface === "console") {
-        mergeFlushIntoEngagement(engagementId, { logs: snap.logs, exceptions: snap.exceptions });
+        mergeFlushIntoEngagement(engagementId, flushTabId, { logs: snap.logs, exceptions: snap.exceptions });
       } else if (surface === "network") {
-        mergeFlushIntoEngagement(engagementId, { requests: snap.requests });
+        mergeFlushIntoEngagement(engagementId, flushTabId, { requests: snap.requests });
       } else if (surface === "actions") {
-        mergeFlushIntoEngagement(engagementId, { actions: snap.actions });
+        mergeFlushIntoEngagement(engagementId, flushTabId, { actions: snap.actions });
       }
     }
     sendResponse({ ok: true });
@@ -1985,6 +2504,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         };
         cachedSessionUser = sw.currentUser;
       }
+      persistTokenToStorage(token, extensionTokenExpiresAt, persistedUserFromCurrent());
       trayOpen = true;
       globalUIState.visible = true;
       void (async () => {
@@ -1992,7 +2512,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (sessionIdForRehydrate) {
           await rehydrateSession(sessionIdForRehydrate);
         }
-        await openWidgetInActiveTab();
+        // The token just arrived from the auth broker, so the user is authenticated —
+        // no requireAuthForExplicitOpen gate needed. Paint + commit directly (this is
+        // the old openWidgetInActiveTab, now split into paint vs engagement-commit).
+        const tabId = (await getActiveTabIdForBroadcast()) ?? undefined;
+        const paintedTabId = await paintWidgetInTab(tabId);
+        if (paintedTabId != null) {
+          commitOpenEngagement(paintedTabId);
+        }
         broadcastUIState();
       })();
     }
@@ -2024,6 +2551,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     (async () => {
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
       const tabId = tabs[0]?.id;
+      // Paint the skeleton the instant the tab is known, before the auth-gated open.
+      sendOpeningSignal(tabId);
       const opened = await openRecorderUI(tabId);
       if (!opened) {
         sendResponse({ ok: false, authenticated: false });
@@ -2045,6 +2574,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ ok: true, alreadyOpen: true });
         return;
       }
+      // Opening (not already open): paint the skeleton first, then run the gated open.
+      sendOpeningSignal(tab?.id);
       (async () => {
         const opened = await openRecorderUI(tab?.id);
         if (opened && tab?.id) {
@@ -2611,6 +3142,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         };
         sw.currentUser = cachedSessionUser;
       }
+      persistTokenToStorage(tok, extensionTokenExpiresAt, persistedUserFromCurrent());
       const sessionIdForRehydrate = activeSessionId ?? globalUIState.sessionId;
       if (sessionIdForRehydrate) {
         void rehydrateSession(sessionIdForRehydrate);
@@ -2621,12 +3153,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "ECHLY_AUTH_INVALID") {
-    extensionToken = null;
-    extensionTokenExpiresAt = null;
-    sw.extensionToken = null;
-    sw.currentUser = null;
-    cachedSessionUser = null;
-    setExtensionToken(null);
+    // Server 401'd the token mid-use (apiFetch forwards this). Full clear, incl. the
+    // persisted storage copy via clearAuthState → clearPersistedToken, so the invalid
+    // token can't be resurrected on the next SW boot.
+    clearAuthState();
     sendResponse({ ok: true });
     return false;
   }
@@ -2894,8 +3424,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
            by timestamp, so the ticket carries the full multi-page timeline rather than
            just the page the user clicked file on. Resolved from the sender tab's
            engagement; falls through to the live-only ticket if no engagement is bound. */
+        const engagementIdForFile = resolveEngagementIdForTab(senderTabId);
         const mergedTicket = mergeEngagementIntoTicket(
-          resolveEngagementIdForTab(senderTabId),
+          engagementIdForFile,
+          senderTabId,
           ticket as unknown as Record<string, unknown>
         );
         const feedbackRes = await createFeedbackInternal({
@@ -2946,6 +3478,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
 
         await markFeedbackCompleted(feedbackId);
+        /* ADVANCE the actions watermark — SUCCESS ONLY. The ticket was created, so the
+           actions actually filed (mergedTicket.userActions, the post-watermark filtered
+           list) become the new cut: ticket N+1 will include only actions after these.
+           Reaching this point means the POST succeeded; the failure/catch branches below
+           never run this, so a failed-then-retried submission re-includes the same
+           actions. A zero-action ticket leaves the watermark unmoved (handled inside). */
+        const filedActions = Array.isArray(mergedTicket.userActions)
+          ? (mergedTicket.userActions as EngagementAction[])
+          : [];
+        advanceActionsWatermark(engagementIdForFile, senderTabId, filedActions);
         cachedBillingUsage = null;
         billingUsageCachedAt = 0;
         globalUIState.feedbackJobs = globalUIState.feedbackJobs.filter((j) => j.id !== feedbackId);
