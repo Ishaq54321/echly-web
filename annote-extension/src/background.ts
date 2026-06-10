@@ -1363,34 +1363,51 @@ type EngagementNetwork = NetworkRequestEntry;
 type EngagementAction = UserAction;
 
 /**
- * Per-engagement ACTIONS WATERMARK (userActions only). Within one engagement, each
- * filed ticket's userActions should contain ONLY the actions that occurred AFTER the
- * previous successfully-filed ticket — so ticket 2+ doesn't repeat ticket 1's journey.
+ * Per-engagement PER-STREAM WATERMARK (userActions, consoleLogs, exceptions,
+ * networkRequests). Within one engagement, each filed ticket's capture surfaces should
+ * contain ONLY the entries that occurred AFTER the previous successfully-filed ticket —
+ * so ticket 2+ doesn't repeat ticket 1's console errors, network requests, or journey.
  *
  * This is a FILTER applied at the file-time merge, NOT a buffer-clear: the SW
- * engagement buffer's `actions` array and the MAIN-world ActionBuffer are left intact
- * (console/network are deliberately NOT watermarked — they keep the full engagement
- * window). The watermark advances ONLY after a ticket is successfully created; a failed
- * submission leaves it untouched so a retry re-includes the same actions.
+ * engagement buffer's arrays and the MAIN-world buffers are left intact. The watermark
+ * advances ONLY after a ticket is successfully created; a failed submission leaves it
+ * untouched so a retry re-includes the same entries. All four streams behave identically
+ * (the actions watermark shipped first; console/network were later extended to match —
+ * the per-(engagement,tab) keying, advance-on-success-only, and stop-signal purge are
+ * shared).
  *
- * `timestamp` is the max timestamp among the actions included in the last filed ticket.
- * `includedIds` are the UUIDs of those included actions whose timestamp EQUALS the
- * watermark timestamp — the millisecond-collision tiebreak so same-ms actions filed in
- * the previous ticket aren't re-emitted while same-ms actions that arrived later still
- * pass. Capped small (it only needs same-ms ids).
+ * `timestamp` is the max timestamp among the entries included in the last filed ticket.
+ * `includedKeys` are the stable identities of those included entries whose timestamp
+ * EQUALS the watermark timestamp — the millisecond-collision tiebreak so same-ms entries
+ * filed in the previous ticket aren't re-emitted while same-ms entries that arrived later
+ * still pass. Capped small (it only needs same-ms keys). The identity is the entry's UUID
+ * for network/actions and the synthetic dedup key (consoleLogKey/exceptionKey) for
+ * console/exceptions, which have no id field — see streamKey().
  *
  * null = no watermark yet → the engagement's first ticket keeps full history. A fresh
- * engagement (tray re-open, soft-end re-arm) starts with a new buffer whose watermark is
- * null, and the watermark is purged for free when the engagement buffer is purged.
+ * engagement (tray re-open, soft-end re-arm) starts with a new buffer whose watermarks
+ * are null, and they are purged for free when the engagement buffer is purged.
  */
-interface ActionsWatermark {
+interface StreamWatermark {
   timestamp: number;
-  includedIds: Set<string>;
+  includedKeys: Set<string>;
 }
 
-/** Cap on the same-ms tiebreak id set; a single millisecond can only realistically hold
- *  a handful of distinct actions, so this is generous. */
-const ACTIONS_WATERMARK_MAX_IDS = 32;
+/** The four watermarked capture surfaces. One StreamWatermark per surface per bucket. */
+interface EngagementWatermarks {
+  logs: StreamWatermark | null;
+  exceptions: StreamWatermark | null;
+  network: StreamWatermark | null;
+  actions: StreamWatermark | null;
+}
+
+/** Cap on the same-ms tiebreak key set; a single millisecond can only realistically hold
+ *  a handful of distinct entries, so this is generous. */
+const STREAM_WATERMARK_MAX_KEYS = 32;
+
+function emptyWatermarks(): EngagementWatermarks {
+  return { logs: null, exceptions: null, network: null, actions: null };
+}
 
 interface EngagementBuffer {
   logs: EngagementConsoleLog[];
@@ -1399,9 +1416,9 @@ interface EngagementBuffer {
   actions: EngagementAction[];
   /** True once ECHLY_SESSION_MODE_START claimed this engagement; gates persistence. */
   claimed: boolean;
-  /** Per-engagement userActions watermark; null until the first ticket is filed. NOT
-   *  persisted to storage — see persistEngagementBuffer / restorePersistedEngagement. */
-  actionsWatermark: ActionsWatermark | null;
+  /** Per-engagement per-stream watermarks; each null until the first ticket is filed.
+   *  NOT persisted to storage — see persistEngagementBuffer / restorePersistedEngagement. */
+  watermarks: EngagementWatermarks;
 }
 
 /** tabId → engagement id. One engagement per engaged tray; all tabs the user
@@ -1474,7 +1491,7 @@ function genEngagementId(): string {
 }
 
 function emptyEngagementBuffer(): EngagementBuffer {
-  return { logs: [], exceptions: [], network: [], actions: [], claimed: false, actionsWatermark: null };
+  return { logs: [], exceptions: [], network: [], actions: [], claimed: false, watermarks: emptyWatermarks() };
 }
 
 /** Stable dedup key per surface. Network + actions carry their own UUID; console
@@ -1794,10 +1811,10 @@ async function restorePersistedEngagement(boundTabId?: number): Promise<string |
         network: Array.isArray(raw?.network) ? raw!.network! : [],
         actions: Array.isArray(raw?.actions) ? raw!.actions! : [],
         claimed: true,
-        // Watermark is intentionally NOT persisted (Set isn't JSON-serializable and the
-        // cut is a memory-only filter). A cold-start restore therefore begins with no
-        // watermark — the first ticket filed post-restart keeps the full restored journey.
-        actionsWatermark: null,
+        // Watermarks are intentionally NOT persisted (Sets aren't JSON-serializable and
+        // the cut is a memory-only filter). A cold-start restore therefore begins with no
+        // watermarks — the first ticket filed post-restart keeps the full restored history.
+        watermarks: emptyWatermarks(),
       };
       evictEngagementBuffer(buf);
       const isEmpty =
@@ -1896,101 +1913,144 @@ function mergeEngagementIntoTicket(
   };
   const byTs = <T extends { timestamp: number }>(a: T, b: T) => a.timestamp - b.timestamp;
 
-  const logs = dedupBy([...eng.logs, ...liveLogs], consoleLogKey).sort(byTs);
-  const exceptions = dedupBy([...eng.exceptions, ...liveExceptions], exceptionKey).sort(byTs);
-  const network = dedupBy([...eng.network, ...liveNetwork], (e) => e.id).sort(byTs);
-  const allActions = dedupBy([...eng.actions, ...liveActions], (e) => e.id).sort(byTs);
+  const allLogs = dedupBy([...eng.logs, ...liveLogs], consoleLogKey).sort(byTs);
+  const allExceptions = dedupBy([...eng.exceptions, ...liveExceptions], exceptionKey).sort(byTs);
+  const allNetwork = dedupBy([...eng.network, ...liveNetwork], networkKey).sort(byTs);
+  const allActions = dedupBy([...eng.actions, ...liveActions], actionKey).sort(byTs);
 
-  /* ACTIONS WATERMARK FILTER (userActions ONLY). Console/network above are untouched —
-     they keep the full engagement window. After producing the merged, deduped,
-     time-ordered actions list, drop everything at-or-before the previous filed ticket's
-     cut: keep actions whose timestamp is AFTER the watermark, plus same-ms actions that
-     were NOT already included last time (includedIds tiebreak). No watermark → keep all.
-     The watermark only advances on a SUCCESSFUL file (see advanceActionsWatermark at the
-     ECHLY_CREATE_FEEDBACK success site), so a failed/retried submission re-includes the
-     same actions. */
-  const wm =
+  /* PER-STREAM WATERMARK FILTER (all four surfaces). After producing each merged,
+     deduped, time-ordered list, drop everything at-or-before the previous filed ticket's
+     cut for that stream: keep entries whose timestamp is AFTER the watermark, plus same-ms
+     entries that were NOT already included last time (includedKeys tiebreak). No watermark
+     for a stream → keep all of it. Each watermark only advances on a SUCCESSFUL file (see
+     advanceWatermarks at the ECHLY_CREATE_FEEDBACK success site), so a failed/retried
+     submission re-includes the same entries. All four streams are filtered identically so
+     the dashboard Console/Network/Actions tabs and the AI analysis agree per-ticket. */
+  const wms =
     engagementId != null && typeof tabId === "number"
-      ? engagementBuffers.get(bufferKey(engagementId, tabId))?.actionsWatermark ?? null
+      ? engagementBuffers.get(bufferKey(engagementId, tabId))?.watermarks ?? null
       : null;
-  const actions = wm == null
-    ? allActions
-    : allActions.filter(
-        (a) => a.timestamp > wm.timestamp || (a.timestamp === wm.timestamp && !wm.includedIds.has(a.id))
-      );
+  const logs = filterByWatermark(allLogs, wms?.logs ?? null, consoleLogKey);
+  const exceptions = filterByWatermark(allExceptions, wms?.exceptions ?? null, exceptionKey);
+  const network = filterByWatermark(allNetwork, wms?.network ?? null, networkKey);
+  const actions = filterByWatermark(allActions, wms?.actions ?? null, actionKey);
 
   const merged: Record<string, unknown> = { ...ticket };
 
-  if (logs.length > 0 || exceptions.length > 0) {
-    merged.consoleLogs = logs;
-    merged.exceptions = exceptions;
-    merged.consoleLogCount = logs.length;
-    merged.exceptionCount = exceptions.length;
-    merged.errorCount = logs.filter((l) => l.level === "error").length;
-    merged.warningCount = logs.filter((l) => l.level === "warn").length;
-  }
-  if (network.length > 0) {
-    merged.networkRequests = network;
-    merged.networkRequestCount = network.length;
-    merged.networkErrorCount = network.filter(
-      (r) =>
-        r.errored === true ||
-        (typeof r.status === "number" && r.status >= 400 && r.status < 600)
-    ).length;
-  }
-  // userActions / userActionCount reflect the FILTERED (post-watermark) list. When the
-  // filter leaves zero actions (a ticket with no new journey beyond its own filing click,
-  // which itself post-dates the watermark and so survives), we still want the ticket to
-  // carry an accurate count — but to match the existing console/network passthrough
-  // contract we only override when there is something to attach. An empty filtered list
-  // means the live ticket already carried the right (small) actions; leaving it as-is is
-  // fine because the watermark guarantees the filing click is newer than the cut.
-  if (actions.length > 0) {
-    merged.userActions = actions;
-    merged.userActionCount = actions.length;
-  }
+  /* Assign the FILTERED (post-watermark) lists UNCONDITIONALLY for every surface, and
+     recompute the counts from them. This is the part of the cut that makes ticket 3 (no
+     new activity → empty filtered lists) actually empty instead of inheriting the live
+     snapshot: the cut is a filter, NOT a buffer-clear, so the live `ticket.*` arrays still
+     carry the full window — a conditional "only override when non-empty" passthrough would
+     leak the prior tickets' entries back in whenever the filter emptied a surface. The
+     filtered list already INCLUDES this page's live entries (they're in the union above),
+     so writing it back is lossless for the non-empty case and correct (empty) for the
+     watermarked-empty case. All four surfaces are handled identically. */
+  merged.consoleLogs = logs;
+  merged.exceptions = exceptions;
+  merged.consoleLogCount = logs.length;
+  merged.exceptionCount = exceptions.length;
+  merged.errorCount = logs.filter((l) => l.level === "error").length;
+  merged.warningCount = logs.filter((l) => l.level === "warn").length;
+
+  merged.networkRequests = network;
+  merged.networkRequestCount = network.length;
+  merged.networkErrorCount = network.filter(
+    (r) =>
+      r.errored === true ||
+      (typeof r.status === "number" && r.status >= 400 && r.status < 600)
+  ).length;
+
+  merged.userActions = actions;
+  merged.userActionCount = actions.length;
 
   return merged;
 }
 
+/** Stable per-stream identity used by both the watermark filter and the advance step.
+ *  Network/actions carry their own UUID; console logs/exceptions have no id so reuse the
+ *  same synthetic dedup keys the merge uses. Keeping these aligned with the dedup keys
+ *  guarantees the filter's tiebreak matches the entries actually in the merged list. */
+const networkKey = (e: EngagementNetwork): string => e.id;
+const actionKey = (e: EngagementAction): string => e.id;
+
+/** Apply a single stream's watermark to its merged, time-ordered list. Keep entries
+ *  strictly after the cut, plus same-ms entries not already filed last time. null
+ *  watermark → keep all. Pure; does not mutate the watermark. */
+function filterByWatermark<T extends { timestamp: number }>(
+  items: T[],
+  wm: StreamWatermark | null,
+  keyOf: (item: T) => string
+): T[] {
+  if (wm == null) return items;
+  return items.filter(
+    (it) => it.timestamp > wm.timestamp || (it.timestamp === wm.timestamp && !wm.includedKeys.has(keyOf(it)))
+  );
+}
+
+/** Compute the watermark that the just-filed `included` list defines: the max timestamp
+ *  among them, plus the stable keys of the entries AT that exact timestamp (same-ms
+ *  tiebreak). Returns null when there is nothing to advance to (empty/invalid list). */
+function computeWatermark<T extends { timestamp: number }>(
+  included: T[],
+  keyOf: (item: T) => string
+): StreamWatermark | null {
+  if (!Array.isArray(included) || included.length === 0) return null;
+  let maxTs = -Infinity;
+  for (const it of included) {
+    if (it && typeof it.timestamp === "number" && it.timestamp > maxTs) maxTs = it.timestamp;
+  }
+  if (!Number.isFinite(maxTs)) return null;
+  const keysAtMax = included.filter((it) => it && it.timestamp === maxTs).map(keyOf);
+  // Same-ms collisions are rare; cap defensively so a pathological burst can't grow the
+  // set unbounded. Keeping the first N is sufficient — the timestamp already excludes
+  // everything strictly older.
+  return { timestamp: maxTs, includedKeys: new Set(keysAtMax.slice(0, STREAM_WATERMARK_MAX_KEYS)) };
+}
+
 /**
- * Advance the engagement's actions watermark after a SUCCESSFUL ticket creation.
- * `includedActions` is the exact (filtered) list that was filed. The new watermark
- * timestamp is the max timestamp among those actions, and includedIds is the set of
- * filed-action ids AT that exact timestamp (the same-ms tiebreak). If the filed ticket
- * included zero actions, the watermark does NOT advance. Called only on the success path
- * so a failed/retried submission keeps including the same actions.
+ * Advance every stream's watermark after a SUCCESSFUL ticket creation. The `filed` lists
+ * are the exact (filtered) entries that were filed for each surface. For each stream the
+ * new watermark is the max timestamp among the filed entries plus the same-ms-tiebreak
+ * keys; a stream with zero filed entries leaves ITS watermark unmoved (so a ticket that
+ * carried new console errors but no new network requests still advances the console cut
+ * while keeping the network window open). Called only on the success path, so a
+ * failed/retried submission keeps including the same entries for all streams.
  */
-function advanceActionsWatermark(
+function advanceWatermarks(
   engagementId: string | null,
   tabId: number | undefined,
-  includedActions: EngagementAction[]
+  filed: {
+    logs: EngagementConsoleLog[];
+    exceptions: EngagementException[];
+    network: EngagementNetwork[];
+    actions: EngagementAction[];
+  }
 ): void {
   if (engagementId == null || typeof tabId !== "number") return;
-  if (!Array.isArray(includedActions) || includedActions.length === 0) return;
-  // Per-tab watermark: the cut advances only for the bucket that was actually
-  // filed from, so each tab tracks its own "already filed" boundary (Fix A).
+  // Per-tab watermarks: the cut advances only for the bucket that was actually filed
+  // from, so each tab tracks its own "already filed" boundary (Fix A).
   const buf = engagementBuffers.get(bufferKey(engagementId, tabId));
   if (!buf) return;
 
-  let maxTs = -Infinity;
-  for (const a of includedActions) {
-    if (a && typeof a.timestamp === "number" && a.timestamp > maxTs) maxTs = a.timestamp;
-  }
-  if (!Number.isFinite(maxTs)) return;
+  // Advance one stream in place: compute its new cut, never move backwards, skip when the
+  // filed list contributed nothing (computeWatermark → null).
+  const advance = <T extends { timestamp: number }>(
+    stream: keyof EngagementWatermarks,
+    included: T[],
+    keyOf: (item: T) => string
+  ): void => {
+    const next = computeWatermark(included, keyOf);
+    if (next == null) return;
+    const prev = buf.watermarks[stream];
+    if (prev != null && next.timestamp < prev.timestamp) return;
+    buf.watermarks[stream] = next;
+  };
 
-  const idsAtMax = includedActions
-    .filter((a) => a && a.timestamp === maxTs && typeof a.id === "string")
-    .map((a) => a.id);
-  // Same-ms collisions are rare; cap defensively so a pathological burst can't grow the
-  // set unbounded. Keeping the first N is sufficient — the watermark timestamp already
-  // excludes everything strictly older.
-  const includedIds = new Set(idsAtMax.slice(0, ACTIONS_WATERMARK_MAX_IDS));
-
-  // Never move the watermark backwards (e.g. an out-of-order retry whose merged list is
-  // somehow older); only advance.
-  if (buf.actionsWatermark != null && maxTs < buf.actionsWatermark.timestamp) return;
-  buf.actionsWatermark = { timestamp: maxTs, includedIds };
+  advance("logs", filed.logs, consoleLogKey);
+  advance("exceptions", filed.exceptions, exceptionKey);
+  advance("network", filed.network, networkKey);
+  advance("actions", filed.actions, actionKey);
 }
 
 /** Fully purge one engagement: EVERY per-tab in-memory bucket
@@ -3478,16 +3538,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
 
         await markFeedbackCompleted(feedbackId);
-        /* ADVANCE the actions watermark — SUCCESS ONLY. The ticket was created, so the
-           actions actually filed (mergedTicket.userActions, the post-watermark filtered
-           list) become the new cut: ticket N+1 will include only actions after these.
-           Reaching this point means the POST succeeded; the failure/catch branches below
-           never run this, so a failed-then-retried submission re-includes the same
-           actions. A zero-action ticket leaves the watermark unmoved (handled inside). */
-        const filedActions = Array.isArray(mergedTicket.userActions)
-          ? (mergedTicket.userActions as EngagementAction[])
-          : [];
-        advanceActionsWatermark(engagementIdForFile, senderTabId, filedActions);
+        /* ADVANCE every stream watermark — SUCCESS ONLY. The ticket was created, so the
+           entries actually filed (the post-watermark filtered lists on mergedTicket:
+           consoleLogs / exceptions / networkRequests / userActions) become the new cut per
+           stream: ticket N+1 will include only entries after these. Reaching this point
+           means the POST succeeded; the failure/catch branches below never run this, so a
+           failed-then-retried submission re-includes the same entries for ALL streams. A
+           stream that filed zero entries leaves ITS watermark unmoved (handled inside). */
+        const asArr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+        advanceWatermarks(engagementIdForFile, senderTabId, {
+          logs: asArr<EngagementConsoleLog>(mergedTicket.consoleLogs),
+          exceptions: asArr<EngagementException>(mergedTicket.exceptions),
+          network: asArr<EngagementNetwork>(mergedTicket.networkRequests),
+          actions: asArr<EngagementAction>(mergedTicket.userActions),
+        });
         cachedBillingUsage = null;
         billingUsageCachedAt = 0;
         globalUIState.feedbackJobs = globalUIState.feedbackJobs.filter((j) => j.id !== feedbackId);
