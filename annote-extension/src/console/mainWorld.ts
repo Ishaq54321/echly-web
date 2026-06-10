@@ -26,7 +26,7 @@
  */
 
 import { ConsoleBuffer } from "./buffer";
-import { isDenylisted } from "./denylist";
+import { isDenylisted, isExtensionOrigin } from "./denylist";
 import { redact } from "./redact";
 import { serializeNode } from "./serializeElement";
 import type {
@@ -482,6 +482,17 @@ declare global {
     column: number | null,
   ): void {
     try {
+      // Drop extension-originated exceptions before they reach the buffer. The
+      // reliable signal is the SOURCE/STACK (a chrome-extension:// script URL),
+      // NOT the message — an extension error's message is often just "Failed to
+      // fetch" with no marker, while every stack frame is chrome-extension://.
+      // This is the gap that fed the AI a bogus "a chrome-extension script"
+      // root cause. We also check the message for the rare case where the URL
+      // is embedded there. Targets the chrome-extension:// SCHEME only, so a
+      // same-origin page error on annote.ai itself is never filtered.
+      if (isExtensionOrigin(stack) || isExtensionOrigin(source) || isExtensionOrigin(message)) {
+        return;
+      }
       const key = `${message}|${source ?? ""}|${line ?? ""}|${column ?? ""}`;
       if (isDuplicateError(key)) return;
       const entry: ExceptionEntry = {
@@ -585,6 +596,12 @@ declare global {
           message = String(reason);
         }
       }
+      // Drop extension-originated rejections (e.g. our widget's own
+      // chrome-extension:// "Failed to fetch") before buffering — the stack
+      // frames carry the chrome-extension:// origin even when the message does
+      // not. Mirrors recordError's guard for the error/onerror paths. SCHEME
+      // only — never filters a same-origin page rejection on annote.ai.
+      if (isExtensionOrigin(stack) || isExtensionOrigin(message)) return;
       const entry: ExceptionEntry = {
         timestamp: Date.now(),
         message: redact(message || ""),

@@ -114,6 +114,18 @@ export function isNetworkDenylisted(url: string): boolean {
   try {
     const parsed = new URL(url, typeof window !== "undefined" ? window.location.href : "http://localhost/");
 
+    // Extension-origin requests are always denied — our widget's own traffic
+    // (API calls, dynamic-import chunk loads from chrome-extension://, and the
+    // "Failed to fetch" transport errors they throw) must never be captured as
+    // if it were the page's. Checked BEFORE the same-origin escape: an
+    // extension-page context would otherwise treat its own chrome-extension://
+    // origin as "first party" and let the noise through. Matches the
+    // chrome-extension:/moz-extension: SCHEME, NOT a host — so a real page
+    // request on annote.ai (same-origin first-party traffic) is never filtered.
+    if (parsed.protocol === "chrome-extension:" || parsed.protocol === "moz-extension:") {
+      return true;
+    }
+
     // GA4 Measurement Protocol beacons are denied even when proxied through
     // the host's own origin — checked BEFORE the same-origin escape below,
     // which would otherwise let first-party-proxied analytics through.

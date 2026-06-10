@@ -103,6 +103,46 @@ describe("isNetworkDenylisted() — proxied GA4 vs the same-origin escape", () =
   });
 });
 
+describe("isNetworkDenylisted() — extension-origin noise vs first-party capture", () => {
+  it("denies a chrome-extension:// request (our widget's own traffic)", () => {
+    setWindowOrigin(HOST_ORIGIN);
+    assert.equal(
+      isNetworkDenylisted("chrome-extension://abcdefghijklmnopabcdefghijklmnop/widget/widget.js"),
+      true,
+    );
+  });
+
+  it("denies a chrome-extension:// asset/chunk fetch even with no window context", () => {
+    // No window → no same-origin escape; the scheme check alone must catch it.
+    assert.equal(
+      isNetworkDenylisted("chrome-extension://abcdefghijklmnopabcdefghijklmnop/assets/annote-logo-icon.svg"),
+      true,
+    );
+  });
+
+  it("denies a moz-extension:// request (Firefox widget origin)", () => {
+    setWindowOrigin(HOST_ORIGIN);
+    assert.equal(
+      isNetworkDenylisted("moz-extension://11112222-3333-4444-5555-666677778888/widget/widget.js"),
+      true,
+    );
+  });
+
+  it("DOGFOODING: still captures same-origin page traffic on annote.ai", () => {
+    // When a bug is filed ON annote.ai itself, the dashboard's own first-party
+    // /api calls must STILL be captured — only the extension's chrome-extension://
+    // noise is excluded. The scheme check targets the SCHEME, never the host.
+    setWindowOrigin("https://annote.ai");
+    assert.equal(isNetworkDenylisted("https://annote.ai/api/sessions"), false);
+    assert.equal(isNetworkDenylisted("https://annote.ai/api/feedback/123/analyze"), false);
+  });
+
+  it("still captures a user's own first-party API calls on their site", () => {
+    setWindowOrigin("https://customer-app.com");
+    assert.equal(isNetworkDenylisted("https://customer-app.com/api/cart"), false);
+  });
+});
+
 describe("isNetworkDenylisted() — classic third-party analytics", () => {
   it("still denies cross-origin google-analytics.com", () => {
     setWindowOrigin(HOST_ORIGIN);

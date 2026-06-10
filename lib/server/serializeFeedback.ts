@@ -1,6 +1,7 @@
 import type { AccessContext } from "@/lib/access/resolveAccess";
 import { getTicketStatus, type Feedback } from "@/lib/domain/feedback";
 import { normalizeTicketStatus } from "@/lib/domain/normalizeTicketStatus";
+import { filterExtensionNoise } from "@/lib/domain/filterExtensionNoise";
 
 function timestampToIso(value: Feedback["createdAt"]): string | null {
   if (value == null) return null;
@@ -47,6 +48,44 @@ export function serializeTicket(ticket: Feedback, access: AccessContext): Record
   const ns = normalizedStatus(ticket);
   const can = access.capabilities.canResolve;
 
+  // Render-time scrub of extension-originated noise on tickets filed before the
+  // capture-time fix. The extension now drops its own console/network/exception
+  // entries at source, but historical tickets still carry them — strip here so
+  // the DevTools tabs (which read these arrays) display clean everywhere, and
+  // keep the count badges consistent with what's shown. Targets the
+  // chrome-extension:// scheme / our own log prefix only — same-origin page
+  // traffic (incl. dogfooding on annote.ai) is preserved. No-op when the arrays
+  // are absent or already clean.
+  const filtered = filterExtensionNoise(ticket);
+  const consoleLogs = filtered.consoleLogs;
+  const exceptions = filtered.exceptions;
+  const networkRequests = filtered.networkRequests;
+  // Recompute level-specific console counts from the cleaned array when present
+  // (the stored counts include the now-removed extension entries). errorCount /
+  // warningCount fall back to the stored value only when the array is absent.
+  const cleanedErrorCount = consoleLogs
+    ? consoleLogs.filter((c) => c.level === "error").length
+    : ticket.errorCount;
+  const cleanedWarningCount = consoleLogs
+    ? consoleLogs.filter((c) => c.level === "warn").length
+    : ticket.warningCount;
+  const cleanedNetworkErrorCount = networkRequests
+    ? networkRequests.filter((r) => r.errored === true || (typeof r.status === "number" && r.status >= 400)).length
+    : ticket.networkErrorCount;
+  // Gross counts: decrement by what we removed so badges match the visible rows.
+  const cleanedConsoleLogCount =
+    typeof ticket.consoleLogCount === "number"
+      ? Math.max(0, ticket.consoleLogCount - filtered.removed.consoleLogs)
+      : ticket.consoleLogCount;
+  const cleanedExceptionCount =
+    typeof ticket.exceptionCount === "number"
+      ? Math.max(0, ticket.exceptionCount - filtered.removed.exceptions)
+      : ticket.exceptionCount;
+  const cleanedNetworkRequestCount =
+    typeof ticket.networkRequestCount === "number"
+      ? Math.max(0, ticket.networkRequestCount - filtered.removed.networkRequests)
+      : ticket.networkRequestCount;
+
   return {
     id: ticket.id,
     sessionId: ticket.sessionId,
@@ -85,24 +124,24 @@ export function serializeTicket(ticket: Feedback, access: AccessContext): Record
     // surface to anyone with read access on the ticket. Omit when absent so
     // the API contract stays clean for tickets filed without any console
     // activity (rather than always emitting empty arrays / zero counts).
-    ...(ticket.consoleLogs ? { consoleLogs: ticket.consoleLogs } : {}),
-    ...(ticket.exceptions ? { exceptions: ticket.exceptions } : {}),
-    ...(typeof ticket.consoleLogCount === "number"
-      ? { consoleLogCount: ticket.consoleLogCount }
+    ...(consoleLogs ? { consoleLogs } : {}),
+    ...(exceptions ? { exceptions } : {}),
+    ...(typeof cleanedConsoleLogCount === "number"
+      ? { consoleLogCount: cleanedConsoleLogCount }
       : {}),
-    ...(typeof ticket.exceptionCount === "number"
-      ? { exceptionCount: ticket.exceptionCount }
+    ...(typeof cleanedExceptionCount === "number"
+      ? { exceptionCount: cleanedExceptionCount }
       : {}),
-    ...(typeof ticket.errorCount === "number" ? { errorCount: ticket.errorCount } : {}),
-    ...(typeof ticket.warningCount === "number" ? { warningCount: ticket.warningCount } : {}),
+    ...(typeof cleanedErrorCount === "number" ? { errorCount: cleanedErrorCount } : {}),
+    ...(typeof cleanedWarningCount === "number" ? { warningCount: cleanedWarningCount } : {}),
     // Phase N4: network-request capture. Mirror console: redacted at capture
     // time, safe for all viewers with read access, omit when absent.
-    ...(ticket.networkRequests ? { networkRequests: ticket.networkRequests } : {}),
-    ...(typeof ticket.networkRequestCount === "number"
-      ? { networkRequestCount: ticket.networkRequestCount }
+    ...(networkRequests ? { networkRequests } : {}),
+    ...(typeof cleanedNetworkRequestCount === "number"
+      ? { networkRequestCount: cleanedNetworkRequestCount }
       : {}),
-    ...(typeof ticket.networkErrorCount === "number"
-      ? { networkErrorCount: ticket.networkErrorCount }
+    ...(typeof cleanedNetworkErrorCount === "number"
+      ? { networkErrorCount: cleanedNetworkErrorCount }
       : {}),
     // Phase A4: user-actions capture. Mirror console/network: redacted at
     // capture time, safe for all viewers with read access, omit when absent.

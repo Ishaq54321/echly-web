@@ -57,18 +57,42 @@ export const CONSOLE_DENYLIST: readonly RegExp[] = Object.freeze([
   /Blocked a frame with origin/i,
   /SecurityError: Blocked a frame/i,
 
-  // Chrome extension content-script noise that isn't ours.
+  // Chrome extension content-script noise (ours and other extensions') — matches
+  // when the message TEXT contains the scheme. See EXTENSION_ORIGIN_PATTERN below
+  // for the SOURCE/STACK signal that catches the more common case where the
+  // scheme is only in an error's origin, not its message.
   /chrome-extension:\/\//,
 
   // Our OWN extension's stray logs, should any reach the page realm (Fix C-lite,
   // belt-and-suspenders). Anchored to the start so only our prefixes match, not
-  // an arbitrary mention of the word elsewhere in a page's log line. NOTE: the
-  // intentional synthetic capture watermarks ("[Annote] Console capture paused…"
-  // / "resumed.") are written straight to the buffer via buffer.addLog and never
-  // pass through this denylist, so they still surface as designed.
-  /^\[ECHLY\]/,
-  /^\[Annote\]/,
+  // an arbitrary mention of the word elsewhere in a page's log line. Case-
+  // insensitive and tolerant of a tag suffix because the widget logs under
+  // several real prefixes — "[ECHLY]", "[Echly]", "[ECHLY PERF]", "[ECHLY BG]",
+  // "[ECHLY MESSAGE]", "[ECHLY AUTH]", "[ECHLY ERROR]", "[Annote]". A literal
+  // "[ECHLY]" anchor missed every variant with a space before the "]".
+  // NOTE: the intentional synthetic capture watermarks ("[Annote] Console capture
+  // paused…" / "resumed.") are written straight to the buffer via buffer.addLog
+  // and never pass through this denylist, so they still surface as designed.
+  /^\[(?:ECHLY|ANNOTE)(?:[ :][^\]]*)?\]/i,
 ]);
+
+/**
+ * Extension-origin signal for the SOURCE/STACK of a console entry (as opposed to
+ * its message text). The console denylist above matches an entry's MESSAGE; this
+ * matches the entry's `source` (script URL) or an Error's `stack`, which is where
+ * a `chrome-extension://` origin actually shows up for an extension-thrown error
+ * (e.g. our widget's own "Failed to fetch" rejection — whose message is just
+ * "Failed to fetch" but whose stack frames are all chrome-extension://). Targets
+ * the SCHEME specifically, never a host like annote.ai, so a real bug captured on
+ * annote.ai (same-origin page traffic) is never filtered.
+ */
+export const EXTENSION_ORIGIN_PATTERN = /chrome-extension:\/\//i;
+
+/** True if `text` (a script source URL or an Error stack) originates in an extension. */
+export function isExtensionOrigin(text: string | null | undefined): boolean {
+  if (!text) return false;
+  return EXTENSION_ORIGIN_PATTERN.test(text);
+}
 
 export function isDenylisted(message: string): boolean {
   if (!message) return false;

@@ -24,6 +24,7 @@
  */
 
 import { truncateForTokenBudget } from "@/lib/ai/pipelineTokenBudget";
+import { filterExtensionNoise } from "@/lib/domain/filterExtensionNoise";
 import type {
   ConsoleLogEntry,
   ExceptionEntry,
@@ -351,8 +352,23 @@ function renderTimeline(kept: TimelineEntry[]): string {
  * even building the timeline.
  */
 export function assembleAnalysisContext(
-  feedback: AnalyzableFeedback
+  rawFeedback: AnalyzableFeedback
 ): AssembledAnalysisContext {
+  // Strip extension-originated noise before any reasoning. New tickets are
+  // already clean (the extension drops it at capture time), but RE-analyzing an
+  // OLD ticket would otherwise still feed the model our widget's own
+  // chrome-extension:// "Failed to fetch" — the exact entry that produced the
+  // bogus "a chrome-extension script" root cause. Filtering here keeps the AI
+  // input identical to what the DevTools tabs now render (both run the same
+  // filter), so the two stay consistent by design. Scheme/prefix only — a
+  // same-origin page fault on annote.ai or a customer's own site is preserved.
+  const cleaned = filterExtensionNoise(rawFeedback);
+  const feedback: AnalyzableFeedback = {
+    ...rawFeedback,
+    consoleLogs: cleaned.consoleLogs,
+    exceptions: cleaned.exceptions,
+    networkRequests: cleaned.networkRequests,
+  };
   const description =
     typeof feedback.description === "string"
       ? truncateForTokenBudget(feedback.description.trim(), DESCRIPTION_CHAR_BUDGET)
