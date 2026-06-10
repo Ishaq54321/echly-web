@@ -2520,14 +2520,12 @@ export default function SessionPageClient({
       // the one-shot guard consumed — release it so the effect re-fires once auth
       // arrives (authUid flips and re-runs the effect). Also clear any prior
       // request_error so the panel returns to bounded-loading for the retry.
-      console.log("[TEMP-DIAG] client POST → /api/feedback/" + id + "/analyze"); // TEMP-DIAG REMOVE
       let res: Response | null;
       try {
         res = await authFetch(`/api/feedback/${id}/analyze`, { method: "POST" });
-      } catch (err) {
+      } catch {
         // Network/timeout — request error, not a doc error. Surface it and release
         // the guard so a later view (or manual retry) can try again.
-        console.error("[TEMP-DIAG] client POST threw:", err); // TEMP-DIAG REMOVE
         aiAnalyzeFiredRef.current.delete(id);
         setAiRequestState(id, "request_error");
         return;
@@ -2536,9 +2534,6 @@ export default function SessionPageClient({
         // Not sent (no auth). Release the guard; do NOT mark request_error — this
         // is a not-ready state, not a failure, and the panel should keep loading
         // (bounded) until auth arrives and the effect re-fires.
-        console.warn(
-          "[TEMP-DIAG] client POST returned NULL — authFetch saw no auth.currentUser (request never sent)"
-        ); // TEMP-DIAG REMOVE
         aiAnalyzeFiredRef.current.delete(id);
         return;
       }
@@ -2546,12 +2541,8 @@ export default function SessionPageClient({
       try {
         body = await res.clone().json();
       } catch {
-        body = "<non-JSON body>";
+        body = null;
       }
-      console.log(
-        "[TEMP-DIAG] client POST response",
-        JSON.stringify({ httpStatus: res.status, ok: res.ok, body })
-      ); // TEMP-DIAG REMOVE
       if (!res.ok) {
         // A gate failed (401/403/404/429/500) WITHOUT writing a terminal doc
         // status — the doc stays null/pending. Surface a client-side error so the
@@ -2588,10 +2579,7 @@ export default function SessionPageClient({
       //    is auth-only, so it can never produce a result; show the unavailable
       //    state instead of spinning toward a useless timeout.
       if (authReady) {
-        console.log("[TEMP-DIAG] client trigger: anonymous (authReady, no uid) → request_error for", id); // TEMP-DIAG REMOVE
         setAiRequestState(id, "request_error");
-      } else {
-        console.log("[TEMP-DIAG] client trigger WAIT: auth not ready (authUid null) for", id); // TEMP-DIAG REMOVE
       }
       return;
     }
@@ -2610,27 +2598,7 @@ export default function SessionPageClient({
       selectedAiStatus === "error" ||
       isStalePending;
 
-    // TEMP-DIAG: trace the trigger decision (id, status, whether it will fire). REMOVE.
-    // canSubscribeToFirestore tells us if a realtime listener is even attached —
-    // if false, the route's write will never reach selectedBaseItem (REST/bundle mode).
-    console.log(
-      "[TEMP-DIAG] client trigger effect",
-      JSON.stringify({
-        id,
-        authUid,
-        selectedAiStatus,
-        selectedAiGeneratedAtMs,
-        isStalePending,
-        retryable,
-        alreadyFiredThisMount: aiAnalyzeFiredRef.current.has(id),
-        canSubscribeToFirestore,
-        effectiveWorkspaceId,
-        willFire: retryable && (isStalePending || !aiAnalyzeFiredRef.current.has(id)),
-      })
-    );
-
     if (!retryable) {
-      console.log("[TEMP-DIAG] client trigger BAIL: not retryable (status keeps panel as-is)"); // TEMP-DIAG REMOVE
       return;
     }
 
@@ -2638,7 +2606,6 @@ export default function SessionPageClient({
     // id so it doesn't separately block the re-fire (BOTH guards must permit it).
     if (isStalePending) aiAnalyzeFiredRef.current.delete(id);
     if (aiAnalyzeFiredRef.current.has(id)) {
-      console.log("[TEMP-DIAG] client trigger BAIL: already fired this mount for", id); // TEMP-DIAG REMOVE
       return;
     }
     aiAnalyzeFiredRef.current.add(id);

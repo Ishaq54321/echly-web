@@ -270,13 +270,11 @@ export async function POST(
   try {
     user = await requireAuth(req);
   } catch (err) {
-    console.error("[TEMP-DIAG][route] NO AUTH — requireAuth threw:", err); // TEMP-DIAG REMOVE
     return toAuthorizationResponse(err);
   }
 
   const { id } = await ctx.params;
   const feedbackId = typeof id === "string" ? id.trim() : "";
-  console.log("[TEMP-DIAG][route] ENTRY", JSON.stringify({ feedbackId, uid: user.uid })); // TEMP-DIAG REMOVE
   if (!feedbackId) {
     return json({ error: "Missing feedback id" }, 400);
   }
@@ -286,22 +284,9 @@ export async function POST(
   try {
     feedback = await getFeedbackByIdRepo(feedbackId);
   } catch (err) {
-    console.error("[TEMP-DIAG][route] getFeedbackByIdRepo THREW:", err); // TEMP-DIAG REMOVE
     console.error("[analyze] load failed:", err);
     return json({ error: "Server error" }, 500);
   }
-  // TEMP-DIAG: confirm the doc loaded AND carries the fields the listener query
-  // filters on — if sessionId/workspaceId are missing here the write would drop
-  // the doc out of the listener's window. REMOVE.
-  console.log(
-    "[TEMP-DIAG][route] getFeedbackByIdRepo done",
-    JSON.stringify({
-      found: !!feedback,
-      sessionId: feedback?.sessionId ?? null,
-      workspaceId: feedback?.workspaceId ?? null,
-      aiAnalysisStatus: feedback?.aiAnalysisStatus ?? null,
-    })
-  );
   if (!feedback) {
     return json({ error: "Not found" }, 404);
   }
@@ -313,7 +298,13 @@ export async function POST(
       authenticatedUser: user,
       feedbackId,
       feedback,
-      session: null,
+      // Do NOT pass `session` here. buildRequestContext / getAccessContext treat
+      // a provided value (INCLUDING null) as an authoritative preload and skip
+      // loading the session — passing `session: null` made getAccessContext see
+      // a null session for a real feedback row and throw NOT_FOUND, so every
+      // analysis 404'd at the access gate (the "AI analysis unavailable" bug).
+      // Omitting it lets buildRequestContext load the session from
+      // feedback.sessionId, matching the working GET /api/tickets/[id] path.
     });
     canView = context.access?.capabilities.canView === true;
   } catch (err) {
@@ -359,11 +350,9 @@ export async function POST(
   try {
     lock = await claimAnalysisLock(feedbackId, now);
   } catch (err) {
-    console.error("[TEMP-DIAG][route] claimAnalysisLock THREW:", err); // TEMP-DIAG REMOVE
     console.error("[analyze] lock claim failed:", err);
     return json({ error: "Server error" }, 500);
   }
-  console.log("[TEMP-DIAG][route] lock claimed", JSON.stringify({ kind: lock.kind })); // TEMP-DIAG REMOVE
   if (lock.kind === "cached") {
     return json({
       status: lock.status,
@@ -381,19 +370,13 @@ export async function POST(
 
   // ---- Assemble correlated context (Part 2) ----
   const { contextText, hasAnchors } = assembleAnalysisContext(feedback);
-  console.log(
-    "[TEMP-DIAG][route] branch",
-    JSON.stringify({ hasAnchors, branch: hasAnchors ? "FAULT (model call)" : "NO_FAULT (template)" })
-  ); // TEMP-DIAG REMOVE
 
   // ---- No-fault path: template the message, NO model call, NO quota charge ----
   // (Zero OpenAI cost — charging quota would mischarge the user.)
   if (!hasAnchors) {
     const result = buildNoFaultResult(feedback);
     try {
-      console.log("[TEMP-DIAG][route] writing status=no_fault to feedback/" + feedbackId); // TEMP-DIAG REMOVE
       await writeAnalysis(feedbackId, result);
-      console.log("[TEMP-DIAG][route] no_fault write RESOLVED"); // TEMP-DIAG REMOVE
     } catch (err) {
       console.error("[analyze] no-fault write failed:", err);
       await writeAnalysis(feedbackId, errorResult()).catch(() => {});
@@ -418,13 +401,8 @@ export async function POST(
   }
 
   try {
-    console.log("[TEMP-DIAG][route] model call start"); // TEMP-DIAG REMOVE
-    const _t0 = Date.now(); // TEMP-DIAG REMOVE
     const result = await runModelAnalysis(client, contextText);
-    console.log("[TEMP-DIAG][route] model call done in", Date.now() - _t0, "ms"); // TEMP-DIAG REMOVE
-    console.log("[TEMP-DIAG][route] writing status=" + result.aiAnalysisStatus + " to feedback/" + feedbackId); // TEMP-DIAG REMOVE
     await writeAnalysis(feedbackId, result);
-    console.log("[TEMP-DIAG][route] success write RESOLVED"); // TEMP-DIAG REMOVE
     incrementAiQuotaAsync(user.uid);
     return json({
       status: result.aiAnalysisStatus,
@@ -436,14 +414,10 @@ export async function POST(
     // Any failure (model error, timeout, parse fail) → graceful "error" status.
     // The ticket itself is never affected; the panel shows "analysis unavailable".
     // "error" is NOT cached as fresh, so a later view retries.
-    console.error("[TEMP-DIAG][route] model/generation FAILED:", err); // TEMP-DIAG REMOVE
     console.error("[analyze] generation failed:", err);
-    console.log("[TEMP-DIAG][route] writing status=error to feedback/" + feedbackId); // TEMP-DIAG REMOVE
-    await writeAnalysis(feedbackId, errorResult())
-      .then(() => console.log("[TEMP-DIAG][route] error write RESOLVED")) // TEMP-DIAG REMOVE
-      .catch((e) =>
-        console.error("[analyze] error-status write failed:", e)
-      );
+    await writeAnalysis(feedbackId, errorResult()).catch((e) =>
+      console.error("[analyze] error-status write failed:", e)
+    );
     return json({ status: "error" });
   }
 }

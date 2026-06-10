@@ -285,36 +285,10 @@ function attachListener(sessionId: string, workspaceId: string) {
     limit(FEEDBACK_LISTENER_LIMIT)
   );
 
-  // TEMP-DIAG: confirm the feedback listener actually attaches for this session. REMOVE.
-  console.log(
-    "[TEMP-DIAG] listener ATTACH",
-    JSON.stringify({ sessionId, workspaceId })
-  );
-
   const unsub = onSnapshot(
     q,
     (snap) => {
       try {
-        // TEMP-DIAG: every snapshot tick — size, cache origin, and the ai* status
-        // of each doc that has one (so we can see "complete" arrive). REMOVE.
-        const aiDocs: Array<{ id: string; aiAnalysisStatus: unknown }> = [];
-        snap.forEach((d) => {
-          const dd = d.data();
-          if (dd && dd.aiAnalysisStatus != null) {
-            aiDocs.push({ id: d.id, aiAnalysisStatus: dd.aiAnalysisStatus });
-          }
-        });
-        console.log(
-          "[TEMP-DIAG] snapshot received",
-          JSON.stringify({
-            sessionId,
-            size: snap.size,
-            fromCache: snap.metadata.fromCache,
-            hasPendingWrites: snap.metadata.hasPendingWrites,
-            aiDocs,
-          })
-        );
-
         const list: Feedback[] = [];
         let lastDoc: QueryDocumentSnapshot<DocumentData> | null = null;
         snap.forEach((doc) => {
@@ -345,15 +319,6 @@ function attachListener(sessionId: string, workspaceId: string) {
       }
     },
     (err) => {
-      // TEMP-DIAG: listener error path. NOTE: a Firestore INTERNAL ASSERTION
-      // (ca9) does NOT come through here — it throws inside the SDK and is not
-      // delivered to this onSnapshot error callback. So "no error here" does NOT
-      // rule out a ca9 wedge; check the browser console for an uncaught
-      // "FIRESTORE INTERNAL ASSERTION FAILED: ca9". REMOVE.
-      console.error(
-        "[TEMP-DIAG] listener ERROR handler fired",
-        JSON.stringify({ sessionId, code: (err as { code?: unknown })?.code, message: String(err) })
-      );
       const error = err instanceof Error ? err : new Error(String(err));
       const code = (err as { code?: unknown })?.code;
       if (code !== undefined && (error as { code?: unknown }).code === undefined) {

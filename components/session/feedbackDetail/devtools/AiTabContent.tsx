@@ -86,21 +86,6 @@ export function AiTabContent({
     return () => window.clearTimeout(handle);
   }, [ticketId, status, docLoading, clientError]);
 
-  // TEMP-DIAG: what status the panel is rendering against, every render. REMOVE.
-  console.log(
-    "[TEMP-DIAG] panel render",
-    JSON.stringify({
-      ticketId,
-      aiAnalysisStatus,
-      resolvedStatus: status,
-      docLoading,
-      clientError,
-      loadingTimedOut,
-      hasSummary: aiSummary != null,
-      hasFix: aiFixSuggestion != null,
-    })
-  );
-
   // Terminal-on-client states take precedence over the doc's null/pending so the
   // user is never stuck: an explicit request error, or a loading window that blew
   // past the bound, both surface a retry affordance.
