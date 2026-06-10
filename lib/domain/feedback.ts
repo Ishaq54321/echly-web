@@ -26,6 +26,9 @@ export interface StructuredFeedback {
   screenshotStatus?: "attached" | "pending" | "none" | "failed" | null;
   status?: "open" | "resolved" | "processing";
 
+  /** See {@link Feedback.captureWindowStartAt}. */
+  captureWindowStartAt?: number;
+
   creatorName?: string | null;
   creatorAvatarUrl?: string | null;
 }
@@ -172,6 +175,18 @@ export interface Feedback {
   screenHeight?: number | null;
   devicePixelRatio?: number | null;
 
+  /**
+   * Capture-window honesty stamp (epoch ms). Present when this ticket's capture
+   * streams were cut at a prior ticket's watermark (same engagement, same tab):
+   * entries at or before this time were already filed with an earlier ticket, so
+   * this ticket's captured window BEGINS here. "No signals captured" on such a
+   * ticket means "none since the prior ticket", not "none at all" — the AI
+   * analysis and the panel frame absence-of-evidence accordingly. Stamped by the
+   * extension at file time; absent for the first ticket of an engagement and for
+   * tickets filed by older extension builds.
+   */
+  captureWindowStartAt?: number | null;
+
   // Screenshot
   // 🚨 IMPORTANT:
   // Do NOT add legacy screenshot URL fields back.
@@ -248,21 +263,30 @@ export interface Feedback {
    */
   aiFixSteps?: string[] | null;
   /**
-   * Structured analysis (new shape). The model's judgment of how the captured
+   * Structured analysis (new shape). The model's verdict on how the captured
    * signals relate to the report:
-   *   "related"        — a captured error/failure plausibly explains the report;
-   *   "unrelated"      — errors were captured but appear disconnected from the report;
-   *   "design_request" — the report is a design/UX/content change, not a defect.
-   * Lets the panel render the relatedness verdict directly. Absent on legacy
-   * tickets, on the templated no-fault path, and on the error path.
+   *   "related"        — a captured signal plausibly explains the report;
+   *   "unrelated"      — signals were captured but appear disconnected from the report;
+   *   "design_request" — the report is a design/UX/content change, not a defect;
+   *   "no_signal"      — the capture holds nothing that confirms OR rules out the
+   *                      report; it may well be a real defect the capture didn't see.
+   * Lets the panel render the verdict directly. Absent on legacy tickets and on
+   * the error path.
    */
-  aiSignalRelation?: "related" | "unrelated" | "design_request" | null;
-  /** Model's self-reported confidence 0-1. Null on the templated no-fault path. */
+  aiSignalRelation?: "related" | "unrelated" | "design_request" | "no_signal" | null;
+  /**
+   * Model's self-reported confidence 0-1 IN THE VERDICT (not in a technical
+   * cause) — a certain design-request call is high-confidence. Null on legacy
+   * templated analyses and the error path.
+   */
   aiConfidence?: number | null;
   /**
    * Analysis lifecycle. "pending" guards concurrent first-opens from double-firing;
-   * "complete" = model produced a fault analysis; "no_fault" = no technical signal
-   * (UX/design observation); "error" = generation failed (panel shows graceful state).
+   * "complete" = the model produced an analysis (every success path — the verdict
+   * lives in aiSignalRelation); "error" = generation failed (panel shows graceful
+   * state). "no_fault" is LEGACY-ONLY: pre-overhaul templated no-fault analyses —
+   * never written for new analyses (no-anchor tickets now get a real model call)
+   * but still read/rendered for old docs.
    */
   aiAnalysisStatus?: "pending" | "complete" | "no_fault" | "error" | null;
   /** When the analysis was written back. */

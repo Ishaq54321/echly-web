@@ -25,6 +25,15 @@ import { checkAiQuota, incrementAiQuotaAsync } from "@/lib/ai/quotaCheck";
 import { assembleAnalysisContext } from "@/lib/ai/assembleAnalysisContext";
 import { ANALYSIS_SYSTEM_PROMPT } from "@/lib/ai/prompts/analysisPrompt";
 import { PENDING_STALE_MS } from "@/lib/ai/analysisConstants";
+import {
+  SIGNAL_RELATIONS,
+  clampConfidence,
+  composeFixSuggestion,
+  sanitizeOut,
+  sanitizeRelation,
+  sanitizeSteps,
+  type SignalRelation,
+} from "@/lib/ai/analysisSanitize";
 import type { Feedback } from "@/lib/domain/feedback";
 
 export const runtime = "nodejs";
@@ -49,38 +58,35 @@ export const AI_ANALYSIS_MODEL = "gpt-5.4-nano";
  */
 const MODEL_CALL_TIMEOUT_MS = 22 * 1000; // 22s
 
-/** A successful (complete/no_fault) analysis is reused for this long. */
+/**
+ * A successful analysis is reused for this long. "complete" is the only success
+ * status new analyses write; "no_fault" still counts as fresh for LEGACY docs
+ * written by the pre-overhaul templated path (they keep rendering; a re-analysis
+ * after expiry upgrades them to a real model verdict).
+ */
 const ANALYSIS_FRESH_MS = 24 * 60 * 60 * 1000; // 24h
 // PENDING_STALE_MS lives in lib/ai/analysisConstants (shared with the dashboard
 // client so the stale-pending reclaim and the client retry agree on the threshold).
 
 type AnalysisStatus = NonNullable<Feedback["aiAnalysisStatus"]>;
-type SignalRelation = NonNullable<Feedback["aiSignalRelation"]>;
-
-/** The relatedness verdicts the model may emit (must match the prompt + schema). */
-const SIGNAL_RELATIONS: readonly SignalRelation[] = [
-  "related",
-  "unrelated",
-  "design_request",
-] as const;
 
 interface AnalysisResult {
   aiSummary: string | null;
   /**
-   * Legacy/compat run-on form. Always populated (joined from cause + steps on the
-   * fault path; the honest framing on the no-fault path) so any reader of this field
-   * — and any old-shape-only renderer — keeps working.
+   * Legacy/compat run-on form. Always populated on success (joined from cause +
+   * steps) so any reader of this field — and any old-shape-only renderer — keeps
+   * working.
    */
   aiFixSuggestion: string | null;
-  /** Structured: one-line cause. Null on the no-fault/error paths. */
+  /** Structured: one-line cause/assessment. Null on the error path. */
   aiCause: string | null;
-  /** Structured: discrete fix steps. Null on the no-fault/error paths. */
+  /** Structured: discrete fix/next steps. Null on the error path. */
   aiFixSteps: string[] | null;
   /**
-   * Structured: the model's judgment of how the captured signals relate to the
-   * report ("related" | "unrelated" | "design_request"). Lets the panel render the
-   * relatedness verdict without parsing prose. Null on the no-fault/error paths and
-   * on legacy tickets analyzed before this field existed.
+   * Structured: the model's verdict on how the captured signals relate to the
+   * report ("related" | "unrelated" | "design_request" | "no_signal"). Lets the
+   * panel render the verdict without parsing prose. Null on the error path and on
+   * legacy tickets analyzed before this field existed.
    */
   aiSignalRelation: SignalRelation | null;
   aiConfidence: number | null;
@@ -89,19 +95,20 @@ interface AnalysisResult {
 
 /**
  * Strict JSON schema for the model's output (voiceToTicketPipeline pattern).
- * Structured shape: a tight summary, a one-line cause, and an ARRAY of discrete fix
- * steps (so they render as a list, not "(1)…(2)…" inside a paragraph).
+ * Structured shape: a tight summary, a verdict, a one-line cause/assessment, and
+ * an ARRAY of discrete steps (so they render as a list, not "(1)…(2)…" inside a
+ * paragraph).
  */
 const ANALYSIS_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
   properties: {
     aiSummary: { type: "string" },
-    // The relatedness verdict (constrained to the three values the prompt defines)
-    // so the model commits to a judgment the panel can render, not just prose.
+    // The verdict (constrained to the four values the prompt defines) so the
+    // model commits to a judgment the panel can render, not just prose.
     aiSignalRelation: {
       type: "string",
-      enum: ["related", "unrelated", "design_request"],
+      enum: SIGNAL_RELATIONS as unknown as string[],
     },
     aiCause: { type: "string" },
     aiFixSteps: {
@@ -194,80 +201,9 @@ async function claimAnalysisLock(id: string, now: number): Promise<LockOutcome> 
   });
 }
 
-/** Template message for a report with no technical fault (no model call needed). */
-function buildNoFaultResult(feedback: Feedback): AnalysisResult {
-  const desc =
-    typeof feedback.description === "string" ? feedback.description.trim() : "";
-  const summary = desc
-    ? `This report describes: ${desc.slice(0, 280)}${desc.length > 280 ? "…" : ""}`
-    : "This report has no captured technical signals to analyze.";
-  return {
-    aiSummary: summary,
-    aiFixSuggestion:
-      "No console or network errors and no uncaught exceptions were captured in the recorded window — this appears to be a usability or design observation rather than a code defect. Treat it as product/UX feedback: review the described experience against the intended design rather than looking for a bug to fix.",
-    // No-fault is a templated, non-technical message — it has no discrete cause/steps;
-    // the panel renders it from aiFixSuggestion in its own no-fault layout.
-    aiCause: null,
-    aiFixSteps: null,
-    // No-fault is its own (untouched) path with a dedicated layout — leave the
-    // relatedness verdict null here; it only applies when a model call ran.
-    aiSignalRelation: null,
-    aiConfidence: null,
-    aiAnalysisStatus: "no_fault",
-  };
-}
-
-function sanitizeOut(s: unknown, max: number): string {
-  return typeof s === "string" ? s.trim().slice(0, max) : "";
-}
-
-/**
- * Sanitize the model's fix-steps array: trim each item, drop empties, strip any
- * leading enumeration the model added despite instructions ("1.", "1)", "(1)",
- * "- ", "• "), cap item count and length. Returns [] if nothing usable.
- */
-function sanitizeSteps(value: unknown, maxItems: number, maxLen: number): string[] {
-  if (!Array.isArray(value)) return [];
-  const out: string[] = [];
-  for (const item of value) {
-    if (typeof item !== "string") continue;
-    const cleaned = item
-      .trim()
-      .replace(/^(?:[-*•]\s+|\(?\d+[.)]\s+)/, "")
-      .trim()
-      .slice(0, maxLen);
-    if (cleaned) out.push(cleaned);
-    if (out.length >= maxItems) break;
-  }
-  return out;
-}
-
-/**
- * Build the legacy/compat run-on string from the structured fields. Kept in sync on
- * every fault write so old-shape readers (and any cached old-shape renderer) still
- * get a sensible single block. Steps are joined as a numbered sentence list.
- */
-function composeFixSuggestion(cause: string, steps: string[]): string {
-  const stepText = steps.map((s, i) => `${i + 1}. ${s}`).join(" ");
-  return stepText ? `${cause} Suggested fix: ${stepText}` : cause;
-}
-
-function clampConfidence(n: unknown): number | null {
-  if (typeof n !== "number" || !Number.isFinite(n)) return null;
-  return Math.max(0, Math.min(1, n));
-}
-
-/**
- * Coerce the model's relatedness verdict to one of the allowed values. Defaults to
- * "related" when the value is missing/unrecognized: the fault path only runs when
- * real anchors exist, so a malformed verdict should fall back to the
- * diagnose-the-fault behaviour rather than silently suppressing a real cause.
- */
-function sanitizeRelation(value: unknown): SignalRelation {
-  return SIGNAL_RELATIONS.includes(value as SignalRelation)
-    ? (value as SignalRelation)
-    : "related";
-}
+// Output sanitization (sanitizeOut/sanitizeSteps/composeFixSuggestion/
+// clampConfidence/sanitizeRelation) lives in lib/ai/analysisSanitize — pure and
+// unit-tested there; the route just wires it up.
 
 /**
  * One OpenAI call → strict JSON. Throws on transport/parse failure (caller maps
@@ -284,7 +220,8 @@ function sanitizeRelation(value: unknown): SignalRelation {
  */
 async function runModelAnalysis(
   client: OpenAI,
-  contextText: string
+  contextText: string,
+  hasAnchors: boolean
 ): Promise<AnalysisResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), MODEL_CALL_TIMEOUT_MS);
@@ -325,7 +262,7 @@ async function runModelAnalysis(
   const aiSummary = sanitizeOut(parsed.aiSummary, 600);
   const aiCause = sanitizeOut(parsed.aiCause, 400);
   const aiFixSteps = sanitizeSteps(parsed.aiFixSteps, 5, 300);
-  const aiSignalRelation = sanitizeRelation(parsed.aiSignalRelation);
+  const aiSignalRelation = sanitizeRelation(parsed.aiSignalRelation, hasAnchors);
   // Require the scannable core: a summary, a cause, and at least one concrete step.
   if (!aiSummary || !aiCause || aiFixSteps.length === 0) {
     throw new Error("Model returned empty analysis fields");
@@ -508,24 +445,15 @@ export async function POST(
   }
   // lock.kind === "claimed": we own the analysis; status is now "pending".
 
-  // ---- Assemble correlated context (Part 2) ----
+  // ---- Assemble the analysis context (Part 2) ----
+  // hasAnchors selects WHICH context was built (correlated timeline vs journey/
+  // slow-summary) and the verdict fallback — but BOTH paths run the model. The
+  // old no-anchor template ("appears to be a design observation") issued
+  // confident wrong verdicts on performance/wrong-data/visual tickets without
+  // any model in the loop; the model now judges those, which is worth the call.
   const { contextText, hasAnchors } = assembleAnalysisContext(feedback);
 
-  // ---- No-fault path: template the message, NO model call, NO quota charge ----
-  // (Zero OpenAI cost — charging quota would mischarge the user.)
-  if (!hasAnchors) {
-    const result = buildNoFaultResult(feedback);
-    try {
-      await writeAnalysis(feedbackId, result);
-    } catch (err) {
-      console.error("[analyze] no-fault write failed:", err);
-      await writeAnalysis(feedbackId, errorResult()).catch(() => {});
-      return json({ status: "error" });
-    }
-    return json(terminalResponse(result));
-  }
-
-  // ---- Fault path: one model call → write back; increment quota on success ----
+  // ---- One model call → write back; increment quota on success ----
   let client: OpenAI;
   try {
     client = getOpenAIClient();
@@ -536,7 +464,7 @@ export async function POST(
   }
 
   try {
-    const result = await runModelAnalysis(client, contextText);
+    const result = await runModelAnalysis(client, contextText, hasAnchors);
     await writeAnalysis(feedbackId, result);
     incrementAiQuotaAsync(user.uid);
     return json(terminalResponse(result));

@@ -135,6 +135,9 @@ const feedbackPayload = (
     screenWidth: (data as { screenWidth?: number }).screenWidth ?? null,
     screenHeight: (data as { screenHeight?: number }).screenHeight ?? null,
     devicePixelRatio: (data as { devicePixelRatio?: number }).devicePixelRatio ?? null,
+    // Capture-window honesty stamp (per-ticket watermark cut) — null when this
+    // is the engagement's first ticket or the client predates the field.
+    captureWindowStartAt: data.captureWindowStartAt ?? null,
 
     screenshotId: data.screenshotId ?? null,
     screenshotStatus: data.screenshotStatus ?? null,
@@ -188,6 +191,7 @@ export function feedbackFromCreateInsert(args: {
     screenWidth: (row as { screenWidth?: number }).screenWidth ?? null,
     screenHeight: (row as { screenHeight?: number }).screenHeight ?? null,
     devicePixelRatio: (row as { devicePixelRatio?: number }).devicePixelRatio ?? null,
+    captureWindowStartAt: row.captureWindowStartAt ?? null,
     screenshotId: row.screenshotId ?? null,
     screenshotStatus: row.screenshotStatus ?? null,
     commentCount: 0,
@@ -937,6 +941,8 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
     screenHeight: typeof data.screenHeight === "number" ? data.screenHeight : null,
     devicePixelRatio:
       typeof data.devicePixelRatio === "number" ? data.devicePixelRatio : null,
+    captureWindowStartAt:
+      typeof data.captureWindowStartAt === "number" ? data.captureWindowStartAt : null,
     screenshotId: data.screenshotId ?? null,
     screenshotStatus:
       (data.screenshotStatus as Feedback["screenshotStatus"] | undefined) ?? null,
@@ -1003,6 +1009,12 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
     ...(Array.isArray(data.aiFixSteps) &&
     data.aiFixSteps.every((s: unknown) => typeof s === "string")
       ? { aiFixSteps: data.aiFixSteps as string[] }
+      : {}),
+    ...(data.aiSignalRelation === "related" ||
+    data.aiSignalRelation === "unrelated" ||
+    data.aiSignalRelation === "design_request" ||
+    data.aiSignalRelation === "no_signal"
+      ? { aiSignalRelation: data.aiSignalRelation as Feedback["aiSignalRelation"] }
       : {}),
     ...(typeof data.aiConfidence === "number"
       ? { aiConfidence: data.aiConfidence }

@@ -67,6 +67,9 @@ export async function POST(req: NextRequest) {
     screenWidth?: number;
     screenHeight?: number;
     devicePixelRatio?: number;
+    // Capture-window honesty stamp: epoch-ms watermark cut when a prior ticket
+    // in the same engagement already filed the earlier entries.
+    captureWindowStartAt?: unknown;
     // Phase 4: console-log capture from the extension's MAIN-world wrapper.
     // All entries are redacted at capture time before they reach this route.
     consoleLogs?: unknown;
@@ -384,7 +387,10 @@ export async function POST(req: NextRequest) {
       console.warn(`[feedback] dropped ${field}: not an array`);
       return undefined;
     }
-    const capped = raw.slice(0, MAX_LOG_ENTRIES);
+    // Keep the NEWEST entries: the merged capture arrays arrive time-ascending,
+    // so slice from the END — the entries nearest the report are the evidence;
+    // the oldest tail is what a cap should sacrifice.
+    const capped = raw.slice(-MAX_LOG_ENTRIES);
     const validated: T[] = [];
     for (const entry of capped) {
       const v = validator(entry);
@@ -506,7 +512,8 @@ export async function POST(req: NextRequest) {
       console.warn("[feedback] dropped networkRequests: not an array");
       return undefined;
     }
-    const capped = raw.slice(0, MAX_NETWORK_ENTRIES);
+    // Keep the NEWEST entries (see validateLogArray) — input is time-ascending.
+    const capped = raw.slice(-MAX_NETWORK_ENTRIES);
     const validated: NetworkRequestEntry[] = [];
     for (const entry of capped) {
       const v = validateNetworkRequest(entry);
@@ -638,7 +645,8 @@ export async function POST(req: NextRequest) {
       console.warn("[feedback] dropped userActions: not an array");
       return undefined;
     }
-    const capped = raw.slice(0, MAX_USER_ACTIONS);
+    // Keep the NEWEST entries (see validateLogArray) — input is time-ascending.
+    const capped = raw.slice(-MAX_USER_ACTIONS);
     const validated: UserAction[] = [];
     for (const entry of capped) {
       const v = validateUserAction(entry);
@@ -708,6 +716,12 @@ export async function POST(req: NextRequest) {
     screenWidth: typeof body.screenWidth === "number" ? body.screenWidth : undefined,
     screenHeight: typeof body.screenHeight === "number" ? body.screenHeight : undefined,
     devicePixelRatio: typeof body.devicePixelRatio === "number" ? body.devicePixelRatio : undefined,
+    captureWindowStartAt:
+      typeof body.captureWindowStartAt === "number" &&
+      Number.isFinite(body.captureWindowStartAt) &&
+      body.captureWindowStartAt > 0
+        ? body.captureWindowStartAt
+        : undefined,
     creatorName: typeof resolvedCreatorName === "string" ? resolvedCreatorName : null,
     creatorAvatarUrl: typeof resolvedCreatorAvatarUrl === "string" ? resolvedCreatorAvatarUrl : null,
     // Phase 4: console-log capture (post-validation). Repository skips

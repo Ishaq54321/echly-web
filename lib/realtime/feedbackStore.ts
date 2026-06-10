@@ -180,6 +180,8 @@ function mapFeedbackFromSnap(snap: QueryDocumentSnapshot<DocumentData>): Feedbac
     screenHeight: typeof data.screenHeight === "number" ? data.screenHeight : null,
     devicePixelRatio:
       typeof data.devicePixelRatio === "number" ? data.devicePixelRatio : null,
+    captureWindowStartAt:
+      typeof data.captureWindowStartAt === "number" ? data.captureWindowStartAt : null,
     screenshotId: typeof data.screenshotId === "string" ? data.screenshotId : null,
     screenshotStatus:
       data.screenshotStatus === "attached" ||
@@ -249,7 +251,8 @@ function mapFeedbackFromSnap(snap: QueryDocumentSnapshot<DocumentData>): Feedbac
     aiSignalRelation:
       data.aiSignalRelation === "related" ||
       data.aiSignalRelation === "unrelated" ||
-      data.aiSignalRelation === "design_request"
+      data.aiSignalRelation === "design_request" ||
+      data.aiSignalRelation === "no_signal"
         ? data.aiSignalRelation
         : null,
     aiConfidence:

@@ -1937,6 +1937,20 @@ function mergeEngagementIntoTicket(
 
   const merged: Record<string, unknown> = { ...ticket };
 
+  /* CAPTURE-WINDOW HONESTY STAMP. When any stream carries a watermark, this
+     ticket's window BEGINS after a prior successful ticket in this engagement+tab
+     — entries at or before the cut were filed with THAT ticket, not lost. Stamp
+     the latest cut (epoch ms) onto the payload so the server, the AI analysis,
+     and the dashboard panel can say "the captured window begins after a prior
+     ticket" instead of the misleading "nothing was captured". Absent on the
+     engagement's first ticket and when no stream has filed before. */
+  const watermarkCuts = [wms?.logs, wms?.exceptions, wms?.network, wms?.actions]
+    .filter((w): w is StreamWatermark => w != null)
+    .map((w) => w.timestamp);
+  if (watermarkCuts.length > 0) {
+    merged.captureWindowStartAt = Math.max(...watermarkCuts);
+  }
+
   /* Assign the FILTERED (post-watermark) lists UNCONDITIONALLY for every surface, and
      recompute the counts from them. This is the part of the cut that makes ticket 3 (no
      new activity → empty filtered lists) actually empty instead of inheriting the live

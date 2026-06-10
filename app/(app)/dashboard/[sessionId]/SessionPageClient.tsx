@@ -2489,7 +2489,8 @@ export default function SessionPageClient({
       aiSignalRelation:
         result.aiSignalRelation === "related" ||
         result.aiSignalRelation === "unrelated" ||
-        result.aiSignalRelation === "design_request"
+        result.aiSignalRelation === "design_request" ||
+        result.aiSignalRelation === "no_signal"
           ? result.aiSignalRelation
           : f.aiSignalRelation,
       aiConfidence: typeof result.aiConfidence === "number" ? result.aiConfidence : f.aiConfidence,

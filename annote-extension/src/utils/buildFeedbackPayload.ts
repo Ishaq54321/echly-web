@@ -87,6 +87,12 @@ export function buildFeedbackPayload({
     screenHeight: typeof ticket.screenHeight === "number" ? ticket.screenHeight : undefined,
     devicePixelRatio:
       typeof ticket.devicePixelRatio === "number" ? ticket.devicePixelRatio : undefined,
+    // Capture-window honesty stamp (set by the background file-time merge when a
+    // prior ticket's watermark cut this ticket's streams). Server validates.
+    captureWindowStartAt:
+      typeof ticket.captureWindowStartAt === "number"
+        ? ticket.captureWindowStartAt
+        : undefined,
     metadata: {
       clientTimestamp: Date.now(),
       url: typeof ticket.url === "string" ? ticket.url : undefined,

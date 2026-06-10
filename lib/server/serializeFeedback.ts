@@ -104,6 +104,7 @@ export function serializeTicket(ticket: Feedback, access: AccessContext): Record
     screenWidth: can ? (ticket.screenWidth ?? null) : null,
     screenHeight: can ? (ticket.screenHeight ?? null) : null,
     devicePixelRatio: can ? (ticket.devicePixelRatio ?? null) : null,
+    captureWindowStartAt: can ? (ticket.captureWindowStartAt ?? null) : null,
     status: ns,
     isResolved: ns === "resolved",
     createdAt: timestampToIso(ticket.createdAt),

@@ -14,17 +14,20 @@ export type AiAnalysisStatus =
   | undefined;
 
 /**
- * The model's judgment of how the captured signals relate to the report. Rendered
+ * The model's verdict on how the captured signals relate to the report. Rendered
  * as a verdict badge above the cause so the developer sees WHY the AI did or did not
- * connect the errors to what the user described:
- *   "related"        — a captured error plausibly explains the report;
- *   "unrelated"      — errors were captured but look disconnected from the report;
- *   "design_request" — the report is a design/UX/content change, not a defect.
+ * connect the evidence to what the user described:
+ *   "related"        — a captured signal plausibly explains the report;
+ *   "unrelated"      — signals were captured but look disconnected from the report;
+ *   "design_request" — the report is a design/UX/content change, not a defect;
+ *   "no_signal"      — nothing captured confirms OR rules out the report; it may
+ *                      well be a real defect the capture didn't see.
  */
 export type AiSignalRelation =
   | "related"
   | "unrelated"
   | "design_request"
+  | "no_signal"
   | null
   | undefined;
 
@@ -41,8 +44,15 @@ export interface AiTabContentProps {
   aiFixSteps?: string[] | null;
   /** Structured: the model's relatedness verdict, rendered as a badge (new shape). */
   aiSignalRelation?: AiSignalRelation;
+  /** Model confidence 0-1 IN THE VERDICT (not in a technical cause). */
   aiConfidence?: number | null;
   aiAnalysisStatus?: AiAnalysisStatus;
+  /**
+   * Capture-window honesty stamp (epoch ms) — present when this ticket's capture
+   * streams were cut at a prior ticket's watermark. Rendered as a small framing
+   * note so "no related capture" reads as "none since the prior ticket".
+   */
+  captureWindowStartAt?: number | null;
   /**
    * Ticket id — used only to reset the bounded-loading timer when the open
    * ticket changes (so switching tickets restarts the clock, never inherits a
@@ -89,6 +99,7 @@ export function AiTabContent({
   ticketId,
   clientError = false,
   onRetry,
+  captureWindowStartAt,
 }: AiTabContentProps) {
   // Treat absent status as "not analyzed yet" — the dashboard fires the analyze
   // request on open, which flips this to "pending" then a terminal state via the
@@ -309,6 +320,7 @@ export function AiTabContent({
             aiFixSteps={aiFixSteps}
             aiSignalRelation={aiSignalRelation}
             aiConfidence={aiConfidence}
+            captureWindowStartAt={captureWindowStartAt}
           />
         ) : (
           // Defensive: unknown status → treat like not-yet-analyzed.
@@ -398,6 +410,12 @@ function TimedOutState({ onRetry }: { onRetry?: () => void }) {
   );
 }
 
+/**
+ * LEGACY layout for docs analyzed by the pre-overhaul templated no-fault path
+ * (aiAnalysisStatus === "no_fault"). New analyses always run the model and land
+ * in CompleteState with a verdict; this stays only so old tickets keep rendering
+ * until a re-analysis upgrades them.
+ */
 function NoFaultState({
   aiSummary,
   aiFixSuggestion,
@@ -453,16 +471,18 @@ function ConfidenceIndicator({ aiConfidence }: { aiConfidence?: number | null })
 
 /**
  * Per-verdict presentation for the relatedness badge + the cause/fix labels.
- * "related" keeps the original "Likely cause" / "Suggested fix" wording; the other
- * two reframe the section so the panel reads honestly (the AI did NOT pin the
- * captured errors as the bug, or it's a design request, not a defect).
+ * "related" keeps the original "Likely cause" / "Suggested fix" wording; the
+ * others reframe the section so the panel reads honestly: the AI did NOT pin the
+ * captured errors as the bug ("unrelated"), it's a change request not a defect
+ * ("design_request"), or the capture simply holds nothing that bears on the
+ * report either way ("no_signal" — which must NOT read as "probably not a bug").
  */
 const RELATION_PRESENTATION: Record<
   NonNullable<AiSignalRelation>,
   { badge: string; color: string; causeLabel: string; fixLabel: string }
 > = {
   related: {
-    badge: "Captured errors relate to this report",
+    badge: "Captured signals relate to this report",
     color: "var(--color-success)",
     causeLabel: "Likely cause",
     fixLabel: "Suggested fix",
@@ -474,10 +494,16 @@ const RELATION_PRESENTATION: Record<
     fixLabel: "Suggested next steps",
   },
   design_request: {
-    badge: "Design / UX observation — no code fault",
+    badge: "Design / UX request — no code fault",
     color: "var(--text-tertiary)",
     causeLabel: "Assessment",
     fixLabel: "Suggested next steps",
+  },
+  no_signal: {
+    badge: "No related capture — defect not ruled out",
+    color: "var(--color-accent)",
+    causeLabel: "Assessment",
+    fixLabel: "How to confirm",
   },
 };
 
@@ -508,6 +534,7 @@ function CompleteState({
   aiFixSteps,
   aiSignalRelation,
   aiConfidence,
+  captureWindowStartAt,
 }: {
   aiSummary?: string | null;
   aiFixSuggestion?: string | null;
@@ -515,6 +542,7 @@ function CompleteState({
   aiFixSteps?: string[] | null;
   aiSignalRelation?: AiSignalRelation;
   aiConfidence?: number | null;
+  captureWindowStartAt?: number | null;
 }) {
   // Prefer the structured shape (new tickets): a labeled one-line cause + a list of
   // discrete steps. Fall back to the legacy run-on `aiFixSuggestion` for old tickets
@@ -530,15 +558,22 @@ function CompleteState({
   const relation = aiSignalRelation ?? "related";
   const presentation =
     RELATION_PRESENTATION[relation] ?? RELATION_PRESENTATION.related;
-  // Confidence reads as confidence in a TECHNICAL cause — only meaningful when the
-  // signals are related. For unrelated/design verdicts the badge carries the signal
-  // and a low confidence number would just be noise, so suppress it there.
-  const showConfidence = aiSignalRelation == null || aiSignalRelation === "related";
+
+  // Window-start framing: when this ticket's capture was cut at a prior ticket's
+  // watermark, absence-of-evidence verdicts need the context to read honestly.
+  // Most load-bearing for no_signal/unrelated, harmless elsewhere.
+  const showWindowNote = typeof captureWindowStartAt === "number";
 
   return (
     <div>
       <AiAffordance />
       <RelationBadge relation={aiSignalRelation} />
+      {showWindowNote ? (
+        <div className="aitab-relation-note">
+          Capture window began after an earlier ticket from this session — older
+          activity was filed with that ticket.
+        </div>
+      ) : null}
       <div className="aitab-section">
         <div className="aitab-label">Summary</div>
         <div className="aitab-body">{aiSummary || "No summary available."}</div>
@@ -571,7 +606,10 @@ function CompleteState({
         </div>
       )}
 
-      {showConfidence ? <ConfidenceIndicator aiConfidence={aiConfidence} /> : null}
+      {/* Confidence is the model's confidence in its VERDICT (not in a technical
+          cause), so it renders for every verdict — a certain design-request call
+          shows as high confidence rather than being suppressed. */}
+      <ConfidenceIndicator aiConfidence={aiConfidence} />
     </div>
   );
 }

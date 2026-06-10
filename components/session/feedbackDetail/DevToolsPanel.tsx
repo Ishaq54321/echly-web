@@ -43,6 +43,7 @@ export type DevToolsFeedback = Partial<
     | "aiSignalRelation"
     | "aiConfidence"
     | "aiAnalysisStatus"
+    | "captureWindowStartAt"
   >
 >;
 import { Tabs, type TabsItem } from "@/components/ui/Tabs";
@@ -143,6 +144,7 @@ export function DevToolsPanel({
             aiSignalRelation={feedback?.aiSignalRelation}
             aiConfidence={feedback?.aiConfidence}
             aiAnalysisStatus={feedback?.aiAnalysisStatus}
+            captureWindowStartAt={feedback?.captureWindowStartAt}
             clientError={aiClientError}
             onRetry={onAiRetry}
           />

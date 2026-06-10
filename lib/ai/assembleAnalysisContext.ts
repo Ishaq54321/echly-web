@@ -7,7 +7,7 @@
  * error sits next to the action that triggered it, rather than the full noisy
  * capture buffer.
  *
- * Pipeline:
+ * Pipeline (fault path — at least one anchor exists):
  *   1. Merge consoleLogs ∪ exceptions ∪ networkRequests ∪ userActions into one
  *      timeline tagged {source, ts}. All four use Date.now() epoch-ms from the
  *      same MAIN-world context, so they're directly correlatable on ts.
@@ -19,8 +19,20 @@
  *   5. RENDER a compact labeled chronological text block (voiceToTicketPipeline
  *      buildUserMessage style) + description + key metadata.
  *
- * Output { contextText, hasAnchors }. hasAnchors === false → the route takes the
- * honest no-fault path (no fabricated cause for a UX/design report).
+ * No-anchor path (no error-shaped signal in the capture): the model STILL runs —
+ * zero anchors means "no error-shaped defect", NOT "no defect" (performance,
+ * wrong-data, and visual defects all produce zero anchors). The context carries
+ * the description, the ticket metadata, the user journey (navigations + clicks),
+ * a slowest-requests summary, and an honest statement of what was and wasn't
+ * captured; the MODEL decides between design request, non-error defect, and
+ * insufficient signal — never a template.
+ *
+ * Both paths state the capture-window bounds (including the prior-ticket
+ * watermark cut when `captureWindowStartAt` is stamped) so the model can reason
+ * about absence of evidence honestly.
+ *
+ * Output { contextText, hasAnchors }. hasAnchors only tells the route which
+ * sanitization fallback applies — both values lead to a model call.
  */
 
 import { truncateForTokenBudget } from "@/lib/ai/pipelineTokenBudget";
@@ -57,6 +69,15 @@ const TIMELINE_CHAR_BUDGET = 5_000;
 const MAX_ANCHORS = 8;
 /** Description is capped separately so a huge body can't crowd out the report. */
 const DESCRIPTION_CHAR_BUDGET = 2_000;
+/**
+ * Char cap for the USER JOURNEY section (navigations + clicks/submits/inputs).
+ * Actions are one short line each, so this comfortably holds dozens; when a long
+ * engagement overflows it we keep the NEWEST actions (closest to filing) and say
+ * how many earlier ones were dropped.
+ */
+const JOURNEY_CHAR_BUDGET = 2_500;
+/** How many slowest requests the no-anchor summary lists. */
+const SLOW_SUMMARY_COUNT = 5;
 /** Capture-site sentinels we replace with a short human note. */
 const STREAMING_SENTINEL = "<streaming response>";
 const BINARY_SENTINEL = "<binary content>";
@@ -86,16 +107,30 @@ interface TimelineEntry {
 export interface AssembledAnalysisContext {
   /** Compact labeled chronological block + description + metadata. */
   contextText: string;
-  /** False → no technical fault detected → the route's no_fault path. */
+  /**
+   * False → no error-shaped signal in the capture; the context carries the
+   * journey/slow-summary/metadata instead of a correlated timeline. The model
+   * runs either way — this only selects the route's sanitization fallback.
+   */
   hasAnchors: boolean;
 }
 
 /** Subset of Feedback the assembler reads. Keeps the signature honest about deps. */
 export type AnalyzableFeedback = Pick<
   Feedback,
+  | "title"
   | "description"
+  | "tags"
+  | "pageArea"
   | "url"
   | "userAgent"
+  | "viewportWidth"
+  | "viewportHeight"
+  | "screenWidth"
+  | "screenHeight"
+  | "devicePixelRatio"
+  | "clientTimestamp"
+  | "captureWindowStartAt"
   | "consoleLogs"
   | "exceptions"
   | "networkRequests"
@@ -180,6 +215,116 @@ function renderNetwork(req: NetworkRequestEntry): string {
     if (resBody) lines.push(`    response body: ${resBody}`);
   }
   return lines.join("\n");
+}
+
+/**
+ * Ticket metadata lines for the model. All of this is already persisted on the
+ * doc and costs a handful of tokens: the title carries the interpreter's
+ * distilled claim, tags carry its bug-vs-request classification, and the
+ * viewport/screen/DPR are the only numbers that matter for layout reports.
+ */
+function buildMetaParts(feedback: AnalyzableFeedback): string[] {
+  const parts: string[] = [];
+  if (feedback.title) parts.push(`Title: ${truncateForTokenBudget(feedback.title, 150)}`);
+  if (Array.isArray(feedback.tags) && feedback.tags.length > 0) {
+    parts.push(`Tags: ${feedback.tags.slice(0, 8).join(", ")}`);
+  }
+  if (feedback.pageArea) parts.push(`Page area: ${truncateForTokenBudget(feedback.pageArea, 60)}`);
+  if (feedback.url) parts.push(`URL: ${feedback.url}`);
+  if (feedback.viewportWidth != null && feedback.viewportHeight != null) {
+    parts.push(`Viewport: ${feedback.viewportWidth}×${feedback.viewportHeight}`);
+  }
+  if (feedback.screenWidth != null && feedback.screenHeight != null) {
+    const dpr = feedback.devicePixelRatio != null ? ` @${feedback.devicePixelRatio}x` : "";
+    parts.push(`Screen: ${feedback.screenWidth}×${feedback.screenHeight}${dpr}`);
+  }
+  if (feedback.userAgent)
+    parts.push(`User agent: ${truncateForTokenBudget(feedback.userAgent, 200)}`);
+  return parts;
+}
+
+/** Action types that constitute the user's journey; focus/blur/visibility/resize are noise here. */
+const JOURNEY_ACTION_TYPES = new Set<UserAction["type"]>([
+  "click",
+  "navigation",
+  "submit",
+  "input",
+]);
+
+/**
+ * Compact USER JOURNEY block: every navigation/click/submit/input across the
+ * captured engagement, one line each, relative-timed from the first kept action,
+ * closed with a "ticket filed at t+N" marker (from clientTimestamp) so the model
+ * can judge how stale each step is. Returns null when nothing was captured.
+ * Overflow keeps the NEWEST actions — the steps nearest the report matter most.
+ */
+function renderJourney(feedback: AnalyzableFeedback): string | null {
+  const actions = (feedback.userActions ?? [])
+    .filter((a) => JOURNEY_ACTION_TYPES.has(a.type))
+    .sort((a, b) => a.timestamp - b.timestamp);
+  if (actions.length === 0) return null;
+
+  const t0 = actions[0].timestamp;
+  let lines = actions.map(
+    (a) => `t+${Math.max(0, Math.round(a.timestamp - t0))}ms ${renderAction(a)}`
+  );
+  let omitted = 0;
+  // Trim oldest-first until the block fits — whole lines only.
+  while (lines.length > 1 && lines.join("\n").length > JOURNEY_CHAR_BUDGET) {
+    lines = lines.slice(1);
+    omitted += 1;
+  }
+  if (omitted > 0) {
+    lines.unshift(`… (${omitted} earlier actions omitted for length)`);
+  }
+  if (
+    typeof feedback.clientTimestamp === "number" &&
+    feedback.clientTimestamp >= t0
+  ) {
+    lines.push(`t+${Math.round(feedback.clientTimestamp - t0)}ms [TICKET FILED]`);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Slowest-requests summary for the no-anchor path: when nothing failed, request
+ * timing is the strongest remaining technical signal (it is the ONLY evidence
+ * for a performance complaint). Lists the top SLOW_SUMMARY_COUNT by duration.
+ */
+function renderSlowRequestSummary(feedback: AnalyzableFeedback): string | null {
+  const timed = (feedback.networkRequests ?? []).filter(
+    (r): r is NetworkRequestEntry & { durationMs: number } =>
+      typeof r.durationMs === "number" && r.durationMs > 0
+  );
+  if (timed.length === 0) return null;
+  const slowest = [...timed]
+    .sort((a, b) => b.durationMs - a.durationMs)
+    .slice(0, SLOW_SUMMARY_COUNT);
+  return slowest
+    .map((r) => {
+      const status = r.status != null ? String(r.status) : r.errored ? "ERR" : "pending";
+      return `${r.method} ${r.url} → ${status} (${Math.round(r.durationMs)}ms)`;
+    })
+    .join("\n");
+}
+
+/**
+ * Honest statement of the capture window's bounds. When the prior-ticket
+ * watermark cut applies (captureWindowStartAt stamped at file time), the model
+ * must know the window BEGINS there — "no signals" on such a ticket means "none
+ * since the prior ticket", not "none at all".
+ */
+function captureWindowNote(feedback: AnalyzableFeedback): string | null {
+  if (typeof feedback.captureWindowStartAt !== "number") return null;
+  const filedAt = feedback.clientTimestamp;
+  const span =
+    typeof filedAt === "number" && filedAt > feedback.captureWindowStartAt
+      ? ` (~${Math.round((filedAt - feedback.captureWindowStartAt) / 1000)}s before this ticket was filed)`
+      : "";
+  return (
+    `NOTE: the captured window BEGINS after a prior ticket was filed from the same browsing session${span}. ` +
+    `Anything that happened before that prior ticket is not in view here — it was filed with that ticket, not lost.`
+  );
 }
 
 /** Build the flat, ts-tagged timeline from all four capture sources. */
@@ -346,10 +491,10 @@ function renderTimeline(kept: TimelineEntry[]): string {
 
 /**
  * Assemble the analysis context. Pure: same input → same output, no I/O, no
- * Date.now(). Uses denormalized counts to short-circuit cheaply: if there are
- * zero console errors AND zero network errors AND no exceptions, there is no
- * technical fault to analyze → hasAnchors:false (the no-fault path) without
- * even building the timeline.
+ * Date.now(). Fault detection scans the actual entries; when no error-shaped
+ * signal exists the context switches from the correlated timeline to the
+ * journey/slow-summary form — but a context is ALWAYS produced, because the
+ * model always runs.
  */
 export function assembleAnalysisContext(
   rawFeedback: AnalyzableFeedback
@@ -374,14 +519,12 @@ export function assembleAnalysisContext(
       ? truncateForTokenBudget(feedback.description.trim(), DESCRIPTION_CHAR_BUDGET)
       : "";
 
-  const metaParts: string[] = [];
-  if (feedback.url) metaParts.push(`URL: ${feedback.url}`);
-  if (feedback.userAgent)
-    metaParts.push(`User agent: ${truncateForTokenBudget(feedback.userAgent, 200)}`);
+  const metaParts = buildMetaParts(feedback);
+  const windowNote = captureWindowNote(feedback);
 
   // Fault detection scans the ACTUAL entries (source of truth) rather than
   // trusting the denormalized counts — a stale/under-counted networkErrorCount
-  // must not let a real 4xx/5xx slip into the no-fault path. The counts are a
+  // must not let a real 4xx/5xx slip onto the no-anchor path. The counts are a
   // capture-time hint only; here we look at the data we actually have.
   const hasExceptions = (feedback.exceptions?.length ?? 0) > 0;
   const hasConsoleError = (feedback.consoleLogs ?? []).some(
@@ -391,9 +534,13 @@ export function assembleAnalysisContext(
     isNetworkFault(r)
   );
 
+  // No error-shaped signal (or — below — no anchor survived windowing): build
+  // the non-fault context. The model still runs and decides the verdict.
   if (!hasExceptions && !hasConsoleError && !hasNetworkFault) {
-    // No technical signal in the captured data → honest no-fault path.
-    return { contextText: renderNoFaultContext(description, metaParts), hasAnchors: false };
+    return {
+      contextText: renderNoAnchorContext(feedback, description, metaParts, windowNote),
+      hasAnchors: false,
+    };
   }
 
   // There is at least one fault — build and window the timeline to slice it.
@@ -401,9 +548,13 @@ export function assembleAnalysisContext(
   const kept = windowAroundAnchors(timeline);
 
   if (kept.length === 0) {
-    // Counts suggested a fault but no anchor survived (e.g. counts stale) —
-    // treat as no-fault rather than feeding the model an empty timeline.
-    return { contextText: renderNoFaultContext(description, metaParts), hasAnchors: false };
+    // A fault was detected above but no anchor survived selection (defensive —
+    // should not happen since every fault IS an anchor). Fall back to the
+    // non-fault context rather than feeding the model an empty timeline.
+    return {
+      contextText: renderNoAnchorContext(feedback, description, metaParts, windowNote),
+      hasAnchors: false,
+    };
   }
 
   const timelineText = renderTimeline(kept);
@@ -411,8 +562,11 @@ export function assembleAnalysisContext(
   sections.push("REPORT DESCRIPTION:");
   sections.push(description || "(no description provided)");
   if (metaParts.length > 0) {
-    sections.push("\nPAGE METADATA:");
+    sections.push("\nTICKET METADATA:");
     sections.push(metaParts.join("\n"));
+  }
+  if (windowNote) {
+    sections.push(`\n${windowNote}`);
   }
   sections.push(
     "\nCORRELATED TIMELINE (console errors, network failures, exceptions, and the user actions around them, aligned by capture time):"
@@ -422,17 +576,44 @@ export function assembleAnalysisContext(
   return { contextText: sections.join("\n"), hasAnchors: true };
 }
 
-/** Description + metadata only, for the no-fault path (no timeline to show). */
-function renderNoFaultContext(description: string, metaParts: string[]): string {
+/**
+ * Context for the no-anchor path. No error-shaped signal exists, so instead of a
+ * correlated timeline the model gets the strongest non-fault evidence available:
+ * the user's journey, request timing, and the ticket metadata — plus an explicit,
+ * honest statement of what the capture did and didn't see, so it can distinguish
+ * "design request" from "non-error defect" from "insufficient signal".
+ */
+function renderNoAnchorContext(
+  feedback: AnalyzableFeedback,
+  description: string,
+  metaParts: string[],
+  windowNote: string | null
+): string {
   const sections: string[] = [];
   sections.push("REPORT DESCRIPTION:");
   sections.push(description || "(no description provided)");
   if (metaParts.length > 0) {
-    sections.push("\nPAGE METADATA:");
+    sections.push("\nTICKET METADATA:");
     sections.push(metaParts.join("\n"));
   }
+
+  const journey = renderJourney(feedback);
   sections.push(
-    "\nCAPTURE SIGNALS: No console errors, network failures, or uncaught exceptions were captured in the recorded window."
+    "\nUSER JOURNEY (navigations, clicks, submits, and inputs captured across the engagement; t+Nms is relative to the first kept action):"
   );
+  sections.push(journey ?? "(no user actions were captured)");
+
+  const slowSummary = renderSlowRequestSummary(feedback);
+  if (slowSummary) {
+    sections.push("\nSLOWEST REQUESTS (all completed without error; listed by duration):");
+    sections.push(slowSummary);
+  }
+
+  sections.push(
+    "\nCAPTURE SIGNALS: No console errors, failed requests, or uncaught exceptions were captured in the recorded window."
+  );
+  if (windowNote) {
+    sections.push(windowNote);
+  }
   return sections.join("\n");
 }
