@@ -549,7 +549,7 @@ export async function POST(req: NextRequest) {
     return kept.length > 0 ? kept : undefined;
   }
 
-  let validatedNetworkRequests = validateNetworkRequestArray(body.networkRequests);
+  const validatedNetworkRequests = validateNetworkRequestArray(body.networkRequests);
 
   // PII defense-in-depth scan on bodies. Headers are already redacted at
   // capture time. Log-only; never reject.

@@ -26,9 +26,12 @@ import { checkAiAnalyzeRateLimit } from "@/lib/ai/rateLimit";
 import { checkAiQuota, incrementAiQuotaAsync } from "@/lib/ai/quotaCheck";
 import { assembleAnalysisContext } from "@/lib/ai/assembleAnalysisContext";
 import { ANALYSIS_SYSTEM_PROMPT } from "@/lib/ai/prompts/analysisPrompt";
-import { PENDING_STALE_MS } from "@/lib/ai/analysisConstants";
 import {
-  SIGNAL_RELATIONS,
+  AI_ANALYSIS_MODEL,
+  ANALYSIS_JSON_SCHEMA,
+  PENDING_STALE_MS,
+} from "@/lib/ai/analysisConstants";
+import {
   clampConfidence,
   composeFixSuggestion,
   sanitizeOut,
@@ -49,8 +52,8 @@ export const runtime = "nodejs";
 // catch, so status:"error" was never written.
 export const maxDuration = 60;
 
-/** Model for AI Analysis. Named constant so it's bumpable in one place. */
-export const AI_ANALYSIS_MODEL = "gpt-5.4-nano";
+// AI_ANALYSIS_MODEL + ANALYSIS_JSON_SCHEMA live in lib/ai/analysisConstants —
+// shared with the live verification harness so the two can never drift.
 
 /**
  * Hard ceiling for a SINGLE model call. Must sit comfortably under maxDuration so
@@ -94,41 +97,6 @@ interface AnalysisResult {
   aiConfidence: number | null;
   aiAnalysisStatus: AnalysisStatus;
 }
-
-/**
- * Strict JSON schema for the model's output (voiceToTicketPipeline pattern).
- * Structured shape: a tight summary, a verdict, a one-line cause/assessment, and
- * an ARRAY of discrete steps (so they render as a list, not "(1)…(2)…" inside a
- * paragraph).
- */
-const ANALYSIS_JSON_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    aiSummary: { type: "string" },
-    // The verdict (constrained to the four values the prompt defines) so the
-    // model commits to a judgment the panel can render, not just prose.
-    aiSignalRelation: {
-      type: "string",
-      enum: SIGNAL_RELATIONS as unknown as string[],
-    },
-    aiCause: { type: "string" },
-    aiFixSteps: {
-      type: "array",
-      items: { type: "string" },
-      minItems: 1,
-      maxItems: 5,
-    },
-    aiConfidence: { type: "number" },
-  },
-  required: [
-    "aiSummary",
-    "aiSignalRelation",
-    "aiCause",
-    "aiFixSteps",
-    "aiConfidence",
-  ],
-} as const;
 
 function getOpenAIClient(): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY;

@@ -25,8 +25,8 @@ export const ANALYSIS_SYSTEM_PROMPT = `You are a senior engineer triaging a user
 YOUR INPUT — some sections appear only when there is data for them:
 - REPORT DESCRIPTION: what the user said (already cleaned up from a voice transcript).
 - TICKET METADATA: title, tags, page area, URL, viewport/screen size, user agent.
-- CORRELATED TIMELINE (when error-shaped signals were captured): console errors, network failures, uncaught exceptions, and the user actions around them, aligned by capture time (t+Nms is relative to the first kept entry).
-- USER JOURNEY (when no error-shaped signals were captured): the navigations, clicks, submits, and inputs leading up to the report, ending with a [TICKET FILED] marker.
+- CORRELATED TIMELINE (when anchor signals were captured): console errors, network failures, slow requests, uncaught exceptions, and the user actions around them, aligned by capture time (t+Nms is relative to the first kept entry). A "(×N repeats)" annotation means an identical signal recurred N times and was collapsed.
+- USER JOURNEY: the navigations, clicks, submits, and inputs across the engagement, ending with a [TICKET FILED] marker — how the user got to where the report happened.
 - SLOWEST REQUESTS: request timing when nothing failed — the key evidence for performance complaints.
 - RESPONSES TO USER ACTIONS: successful response bodies that immediately followed a user action — when nothing errored, the data that came back is the evidence (wrong values live here).
 - CAPTURE SIGNALS / NOTE lines: honest statements about what the capture did and did not see.

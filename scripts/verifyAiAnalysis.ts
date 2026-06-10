@@ -19,7 +19,10 @@ import {
 } from "@/lib/ai/assembleAnalysisContext";
 import { ANALYSIS_SYSTEM_PROMPT } from "@/lib/ai/prompts/analysisPrompt";
 import {
-  SIGNAL_RELATIONS,
+  AI_ANALYSIS_MODEL,
+  ANALYSIS_JSON_SCHEMA,
+} from "@/lib/ai/analysisConstants";
+import {
   sanitizeOut,
   sanitizeRelation,
   sanitizeSteps,
@@ -28,21 +31,6 @@ import {
 import type { NetworkRequestEntry, UserAction, ConsoleLogEntry } from "@/lib/domain/feedback";
 
 config({ path: ".env.local" });
-
-// Mirrors the route (AI_ANALYSIS_MODEL / ANALYSIS_JSON_SCHEMA / call params).
-const MODEL = "gpt-5.4-nano";
-const SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    aiSummary: { type: "string" },
-    aiSignalRelation: { type: "string", enum: SIGNAL_RELATIONS as unknown as string[] },
-    aiCause: { type: "string" },
-    aiFixSteps: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
-    aiConfidence: { type: "number" },
-  },
-  required: ["aiSummary", "aiSignalRelation", "aiCause", "aiFixSteps", "aiConfidence"],
-} as const;
 
 const T0 = Date.now() - 90_000;
 
@@ -318,12 +306,12 @@ async function run(name: string, scenario: Scenario) {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const completion = await client.chat.completions.create(
     {
-      model: MODEL,
+      model: AI_ANALYSIS_MODEL,
       temperature: 0.2,
       max_completion_tokens: 600,
       response_format: {
         type: "json_schema",
-        json_schema: { name: "ticket_analysis", schema: SCHEMA as Record<string, unknown>, strict: true },
+        json_schema: { name: "ticket_analysis", schema: ANALYSIS_JSON_SCHEMA as Record<string, unknown>, strict: true },
       },
       messages: [
         { role: "system", content: ANALYSIS_SYSTEM_PROMPT },
