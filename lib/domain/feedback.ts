@@ -228,8 +228,25 @@ export interface Feedback {
    */
   /** 1-2 sentence "what's happening" summary. */
   aiSummary?: string | null;
-  /** Likely cause + suggested fix, or honest no-fault framing for UX/design reports. */
+  /**
+   * Likely cause + suggested fix as one block. LEGACY/COMPAT shape: pre-structured
+   * tickets only have this run-on paragraph. Still written on new analyses (a joined
+   * fallback of {@link aiCause} + {@link aiFixSteps}) so any reader of this field keeps
+   * working; the panel prefers the structured fields and only falls back to this for
+   * old tickets. For the no-fault path this carries the honest UX/design framing.
+   */
   aiFixSuggestion?: string | null;
+  /**
+   * Structured analysis (new shape). One-line likely root cause. Absent on legacy
+   * tickets and on the no-fault path (which uses {@link aiFixSuggestion} only).
+   */
+  aiCause?: string | null;
+  /**
+   * Structured analysis (new shape). Discrete fix / next-step items, rendered as a
+   * scannable list (not "(1)…(2)…" inside a paragraph). Absent on legacy tickets and
+   * on the no-fault path.
+   */
+  aiFixSteps?: string[] | null;
   /** Model's self-reported confidence 0-1. Null on the templated no-fault path. */
   aiConfidence?: number | null;
   /**

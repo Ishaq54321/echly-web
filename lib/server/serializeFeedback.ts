@@ -120,6 +120,10 @@ export function serializeTicket(ticket: Feedback, access: AccessContext): Record
     ...(ticket.aiFixSuggestion != null
       ? { aiFixSuggestion: ticket.aiFixSuggestion }
       : {}),
+    ...(ticket.aiCause != null ? { aiCause: ticket.aiCause } : {}),
+    ...(Array.isArray(ticket.aiFixSteps) && ticket.aiFixSteps.length > 0
+      ? { aiFixSteps: ticket.aiFixSteps }
+      : {}),
     ...(typeof ticket.aiConfidence === "number"
       ? { aiConfidence: ticket.aiConfidence }
       : {}),

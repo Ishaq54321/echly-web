@@ -999,6 +999,11 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
     ...(typeof data.aiFixSuggestion === "string"
       ? { aiFixSuggestion: data.aiFixSuggestion }
       : {}),
+    ...(typeof data.aiCause === "string" ? { aiCause: data.aiCause } : {}),
+    ...(Array.isArray(data.aiFixSteps) &&
+    data.aiFixSteps.every((s: unknown) => typeof s === "string")
+      ? { aiFixSteps: data.aiFixSteps as string[] }
+      : {}),
     ...(typeof data.aiConfidence === "number"
       ? { aiConfidence: data.aiConfidence }
       : {}),

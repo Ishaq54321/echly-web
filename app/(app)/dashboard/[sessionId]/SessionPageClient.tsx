@@ -2469,13 +2469,22 @@ export default function SessionPageClient({
   //    snapshot then backs the same fields.
   const mergeAiFields = useCallback(
     (f: Feedback, status: NonNullable<Feedback["aiAnalysisStatus"]>, result: {
-      aiSummary?: unknown; aiFixSuggestion?: unknown; aiConfidence?: unknown;
+      aiSummary?: unknown; aiFixSuggestion?: unknown;
+      aiCause?: unknown; aiFixSteps?: unknown; aiConfidence?: unknown;
     }): Feedback => ({
       ...f,
       aiAnalysisStatus: status,
       aiSummary: typeof result.aiSummary === "string" ? result.aiSummary : f.aiSummary,
       aiFixSuggestion:
         typeof result.aiFixSuggestion === "string" ? result.aiFixSuggestion : f.aiFixSuggestion,
+      // Structured fields (new shape). Mirror the listener's mapping: an array of
+      // strings overlays, anything else leaves the prior value untouched.
+      aiCause: typeof result.aiCause === "string" ? result.aiCause : f.aiCause,
+      aiFixSteps:
+        Array.isArray(result.aiFixSteps) &&
+        result.aiFixSteps.every((s) => typeof s === "string")
+          ? (result.aiFixSteps as string[])
+          : f.aiFixSteps,
       aiConfidence: typeof result.aiConfidence === "number" ? result.aiConfidence : f.aiConfidence,
     }),
     []
@@ -2487,6 +2496,8 @@ export default function SessionPageClient({
         status?: unknown;
         aiSummary?: unknown;
         aiFixSuggestion?: unknown;
+        aiCause?: unknown;
+        aiFixSteps?: unknown;
         aiConfidence?: unknown;
       }
     ) => {

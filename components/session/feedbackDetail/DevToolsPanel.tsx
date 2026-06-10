@@ -38,6 +38,8 @@ export type DevToolsFeedback = Partial<
     | "userActionCount"
     | "aiSummary"
     | "aiFixSuggestion"
+    | "aiCause"
+    | "aiFixSteps"
     | "aiConfidence"
     | "aiAnalysisStatus"
   >
@@ -134,6 +136,8 @@ export function DevToolsPanel({
             ticketId={feedback?.id}
             aiSummary={feedback?.aiSummary}
             aiFixSuggestion={feedback?.aiFixSuggestion}
+            aiCause={feedback?.aiCause}
+            aiFixSteps={feedback?.aiFixSteps}
             aiConfidence={feedback?.aiConfidence}
             aiAnalysisStatus={feedback?.aiAnalysisStatus}
             clientError={aiClientError}

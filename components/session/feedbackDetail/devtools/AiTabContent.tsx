@@ -15,7 +15,15 @@ export type AiAnalysisStatus =
 
 export interface AiTabContentProps {
   aiSummary?: string | null;
+  /**
+   * Legacy/compat run-on cause+fix. Rendered as prose ONLY when the structured
+   * fields below are absent (old-shape tickets) and on the no-fault path.
+   */
   aiFixSuggestion?: string | null;
+  /** Structured: one-line likely cause (new shape). */
+  aiCause?: string | null;
+  /** Structured: discrete fix steps, rendered as an ordered list (new shape). */
+  aiFixSteps?: string[] | null;
   aiConfidence?: number | null;
   aiAnalysisStatus?: AiAnalysisStatus;
   /**
@@ -56,6 +64,8 @@ function confidenceLabel(c: number | null | undefined): string | null {
 export function AiTabContent({
   aiSummary,
   aiFixSuggestion,
+  aiCause,
+  aiFixSteps,
   aiConfidence,
   aiAnalysisStatus,
   ticketId,
@@ -129,6 +139,50 @@ export function AiTabContent({
           color: var(--text-heading);
           white-space: pre-wrap;
           overflow-wrap: anywhere;
+        }
+        .aitab-cause {
+          font-size: 13px;
+          line-height: 1.55;
+          color: var(--text-heading);
+          padding: 10px 12px;
+          border-radius: 10px;
+          background: var(--surface-subtle);
+          border: 1px solid var(--border);
+          overflow-wrap: anywhere;
+        }
+        .aitab-steps {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+          counter-reset: aitab-step;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .aitab-step {
+          counter-increment: aitab-step;
+          display: flex;
+          align-items: flex-start;
+          gap: 9px;
+          font-size: 13px;
+          line-height: 1.55;
+          color: var(--text-heading);
+          overflow-wrap: anywhere;
+        }
+        .aitab-step::before {
+          content: counter(aitab-step);
+          flex: 0 0 auto;
+          width: 18px;
+          height: 18px;
+          margin-top: 1px;
+          border-radius: 999px;
+          background: var(--surface-subtle);
+          border: 1px solid var(--border);
+          color: var(--text-secondary);
+          font-size: 10.5px;
+          font-weight: 600;
+          line-height: 16px;
+          text-align: center;
         }
         .aitab-confidence {
           display: inline-flex;
@@ -208,6 +262,8 @@ export function AiTabContent({
           <CompleteState
             aiSummary={aiSummary}
             aiFixSuggestion={aiFixSuggestion}
+            aiCause={aiCause}
+            aiFixSteps={aiFixSteps}
             aiConfidence={aiConfidence}
           />
         ) : (
@@ -327,16 +383,10 @@ function NoFaultState({
   );
 }
 
-function CompleteState({
-  aiSummary,
-  aiFixSuggestion,
-  aiConfidence,
-}: {
-  aiSummary?: string | null;
-  aiFixSuggestion?: string | null;
-  aiConfidence?: number | null;
-}) {
+/** Confidence dot + label, or null when there's no usable confidence value. */
+function ConfidenceIndicator({ aiConfidence }: { aiConfidence?: number | null }) {
   const conf = confidenceLabel(aiConfidence);
+  if (!conf) return null;
   const confColor =
     typeof aiConfidence === "number"
       ? aiConfidence >= 0.75
@@ -345,32 +395,76 @@ function CompleteState({
           ? "var(--color-warning-text)"
           : "var(--text-tertiary)"
       : "var(--text-tertiary)";
+  return (
+    <div className="aitab-confidence">
+      <span
+        className="aitab-confidence-dot"
+        style={{ background: confColor }}
+        aria-hidden
+      />
+      {conf}
+    </div>
+  );
+}
+
+function CompleteState({
+  aiSummary,
+  aiFixSuggestion,
+  aiCause,
+  aiFixSteps,
+  aiConfidence,
+}: {
+  aiSummary?: string | null;
+  aiFixSuggestion?: string | null;
+  aiCause?: string | null;
+  aiFixSteps?: string[] | null;
+  aiConfidence?: number | null;
+}) {
+  // Prefer the structured shape (new tickets): a labeled one-line cause + a list of
+  // discrete steps. Fall back to the legacy run-on `aiFixSuggestion` for old tickets
+  // analyzed before the structured fields existed — they still render, just as prose.
+  const steps = Array.isArray(aiFixSteps)
+    ? aiFixSteps.filter((s) => typeof s === "string" && s.trim() !== "")
+    : [];
+  const hasStructured =
+    typeof aiCause === "string" && aiCause.trim() !== "" && steps.length > 0;
 
   return (
     <div>
       <AiAffordance />
       <div className="aitab-section">
         <div className="aitab-label">Summary</div>
-        <div className="aitab-body">
-          {aiSummary || "No summary available."}
-        </div>
+        <div className="aitab-body">{aiSummary || "No summary available."}</div>
       </div>
-      <div className="aitab-section">
-        <div className="aitab-label">Likely cause &amp; fix</div>
-        <div className="aitab-body">
-          {aiFixSuggestion || "No suggestion available."}
+
+      {hasStructured ? (
+        <>
+          <div className="aitab-section">
+            <div className="aitab-label">Likely cause</div>
+            <div className="aitab-cause">{aiCause}</div>
+          </div>
+          <div className="aitab-section">
+            <div className="aitab-label">Suggested fix</div>
+            <ol className="aitab-steps">
+              {steps.map((step, i) => (
+                <li key={i} className="aitab-step">
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </>
+      ) : (
+        // Legacy shape — single prose block, unchanged from before.
+        <div className="aitab-section">
+          <div className="aitab-label">Likely cause &amp; fix</div>
+          <div className="aitab-body">
+            {aiFixSuggestion || "No suggestion available."}
+          </div>
         </div>
-      </div>
-      {conf ? (
-        <div className="aitab-confidence">
-          <span
-            className="aitab-confidence-dot"
-            style={{ background: confColor }}
-            aria-hidden
-          />
-          {conf}
-        </div>
-      ) : null}
+      )}
+
+      <ConfidenceIndicator aiConfidence={aiConfidence} />
     </div>
   );
 }

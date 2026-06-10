@@ -58,21 +58,40 @@ type AnalysisStatus = NonNullable<Feedback["aiAnalysisStatus"]>;
 
 interface AnalysisResult {
   aiSummary: string | null;
+  /**
+   * Legacy/compat run-on form. Always populated (joined from cause + steps on the
+   * fault path; the honest framing on the no-fault path) so any reader of this field
+   * — and any old-shape-only renderer — keeps working.
+   */
   aiFixSuggestion: string | null;
+  /** Structured: one-line cause. Null on the no-fault/error paths. */
+  aiCause: string | null;
+  /** Structured: discrete fix steps. Null on the no-fault/error paths. */
+  aiFixSteps: string[] | null;
   aiConfidence: number | null;
   aiAnalysisStatus: AnalysisStatus;
 }
 
-/** Strict JSON schema for the model's output (voiceToTicketPipeline pattern). */
+/**
+ * Strict JSON schema for the model's output (voiceToTicketPipeline pattern).
+ * Structured shape: a tight summary, a one-line cause, and an ARRAY of discrete fix
+ * steps (so they render as a list, not "(1)…(2)…" inside a paragraph).
+ */
 const ANALYSIS_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
   properties: {
     aiSummary: { type: "string" },
-    aiFixSuggestion: { type: "string" },
+    aiCause: { type: "string" },
+    aiFixSteps: {
+      type: "array",
+      items: { type: "string" },
+      minItems: 1,
+      maxItems: 5,
+    },
     aiConfidence: { type: "number" },
   },
-  required: ["aiSummary", "aiFixSuggestion", "aiConfidence"],
+  required: ["aiSummary", "aiCause", "aiFixSteps", "aiConfidence"],
 } as const;
 
 function getOpenAIClient(): OpenAI {
@@ -159,6 +178,10 @@ function buildNoFaultResult(feedback: Feedback): AnalysisResult {
     aiSummary: summary,
     aiFixSuggestion:
       "No console or network errors and no uncaught exceptions were captured in the recorded window — this appears to be a usability or design observation rather than a code defect. Treat it as product/UX feedback: review the described experience against the intended design rather than looking for a bug to fix.",
+    // No-fault is a templated, non-technical message — it has no discrete cause/steps;
+    // the panel renders it from aiFixSuggestion in its own no-fault layout.
+    aiCause: null,
+    aiFixSteps: null,
     aiConfidence: null,
     aiAnalysisStatus: "no_fault",
   };
@@ -166,6 +189,37 @@ function buildNoFaultResult(feedback: Feedback): AnalysisResult {
 
 function sanitizeOut(s: unknown, max: number): string {
   return typeof s === "string" ? s.trim().slice(0, max) : "";
+}
+
+/**
+ * Sanitize the model's fix-steps array: trim each item, drop empties, strip any
+ * leading enumeration the model added despite instructions ("1.", "1)", "(1)",
+ * "- ", "• "), cap item count and length. Returns [] if nothing usable.
+ */
+function sanitizeSteps(value: unknown, maxItems: number, maxLen: number): string[] {
+  if (!Array.isArray(value)) return [];
+  const out: string[] = [];
+  for (const item of value) {
+    if (typeof item !== "string") continue;
+    const cleaned = item
+      .trim()
+      .replace(/^(?:[-*•]\s+|\(?\d+[.)]\s+)/, "")
+      .trim()
+      .slice(0, maxLen);
+    if (cleaned) out.push(cleaned);
+    if (out.length >= maxItems) break;
+  }
+  return out;
+}
+
+/**
+ * Build the legacy/compat run-on string from the structured fields. Kept in sync on
+ * every fault write so old-shape readers (and any cached old-shape renderer) still
+ * get a sensible single block. Steps are joined as a numbered sentence list.
+ */
+function composeFixSuggestion(cause: string, steps: string[]): string {
+  const stepText = steps.map((s, i) => `${i + 1}. ${s}`).join(" ");
+  return stepText ? `${cause} Suggested fix: ${stepText}` : cause;
 }
 
 function clampConfidence(n: unknown): number | null {
@@ -221,28 +275,42 @@ async function runModelAnalysis(
   const raw = completion.choices[0]?.message?.content?.trim() ?? "";
   const parsed = JSON.parse(raw) as {
     aiSummary?: unknown;
-    aiFixSuggestion?: unknown;
+    aiCause?: unknown;
+    aiFixSteps?: unknown;
     aiConfidence?: unknown;
   };
   const aiSummary = sanitizeOut(parsed.aiSummary, 600);
-  const aiFixSuggestion = sanitizeOut(parsed.aiFixSuggestion, 2000);
-  if (!aiSummary || !aiFixSuggestion) {
+  const aiCause = sanitizeOut(parsed.aiCause, 400);
+  const aiFixSteps = sanitizeSteps(parsed.aiFixSteps, 5, 300);
+  // Require the scannable core: a summary, a cause, and at least one concrete step.
+  if (!aiSummary || !aiCause || aiFixSteps.length === 0) {
     throw new Error("Model returned empty analysis fields");
   }
   return {
     aiSummary,
-    aiFixSuggestion,
+    // Compat: keep the run-on field populated for any old-shape reader.
+    aiFixSuggestion: composeFixSuggestion(aiCause, aiFixSteps),
+    aiCause,
+    aiFixSteps,
     aiConfidence: clampConfidence(parsed.aiConfidence),
     aiAnalysisStatus: "complete",
   };
 }
 
-/** Write the terminal analysis back to feedback/{id}. ai* fields only. */
+/**
+ * Write the terminal analysis back to feedback/{id}. ai* fields only.
+ *
+ * aiCause/aiFixSteps are written explicitly (including null) on every path so a
+ * re-analysis that transitions complete → no_fault/error CLEARS any stale structured
+ * fields rather than leaving an orphaned cause/steps the panel would still render.
+ */
 async function writeAnalysis(id: string, result: AnalysisResult): Promise<void> {
   await adminDb.doc(`feedback/${id}`).set(
     {
       aiSummary: result.aiSummary,
       aiFixSuggestion: result.aiFixSuggestion,
+      aiCause: result.aiCause,
+      aiFixSteps: result.aiFixSteps,
       aiConfidence: result.aiConfidence,
       aiAnalysisStatus: result.aiAnalysisStatus,
       aiGeneratedAt: FieldValue.serverTimestamp(),
@@ -256,8 +324,26 @@ function errorResult(): AnalysisResult {
   return {
     aiSummary: null,
     aiFixSuggestion: null,
+    aiCause: null,
+    aiFixSteps: null,
     aiConfidence: null,
     aiAnalysisStatus: "error",
+  };
+}
+
+/**
+ * Shape the JSON the client receives for a terminal (just-written) analysis. Echoes
+ * both the structured fields and the compat run-on so the panel's fast-path overlay
+ * can render the scannable view immediately, before the realtime listener tick.
+ */
+function terminalResponse(result: AnalysisResult): Record<string, unknown> {
+  return {
+    status: result.aiAnalysisStatus,
+    aiSummary: result.aiSummary,
+    aiFixSuggestion: result.aiFixSuggestion,
+    aiCause: result.aiCause,
+    aiFixSteps: result.aiFixSteps,
+    aiConfidence: result.aiConfidence,
   };
 }
 
@@ -322,6 +408,8 @@ export async function POST(
       cached: true,
       aiSummary: feedback.aiSummary ?? null,
       aiFixSuggestion: feedback.aiFixSuggestion ?? null,
+      aiCause: feedback.aiCause ?? null,
+      aiFixSteps: feedback.aiFixSteps ?? null,
       aiConfidence: feedback.aiConfidence ?? null,
     });
   }
@@ -359,6 +447,8 @@ export async function POST(
       cached: true,
       aiSummary: feedback.aiSummary ?? null,
       aiFixSuggestion: feedback.aiFixSuggestion ?? null,
+      aiCause: feedback.aiCause ?? null,
+      aiFixSteps: feedback.aiFixSteps ?? null,
       aiConfidence: feedback.aiConfidence ?? null,
     });
   }
@@ -382,12 +472,7 @@ export async function POST(
       await writeAnalysis(feedbackId, errorResult()).catch(() => {});
       return json({ status: "error" });
     }
-    return json({
-      status: result.aiAnalysisStatus,
-      aiSummary: result.aiSummary,
-      aiFixSuggestion: result.aiFixSuggestion,
-      aiConfidence: result.aiConfidence,
-    });
+    return json(terminalResponse(result));
   }
 
   // ---- Fault path: one model call → write back; increment quota on success ----
@@ -404,12 +489,7 @@ export async function POST(
     const result = await runModelAnalysis(client, contextText);
     await writeAnalysis(feedbackId, result);
     incrementAiQuotaAsync(user.uid);
-    return json({
-      status: result.aiAnalysisStatus,
-      aiSummary: result.aiSummary,
-      aiFixSuggestion: result.aiFixSuggestion,
-      aiConfidence: result.aiConfidence,
-    });
+    return json(terminalResponse(result));
   } catch (err) {
     // Any failure (model error, timeout, parse fail) → graceful "error" status.
     // The ticket itself is never affected; the panel shows "analysis unavailable".

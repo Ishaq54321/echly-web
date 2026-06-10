@@ -240,6 +240,12 @@ function mapFeedbackFromSnap(snap: QueryDocumentSnapshot<DocumentData>): Feedbac
     aiSummary: typeof data.aiSummary === "string" ? data.aiSummary : null,
     aiFixSuggestion:
       typeof data.aiFixSuggestion === "string" ? data.aiFixSuggestion : null,
+    aiCause: typeof data.aiCause === "string" ? data.aiCause : null,
+    aiFixSteps:
+      Array.isArray(data.aiFixSteps) &&
+      data.aiFixSteps.every((s) => typeof s === "string")
+        ? (data.aiFixSteps as string[])
+        : null,
     aiConfidence:
       typeof data.aiConfidence === "number" ? data.aiConfidence : null,
     aiAnalysisStatus:
