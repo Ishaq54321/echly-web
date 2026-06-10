@@ -19,6 +19,8 @@ import { FieldValue } from "firebase-admin/firestore";
 import { requireAuth, toAuthorizationResponse } from "@/lib/server/auth/authorize";
 import { buildRequestContext } from "@/lib/server/requestContext";
 import { getFeedbackByIdRepo } from "@/lib/repositories/feedbackRepository.server";
+import { getScreenshotByIdRepo } from "@/lib/repositories/screenshotsRepository";
+import { getSignedStorageUrl } from "@/lib/server/storage/getSignedUrl";
 import { adminDb } from "@/lib/server/firebaseAdmin";
 import { checkAiAnalyzeRateLimit } from "@/lib/ai/rateLimit";
 import { checkAiQuota, incrementAiQuotaAsync } from "@/lib/ai/quotaCheck";
@@ -206,6 +208,59 @@ async function claimAnalysisLock(id: string, now: number): Promise<LockOutcome> 
 // unit-tested there; the route just wires it up.
 
 /**
+ * Tags (interpreter vocabulary, see interpreterPrompt) whose presence means the
+ * screenshot is likely the evidence — visual/layout complaints where the page's
+ * appearance IS the report.
+ */
+const VISUAL_TAGS = new Set([
+  "layout",
+  "typography",
+  "color-theme",
+  "visual-design",
+  "responsive",
+  "dark-mode",
+  "image-media",
+  "animation",
+  "scroll-overflow",
+  "empty-state",
+  "loading-state",
+]);
+
+/** Lifetime of the signed screenshot URL handed to OpenAI (one model call). */
+const SCREENSHOT_URL_TTL_MS = 15 * 60 * 1000; // 15m
+
+/**
+ * Attach the screenshot when it's likely to BE the evidence: on the no-anchor
+ * path (often the only evidence — visual/layout defects produce zero signals)
+ * and on anchor-path tickets the interpreter tagged as visual. Not always-on:
+ * the shot is taken at file time and may show the capture tray rather than the
+ * bug, so its value is probabilistic — gate it to where it pays.
+ */
+function shouldAttachScreenshot(hasAnchors: boolean, feedback: Feedback): boolean {
+  if (!hasAnchors) return true;
+  const tags = Array.isArray(feedback.tags) ? feedback.tags : [];
+  return tags.some((t) => VISUAL_TAGS.has(t));
+}
+
+/**
+ * Resolve the ticket's screenshot to a short-lived signed URL for the model, or
+ * null when there is no usable screenshot. Never throws — a screenshot problem
+ * must degrade to a text-only analysis, not fail it.
+ */
+async function resolveScreenshotUrl(feedback: Feedback): Promise<string | null> {
+  try {
+    if (feedback.screenshotStatus !== "attached" || !feedback.screenshotId) return null;
+    const record = await getScreenshotByIdRepo(feedback.screenshotId);
+    const storagePath = record?.storagePath?.trim();
+    if (!storagePath) return null;
+    return await getSignedStorageUrl(storagePath, { expiresInMs: SCREENSHOT_URL_TTL_MS });
+  } catch (err) {
+    console.error("[analyze] screenshot resolve failed (continuing text-only):", err);
+    return null;
+  }
+}
+
+/**
  * One OpenAI call → strict JSON. Throws on transport/parse failure (caller maps
  * to "error").
  *
@@ -221,10 +276,23 @@ async function claimAnalysisLock(id: string, now: number): Promise<LockOutcome> 
 async function runModelAnalysis(
   client: OpenAI,
   contextText: string,
-  hasAnchors: boolean
+  hasAnchors: boolean,
+  screenshotUrl: string | null
 ): Promise<AnalysisResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), MODEL_CALL_TIMEOUT_MS);
+  // Low-detail vision keeps the image cost to a handful of tokens and the
+  // latency add small; the text context notes the attachment so the model knows
+  // the image is the page at file time (and that the capture tray may be in it).
+  const userContent: OpenAI.Chat.ChatCompletionContentPart[] = screenshotUrl
+    ? [
+        {
+          type: "text",
+          text: `${contextText}\n\nATTACHED SCREENSHOT: the full-page screenshot taken when the ticket was filed (the capture widget's own tray may be visible in it — ignore that overlay).`,
+        },
+        { type: "image_url", image_url: { url: screenshotUrl, detail: "low" } },
+      ]
+    : [{ type: "text", text: contextText }];
   let completion;
   try {
     completion = await client.chat.completions.create(
@@ -242,7 +310,7 @@ async function runModelAnalysis(
         },
         messages: [
           { role: "system", content: ANALYSIS_SYSTEM_PROMPT },
-          { role: "user", content: contextText },
+          { role: "user", content: userContent },
         ],
       },
       { signal: controller.signal, timeout: MODEL_CALL_TIMEOUT_MS, maxRetries: 0 }
@@ -463,8 +531,14 @@ export async function POST(
     return json({ status: "error" });
   }
 
+  // Screenshot: only resolved when the gate says it's likely evidence; any
+  // resolution failure degrades to text-only rather than failing the analysis.
+  const screenshotUrl = shouldAttachScreenshot(hasAnchors, feedback)
+    ? await resolveScreenshotUrl(feedback)
+    : null;
+
   try {
-    const result = await runModelAnalysis(client, contextText, hasAnchors);
+    const result = await runModelAnalysis(client, contextText, hasAnchors, screenshotUrl);
     await writeAnalysis(feedbackId, result);
     incrementAiQuotaAsync(user.uid);
     return json(terminalResponse(result));

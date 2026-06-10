@@ -524,6 +524,68 @@ declare global {
     }
   });
 
+  // ─── Resource-load failure capture ──────────────────────────────
+  //
+  // A failed <img>/<script>/<link>/<video>… fires "error" on the ELEMENT, which
+  // does NOT bubble — it is only observable at window in the CAPTURE phase, and
+  // its event carries no message (the bubble-phase listener above reads
+  // event.message, which is empty for these). Until now "the image is broken" —
+  // one of the most common non-technical reports — produced zero captured
+  // evidence. Record a synthetic console-error entry (the browser's own
+  // DevTools shows these as "Failed to load resource", the shape developers
+  // expect); it flows through the existing buffer → engagement → ticket path,
+  // renders in the Console tab, and counts as an anchor for the AI analysis.
+  //
+  // Dedup per URL: a React re-render can re-fire the same broken element many
+  // times; one entry per distinct URL is the signal, the repeats are noise.
+  // Capped so a pathological page (every avatar 404s) can't flood the buffer.
+  const RESOURCE_TAGS = new Set([
+    "IMG", "SCRIPT", "LINK", "AUDIO", "VIDEO", "SOURCE", "TRACK", "IFRAME", "EMBED", "OBJECT",
+  ]);
+  const seenResourceFailureUrls = new Set<string>();
+  const RESOURCE_FAILURE_MAX_URLS = 50;
+  window.addEventListener(
+    "error",
+    (event) => {
+      try {
+        const target = event.target as unknown;
+        // Uncaught JS errors arrive with target === window and are handled by
+        // the bubble-phase listener above — only element load failures here.
+        if (target == null || target === window) return;
+        const el = target as { tagName?: unknown; src?: unknown; href?: unknown };
+        const tagName = typeof el.tagName === "string" ? el.tagName.toUpperCase() : "";
+        if (!RESOURCE_TAGS.has(tagName)) return;
+        const rawUrl =
+          typeof el.src === "string" && el.src
+            ? el.src
+            : typeof el.href === "string" && el.href
+              ? el.href
+              : "";
+        if (!rawUrl) return;
+        // Reuse the noise gates: never record our own extension's resources;
+        // respect the console denylist.
+        if (isExtensionOrigin(rawUrl)) return;
+        if (isDenylisted(rawUrl)) return;
+        if (
+          seenResourceFailureUrls.has(rawUrl) ||
+          seenResourceFailureUrls.size >= RESOURCE_FAILURE_MAX_URLS
+        ) {
+          return;
+        }
+        seenResourceFailureUrls.add(rawUrl);
+        buffer.addLog({
+          timestamp: Date.now(),
+          level: "error",
+          message: `Failed to load resource: <${tagName.toLowerCase()}> ${redact(rawUrl)}`,
+          source: safeLocationHref(),
+        });
+      } catch {
+        // swallow — never let resource-error capture break the page
+      }
+    },
+    true // capture phase — element error events do not bubble
+  );
+
   // window.onerror — set in addition to the listener, chaining to whatever the
   // page (or an SDK) already installed. CRITICAL discipline (matches the
   // console/history wrappers): record in try/catch, never throw, and ALWAYS

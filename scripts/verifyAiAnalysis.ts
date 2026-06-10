@@ -102,7 +102,14 @@ function base(over: Partial<AnalyzableFeedback>): AnalyzableFeedback {
   };
 }
 
-const SCENARIOS: Record<string, { expect: string; ticket: AnalyzableFeedback }> = {
+interface Scenario {
+  expect: string;
+  ticket: AnalyzableFeedback;
+  /** When set, rendered to PNG (via sharp) and attached as a low-detail image — mirrors the route's screenshot path. */
+  screenshotSvg?: string;
+}
+
+const SCENARIOS: Record<string, Scenario> = {
   design: {
     expect: "design_request, high confidence, no fabricated cause",
     ticket: base({
@@ -217,6 +224,57 @@ const SCENARIOS: Record<string, { expect: string; ticket: AnalyzableFeedback }> 
       ],
     }),
   },
+  brokenimage: {
+    expect: "Wave 3 gate: the synthetic resource-failure entry is the cited evidence (related)",
+    ticket: base({
+      title: "Profile pictures are broken on the team page",
+      description: "On the team page every member's photo shows the broken-image icon instead of their picture.",
+      tags: ["bug", "image-media"],
+      pageArea: "Team",
+      url: "https://shop.example.com/team",
+      userActions: [
+        act({ timestamp: T0, type: "navigation", url: "https://shop.example.com/team" }),
+      ],
+      consoleLogs: [
+        // Exactly what the new capture-phase resource-error listener emits.
+        cerr({
+          timestamp: T0 + 800,
+          message: "Failed to load resource: <img> https://cdn.example.com/avatars/u42.png",
+          source: "https://shop.example.com/team",
+        }),
+        cerr({
+          timestamp: T0 + 820,
+          message: "Failed to load resource: <img> https://cdn.example.com/avatars/u57.png",
+          source: "https://shop.example.com/team",
+        }),
+      ],
+    }),
+  },
+  visual: {
+    expect: "Wave 3 gate: the screenshot is attached and the analysis references what is visible (overlapping text/button)",
+    screenshotSvg: `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400">
+      <rect width="640" height="400" fill="#ffffff"/>
+      <text x="24" y="48" font-family="Arial" font-size="28" fill="#111">Your Cart</text>
+      <text x="24" y="120" font-family="Arial" font-size="16" fill="#333">Wireless Headphones — $129.00</text>
+      <text x="24" y="150" font-family="Arial" font-size="16" fill="#333">USB-C Cable — $19.00</text>
+      <!-- The bug: the total label and the checkout button overlap -->
+      <text x="380" y="330" font-family="Arial" font-size="20" fill="#111">Total: $148.00</text>
+      <rect x="360" y="305" width="220" height="48" rx="8" fill="#155DFC" fill-opacity="0.85"/>
+      <text x="395" y="336" font-family="Arial" font-size="18" fill="#fff">Checkout now</text>
+    </svg>`,
+    ticket: base({
+      title: "Checkout button covers the cart total",
+      description: "On the cart page the blue Checkout button sits on top of the total amount so I can't read what I'm paying.",
+      tags: ["bug", "layout", "visual-design"],
+      pageArea: "Cart",
+      url: "https://shop.example.com/cart",
+      viewportWidth: 640,
+      viewportHeight: 400,
+      userActions: [
+        act({ timestamp: T0, type: "navigation", url: "https://shop.example.com/cart" }),
+      ],
+    }),
+  },
   watermark: {
     expect: "no_signal with prior-ticket window framing (not 'nothing was captured')",
     ticket: base({
@@ -233,8 +291,30 @@ const SCENARIOS: Record<string, { expect: string; ticket: AnalyzableFeedback }> 
   },
 };
 
-async function run(name: string, scenario: { expect: string; ticket: AnalyzableFeedback }) {
+async function run(name: string, scenario: Scenario) {
   const { contextText, hasAnchors } = assembleAnalysisContext(scenario.ticket);
+
+  // Mirror the route's screenshot attach (low-detail image content part + the
+  // attachment note). The harness renders its SVG fixture to PNG via sharp and
+  // inlines it as a data URL — the route uses a signed Storage URL instead.
+  let userContent: OpenAI.Chat.ChatCompletionContentPart[];
+  if (scenario.screenshotSvg) {
+    const { default: sharp } = await import("sharp");
+    const png = await sharp(Buffer.from(scenario.screenshotSvg)).png().toBuffer();
+    userContent = [
+      {
+        type: "text",
+        text: `${contextText}\n\nATTACHED SCREENSHOT: the full-page screenshot taken when the ticket was filed (the capture widget's own tray may be visible in it — ignore that overlay).`,
+      },
+      {
+        type: "image_url",
+        image_url: { url: `data:image/png;base64,${png.toString("base64")}`, detail: "low" },
+      },
+    ];
+  } else {
+    userContent = [{ type: "text", text: contextText }];
+  }
+
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const completion = await client.chat.completions.create(
     {
@@ -247,7 +327,7 @@ async function run(name: string, scenario: { expect: string; ticket: AnalyzableF
       },
       messages: [
         { role: "system", content: ANALYSIS_SYSTEM_PROMPT },
-        { role: "user", content: contextText },
+        { role: "user", content: userContent },
       ],
     },
     { timeout: 30_000, maxRetries: 0 }
@@ -257,7 +337,9 @@ async function run(name: string, scenario: { expect: string; ticket: AnalyzableF
   const verdict = sanitizeRelation(parsed.aiSignalRelation, hasAnchors);
 
   console.log(`\n${"═".repeat(70)}`);
-  console.log(`SCENARIO: ${name}  (hasAnchors=${hasAnchors}, context=${contextText.length} chars)`);
+  console.log(
+    `SCENARIO: ${name}  (hasAnchors=${hasAnchors}, context=${contextText.length} chars${scenario.screenshotSvg ? ", screenshot attached" : ""})`
+  );
   console.log(`EXPECT:   ${scenario.expect}`);
   console.log(`${"─".repeat(70)}`);
   console.log(`VERDICT:    ${verdict}   confidence=${clampConfidence(parsed.aiConfidence)}`);

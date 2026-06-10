@@ -20,6 +20,7 @@ import {
   getScreenshotByIdRepo,
 } from "@/lib/repositories/screenshotsRepository";
 import { corsHeaders } from "@/lib/server/cors";
+import { evictOldestUntilFits } from "@/lib/server/evictOldestUntilFits";
 import "@/lib/server/firebaseAdmin";
 import { assert, ECHLY_STRICT_MODE } from "@/lib/guardrails";
 import { tryBuildRequestContext } from "@/lib/server/requestContext";
@@ -320,8 +321,9 @@ export async function POST(req: NextRequest) {
   // ─── Phase 4: console-log capture validation ────────────────────────
   // Defense-in-depth. The extension already redacts at capture time, but we
   // re-validate here to:
-  //   • cap array length (200) and total byte size (100KB) so a buggy or
-  //     compromised client can't write unbounded blobs to Firestore.
+  //   • cap array length (200, keep newest) and total byte size (100KB,
+  //     evict oldest until it fits) so a buggy or compromised client can't
+  //     write unbounded blobs to Firestore.
   //   • require well-formed entry shapes; drop the offending field on
   //     failure but accept the rest of the payload (spec: don't reject the
   //     whole ticket over malformed logs).
@@ -410,20 +412,39 @@ export async function POST(req: NextRequest) {
     validateException,
   );
 
-  // Combined byte cap. If over, drop both rather than truncate selectively —
-  // the client buffer already enforced a 50KB cap, so 100KB here is a wide
-  // margin and breaching it indicates a misbehaving client.
+  // Combined byte cap over logs ∪ exceptions: evict the OLDEST entries (by
+  // timestamp, across both streams) until the union fits. The old behaviour
+  // dropped BOTH arrays wholesale — written when the client cap was 50KB and
+  // an overage meant a misbehaving client; the watermark/engagement merge made
+  // large payloads legitimate, and losing every entry (ticket, DevTools tabs,
+  // AI analysis) over the cap was strictly worse than losing the oldest tail.
   if (validatedConsoleLogs || validatedExceptions) {
-    const sizeProbe = JSON.stringify({
-      consoleLogs: validatedConsoleLogs ?? [],
-      exceptions: validatedExceptions ?? [],
-    });
-    if (sizeProbe.length > MAX_TOTAL_BYTES) {
+    type TaggedEntry =
+      | { stream: "log"; ts: number; entry: ConsoleLogEntry }
+      | { stream: "exc"; ts: number; entry: ExceptionEntry };
+    const merged: TaggedEntry[] = [
+      ...(validatedConsoleLogs ?? []).map(
+        (entry): TaggedEntry => ({ stream: "log", ts: entry.timestamp, entry })
+      ),
+      ...(validatedExceptions ?? []).map(
+        (entry): TaggedEntry => ({ stream: "exc", ts: entry.timestamp, entry })
+      ),
+    ].sort((a, b) => a.ts - b.ts);
+    const { kept, evicted } = evictOldestUntilFits(merged, MAX_TOTAL_BYTES, (t) =>
+      JSON.stringify(t.entry).length
+    );
+    if (evicted > 0) {
       console.warn(
-        `[feedback] dropped console capture: combined size ${sizeProbe.length} bytes exceeds ${MAX_TOTAL_BYTES} cap`,
+        `[feedback] console capture over ${MAX_TOTAL_BYTES} byte cap: evicted ${evicted} oldest entries, kept ${kept.length}`,
       );
-      validatedConsoleLogs = undefined;
-      validatedExceptions = undefined;
+      const keptLogs = kept
+        .filter((t): t is Extract<TaggedEntry, { stream: "log" }> => t.stream === "log")
+        .map((t) => t.entry);
+      const keptExceptions = kept
+        .filter((t): t is Extract<TaggedEntry, { stream: "exc" }> => t.stream === "exc")
+        .map((t) => t.entry);
+      validatedConsoleLogs = keptLogs.length > 0 ? keptLogs : undefined;
+      validatedExceptions = keptExceptions.length > 0 ? keptExceptions : undefined;
     }
   }
 
@@ -449,10 +470,9 @@ export async function POST(req: NextRequest) {
 
   // ─── Phase N4: network-request capture validation ──────────────────
   // Same defense-in-depth pattern as console. Per-entry shape validation
-  // drops malformed entries individually; combined byte cap drops the
-  // whole field rather than truncating (client buffer already enforced
-  // 100KB so 200KB here is a wide margin). PII scan over request/response
-  // bodies logs warnings; never rejects.
+  // drops malformed entries individually; the combined byte cap evicts the
+  // oldest entries until the rest fits (see evictOldestUntilFits). PII scan
+  // over request/response bodies logs warnings; never rejects.
   const MAX_NETWORK_ENTRIES = 200;
   const MAX_NETWORK_TOTAL_BYTES = 200 * 1024;
   const ALLOWED_NETWORK_SOURCES = new Set(["fetch", "xhr"]);
@@ -520,14 +540,13 @@ export async function POST(req: NextRequest) {
       if (v !== null) validated.push(v);
     }
     if (validated.length === 0) return undefined;
-    const sizeProbe = JSON.stringify(validated);
-    if (sizeProbe.length > MAX_NETWORK_TOTAL_BYTES) {
+    const { kept, evicted } = evictOldestUntilFits(validated, MAX_NETWORK_TOTAL_BYTES);
+    if (evicted > 0) {
       console.warn(
-        `[feedback] dropped networkRequests: combined size ${sizeProbe.length} bytes exceeds ${MAX_NETWORK_TOTAL_BYTES} cap`,
+        `[feedback] networkRequests over ${MAX_NETWORK_TOTAL_BYTES} byte cap: evicted ${evicted} oldest entries, kept ${kept.length}`,
       );
-      return undefined;
     }
-    return validated;
+    return kept.length > 0 ? kept : undefined;
   }
 
   let validatedNetworkRequests = validateNetworkRequestArray(body.networkRequests);
@@ -557,8 +576,8 @@ export async function POST(req: NextRequest) {
   // Same defense-in-depth pattern as console/network. Element fields are
   // already redacted at capture time (text post-redaction; masked: true
   // when withheld). Per-entry shape validation drops malformed entries
-  // individually; combined byte cap drops the whole field rather than
-  // truncating. No PII regex sweep — actions don't carry free-form bodies.
+  // individually; the combined byte cap evicts the oldest entries until the
+  // rest fits. No PII regex sweep — actions don't carry free-form bodies.
   const MAX_USER_ACTIONS = 200;
   const MAX_USER_ACTIONS_TOTAL_BYTES = 100 * 1024;
   const ALLOWED_ACTION_TYPES = new Set<ActionType>([
@@ -653,14 +672,13 @@ export async function POST(req: NextRequest) {
       if (v !== null) validated.push(v);
     }
     if (validated.length === 0) return undefined;
-    const sizeProbe = JSON.stringify(validated);
-    if (sizeProbe.length > MAX_USER_ACTIONS_TOTAL_BYTES) {
+    const { kept, evicted } = evictOldestUntilFits(validated, MAX_USER_ACTIONS_TOTAL_BYTES);
+    if (evicted > 0) {
       console.warn(
-        `[feedback] dropped userActions: combined size ${sizeProbe.length} bytes exceeds ${MAX_USER_ACTIONS_TOTAL_BYTES} cap`,
+        `[feedback] userActions over ${MAX_USER_ACTIONS_TOTAL_BYTES} byte cap: evicted ${evicted} oldest entries, kept ${kept.length}`,
       );
-      return undefined;
     }
-    return validated;
+    return kept.length > 0 ? kept : undefined;
   }
 
   const validatedUserActions = validateUserActionArray(body.userActions);
