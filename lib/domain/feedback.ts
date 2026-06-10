@@ -247,6 +247,16 @@ export interface Feedback {
    * on the no-fault path.
    */
   aiFixSteps?: string[] | null;
+  /**
+   * Structured analysis (new shape). The model's judgment of how the captured
+   * signals relate to the report:
+   *   "related"        — a captured error/failure plausibly explains the report;
+   *   "unrelated"      — errors were captured but appear disconnected from the report;
+   *   "design_request" — the report is a design/UX/content change, not a defect.
+   * Lets the panel render the relatedness verdict directly. Absent on legacy
+   * tickets, on the templated no-fault path, and on the error path.
+   */
+  aiSignalRelation?: "related" | "unrelated" | "design_request" | null;
   /** Model's self-reported confidence 0-1. Null on the templated no-fault path. */
   aiConfidence?: number | null;
   /**

@@ -163,6 +163,9 @@ export function serializeTicket(ticket: Feedback, access: AccessContext): Record
     ...(Array.isArray(ticket.aiFixSteps) && ticket.aiFixSteps.length > 0
       ? { aiFixSteps: ticket.aiFixSteps }
       : {}),
+    ...(ticket.aiSignalRelation != null
+      ? { aiSignalRelation: ticket.aiSignalRelation }
+      : {}),
     ...(typeof ticket.aiConfidence === "number"
       ? { aiConfidence: ticket.aiConfidence }
       : {}),

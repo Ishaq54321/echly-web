@@ -246,6 +246,12 @@ function mapFeedbackFromSnap(snap: QueryDocumentSnapshot<DocumentData>): Feedbac
       data.aiFixSteps.every((s) => typeof s === "string")
         ? (data.aiFixSteps as string[])
         : null,
+    aiSignalRelation:
+      data.aiSignalRelation === "related" ||
+      data.aiSignalRelation === "unrelated" ||
+      data.aiSignalRelation === "design_request"
+        ? data.aiSignalRelation
+        : null,
     aiConfidence:
       typeof data.aiConfidence === "number" ? data.aiConfidence : null,
     aiAnalysisStatus:

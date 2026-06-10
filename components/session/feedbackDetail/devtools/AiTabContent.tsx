@@ -13,6 +13,21 @@ export type AiAnalysisStatus =
   | null
   | undefined;
 
+/**
+ * The model's judgment of how the captured signals relate to the report. Rendered
+ * as a verdict badge above the cause so the developer sees WHY the AI did or did not
+ * connect the errors to what the user described:
+ *   "related"        — a captured error plausibly explains the report;
+ *   "unrelated"      — errors were captured but look disconnected from the report;
+ *   "design_request" — the report is a design/UX/content change, not a defect.
+ */
+export type AiSignalRelation =
+  | "related"
+  | "unrelated"
+  | "design_request"
+  | null
+  | undefined;
+
 export interface AiTabContentProps {
   aiSummary?: string | null;
   /**
@@ -24,6 +39,8 @@ export interface AiTabContentProps {
   aiCause?: string | null;
   /** Structured: discrete fix steps, rendered as an ordered list (new shape). */
   aiFixSteps?: string[] | null;
+  /** Structured: the model's relatedness verdict, rendered as a badge (new shape). */
+  aiSignalRelation?: AiSignalRelation;
   aiConfidence?: number | null;
   aiAnalysisStatus?: AiAnalysisStatus;
   /**
@@ -66,6 +83,7 @@ export function AiTabContent({
   aiFixSuggestion,
   aiCause,
   aiFixSteps,
+  aiSignalRelation,
   aiConfidence,
   aiAnalysisStatus,
   ticketId,
@@ -122,6 +140,31 @@ export function AiTabContent({
           font-weight: 600;
           letter-spacing: 0.01em;
           user-select: none;
+        }
+        .aitab-relation {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          margin-top: 14px;
+          padding: 4px 10px 4px 8px;
+          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.01em;
+          border: 1px solid var(--border);
+        }
+        .aitab-relation-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 999px;
+          flex: 0 0 auto;
+        }
+        .aitab-relation-note {
+          margin-top: 8px;
+          font-size: 12px;
+          line-height: 1.55;
+          color: var(--text-secondary);
+          overflow-wrap: anywhere;
         }
         .aitab-section { margin-top: 18px; }
         .aitab-section:first-of-type { margin-top: 16px; }
@@ -264,6 +307,7 @@ export function AiTabContent({
             aiFixSuggestion={aiFixSuggestion}
             aiCause={aiCause}
             aiFixSteps={aiFixSteps}
+            aiSignalRelation={aiSignalRelation}
             aiConfidence={aiConfidence}
           />
         ) : (
@@ -407,17 +451,69 @@ function ConfidenceIndicator({ aiConfidence }: { aiConfidence?: number | null })
   );
 }
 
+/**
+ * Per-verdict presentation for the relatedness badge + the cause/fix labels.
+ * "related" keeps the original "Likely cause" / "Suggested fix" wording; the other
+ * two reframe the section so the panel reads honestly (the AI did NOT pin the
+ * captured errors as the bug, or it's a design request, not a defect).
+ */
+const RELATION_PRESENTATION: Record<
+  NonNullable<AiSignalRelation>,
+  { badge: string; color: string; causeLabel: string; fixLabel: string }
+> = {
+  related: {
+    badge: "Captured errors relate to this report",
+    color: "var(--color-success)",
+    causeLabel: "Likely cause",
+    fixLabel: "Suggested fix",
+  },
+  unrelated: {
+    badge: "Captured errors appear unrelated",
+    color: "var(--color-warning-text)",
+    causeLabel: "Relatedness assessment",
+    fixLabel: "Suggested next steps",
+  },
+  design_request: {
+    badge: "Design / UX observation — no code fault",
+    color: "var(--text-tertiary)",
+    causeLabel: "Assessment",
+    fixLabel: "Suggested next steps",
+  },
+};
+
+/** Relatedness verdict pill. Null for legacy tickets that have no verdict. */
+function RelationBadge({ relation }: { relation?: AiSignalRelation }) {
+  if (relation == null) return null;
+  const p = RELATION_PRESENTATION[relation];
+  if (!p) return null;
+  return (
+    <div
+      className="aitab-relation"
+      style={{ color: p.color }}
+    >
+      <span
+        className="aitab-relation-dot"
+        style={{ background: p.color }}
+        aria-hidden
+      />
+      {p.badge}
+    </div>
+  );
+}
+
 function CompleteState({
   aiSummary,
   aiFixSuggestion,
   aiCause,
   aiFixSteps,
+  aiSignalRelation,
   aiConfidence,
 }: {
   aiSummary?: string | null;
   aiFixSuggestion?: string | null;
   aiCause?: string | null;
   aiFixSteps?: string[] | null;
+  aiSignalRelation?: AiSignalRelation;
   aiConfidence?: number | null;
 }) {
   // Prefer the structured shape (new tickets): a labeled one-line cause + a list of
@@ -429,9 +525,20 @@ function CompleteState({
   const hasStructured =
     typeof aiCause === "string" && aiCause.trim() !== "" && steps.length > 0;
 
+  // Reframe the cause/fix labels by verdict (related → original wording). Legacy
+  // tickets with no verdict fall back to "related" so their rendering is unchanged.
+  const relation = aiSignalRelation ?? "related";
+  const presentation =
+    RELATION_PRESENTATION[relation] ?? RELATION_PRESENTATION.related;
+  // Confidence reads as confidence in a TECHNICAL cause — only meaningful when the
+  // signals are related. For unrelated/design verdicts the badge carries the signal
+  // and a low confidence number would just be noise, so suppress it there.
+  const showConfidence = aiSignalRelation == null || aiSignalRelation === "related";
+
   return (
     <div>
       <AiAffordance />
+      <RelationBadge relation={aiSignalRelation} />
       <div className="aitab-section">
         <div className="aitab-label">Summary</div>
         <div className="aitab-body">{aiSummary || "No summary available."}</div>
@@ -440,11 +547,11 @@ function CompleteState({
       {hasStructured ? (
         <>
           <div className="aitab-section">
-            <div className="aitab-label">Likely cause</div>
+            <div className="aitab-label">{presentation.causeLabel}</div>
             <div className="aitab-cause">{aiCause}</div>
           </div>
           <div className="aitab-section">
-            <div className="aitab-label">Suggested fix</div>
+            <div className="aitab-label">{presentation.fixLabel}</div>
             <ol className="aitab-steps">
               {steps.map((step, i) => (
                 <li key={i} className="aitab-step">
@@ -464,7 +571,7 @@ function CompleteState({
         </div>
       )}
 
-      <ConfidenceIndicator aiConfidence={aiConfidence} />
+      {showConfidence ? <ConfidenceIndicator aiConfidence={aiConfidence} /> : null}
     </div>
   );
 }

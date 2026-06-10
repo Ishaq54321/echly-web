@@ -2470,7 +2470,8 @@ export default function SessionPageClient({
   const mergeAiFields = useCallback(
     (f: Feedback, status: NonNullable<Feedback["aiAnalysisStatus"]>, result: {
       aiSummary?: unknown; aiFixSuggestion?: unknown;
-      aiCause?: unknown; aiFixSteps?: unknown; aiConfidence?: unknown;
+      aiCause?: unknown; aiFixSteps?: unknown;
+      aiSignalRelation?: unknown; aiConfidence?: unknown;
     }): Feedback => ({
       ...f,
       aiAnalysisStatus: status,
@@ -2485,6 +2486,12 @@ export default function SessionPageClient({
         result.aiFixSteps.every((s) => typeof s === "string")
           ? (result.aiFixSteps as string[])
           : f.aiFixSteps,
+      aiSignalRelation:
+        result.aiSignalRelation === "related" ||
+        result.aiSignalRelation === "unrelated" ||
+        result.aiSignalRelation === "design_request"
+          ? result.aiSignalRelation
+          : f.aiSignalRelation,
       aiConfidence: typeof result.aiConfidence === "number" ? result.aiConfidence : f.aiConfidence,
     }),
     []
@@ -2498,6 +2505,7 @@ export default function SessionPageClient({
         aiFixSuggestion?: unknown;
         aiCause?: unknown;
         aiFixSteps?: unknown;
+        aiSignalRelation?: unknown;
         aiConfidence?: unknown;
       }
     ) => {

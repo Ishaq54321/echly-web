@@ -55,6 +55,14 @@ const ANALYSIS_FRESH_MS = 24 * 60 * 60 * 1000; // 24h
 // client so the stale-pending reclaim and the client retry agree on the threshold).
 
 type AnalysisStatus = NonNullable<Feedback["aiAnalysisStatus"]>;
+type SignalRelation = NonNullable<Feedback["aiSignalRelation"]>;
+
+/** The relatedness verdicts the model may emit (must match the prompt + schema). */
+const SIGNAL_RELATIONS: readonly SignalRelation[] = [
+  "related",
+  "unrelated",
+  "design_request",
+] as const;
 
 interface AnalysisResult {
   aiSummary: string | null;
@@ -68,6 +76,13 @@ interface AnalysisResult {
   aiCause: string | null;
   /** Structured: discrete fix steps. Null on the no-fault/error paths. */
   aiFixSteps: string[] | null;
+  /**
+   * Structured: the model's judgment of how the captured signals relate to the
+   * report ("related" | "unrelated" | "design_request"). Lets the panel render the
+   * relatedness verdict without parsing prose. Null on the no-fault/error paths and
+   * on legacy tickets analyzed before this field existed.
+   */
+  aiSignalRelation: SignalRelation | null;
   aiConfidence: number | null;
   aiAnalysisStatus: AnalysisStatus;
 }
@@ -82,6 +97,12 @@ const ANALYSIS_JSON_SCHEMA = {
   additionalProperties: false,
   properties: {
     aiSummary: { type: "string" },
+    // The relatedness verdict (constrained to the three values the prompt defines)
+    // so the model commits to a judgment the panel can render, not just prose.
+    aiSignalRelation: {
+      type: "string",
+      enum: ["related", "unrelated", "design_request"],
+    },
     aiCause: { type: "string" },
     aiFixSteps: {
       type: "array",
@@ -91,7 +112,13 @@ const ANALYSIS_JSON_SCHEMA = {
     },
     aiConfidence: { type: "number" },
   },
-  required: ["aiSummary", "aiCause", "aiFixSteps", "aiConfidence"],
+  required: [
+    "aiSummary",
+    "aiSignalRelation",
+    "aiCause",
+    "aiFixSteps",
+    "aiConfidence",
+  ],
 } as const;
 
 function getOpenAIClient(): OpenAI {
@@ -182,6 +209,9 @@ function buildNoFaultResult(feedback: Feedback): AnalysisResult {
     // the panel renders it from aiFixSuggestion in its own no-fault layout.
     aiCause: null,
     aiFixSteps: null,
+    // No-fault is its own (untouched) path with a dedicated layout — leave the
+    // relatedness verdict null here; it only applies when a model call ran.
+    aiSignalRelation: null,
     aiConfidence: null,
     aiAnalysisStatus: "no_fault",
   };
@@ -225,6 +255,18 @@ function composeFixSuggestion(cause: string, steps: string[]): string {
 function clampConfidence(n: unknown): number | null {
   if (typeof n !== "number" || !Number.isFinite(n)) return null;
   return Math.max(0, Math.min(1, n));
+}
+
+/**
+ * Coerce the model's relatedness verdict to one of the allowed values. Defaults to
+ * "related" when the value is missing/unrecognized: the fault path only runs when
+ * real anchors exist, so a malformed verdict should fall back to the
+ * diagnose-the-fault behaviour rather than silently suppressing a real cause.
+ */
+function sanitizeRelation(value: unknown): SignalRelation {
+  return SIGNAL_RELATIONS.includes(value as SignalRelation)
+    ? (value as SignalRelation)
+    : "related";
 }
 
 /**
@@ -275,6 +317,7 @@ async function runModelAnalysis(
   const raw = completion.choices[0]?.message?.content?.trim() ?? "";
   const parsed = JSON.parse(raw) as {
     aiSummary?: unknown;
+    aiSignalRelation?: unknown;
     aiCause?: unknown;
     aiFixSteps?: unknown;
     aiConfidence?: unknown;
@@ -282,6 +325,7 @@ async function runModelAnalysis(
   const aiSummary = sanitizeOut(parsed.aiSummary, 600);
   const aiCause = sanitizeOut(parsed.aiCause, 400);
   const aiFixSteps = sanitizeSteps(parsed.aiFixSteps, 5, 300);
+  const aiSignalRelation = sanitizeRelation(parsed.aiSignalRelation);
   // Require the scannable core: a summary, a cause, and at least one concrete step.
   if (!aiSummary || !aiCause || aiFixSteps.length === 0) {
     throw new Error("Model returned empty analysis fields");
@@ -292,6 +336,7 @@ async function runModelAnalysis(
     aiFixSuggestion: composeFixSuggestion(aiCause, aiFixSteps),
     aiCause,
     aiFixSteps,
+    aiSignalRelation,
     aiConfidence: clampConfidence(parsed.aiConfidence),
     aiAnalysisStatus: "complete",
   };
@@ -311,6 +356,7 @@ async function writeAnalysis(id: string, result: AnalysisResult): Promise<void> 
       aiFixSuggestion: result.aiFixSuggestion,
       aiCause: result.aiCause,
       aiFixSteps: result.aiFixSteps,
+      aiSignalRelation: result.aiSignalRelation,
       aiConfidence: result.aiConfidence,
       aiAnalysisStatus: result.aiAnalysisStatus,
       aiGeneratedAt: FieldValue.serverTimestamp(),
@@ -326,6 +372,7 @@ function errorResult(): AnalysisResult {
     aiFixSuggestion: null,
     aiCause: null,
     aiFixSteps: null,
+    aiSignalRelation: null,
     aiConfidence: null,
     aiAnalysisStatus: "error",
   };
@@ -343,6 +390,7 @@ function terminalResponse(result: AnalysisResult): Record<string, unknown> {
     aiFixSuggestion: result.aiFixSuggestion,
     aiCause: result.aiCause,
     aiFixSteps: result.aiFixSteps,
+    aiSignalRelation: result.aiSignalRelation,
     aiConfidence: result.aiConfidence,
   };
 }
@@ -410,6 +458,7 @@ export async function POST(
       aiFixSuggestion: feedback.aiFixSuggestion ?? null,
       aiCause: feedback.aiCause ?? null,
       aiFixSteps: feedback.aiFixSteps ?? null,
+      aiSignalRelation: feedback.aiSignalRelation ?? null,
       aiConfidence: feedback.aiConfidence ?? null,
     });
   }
@@ -449,6 +498,7 @@ export async function POST(
       aiFixSuggestion: feedback.aiFixSuggestion ?? null,
       aiCause: feedback.aiCause ?? null,
       aiFixSteps: feedback.aiFixSteps ?? null,
+      aiSignalRelation: feedback.aiSignalRelation ?? null,
       aiConfidence: feedback.aiConfidence ?? null,
     });
   }
