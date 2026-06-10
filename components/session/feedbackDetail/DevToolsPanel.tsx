@@ -36,6 +36,10 @@ export type DevToolsFeedback = Partial<
     | "networkErrorCount"
     | "userActions"
     | "userActionCount"
+    | "aiSummary"
+    | "aiFixSuggestion"
+    | "aiConfidence"
+    | "aiAnalysisStatus"
   >
 >;
 import { Tabs, type TabsItem } from "@/components/ui/Tabs";
@@ -43,8 +47,9 @@ import { ActionsTabContent } from "@/components/session/feedbackDetail/devtools/
 import { ConsoleTabContent } from "@/components/session/feedbackDetail/devtools/ConsoleTabContent";
 import { MetadataTabContent } from "@/components/session/feedbackDetail/devtools/MetadataTabContent";
 import { NetworkTabContent } from "@/components/session/feedbackDetail/devtools/NetworkTabContent";
+import { AiTabContent } from "@/components/session/feedbackDetail/devtools/AiTabContent";
 
-export type DevToolsTabId = "actions" | "console" | "network" | "metadata";
+export type DevToolsTabId = "ai" | "actions" | "console" | "network" | "metadata";
 export type DevToolsConsoleFilter = "errors" | "warnings" | "all";
 export type DevToolsNetworkFilter = "errors";
 
@@ -57,6 +62,10 @@ export interface DevToolsPanelProps {
   initialNetworkFilter?: DevToolsNetworkFilter;
   /** Phase 5E: when true, ConsoleTabContent scrolls its Exceptions section into view on mount. */
   scrollToExceptions?: boolean;
+  /** AI panel: client-side request error (POST failed without a terminal doc status). */
+  aiClientError?: boolean;
+  /** AI panel: manual retry — re-fires the analyze POST. */
+  onAiRetry?: () => void;
 }
 
 /**
@@ -74,6 +83,8 @@ export function DevToolsPanel({
   initialFilter,
   initialNetworkFilter,
   scrollToExceptions = false,
+  aiClientError = false,
+  onAiRetry,
 }: DevToolsPanelProps) {
   // `initialTab` is the entry-time default. The caller (SessionPageClient)
   // forces a re-mount via `key` when it wants to override the active tab
@@ -81,7 +92,11 @@ export function DevToolsPanel({
   // initial value without a setState-in-effect.
   const [activeTab, setActiveTab] = useState<DevToolsTabId>(initialTab);
 
+  // AI is placed first in the strip as the landing tab for triage. The default
+  // SELECTED tab is still `initialTab` (Actions, set by the caller), so existing
+  // entry behavior (header-badge deep-links to console/network) is unchanged.
   const tabs: TabsItem[] = [
+    { id: "ai", label: "AI" },
     { id: "actions", label: "Actions" },
     { id: "console", label: "Console" },
     { id: "network", label: "Network" },
@@ -114,6 +129,18 @@ export function DevToolsPanel({
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto">
+        <DevToolsTabPanel id="ai" activeId={activeTab}>
+          <AiTabContent
+            ticketId={feedback?.id}
+            aiSummary={feedback?.aiSummary}
+            aiFixSuggestion={feedback?.aiFixSuggestion}
+            aiConfidence={feedback?.aiConfidence}
+            aiAnalysisStatus={feedback?.aiAnalysisStatus}
+            clientError={aiClientError}
+            onRetry={onAiRetry}
+          />
+        </DevToolsTabPanel>
+
         <DevToolsTabPanel id="actions" activeId={activeTab}>
           <ActionsTabContent
             userActions={feedback?.userActions}

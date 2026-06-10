@@ -991,6 +991,23 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
     ...(typeof data.userActionCount === "number" && data.userActionCount > 0
       ? { userActionCount: data.userActionCount }
       : {}),
+    // AI Analysis: optional; only include if persisted (written lazily on first
+    // ticket view by the analyze route, never at create). aiGeneratedAt is an
+    // Admin Timestamp here; domain type uses client Timestamp, same cast as
+    // createdAt/lastCommentAt above.
+    ...(typeof data.aiSummary === "string" ? { aiSummary: data.aiSummary } : {}),
+    ...(typeof data.aiFixSuggestion === "string"
+      ? { aiFixSuggestion: data.aiFixSuggestion }
+      : {}),
+    ...(typeof data.aiConfidence === "number"
+      ? { aiConfidence: data.aiConfidence }
+      : {}),
+    ...(typeof data.aiAnalysisStatus === "string"
+      ? { aiAnalysisStatus: data.aiAnalysisStatus as Feedback["aiAnalysisStatus"] }
+      : {}),
+    ...(data.aiGeneratedAt != null
+      ? { aiGeneratedAt: data.aiGeneratedAt as Feedback["aiGeneratedAt"] }
+      : {}),
   };
 }
 

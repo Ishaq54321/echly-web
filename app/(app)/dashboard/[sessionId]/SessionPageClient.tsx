@@ -25,6 +25,7 @@ import { normalizeTicketStatus } from "@/lib/domain/normalizeTicketStatus";
 import { useFeedbackDetailController } from "./hooks/useFeedbackDetailController";
 import type { Feedback } from "@/lib/domain/feedback";
 import { getTicketStatus } from "@/lib/domain/feedback";
+import { PENDING_STALE_MS } from "@/lib/ai/analysisConstants";
 import type { Session } from "@/lib/domain/session";
 import type { AccessCapabilities } from "@/lib/access/resolveAccess";
 import { requireAccessLevel } from "@/lib/domain/accessLevel";
@@ -2404,6 +2405,274 @@ export default function SessionPageClient({
     () => stableCanonicalFeedback.find((t) => t.id === effectiveSelectedId) ?? null,
     [stableCanonicalFeedback, effectiveSelectedId]
   );
+
+  // AI Analysis trigger (on-first-view). When the open ticket has no analysis
+  // yet — or the prior attempt errored, or a "pending" lock went STALE — fire
+  // POST /api/feedback/{id}/analyze. The route caches the result on the doc and
+  // the realtime listener streams it back into selectedBaseItem.aiAnalysisStatus
+  // → the AI panel fills in. Never blocks the ticket UI.
+  //
+  // Stale-pending recovery (the un-deadlock): if a prior run was platform-killed
+  // mid-flight the doc freezes at "pending". The server's claimAnalysisLock will
+  // RECLAIM a pending older than PENDING_STALE_MS — but only if a client calls
+  // again. So here we re-fire when a "pending" is older than that same threshold.
+  // A FRESH pending (someone genuinely analyzing right now) still bails, so we
+  // never double-fire an active analysis. Both halves read PENDING_STALE_MS from
+  // lib/ai/analysisConstants so they agree on what "stale" means.
+  //
+  // Guarding: a ref-set records ids already attempted THIS MOUNT. We never remove
+  // an id from it on failure — that would let a 429/quota/network failure (which
+  // doesn't change the doc's status) re-fire on every ticket re-select, hammering
+  // the endpoint. Instead the id stays "attempted" until a fresh mount (reload),
+  // a server-written "error" status, or a now-stale "pending" — the last two are
+  // the only cases that clear the ref so the retry isn't separately blocked by it.
+  const aiAnalyzeFiredRef = useRef<Set<string>>(new Set());
+  const selectedAiStatus = selectedBaseItem?.aiAnalysisStatus ?? null;
+  const selectedAiGeneratedAtMs = selectedBaseItem?.aiGeneratedAt?.toMillis() ?? 0;
+
+  // Client-side AI request state, keyed by ticket id. This is the panel's escape
+  // hatch out of an infinite "Analyzing…": the analyze route can fail at a gate
+  // (auth/access/rate/quota/500) WITHOUT writing a terminal doc status, so the
+  // realtime doc would stay null/pending forever. When the POST comes back non-OK
+  // we record a "request_error" here so the panel shows the unavailable+retry
+  // state instead of spinning. "ok" with a terminal payload also lets a no-LISTENER
+  // viewer (bundle/REST mode, canSubscribeToFirestore=false) repaint without a
+  // realtime snapshot — we apply the returned ai* fields directly to local state.
+  type AiRequestState = "request_error";
+  const [aiRequestStateById, setAiRequestStateById] = useState<
+    Record<string, AiRequestState>
+  >({});
+  const setAiRequestState = useCallback((id: string, state: AiRequestState | null) => {
+    setAiRequestStateById((prev) => {
+      if (state === null) {
+        if (!(id in prev)) return prev;
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      }
+      if (prev[id] === state) return prev;
+      return { ...prev, [id]: state };
+    });
+  }, []);
+
+  // Apply a terminal analyze result onto local feedback state so the open ticket's
+  // panel repaints even when no realtime listener is attached (bundle/REST viewer).
+  //
+  // Two write targets, both fired (each is a no-op in the other mode):
+  //  • BUNDLE/no-listener mode (anonymousBundledFeedback != null): write the result
+  //    DURABLY into the bundle list. The bundle is a one-shot fetch the listener
+  //    never refreshes, so this must persist — it can't go through the optimistic
+  //    overlay, which auto-clears after 500ms and would revert the panel to loading.
+  //  • LISTENER mode (bundle null): the realtime snapshot is the durable carrier;
+  //    here we just apply a fast-path optimistic overlay so the panel fills in a
+  //    beat sooner. It's safe to let that overlay auto-clear because the listener's
+  //    snapshot then backs the same fields.
+  const mergeAiFields = useCallback(
+    (f: Feedback, status: NonNullable<Feedback["aiAnalysisStatus"]>, result: {
+      aiSummary?: unknown; aiFixSuggestion?: unknown; aiConfidence?: unknown;
+    }): Feedback => ({
+      ...f,
+      aiAnalysisStatus: status,
+      aiSummary: typeof result.aiSummary === "string" ? result.aiSummary : f.aiSummary,
+      aiFixSuggestion:
+        typeof result.aiFixSuggestion === "string" ? result.aiFixSuggestion : f.aiFixSuggestion,
+      aiConfidence: typeof result.aiConfidence === "number" ? result.aiConfidence : f.aiConfidence,
+    }),
+    []
+  );
+  const applyAiResultLocally = useCallback(
+    (
+      id: string,
+      result: {
+        status?: unknown;
+        aiSummary?: unknown;
+        aiFixSuggestion?: unknown;
+        aiConfidence?: unknown;
+      }
+    ) => {
+      const status =
+        result.status === "complete" ||
+        result.status === "no_fault" ||
+        result.status === "error"
+          ? (result.status as NonNullable<Feedback["aiAnalysisStatus"]>)
+          : null;
+      // Only terminal payloads carry usable fields. "pending"/"inflight"/unknown →
+      // leave local state alone and let the listener / panel-timeout / retry drive it.
+      if (status == null) return;
+      // Durable write for bundle mode (no-op when not in bundle mode → prev null).
+      setAnonymousBundledFeedback((prev) =>
+        prev == null ? prev : prev.map((f) => (f.id === id ? mergeAiFields(f, status, result) : f))
+      );
+      // Fast-path overlay for listener mode (harmless in bundle mode; auto-clears).
+      setFeedback((prev) =>
+        prev.map((f) => (f.id === id ? mergeAiFields(f, status, result) : f))
+      );
+    },
+    [setFeedback, setAnonymousBundledFeedback, mergeAiFields]
+  );
+
+  // Imperative analyze fire — shared by the on-open effect and the panel's manual
+  // retry. Returns nothing; updates the fired-guard and client error state itself.
+  const fireAnalyze = useCallback(
+    async (id: string) => {
+      // authFetch returns null when auth.currentUser is null (auth not yet
+      // rehydrated on localhost). The request was NEVER sent, so we must NOT keep
+      // the one-shot guard consumed — release it so the effect re-fires once auth
+      // arrives (authUid flips and re-runs the effect). Also clear any prior
+      // request_error so the panel returns to bounded-loading for the retry.
+      console.log("[TEMP-DIAG] client POST → /api/feedback/" + id + "/analyze"); // TEMP-DIAG REMOVE
+      let res: Response | null;
+      try {
+        res = await authFetch(`/api/feedback/${id}/analyze`, { method: "POST" });
+      } catch (err) {
+        // Network/timeout — request error, not a doc error. Surface it and release
+        // the guard so a later view (or manual retry) can try again.
+        console.error("[TEMP-DIAG] client POST threw:", err); // TEMP-DIAG REMOVE
+        aiAnalyzeFiredRef.current.delete(id);
+        setAiRequestState(id, "request_error");
+        return;
+      }
+      if (res === null) {
+        // Not sent (no auth). Release the guard; do NOT mark request_error — this
+        // is a not-ready state, not a failure, and the panel should keep loading
+        // (bounded) until auth arrives and the effect re-fires.
+        console.warn(
+          "[TEMP-DIAG] client POST returned NULL — authFetch saw no auth.currentUser (request never sent)"
+        ); // TEMP-DIAG REMOVE
+        aiAnalyzeFiredRef.current.delete(id);
+        return;
+      }
+      let body: unknown = null;
+      try {
+        body = await res.clone().json();
+      } catch {
+        body = "<non-JSON body>";
+      }
+      console.log(
+        "[TEMP-DIAG] client POST response",
+        JSON.stringify({ httpStatus: res.status, ok: res.ok, body })
+      ); // TEMP-DIAG REMOVE
+      if (!res.ok) {
+        // A gate failed (401/403/404/429/500) WITHOUT writing a terminal doc
+        // status — the doc stays null/pending. Surface a client-side error so the
+        // panel shows unavailable+retry instead of an infinite spinner. We do NOT
+        // release the guard here: a 429/quota/403 shouldn't auto-hammer the route
+        // every re-select; the manual retry (or a fresh mount) is the recovery.
+        setAiRequestState(id, "request_error");
+        return;
+      }
+      // OK: clear any prior error and apply the terminal payload locally so even a
+      // no-listener viewer repaints. (Listener viewers also get it via snapshot.)
+      setAiRequestState(id, null);
+      if (body && typeof body === "object") {
+        applyAiResultLocally(id, body as Record<string, unknown>);
+      }
+    },
+    [setAiRequestState, applyAiResultLocally]
+  );
+
+  useEffect(() => {
+    const id = effectiveSelectedId;
+    if (!id) return;
+
+    // AUTH-READINESS GATE. authFetch needs auth.currentUser to be non-null; that
+    // becomes available exactly when authUid flips from null → a real uid. If we
+    // fire before then, authFetch returns null and the request is silently dropped.
+    // Gate on authUid AND keep it in the dep array so the effect RE-RUNS (and fires)
+    // the moment auth rehydrates.
+    if (!authUid) {
+      // Distinguish "auth still resolving" from "genuinely anonymous":
+      //  • authReady=false → first auth callback hasn't fired yet; WAIT (don't
+      //    consume the guard) so we fire once authUid arrives.
+      //  • authReady=true & no uid → this viewer is signed-out. The analyze route
+      //    is auth-only, so it can never produce a result; show the unavailable
+      //    state instead of spinning toward a useless timeout.
+      if (authReady) {
+        console.log("[TEMP-DIAG] client trigger: anonymous (authReady, no uid) → request_error for", id); // TEMP-DIAG REMOVE
+        setAiRequestState(id, "request_error");
+      } else {
+        console.log("[TEMP-DIAG] client trigger WAIT: auth not ready (authUid null) for", id); // TEMP-DIAG REMOVE
+      }
+      return;
+    }
+
+    // A "pending" is retryable only once it has gone stale (a crashed/killed prior
+    // run). Until then it's an active analysis and must be left alone.
+    const isStalePending =
+      selectedAiStatus === "pending" &&
+      selectedAiGeneratedAtMs > 0 &&
+      Date.now() - selectedAiGeneratedAtMs >= PENDING_STALE_MS;
+
+    // Retry when: no analysis yet (null), the prior attempt errored, or a stale
+    // pending. A fresh pending / complete / no_fault → leave it alone.
+    const retryable =
+      selectedAiStatus == null ||
+      selectedAiStatus === "error" ||
+      isStalePending;
+
+    // TEMP-DIAG: trace the trigger decision (id, status, whether it will fire). REMOVE.
+    // canSubscribeToFirestore tells us if a realtime listener is even attached —
+    // if false, the route's write will never reach selectedBaseItem (REST/bundle mode).
+    console.log(
+      "[TEMP-DIAG] client trigger effect",
+      JSON.stringify({
+        id,
+        authUid,
+        selectedAiStatus,
+        selectedAiGeneratedAtMs,
+        isStalePending,
+        retryable,
+        alreadyFiredThisMount: aiAnalyzeFiredRef.current.has(id),
+        canSubscribeToFirestore,
+        effectiveWorkspaceId,
+        willFire: retryable && (isStalePending || !aiAnalyzeFiredRef.current.has(id)),
+      })
+    );
+
+    if (!retryable) {
+      console.log("[TEMP-DIAG] client trigger BAIL: not retryable (status keeps panel as-is)"); // TEMP-DIAG REMOVE
+      return;
+    }
+
+    // The per-mount ref must also allow a stale-pending retry — clear it for this
+    // id so it doesn't separately block the re-fire (BOTH guards must permit it).
+    if (isStalePending) aiAnalyzeFiredRef.current.delete(id);
+    if (aiAnalyzeFiredRef.current.has(id)) {
+      console.log("[TEMP-DIAG] client trigger BAIL: already fired this mount for", id); // TEMP-DIAG REMOVE
+      return;
+    }
+    aiAnalyzeFiredRef.current.add(id);
+
+    void fireAnalyze(id);
+  }, [
+    effectiveSelectedId,
+    authUid,
+    authReady,
+    selectedAiStatus,
+    selectedAiGeneratedAtMs,
+    canSubscribeToFirestore,
+    effectiveWorkspaceId,
+    fireAnalyze,
+    setAiRequestState,
+  ]);
+
+  // Manual retry from the panel's "taking longer than expected" / error affordance.
+  // Clears BOTH guards (the per-mount fired-set and any client error) and re-fires.
+  const retryAiAnalyze = useCallback(
+    (id: string) => {
+      if (!id) return;
+      aiAnalyzeFiredRef.current.delete(id);
+      setAiRequestState(id, null);
+      aiAnalyzeFiredRef.current.add(id);
+      void fireAnalyze(id);
+    },
+    [fireAnalyze, setAiRequestState]
+  );
+
+  const selectedAiRequestErrored =
+    effectiveSelectedId != null &&
+    aiRequestStateById[effectiveSelectedId] === "request_error";
+
   const selectedScreenshotId = selectedBaseItem?.screenshotId ?? null;
   const {
     url: selectedScreenshotUrl,
@@ -4448,6 +4717,12 @@ export default function SessionPageClient({
                       initialFilter={devToolsInitialFilter}
                       initialNetworkFilter={devToolsInitialNetworkFilter}
                       scrollToExceptions={devToolsScrollExceptionsKey > 0}
+                      aiClientError={selectedAiRequestErrored}
+                      onAiRetry={
+                        effectiveSelectedId
+                          ? () => retryAiAnalyze(effectiveSelectedId)
+                          : undefined
+                      }
                       onClose={() => {
                         // Top-right collapse/close icon → restore the sidebar.
                         closeDevTools();

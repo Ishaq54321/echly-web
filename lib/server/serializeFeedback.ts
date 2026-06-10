@@ -28,6 +28,11 @@ function lastCommentAtToApiShape(value: Feedback["lastCommentAt"]): { seconds: n
   return null;
 }
 
+/** Same {@link Timestamp}→{ seconds } shape as {@link lastCommentAtToApiShape}; used for aiGeneratedAt. */
+function timestampToApiShape(value: Feedback["aiGeneratedAt"]): { seconds: number } | null {
+  return lastCommentAtToApiShape(value as Feedback["lastCommentAt"]);
+}
+
 function normalizedStatus(ticket: Feedback) {
   const raw =
     typeof ticket.status === "string" ? ticket.status : getTicketStatus(ticket);
@@ -104,6 +109,25 @@ export function serializeTicket(ticket: Feedback, access: AccessContext): Record
     ...(ticket.userActions ? { userActions: ticket.userActions } : {}),
     ...(typeof ticket.userActionCount === "number"
       ? { userActionCount: ticket.userActionCount }
+      : {}),
+    // AI Analysis: read-only second opinion derived from the (already-redacted)
+    // capture data + description. Not access-gated for the same reason as the
+    // capture fields — safe for any viewer with read access. Omit when absent so
+    // tickets that haven't been analyzed yet stay clean of null fields. This is
+    // the path that carries the analysis into the session-page bundle (which
+    // reuses serializeFeedback → serializeTicket).
+    ...(ticket.aiSummary != null ? { aiSummary: ticket.aiSummary } : {}),
+    ...(ticket.aiFixSuggestion != null
+      ? { aiFixSuggestion: ticket.aiFixSuggestion }
+      : {}),
+    ...(typeof ticket.aiConfidence === "number"
+      ? { aiConfidence: ticket.aiConfidence }
+      : {}),
+    ...(ticket.aiAnalysisStatus != null
+      ? { aiAnalysisStatus: ticket.aiAnalysisStatus }
+      : {}),
+    ...(ticket.aiGeneratedAt != null
+      ? { aiGeneratedAt: timestampToApiShape(ticket.aiGeneratedAt) }
       : {}),
   };
 }

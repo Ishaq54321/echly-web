@@ -15423,8 +15423,8 @@ h6 [data-ai-touched="true"] {
   gap: 16px;
 }
 .echly-v2 .auth-check-logo {
-  width: 40px;
-  height: 40px;
+  width: 64px;
+  height: 64px;
   border-radius: 0;
   background: transparent;
   display: grid;
@@ -15433,8 +15433,8 @@ h6 [data-ai-touched="true"] {
 }
 .echly-v2 .auth-check-logo svg,
 .echly-v2 .auth-check-logo img {
-  width: 30px;
-  height: 30px;
+  width: 48px;
+  height: 48px;
 }
 .echly-v2 .auth-check-bar-wrap {
   width: 120px;

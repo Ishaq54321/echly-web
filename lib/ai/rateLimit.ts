@@ -24,12 +24,25 @@ export interface AiImproveRateLimitResult {
 }
 
 export function checkAiImproveRateLimit(userId: string): AiImproveRateLimitResult {
+  return checkRateLimitForKey(`improve:${userId}`);
+}
+
+/**
+ * Per-user rate limit for AI Analysis. Separate bucket from the improve feature
+ * so exhausting one does not block the other (they are unrelated AI operations).
+ */
+export function checkAiAnalyzeRateLimit(userId: string): AiImproveRateLimitResult {
+  return checkRateLimitForKey(`analyze:${userId}`);
+}
+
+/** Shared fixed-window limiter, keyed so distinct features get distinct buckets. */
+function checkRateLimitForKey(key: string): AiImproveRateLimitResult {
   ensureCleanup();
   const now = Date.now();
-  const bucket = userBuckets.get(userId);
+  const bucket = userBuckets.get(key);
 
   if (!bucket || bucket.resetAt <= now) {
-    userBuckets.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    userBuckets.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
     return { allowed: true };
   }
 

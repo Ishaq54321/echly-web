@@ -1339,9 +1339,9 @@ function ContentApp({ widgetRoot }: ContentAppProps) {
               <img
                 src={chrome.runtime.getURL("assets/annote-logo-icon.svg")}
                 alt="Annote"
-                width={30}
-                height={30}
-                style={{ width: 30, height: 30, objectFit: "contain" }}
+                width={48}
+                height={48}
+                style={{ width: 48, height: 48, objectFit: "contain" }}
               />
             </div>
             <div className="auth-check-bar-wrap">

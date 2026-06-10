@@ -218,6 +218,28 @@ export interface Feedback {
   userActions?: UserAction[] | null;
   /** Denormalized count of userActions. Used for the A5 header badge / Actions tab placeholder. */
   userActionCount?: number;
+
+  /**
+   * AI Analysis (read-only second opinion). Generated lazily on first ticket
+   * view by POST /api/feedback/[id]/analyze and cached back on this doc, then
+   * streamed into the open ticket via the realtime listener. NEVER set at
+   * create time and NEVER mutates the human-facing priority/pageArea fields.
+   * Absent until the first view triggers analysis.
+   */
+  /** 1-2 sentence "what's happening" summary. */
+  aiSummary?: string | null;
+  /** Likely cause + suggested fix, or honest no-fault framing for UX/design reports. */
+  aiFixSuggestion?: string | null;
+  /** Model's self-reported confidence 0-1. Null on the templated no-fault path. */
+  aiConfidence?: number | null;
+  /**
+   * Analysis lifecycle. "pending" guards concurrent first-opens from double-firing;
+   * "complete" = model produced a fault analysis; "no_fault" = no technical signal
+   * (UX/design observation); "error" = generation failed (panel shows graceful state).
+   */
+  aiAnalysisStatus?: "pending" | "complete" | "no_fault" | "error" | null;
+  /** When the analysis was written back. */
+  aiGeneratedAt?: Timestamp | null;
 }
 
 /** Returns explicit status for a feedback item. Use instead of !isResolved. */
