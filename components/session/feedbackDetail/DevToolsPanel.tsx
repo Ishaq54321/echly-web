@@ -81,7 +81,7 @@ export interface DevToolsPanelProps {
 export function DevToolsPanel({
   feedback,
   onClose,
-  initialTab = "actions",
+  initialTab = "ai",
   initialFilter,
   initialNetworkFilter,
   scrollToExceptions = false,
@@ -94,9 +94,10 @@ export function DevToolsPanel({
   // initial value without a setState-in-effect.
   const [activeTab, setActiveTab] = useState<DevToolsTabId>(initialTab);
 
-  // AI is placed first in the strip as the landing tab for triage. The default
-  // SELECTED tab is still `initialTab` (Actions, set by the caller), so existing
-  // entry behavior (header-badge deep-links to console/network) is unchanged.
+  // AI is placed first in the strip as the landing tab for triage, and is also
+  // the default SELECTED tab (`initialTab`, set by the caller). Header-badge
+  // deep-links still pass their own explicit tab (console/network), so that
+  // entry behavior is unchanged.
   const tabs: TabsItem[] = [
     { id: "ai", label: "AI" },
     { id: "actions", label: "Actions" },

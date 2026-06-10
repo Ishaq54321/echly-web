@@ -1571,7 +1571,7 @@ export default function SessionPageClient({
   const [isDraggingDevTools, setIsDraggingDevTools] = useState(false);
   const layoutGridRef = useRef<HTMLDivElement | null>(null);
   const [devToolsInitialTab, setDevToolsInitialTab] =
-    useState<DevToolsTabId>("actions");
+    useState<DevToolsTabId>("ai");
   const [devToolsInitialFilter, setDevToolsInitialFilter] =
     useState<DevToolsConsoleFilter | undefined>(undefined);
   // Phase N5D: Errors-only on the Network tab when set.
@@ -2928,9 +2928,9 @@ export default function SessionPageClient({
       if (next) {
         setIsActivityPanelOpen(false);
         setActiveThreadId(null);
-        // Default entry: Actions tab (the user-story narrative is the entry
-        // point for Phase A5), no preset filter.
-        setDevToolsInitialTab("actions");
+        // Default entry: AI tab (triage landing — the AI root-cause summary is
+        // the entry point), no preset filter.
+        setDevToolsInitialTab("ai");
         setDevToolsInitialFilter(undefined);
         setDevToolsInitialNetworkFilter(undefined);
         setSidebarRailCollapsed(true);
