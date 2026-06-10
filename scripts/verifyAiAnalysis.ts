@@ -138,7 +138,7 @@ const SCENARIOS: Record<string, { expect: string; ticket: AnalyzableFeedback }> 
     }),
   },
   wrongdata: {
-    expect: "NOT design-observation framing; wrong-data reasoning (no_signal acceptable pre-Wave-2 since bodies aren't included yet)",
+    expect: "Wave 2 gate: the 200 body (total:75) reaches the model and the analysis cites it",
     ticket: base({
       title: "Cart total is calculated wrong",
       description:
@@ -149,7 +149,8 @@ const SCENARIOS: Record<string, { expect: string; ticket: AnalyzableFeedback }> 
       userActions: [
         act({ timestamp: T0, element: { tag: "button", text: "Add to cart" } }),
         act({ timestamp: T0 + 4_000, element: { tag: "button", text: "Add to cart" } }),
-        act({ timestamp: T0 + 8_000, type: "navigation", url: "https://shop.example.com/cart" }),
+        act({ timestamp: T0 + 8_000, element: { tag: "a", text: "View cart" } }),
+        act({ timestamp: T0 + 8_050, type: "navigation", url: "https://shop.example.com/cart" }),
       ],
       networkRequests: [
         req({
@@ -158,6 +159,25 @@ const SCENARIOS: Record<string, { expect: string; ticket: AnalyzableFeedback }> 
           durationMs: 310,
           responseBody: '{"items":[{"sku":"A1","qty":2,"unitPrice":25}],"total":75}',
         }),
+      ],
+    }),
+  },
+  cascade: {
+    expect: "Wave 2 gate: the user's real error (cart.total undefined) survives a 40-deep newer cascade and is the cited cause",
+    ticket: base({
+      title: "Cart page crashes when opening",
+      description: "When I open the cart the page goes blank for a second and the total never renders.",
+      tags: ["bug", "cart"],
+      pageArea: "Cart",
+      url: "https://shop.example.com/cart",
+      userActions: [
+        act({ timestamp: T0 + 4_000, element: { tag: "a", text: "Cart" } }),
+      ],
+      consoleLogs: [
+        cerr({ timestamp: T0 + 5_000, message: "TypeError: Cannot read properties of undefined (reading 'total') at CartSummary.render" }),
+        ...Array.from({ length: 40 }, (_, i) =>
+          cerr({ timestamp: T0 + 20_000 + i * 800, message: "ResizeObserver loop completed with undelivered notifications." })
+        ),
       ],
     }),
   },
