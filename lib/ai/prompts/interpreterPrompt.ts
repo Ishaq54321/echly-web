@@ -81,6 +81,8 @@ When the recorder requests a property change AND computed styles are available, 
 
 Implicit references count: "make it bigger" references the current font-size/size, "change the color" references the current color — ground them ("Increase font size from 14px").
 
+Copy changes ground the same way: quote the current text being replaced. The current copy is the element's visible text — or for form fields, the placeholder in the semantic identifier ("Change the search field placeholder from 'Search projects' to 'search across all workspaces'").
+
 Title stays high-level (no specific values): "Change button color", "Make headline bigger".
 
 Exception: if the recorder explicitly specified a target value, the title can include it ("Make headline 32px").

@@ -12,6 +12,9 @@ import { NextResponse } from "next/server";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
+/** Vocabulary-seed cap — comfortably under the STT model's ~224-token prompt limit. */
+const MAX_PROMPT_CHARS = 600;
+
 /** Allowed Content-Type values (browsers may send audio/mpeg for MP3). */
 const ALLOWED_AUDIO_TYPES = new Set([
   "audio/webm",
@@ -274,6 +277,15 @@ export async function POST(req: NextRequest): Promise<Response> {
     });
   }
 
+  // Optional vocabulary seed: biases the STT model toward UI/dev terms and the
+  // names of elements the recorder is likely to say (known client-side before
+  // they speak). Single-line, capped well under the model's prompt limit.
+  const rawPrompt = formData.get("prompt");
+  const transcriptionPrompt =
+    typeof rawPrompt === "string" && rawPrompt.trim()
+      ? rawPrompt.trim().replace(/[\r\n]+/g, " ").slice(0, MAX_PROMPT_CHARS)
+      : undefined;
+
   let openai: OpenAI;
   try {
     openai = getOpenAIClient();
@@ -294,6 +306,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         return await openai.audio.transcriptions.create({
           file,
           model: "gpt-4o-mini-transcribe",
+          ...(transcriptionPrompt ? { prompt: transcriptionPrompt } : {}),
         });
       } catch (err) {
         logger.error("error", "openai_call_failed", err);

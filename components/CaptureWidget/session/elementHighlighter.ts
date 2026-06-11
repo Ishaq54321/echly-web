@@ -3,7 +3,7 @@
  * Single overlay element; no React re-renders on mousemove.
  */
 
-import { isSessionCaptureTarget, logSession } from "./sessionMode";
+import { findCaptureTargetAtPoint, logSession } from "./sessionMode";
 
 const HIGHLIGHT_STYLE = {
   outline: "2px solid #5A49BF",
@@ -19,14 +19,9 @@ let overlay: HTMLDivElement | null = null;
 let mousemoveBound: ((e: MouseEvent) => void) | null = null;
 let lastTarget: Element | null = null;
 
-function getElementUnderPoint(x: number, y: number): Element | null {
-  if (typeof document.elementsFromPoint !== "function") return document.elementFromPoint(x, y);
-  const stack = document.elementsFromPoint(x, y);
-  for (const el of stack) {
-    if (isSessionCaptureTarget(el)) return el;
-  }
-  return null;
-}
+// Shared with click capture so the highlight always matches what a click
+// would actually capture.
+const getElementUnderPoint = findCaptureTargetAtPoint;
 
 function updateOverlay(rect: DOMRect | null) {
   if (!overlay) return;

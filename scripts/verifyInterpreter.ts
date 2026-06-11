@@ -420,6 +420,38 @@ const SCENARIOS: Scenario[] = [
     ],
   },
   {
+    name: "form-field",
+    kind: "Form-field feedback (placeholder + typed value) [Wave 3 target]",
+    expect:
+      "Form fields are capturable since Wave 3. Should name the field via its placeholder, ground the copy change, and use the privacy-filtered typed value.",
+    transcript:
+      "this placeholder text is misleading, it should say search across all workspaces instead",
+    context: ctx({
+      elementTag: "input",
+      ancestorTrail: 'header > form "Search"',
+      subtreeText: null,
+      semanticIdentifier: "Search projects",
+      semanticType: "input",
+      computedStyles: "color: #54495F; font-size: 14px; border: 1px solid; border-radius: 8px; size: 320x40px",
+      inputValue: "",
+    }),
+    checks: [
+      {
+        name: "field named via placeholder ('Search projects')",
+        test: (t) => hasAny(t.title + " " + t.description, ["search projects"]),
+      },
+      {
+        name: "replacement copy preserved exactly",
+        test: (t) =>
+          hasAny(t.description, ["search across all workspaces"]),
+      },
+      {
+        name: "tagged as form/input concern",
+        test: (t) => t.tags.includes("form-input") || t.tags.includes("copy") || t.tags.includes("search-filter"),
+      },
+    ],
+  },
+  {
     name: "ancestor-grounding",
     kind: "Deictic on an unlabeled container — only the ancestor is named [Wave 2 target]",
     expect:

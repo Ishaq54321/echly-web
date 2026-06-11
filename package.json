@@ -22,7 +22,7 @@
     "test:console": "node --import tsx --test annote-extension/src/console/redact.test.ts annote-extension/src/console/stringify.test.ts annote-extension/src/console/denylist.test.ts",
     "test:network": "node --import tsx --test annote-extension/src/network/redactNetwork.test.ts annote-extension/src/network/buffer.test.ts annote-extension/src/network/denylist.test.ts",
     "test:actions": "node --import tsx --test annote-extension/src/actions/redactAction.test.ts annote-extension/src/actions/buffer.test.ts annote-extension/src/actions/denylist.test.ts",
-    "test:capture": "node --import tsx --test lib/captureContext.test.ts lib/sensitiveText.test.ts",
+    "test:capture": "node --import tsx --test lib/captureContext.test.ts lib/sensitiveText.test.ts lib/sttVocabulary.test.ts components/CaptureWidget/session/sessionMode.test.ts",
     "test:extension": "npm run test:shared && npm run test:console && npm run test:network && npm run test:actions && npm run test:capture"
   },
   "dependencies": {

@@ -17,6 +17,7 @@ import type {
 } from "../types";
 import { useMicPermissionListener } from "./useMicPermissionListener";
 import { buildCaptureContext } from "../internal/contextHelpers";
+import { buildSttVocabularyPrompt } from "@/lib/sttVocabulary";
 import { playDoneClick, playShutterSound } from "../internal/audioHelpers";
 import { logSession } from "../internal/sessionHelpers";
 import {
@@ -824,6 +825,11 @@ export function useCaptureWidget({
       try {
         const formData = new FormData();
         formData.append("file", audioFile);
+        // STT vocabulary seed: the clicked element's names are known before
+        // the user speaks — bias transcription toward them + base UI terms.
+        const seedContext =
+          recordingsRef.current.find((r) => r.id === activeId)?.context ?? null;
+        formData.append("prompt", buildSttVocabularyPrompt(seedContext));
         logger.debug("voice", "transcription_started");
         if (!environment?.authenticatedFetch) {
           throw new Error("[ECHLY CORE] No capture environment available (authenticatedFetch required for transcription).");

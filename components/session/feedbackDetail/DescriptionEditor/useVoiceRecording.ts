@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { buildSttVocabularyPrompt } from "@/lib/sttVocabulary";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
@@ -283,6 +284,8 @@ export function useVoiceRecording({
     try {
       const formData = new FormData();
       formData.append("file", file);
+      // No element context in the description editor — base UI vocabulary only.
+      formData.append("prompt", buildSttVocabularyPrompt(null));
       const client = fetchClient ?? fetch;
       const res = await client("/api/transcribe-audio", {
         method: "POST",
