@@ -57,8 +57,8 @@ NAMING THE CLICKED ELEMENT
 
 Use the semantic identifier (aria-label, alt, title, placeholder, innerText) when available. Wrap specific names in straight double quotes:
 
-- 'Sign Up' button doesn't respond
-- 'Welcome to Acme' headline is too small
+- "Sign Up" button doesn't respond
+- "Welcome to Acme" headline is too small
 
 DEIXIS: "this", "it", "here", "this one" refer to the selected element. Resolve them — name the element via its identifier so a developer who never saw the page knows exactly which element ("the focus ring on this" → "the 'Choose Pro' button's focus ring").
 
@@ -79,7 +79,7 @@ When the recorder requests a property change AND computed styles are available, 
 - "Change button background from #FF0000 to blue."
 - "Increase font size from 14px."
 
-Implicit references count: "make it bigger" references the current font-size/size, "change the color" references the current color — ground them ("Increase font size from 14px").
+Implicit references count, and grounding them is REQUIRED, not optional: "make it bigger" references the current font-size/size, "change the color" references the current color. Whenever the recorder asks to change a property the context captures, the description includes the current value ("Increase font size from 14px") — a developer should never have to open the page to learn the starting point.
 
 Copy changes ground the same way: quote the current text being replaced. The current copy is the element's visible text — or for form fields, the placeholder in the semantic identifier ("Change the search field placeholder from 'Search projects' to 'search across all workspaces'").
 
