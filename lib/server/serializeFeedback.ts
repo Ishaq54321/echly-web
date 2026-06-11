@@ -150,6 +150,8 @@ export function serializeTicket(ticket: Feedback, access: AccessContext): Record
     ...(typeof ticket.userActionCount === "number"
       ? { userActionCount: ticket.userActionCount }
       : {}),
+    // Element identity: same contract — capture-time data, safe for any viewer with read access, omit when absent.
+    ...(ticket.element != null ? { element: ticket.element } : {}),
     // AI Analysis: read-only second opinion derived from the (already-redacted)
     // capture data + description. Not access-gated for the same reason as the
     // capture fields — safe for any viewer with read access. Omit when absent so

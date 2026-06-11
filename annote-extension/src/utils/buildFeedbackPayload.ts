@@ -73,6 +73,31 @@ export function buildFeedbackPayload({
       ? ticket.userActionCount
       : undefined;
 
+  // Element identity passthrough. Compact identity of the element the recorder
+  // selected (tag/semanticIdentifier/semanticType/computedStyles/modalContext).
+  // Same contract as console/network/actions — keep string sub-fields only,
+  // omit the block entirely when nothing survives; the server route's
+  // validation (caps + whitelist) is the source of truth for the persisted doc.
+  const elementSource =
+    ticket?.element && typeof ticket.element === "object" && !Array.isArray(ticket.element)
+      ? (ticket.element as Record<string, unknown>)
+      : undefined;
+  const elementFields: Record<string, string> = {};
+  if (elementSource) {
+    for (const key of [
+      "tag",
+      "semanticIdentifier",
+      "semanticType",
+      "computedStyles",
+      "modalContext",
+    ] as const) {
+      const value = elementSource[key];
+      if (typeof value === "string" && value.length > 0) elementFields[key] = value;
+    }
+  }
+  const element: Record<string, string> | undefined =
+    Object.keys(elementFields).length > 0 ? elementFields : undefined;
+
   return {
     sessionId,
     feedbackId,
@@ -113,5 +138,6 @@ export function buildFeedbackPayload({
     networkErrorCount,
     userActions,
     userActionCount,
+    element,
   };
 }

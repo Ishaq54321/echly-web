@@ -77,6 +77,16 @@ export type CaptureContext = {
   devicePixelRatio: number;
   screenWidth?: number;
   screenHeight?: number;
+  /** document.title — page-level grounding for feedback that isn't about the clicked element. */
+  pageTitle?: string | null;
+  /** First visible h1 text — page-level grounding alongside pageTitle. */
+  pageH1?: string | null;
+  /** Tag name of the clicked element (lowercase), e.g. "button", "div". */
+  elementTag?: string | null;
+  /** Ancestor breadcrumb, outermost first: 2-3 informative levels (tag + identifier). */
+  ancestorTrail?: string | null;
+  /** Up to 2 named siblings of the clicked element. */
+  siblingsList?: string | null;
   /** Visible text from the DOM subtree of the selected element (Ring 1). */
   subtreeText?: string | null;
   /** Best human-readable name for the clicked element (aria-label, alt, title, placeholder, or innerText). */

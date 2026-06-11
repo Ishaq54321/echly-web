@@ -31,6 +31,9 @@ export interface StructuredFeedback {
 
   creatorName?: string | null;
   creatorAvatarUrl?: string | null;
+
+  /** Element identity captured at ticket creation; identifies which element the recorder selected. Omitted on old tickets. */
+  element?: FeedbackElement;
 }
 
 /** Single console-log entry captured by the extension's MAIN-world wrapper and persisted with a ticket. Domain copy — the extension keeps its own bundler-isolated copy in annote-extension/src/console/types.ts; field names must stay in lockstep. */
@@ -97,6 +100,24 @@ export interface UserAction {
   viewport?: { width: number; height: number };
   /** For input events: name / label / type — never the value typed. */
   fieldLabel?: string;
+}
+
+/**
+ * Compact element-identity block captured at ticket creation; identifies which
+ * element the recorder selected when filing the ticket. Omitted on old tickets
+ * (and whenever the capture saw neither a tag nor a semantic identifier).
+ */
+export interface FeedbackElement {
+  /** Lowercase tag name, e.g. "button". */
+  tag?: string;
+  /** Human-readable name (aria-label / alt / title / placeholder / innerText). */
+  semanticIdentifier?: string;
+  /** One of: button | link | input | heading | paragraph | image | icon | card | section. */
+  semanticType?: string;
+  /** The curated computed-style string captured for the element. */
+  computedStyles?: string;
+  /** Modal/dialog/popover context when the element sat inside one, e.g. 'Modal: Billing settings'. */
+  modalContext?: string;
 }
 
 /** Single network request captured by the extension's MAIN-world fetch/XHR wrapper and persisted with a ticket. Domain copy — the extension keeps its own bundler-isolated copy in annote-extension/src/network/types.ts; field names must stay in lockstep. Headers and bodies are redacted at the extension's capture site before they reach this type. */
@@ -233,6 +254,9 @@ export interface Feedback {
   userActions?: UserAction[] | null;
   /** Denormalized count of userActions. Used for the A5 header badge / Actions tab placeholder. */
   userActionCount?: number;
+
+  /** Element identity captured at ticket creation; identifies which element the recorder selected. Omitted on old tickets. */
+  element?: FeedbackElement;
 
   /**
    * AI Analysis (read-only second opinion). Generated lazily on first ticket

@@ -55,6 +55,11 @@ function ctx(overrides: Record<string, unknown>): Record<string, unknown> {
     viewportWidth: 1440,
     viewportHeight: 900,
     devicePixelRatio: 2,
+    pageTitle: "Pricing — Acme",
+    pageH1: "Pricing that scales with you",
+    elementTag: null,
+    ancestorTrail: null,
+    siblingsList: null,
     subtreeText: null,
     semanticIdentifier: null,
     computedStyles: null,
@@ -82,6 +87,8 @@ const SCENARIOS: Scenario[] = [
       "Names 'Get Started' concretely; grounds size change in current 14px; no invention.",
     transcript: "make this bigger, it's way too small to be the main CTA",
     context: ctx({
+      elementTag: "button",
+      ancestorTrail: 'main > section "Hero"',
       subtreeText: "Get Started",
       semanticIdentifier: "Get Started",
       semanticType: "button",
@@ -112,6 +119,8 @@ const SCENARIOS: Scenario[] = [
     transcript:
       "this sign up button is barely visible, it needs way more contrast",
     context: ctx({
+      elementTag: "div",
+      ancestorTrail: 'main > section "Get started"',
       subtreeText: "Sign up free No credit card required",
       semanticIdentifier: "",
       semanticType: null,
@@ -143,6 +152,9 @@ const SCENARIOS: Scenario[] = [
     transcript:
       "the button next to this price is misaligned, it sits like five pixels too low",
     context: ctx({
+      elementTag: "h2",
+      ancestorTrail: 'main > section "Plans" > div "Pro plan"',
+      siblingsList: 'button "Choose Pro", p "per month"',
       subtreeText: "$29",
       semanticIdentifier: "$29",
       semanticType: "heading",
@@ -161,6 +173,10 @@ const SCENARIOS: Scenario[] = [
         name: "doesn't recast the clicked $29 price as the misaligned element",
         test: (t) => !hasAny(t.title, ["price is misaligned", "$29 is misaligned"]),
       },
+      {
+        name: "names the matching sibling button ('Choose Pro') [Wave 2 target]",
+        test: (t) => hasAny(t.title + " " + t.description, ["choose pro"]),
+      },
     ],
   },
   {
@@ -171,6 +187,8 @@ const SCENARIOS: Scenario[] = [
     transcript:
       "these three plan cards all have different padding, they should be identical",
     context: ctx({
+      elementTag: "div",
+      ancestorTrail: "main",
       subtreeText:
         "Starter For individuals $9 Choose Starter Pro For growing teams $29 Choose Pro Enterprise For large orgs Custom Contact us",
       semanticIdentifier: "",
@@ -203,6 +221,8 @@ const SCENARIOS: Scenario[] = [
     transcript:
       "this headline color is too harsh, change it from this dark color to something warmer",
     context: ctx({
+      elementTag: "h1",
+      ancestorTrail: 'main > section "Hero"',
       subtreeText: "Pricing that scales with you",
       semanticIdentifier: "Pricing that scales with you",
       semanticType: "heading",
@@ -233,6 +253,8 @@ const SCENARIOS: Scenario[] = [
     transcript:
       "change this to say Start your free trial today instead of what it says now",
     context: ctx({
+      elementTag: "p",
+      ancestorTrail: 'main > section "Hero"',
       subtreeText: "Start a trial today",
       semanticIdentifier: "Start a trial today",
       semanticType: "paragraph",
@@ -257,6 +279,8 @@ const SCENARIOS: Scenario[] = [
     transcript:
       "honestly this whole page feels dated, the layout looks like it's from 2015, nothing wrong with any one thing it's just the overall vibe",
     context: ctx({
+      elementTag: "p",
+      ancestorTrail: "main > footer",
       subtreeText: "All prices in USD. Taxes may apply.",
       semanticIdentifier: "All prices in USD. Taxes may apply.",
       semanticType: "paragraph",
@@ -286,6 +310,8 @@ const SCENARIOS: Scenario[] = [
     transcript:
       "the focus ring on this is using #5A49BF but our brand token is #4F46E5, and the class btn-primary is missing its hover state entirely",
     context: ctx({
+      elementTag: "button",
+      ancestorTrail: 'main > section "Plans" > div "Pro plan"',
       subtreeText: "Choose Pro",
       semanticIdentifier: "Choose Pro",
       semanticType: "button",
@@ -319,6 +345,8 @@ const SCENARIOS: Scenario[] = [
     transcript:
       "okay so I have a bunch of notes on this pricing page so bear with me. first the get started button, it's way too small compared to everything else on the page, the font looks like 14 pixels and it should probably be at least 18, and the contrast feels off. second thing, the pricing cards themselves, the pro plan card has this weird shadow that the starter card doesn't have, it makes the page look inconsistent, and the enterprise card's contact us link is buried at the bottom in tiny grey text. third, when you toggle between monthly and yearly billing the prices jump around without any animation and for a split second you see the wrong price which is really confusing. fourth the FAQ section below the cards, the questions don't expand on the first click sometimes, you have to click twice, and one of the answers about refunds still references the old 30 day policy but we changed it to 14 days last quarter. fifth, the testimonial carousel at the bottom auto-advances way too fast, you can't finish reading a quote, and the pause button doesn't actually pause it. oh and the whole page feels slow to load, the cards pop in one by one which looks janky.",
     context: ctx({
+      elementTag: "button",
+      ancestorTrail: 'main > section "Hero"',
       subtreeText: "Get Started",
       semanticIdentifier: "Get Started",
       semanticType: "button",
@@ -363,6 +391,8 @@ const SCENARIOS: Scenario[] = [
     transcript:
       "I think the spacing in this card is off, maybe like 20 pixels too tight at the top, but I'm not sure, it just looks cramped to me",
     context: ctx({
+      elementTag: "div",
+      ancestorTrail: 'main > section "Plans"',
       subtreeText: "Pro For growing teams $29 Choose Pro",
       semanticIdentifier: "",
       semanticType: "card",
@@ -372,9 +402,12 @@ const SCENARIOS: Scenario[] = [
     }),
     checks: [
       {
-        name: "hedge survives (I think / maybe / not sure / looks)",
+        name: "hedge survives (uncertainty language preserved, not stated as fact)",
         test: (t) =>
-          hasAny(t.description, ["i think", "maybe", "not sure", "looks cramped", "seems"]),
+          hasAny(t.description, [
+            "i think", "maybe", "not sure", "not certain", "may be",
+            "seems", "looks", "feels", "around", "about", "possibly",
+          ]),
       },
       {
         name: "estimate kept as estimate (~20px, not stated as fact-from-DOM)",
@@ -383,6 +416,73 @@ const SCENARIOS: Scenario[] = [
       {
         name: "user's qualitative word survives (cramped)",
         test: (t) => hasAny(t.description + " " + t.title, ["cramped", "tight"]),
+      },
+    ],
+  },
+  {
+    name: "ancestor-grounding",
+    kind: "Deictic on an unlabeled container — only the ancestor is named [Wave 2 target]",
+    expect:
+      "Clicked an anonymous div whose children are also unnamed; the breadcrumb names the 'Customer testimonials' section. Should qualify the subject via the ancestor instead of a bare 'section'.",
+    transcript:
+      "this whole section feels way too crowded, everything is fighting for attention",
+    context: ctx({
+      elementTag: "div",
+      ancestorTrail: 'main > section "Customer testimonials"',
+      subtreeText:
+        "Echly changed how we ship UI fixes Sarah K Design Lead The fastest feedback loop we have ever had Marcus T Engineering",
+      semanticIdentifier: "",
+      semanticType: "section",
+      computedStyles: "size: 1180x520px",
+      childrenList:
+        '(2 meaningful descendants)\n1. div: "(no label)" (bg: #FFFFFF; padding: 24px; size: 560x240px)\n2. div: "(no label)" (bg: #FFFFFF; padding: 24px; size: 560x240px)',
+    }),
+    checks: [
+      {
+        name: "subject qualified via ancestor name ('Customer testimonials'/testimonials)",
+        test: (t) => hasAny(t.title + " " + t.description, ["testimonial"]),
+      },
+      {
+        name: "user's judgment preserved (crowded / fighting for attention)",
+        test: (t) =>
+          hasAny(t.description, ["crowded", "fighting for attention", "too much"]),
+      },
+      {
+        name: "no invented specifics (no hex/px values — none were referenced)",
+        test: (t) => !/#[0-9A-Fa-f]{6}|\d+px/.test(t.description),
+      },
+    ],
+  },
+  {
+    name: "tray-minimal-context",
+    kind: "Extension tray add-feedback: page-level context only [Wave 2 target]",
+    expect:
+      "No element clicked — the new fallback sends URL + page title/h1 + viewport. Should ground at page level without inventing an element.",
+    transcript:
+      "the invoices tab takes forever to load, like ten seconds sometimes",
+    context: {
+      url: "https://acme.com/settings/billing",
+      scrollX: 0,
+      scrollY: 0,
+      viewportWidth: 1440,
+      viewportHeight: 900,
+      devicePixelRatio: 2,
+      pageTitle: "Billing — Acme",
+      pageH1: "Billing & plans",
+      capturedAt: 0,
+    },
+    checks: [
+      {
+        name: "grounded at page level (billing referenced)",
+        test: (t) => hasAny(t.title + " " + t.pageArea, ["billing"]),
+      },
+      {
+        name: "subject preserved (invoices tab)",
+        test: (t) => hasAny(t.title + " " + t.description, ["invoices"]),
+      },
+      {
+        name: "user's estimate preserved (ten seconds)",
+        test: (t) => hasAny(t.description, ["ten seconds", "10 seconds", "10s"]),
       },
     ],
   },

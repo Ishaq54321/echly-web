@@ -3,6 +3,7 @@
  * Enables AI-level scene detail: "On /pricing at 1440px, CTA under card #2 has alignment issue."
  */
 import { ECHLY_DEBUG } from "@/lib/utils/logger";
+import { maskSensitiveText } from "@/lib/sensitiveText";
 
 export type SemanticType =
   | "button"
@@ -24,6 +25,16 @@ export type CaptureContext = {
   devicePixelRatio: number;
   screenWidth?: number;
   screenHeight?: number;
+  /** document.title — page-level grounding for feedback that isn't about the clicked element. */
+  pageTitle?: string | null;
+  /** First visible h1 text — page-level grounding alongside pageTitle. */
+  pageH1?: string | null;
+  /** Tag name of the clicked element (lowercase), e.g. "button", "div". */
+  elementTag?: string | null;
+  /** Ancestor breadcrumb, outermost first: 2-3 informative levels (tag + identifier), e.g. 'main > section "Plans" > div'. */
+  ancestorTrail?: string | null;
+  /** Up to 2 named siblings of the clicked element, e.g. 'h3 "Pro", button "Choose Pro"'. */
+  siblingsList?: string | null;
   /** Visible text from the DOM subtree of the selected element (Ring 1 — clicked element + descendants). */
   subtreeText: string | null;
   /** Best human-readable name for the clicked element (aria-label, alt, title, placeholder, or innerText). */
@@ -1359,6 +1370,108 @@ export function getSubtreeText(el: Element | null): string | null {
   return extractSubtreeText(el);
 }
 
+/* ===== Neighborhood capture (tag, ancestors, siblings, page header) =====
+ * The Ring-1 leaf capture is deep but blind sideways and upward. These small
+ * strings (~80-300 chars total) give the AI the element's tag, where it sits,
+ * and what sits next to it — without ids/classes (selector noise the model
+ * would parrot) and without Ring-2 subtree dumps.
+ */
+
+const MAX_ANCESTOR_ENTRIES = 3;
+const MAX_ANCESTOR_WALK = 10;
+const ANCESTOR_NAME_CHARS = 30;
+const MAX_ANCESTOR_TRAIL_CHARS = 160;
+const MAX_NAMED_SIBLINGS = 2;
+const MAX_SIBLINGS_CHARS = 100;
+const MAX_PAGE_HEADER_CHARS = 80;
+
+/** Landmark-ish tags that are informative in a breadcrumb even without a name. */
+const SEMANTIC_ANCESTOR_TAGS = new Set([
+  "main", "nav", "header", "footer", "aside", "article", "section",
+  "form", "dialog", "table", "ul", "ol", "fieldset",
+]);
+
+/**
+ * Builds an ancestor breadcrumb for the clicked element: up to 3 informative
+ * levels (named via getSemanticIdentifier, or a semantic landmark tag),
+ * rendered outermost-first, e.g. 'main > section "Pricing plans" > div'.
+ * Skips anonymous wrapper divs so the trail carries names, not noise.
+ */
+export function buildAncestorTrail(el: Element | null): string {
+  if (!el) return "";
+  const entries: string[] = [];
+  let current: Element | null = el.parentElement;
+  let walked = 0;
+  while (current && walked < MAX_ANCESTOR_WALK && entries.length < MAX_ANCESTOR_ENTRIES) {
+    const tag = current.tagName.toLowerCase();
+    if (tag === "body" || tag === "html") break;
+    if (!isAnnoteElement(current)) {
+      // aria-label/alt/title only — innerText of an ancestor is the clicked
+      // element's own text bubbling up, which would mislabel the container.
+      const label =
+        current.getAttribute("aria-label")?.trim() ||
+        current.getAttribute("title")?.trim() ||
+        "";
+      const named = label.length > 0;
+      if (named || SEMANTIC_ANCESTOR_TAGS.has(tag)) {
+        entries.push(named ? `${tag} "${label.slice(0, ANCESTOR_NAME_CHARS)}"` : tag);
+      }
+    }
+    current = current.parentElement;
+    walked++;
+  }
+  if (entries.length === 0) return "";
+  return entries.reverse().join(" > ").slice(0, MAX_ANCESTOR_TRAIL_CHARS);
+}
+
+/**
+ * Lists up to 2 NAMED siblings of the clicked element (tag + identifier),
+ * e.g. 'h3 "Pro", button "Choose Pro"'. Gives the AI something to match when
+ * the recorder names a neighbor rather than the element they clicked.
+ */
+export function extractNamedSiblings(el: Element | null): string {
+  if (!el) return "";
+  const parent = el.parentElement;
+  if (!parent) return "";
+  const entries: string[] = [];
+  for (const sibling of Array.from(parent.children)) {
+    if (sibling === el) continue;
+    if (isAnnoteElement(sibling)) continue;
+    if (!isMeaningfulChild(sibling)) continue;
+    const name = getSemanticIdentifier(sibling);
+    if (!name) continue;
+    entries.push(`${sibling.tagName.toLowerCase()} "${name.slice(0, ANCESTOR_NAME_CHARS)}"`);
+    if (entries.length >= MAX_NAMED_SIBLINGS) break;
+  }
+  return entries.join(", ").slice(0, MAX_SIBLINGS_CHARS);
+}
+
+/** document.title, trimmed and capped. */
+export function extractPageTitle(win: Window): string {
+  try {
+    const title = win.document?.title?.trim() ?? "";
+    return title.slice(0, MAX_PAGE_HEADER_CHARS);
+  } catch {
+    return "";
+  }
+}
+
+/** First visible h1's text, trimmed and capped. */
+export function extractPageH1(win: Window): string {
+  try {
+    const h1s = win.document?.querySelectorAll?.("h1");
+    if (!h1s) return "";
+    for (const h1 of Array.from(h1s)) {
+      if (isAnnoteElement(h1) || isHidden(h1)) continue;
+      const text = (h1 as HTMLElement).innerText?.trim();
+      if (text) return text.slice(0, MAX_PAGE_HEADER_CHARS);
+    }
+    return "";
+  } catch {
+    return "";
+  }
+}
+
 function echlyDebug(label: string, value: string | number): void {
   try {
     if (ECHLY_DEBUG && typeof console !== "undefined" && console.log) {
@@ -1390,6 +1503,11 @@ export function buildCaptureContext(
   }
 
   let subtreeText: string | null = element ? extractSubtreeText(element) : null;
+  const elementTag: string | null = element ? element.tagName.toLowerCase() : null;
+  const ancestorTrail: string = element ? buildAncestorTrail(element) : "";
+  const siblingsList: string = element ? extractNamedSiblings(element) : "";
+  const pageTitle: string = extractPageTitle(win);
+  const pageH1: string = extractPageH1(win);
   const semanticIdentifier: string = element ? getSemanticIdentifier(element) : "";
   const computedStyles: string = element ? extractComputedStyles(win, element) : "";
   const childrenList: string = element ? extractMeaningfulChildren(element) : "";
@@ -1408,6 +1526,9 @@ export function buildCaptureContext(
     }
   }
 
+  // Mask sensitive patterns (emails, cards, phones, tokens) in every
+  // DOM-derived text field before it leaves the page. Narrow by design —
+  // ordinary copy passes through verbatim so copy-edit grounding survives.
   const ctx: CaptureContext = {
     url: win.location.href.split("#")[0],
     scrollX: win.scrollX,
@@ -1417,15 +1538,20 @@ export function buildCaptureContext(
     devicePixelRatio: win.devicePixelRatio ?? 1,
     screenWidth: typeof win.screen?.width === "number" ? win.screen.width : undefined,
     screenHeight: typeof win.screen?.height === "number" ? win.screen.height : undefined,
-    subtreeText: subtreeText ?? null,
-    semanticIdentifier: semanticIdentifier || null,
+    pageTitle: maskSensitiveText(pageTitle) || null,
+    pageH1: maskSensitiveText(pageH1) || null,
+    elementTag,
+    ancestorTrail: maskSensitiveText(ancestorTrail) || null,
+    siblingsList: maskSensitiveText(siblingsList) || null,
+    subtreeText: maskSensitiveText(subtreeText) ?? null,
+    semanticIdentifier: maskSensitiveText(semanticIdentifier) || null,
     computedStyles: computedStyles || null,
-    childrenList: childrenList || null,
+    childrenList: maskSensitiveText(childrenList) || null,
     elementState: elementState || null,
     semanticType,
     disabledState: disabledState || null,
-    modalContext: modalContext || null,
-    inputValue: inputValue || null,
+    modalContext: maskSensitiveText(modalContext) || null,
+    inputValue: maskSensitiveText(inputValue) || null,
     capturedAt: Date.now(),
   };
 

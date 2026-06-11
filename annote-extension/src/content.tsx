@@ -723,6 +723,37 @@ function ContentApp({ widgetRoot }: ContentAppProps) {
       delete (enrichedContext as Record<string, unknown>).networkSnapshot;
       delete (enrichedContext as Record<string, unknown>).actionsSnapshot;
 
+      // Element identity block: compact identity of the element the recorder
+      // selected, persisted on the ticket. Only attached when the capture saw a
+      // real element — at least one of tag/semanticIdentifier must be non-empty.
+      const elementTag =
+        typeof enrichedContext.elementTag === "string" && enrichedContext.elementTag.trim().length > 0
+          ? enrichedContext.elementTag
+          : undefined;
+      const elementSemanticIdentifier =
+        typeof enrichedContext.semanticIdentifier === "string" &&
+        enrichedContext.semanticIdentifier.trim().length > 0
+          ? enrichedContext.semanticIdentifier
+          : undefined;
+      const elementBlock =
+        elementTag || elementSemanticIdentifier
+          ? {
+              ...(elementTag ? { tag: elementTag } : {}),
+              ...(elementSemanticIdentifier
+                ? { semanticIdentifier: elementSemanticIdentifier }
+                : {}),
+              ...(typeof enrichedContext.semanticType === "string" && enrichedContext.semanticType
+                ? { semanticType: enrichedContext.semanticType }
+                : {}),
+              ...(typeof enrichedContext.computedStyles === "string" && enrichedContext.computedStyles
+                ? { computedStyles: enrichedContext.computedStyles }
+                : {}),
+              ...(typeof enrichedContext.modalContext === "string" && enrichedContext.modalContext
+                ? { modalContext: enrichedContext.modalContext }
+                : {}),
+            }
+          : null;
+
       type StructureTicket = {
         title?: string;
         tags?: string[];
@@ -869,6 +900,7 @@ function ContentApp({ widgetRoot }: ContentAppProps) {
                         }
                       : {}),
                     ...(actionsSnapshot ? { userActions: actionsSnapshot.actions } : {}),
+                    ...(elementBlock ? { element: elementBlock } : {}),
                   },
                   screenshotId: finalScreenshotId,
                 },

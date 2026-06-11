@@ -11,6 +11,16 @@ export interface PipelineContext {
   scrollX?: number;
   scrollY?: number;
   devicePixelRatio?: number;
+  /** document.title — page-level grounding. */
+  pageTitle?: string | null;
+  /** First visible h1 text — page-level grounding. */
+  pageH1?: string | null;
+  /** Tag name of the clicked element (lowercase). */
+  elementTag?: string | null;
+  /** Ancestor breadcrumb, outermost first: 2-3 informative levels (tag + identifier). */
+  ancestorTrail?: string | null;
+  /** Up to 2 named siblings of the clicked element. */
+  siblingsList?: string | null;
   /** Client-sent text for the DOM subtree of the selected element (spatial scope). */
   subtreeText?: string | null;
   /** Semantic type of the clicked element (button, link, input, heading, paragraph, image, icon, card, section). */

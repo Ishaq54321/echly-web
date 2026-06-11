@@ -975,13 +975,20 @@ export function useCaptureWidget({
               setErrorMessage("AI processing failed.");
               setState("voice_listening");
             },
-          }, active.context ?? undefined);
+          }, active.context ?? buildCaptureContext(window, null));
           return;
         }
         setState("processing");
         logger.debug("ai", "processing_started", { source: "voice" });
         try {
-          const structured = await onComplete(transcript, active.screenshot);
+          // No element was clicked on this path — still give the interpreter
+          // page-level grounding (URL, title, h1, viewport).
+          const structured = await onComplete(
+            transcript,
+            active.screenshot,
+            undefined,
+            active.context ?? buildCaptureContext(window, null)
+          );
           if (!structured) {
             logger.error("ai", "processing_failed");
             setState("idle");

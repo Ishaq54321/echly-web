@@ -2410,6 +2410,16 @@ async function createFeedbackInternal({
     // Phase A4: user-actions capture fields. Same passthrough contract.
     userActions?: unknown[];
     userActionCount?: number;
+    // Element identity block (compact identity of the element the recorder
+    // selected). Same passthrough contract — server validates; background
+    // only forwards.
+    element?: {
+      tag?: string;
+      semanticIdentifier?: string;
+      semanticType?: string;
+      computedStyles?: string;
+      modalContext?: string;
+    };
   };
   screenshotId: string;
 }): Promise<Response> {
@@ -3438,6 +3448,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           // Phase A4: user-actions capture fields. Forwarded as-is to the API.
           userActions?: unknown[];
           userActionCount?: number;
+          // Element identity block. Forwarded as-is to the API.
+          element?: {
+            tag?: string;
+            semanticIdentifier?: string;
+            semanticType?: string;
+            computedStyles?: string;
+            modalContext?: string;
+          };
         };
         screenshotId?: string;
       };

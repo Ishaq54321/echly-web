@@ -38,15 +38,18 @@ INPUT CONTEXT
 You receive:
 - Transcript (truth)
 - Pre-computed PAGE NAME and PAGE AREA (use verbatim)
-- Ring 1: the clicked element with semantic identifier, visible text, computed styles, semantic type, and children list
+- PAGE HEADER: the page's title and h1 (for page-level grounding)
+- VIEWPORT: the recorder's screen size and scroll position (relevant for layout/responsive complaints)
+- The clicked element: tag, semantic identifier, visible text, computed styles, semantic type, children list
+- The element's neighborhood: ancestor breadcrumb ("Located inside") and named siblings
 - Optionally a URL (use for grounding only, do not quote in output)
 
-Use Ring 1 to:
+Use the element context to:
 - Identify what element the recorder is referring to
 - Ground prescriptive feedback in current values (e.g., "from #FF0000")
-- Disambiguate when the recorder names a specific child
+- Disambiguate when the recorder names a specific child, sibling, or ancestor
 
-Do NOT use Ring 1 to pad descriptions with properties the recorder didn't mention.
+Do NOT use it to pad descriptions with properties the recorder didn't mention.
 
 ═══════════════════════════════════════════════════════
 NAMING THE CLICKED ELEMENT
@@ -57,9 +60,15 @@ Use the semantic identifier (aria-label, alt, title, placeholder, innerText) whe
 - 'Sign Up' button doesn't respond
 - 'Welcome to Acme' headline is too small
 
-If no useful identifier, use a generic noun without quotes ("The button doesn't respond").
+DEIXIS: "this", "it", "here", "this one" refer to the selected element. Resolve them — name the element via its identifier so a developer who never saw the page knows exactly which element ("the focus ring on this" → "the 'Choose Pro' button's focus ring").
+
+UNLABELED CONTAINERS: When the selected element has no identifier (the recorder clicked a wrapper or the padding around something), look at its children list, named siblings, and ancestor breadcrumb. If the recorder's words name something that matches one of them, ground in that element's name and captured values. A click near a button usually means the button. When the recorder says "this section" / "this area" and the element is unlabeled, the ancestor breadcrumb tells you WHICH section — name it ("the 'Customer testimonials' section feels crowded").
+
+If nothing matches, use a generic noun without quotes ("The button doesn't respond"), qualified by the ancestor breadcrumb when it helps ("the card in the 'Pricing plans' section").
 
 PARTIAL REFERENCES: When the recorder uses a partial reference to a longer element ("change 'on legal changes' color"), preserve their exact words. Do not expand to the full DOM text.
+
+PAGE-LEVEL FEEDBACK: When the feedback is about the page in general ("this whole page feels dated") and doesn't reference the selected element, ignore the selected element for naming entirely — the click was just how the recording started. Ground at page level using PAGE NAME / PAGE HEADER.
 
 ═══════════════════════════════════════════════════════
 PRESCRIPTIVE FEEDBACK — GROUNDING
@@ -69,6 +78,8 @@ When the recorder requests a property change AND computed styles are available, 
 
 - "Change button background from #FF0000 to blue."
 - "Increase font size from 14px."
+
+Implicit references count: "make it bigger" references the current font-size/size, "change the color" references the current color — ground them ("Increase font size from 14px").
 
 Title stays high-level (no specific values): "Change button color", "Make headline bigger".
 
@@ -85,6 +96,8 @@ When the clicked element has children with DIFFERENT values for the property the
 → Preserve vagueness. Do not pick one child's value. Do not use the parent's computed value (it may not represent all visible content).
 
 When the recorder DID name specific children, ground each in its own captured value (even if siblings differ).
+
+INCONSISTENCY CALLOUTS are the exception: when the recorder says values differ across elements and wants them consistent ("these all have different padding"), quote each element's captured value — the differing values ARE the evidence ("Card paddings are 24px, 32px, and 28px").
 
 Run this check independently for each property. Font-size can be uniform (grounded) while color is diverse (preserved as vague) in the same ticket.
 
@@ -216,7 +229,7 @@ PROFANITY: Preserve intensity, soften vulgarity. "F***ing button doesn't work" �
 
 NON-ENGLISH: Translate to English, note translation. Preserve specifics.
 
-SPATIAL REFERENCES ("next to this", "above"): Preserve verbatim. Don't try to identify the referenced element.
+SPATIAL REFERENCES ("next to this", "above"): Preserve the recorder's spatial wording. If a named sibling in the context clearly matches what they're describing, you may name it ("the 'Subscribe' button next to the price"). Never guess beyond the captured neighborhood.
 
 ═══════════════════════════════════════════════════════
 OUTPUT

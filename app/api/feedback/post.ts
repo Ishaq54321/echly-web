@@ -9,6 +9,7 @@ import type {
   ConsoleLogEntry,
   ExceptionEntry,
   Feedback,
+  FeedbackElement,
   NetworkRequestEntry,
   UserAction,
   ElementDescriptor,
@@ -86,6 +87,9 @@ export async function POST(req: NextRequest) {
     // Phase A4: user-actions capture from the extension's MAIN-world wrapper.
     userActions?: unknown;
     userActionCount?: unknown;
+    // Element identity block: compact identity of the element the recorder
+    // selected at ticket-creation time.
+    element?: unknown;
   } = {};
 
   try {
@@ -683,6 +687,60 @@ export async function POST(req: NextRequest) {
 
   const validatedUserActions = validateUserActionArray(body.userActions);
 
+  // ─── Element identity validation ────────────────────────────────────
+  // Same defense-in-depth posture as console/network/actions: cap every
+  // string, whitelist semanticType, and drop the whole block when neither
+  // tag nor semanticIdentifier survives — a block that can't name the
+  // element carries no grounding signal. Drop the offending sub-field on
+  // failure but accept the rest (never reject the ticket over this).
+  const MAX_ELEMENT_TAG_CHARS = 24;
+  const MAX_ELEMENT_IDENTIFIER_CHARS = 120;
+  const MAX_ELEMENT_STYLES_CHARS = 400;
+  const MAX_ELEMENT_MODAL_CHARS = 120;
+  const ALLOWED_SEMANTIC_TYPES = new Set([
+    "button",
+    "link",
+    "input",
+    "heading",
+    "paragraph",
+    "image",
+    "icon",
+    "card",
+    "section",
+  ]);
+
+  function validateElement(entry: unknown): FeedbackElement | undefined {
+    if (!isPlainObject(entry)) return undefined;
+    const out: FeedbackElement = {};
+    if (typeof entry.tag === "string" && entry.tag.trim().length > 0) {
+      out.tag = entry.tag.trim().toLowerCase().slice(0, MAX_ELEMENT_TAG_CHARS);
+    }
+    if (
+      typeof entry.semanticIdentifier === "string" &&
+      entry.semanticIdentifier.trim().length > 0
+    ) {
+      out.semanticIdentifier = entry.semanticIdentifier
+        .trim()
+        .slice(0, MAX_ELEMENT_IDENTIFIER_CHARS);
+    }
+    if (
+      typeof entry.semanticType === "string" &&
+      ALLOWED_SEMANTIC_TYPES.has(entry.semanticType)
+    ) {
+      out.semanticType = entry.semanticType;
+    }
+    if (typeof entry.computedStyles === "string" && entry.computedStyles.trim().length > 0) {
+      out.computedStyles = entry.computedStyles.trim().slice(0, MAX_ELEMENT_STYLES_CHARS);
+    }
+    if (typeof entry.modalContext === "string" && entry.modalContext.trim().length > 0) {
+      out.modalContext = entry.modalContext.trim().slice(0, MAX_ELEMENT_MODAL_CHARS);
+    }
+    if (out.tag === undefined && out.semanticIdentifier === undefined) return undefined;
+    return out;
+  }
+
+  const validatedElement = validateElement(body.element);
+
   // Counters: accept only non-negative integers. Drop the offending field on
   // failure (per spec).
   function validateCount(field: string, raw: unknown): number | undefined {
@@ -759,6 +817,9 @@ export async function POST(req: NextRequest) {
     // contract as console/network — quiet pages produce clean docs.
     userActions: validatedUserActions,
     userActionCount: validatedUserActionCount,
+    // Element identity block (post-validation). Same undefined-skip contract —
+    // old extension clients that don't send it produce clean docs.
+    element: validatedElement,
   };
 
   try {

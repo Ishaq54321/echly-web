@@ -24,6 +24,16 @@ export interface DomContextForAI {
   pageName: string;
   siteName: string;
   pageArea: string;
+  /** document.title — page-level grounding. */
+  pageTitle?: string;
+  /** First visible h1 text — page-level grounding. */
+  pageH1?: string;
+  /** Tag name of the clicked element (lowercase), e.g. "button", "div". */
+  elementTag?: string;
+  /** Ancestor breadcrumb, outermost first, e.g. 'main > section "Plans" > div'. */
+  ancestorTrail?: string;
+  /** Up to 2 named siblings of the clicked element. */
+  siblingsList?: string;
   /** Best human-readable name for the clicked element (aria-label/alt/title/placeholder/innerText). */
   semanticIdentifier?: string;
   /** Computed styles (color, background, font-size, padding, size) for the clicked element. */
@@ -88,6 +98,11 @@ function buildDomContextFromPipelineContext(ctx: PipelineContext | null): DomCon
       pageName: "",
       siteName: "",
       pageArea: "",
+      pageTitle: "",
+      pageH1: "",
+      elementTag: "",
+      ancestorTrail: "",
+      siblingsList: "",
       semanticIdentifier: "",
       computedStyles: "",
       childrenList: "",
@@ -117,6 +132,11 @@ function buildDomContextFromPipelineContext(ctx: PipelineContext | null): DomCon
     pageName: pageInfo.pageName,
     siteName: pageInfo.siteName,
     pageArea: pageInfo.pageArea,
+    pageTitle: typeof ctx.pageTitle === "string" ? ctx.pageTitle : "",
+    pageH1: typeof ctx.pageH1 === "string" ? ctx.pageH1 : "",
+    elementTag: typeof ctx.elementTag === "string" ? ctx.elementTag : "",
+    ancestorTrail: typeof ctx.ancestorTrail === "string" ? ctx.ancestorTrail : "",
+    siblingsList: typeof ctx.siblingsList === "string" ? ctx.siblingsList : "",
     semanticIdentifier,
     computedStyles,
     childrenList,
@@ -139,6 +159,11 @@ function truncateDomContextToBudget(ctx: DomContextForAI): DomContextForAI {
     (ctx.pageName?.length ?? 0) +
     (ctx.siteName?.length ?? 0) +
     (ctx.pageArea?.length ?? 0) +
+    (ctx.pageTitle?.length ?? 0) +
+    (ctx.pageH1?.length ?? 0) +
+    (ctx.elementTag?.length ?? 0) +
+    (ctx.ancestorTrail?.length ?? 0) +
+    (ctx.siblingsList?.length ?? 0) +
     (ctx.semanticIdentifier?.length ?? 0) +
     (ctx.computedStyles?.length ?? 0) +
     (ctx.childrenList?.length ?? 0) +
@@ -159,6 +184,11 @@ function truncateDomContextToBudget(ctx: DomContextForAI): DomContextForAI {
     pageName: ctx.pageName,
     siteName: ctx.siteName,
     pageArea: ctx.pageArea,
+    pageTitle: ctx.pageTitle ?? "",
+    pageH1: ctx.pageH1 ?? "",
+    elementTag: ctx.elementTag ?? "",
+    ancestorTrail: ctx.ancestorTrail ?? "",
+    siblingsList: ctx.siblingsList ?? "",
     semanticIdentifier: ctx.semanticIdentifier ?? "",
     computedStyles: ctx.computedStyles ?? "",
     childrenList: ctx.childrenList ?? "",
@@ -190,6 +220,11 @@ function normalizeRawContext(raw: unknown): PipelineContext | null {
     scrollX: typeof o.scrollX === "number" ? o.scrollX : undefined,
     scrollY: typeof o.scrollY === "number" ? o.scrollY : undefined,
     devicePixelRatio: typeof o.devicePixelRatio === "number" ? o.devicePixelRatio : undefined,
+    pageTitle: typeof o.pageTitle === "string" ? o.pageTitle : null,
+    pageH1: typeof o.pageH1 === "string" ? o.pageH1 : null,
+    elementTag: typeof o.elementTag === "string" ? o.elementTag : null,
+    ancestorTrail: typeof o.ancestorTrail === "string" ? o.ancestorTrail : null,
+    siblingsList: typeof o.siblingsList === "string" ? o.siblingsList : null,
     subtreeText: o.subtreeText != null && typeof o.subtreeText === "string" ? o.subtreeText : null,
     semanticType:
       o.semanticType != null && typeof o.semanticType === "string"
@@ -233,13 +268,24 @@ export function buildUserMessage(
   parts.push(domContext.pageURL || "Unknown");
 
   parts.push("\nPAGE NAME (use this for [Page Name] bracket prefix in title):");
-  parts.push(domContext.pageName || "Unknown");
+  parts.push(
+    domContext.pageName ||
+      "(none — omit the bracket prefix from the title entirely)"
+  );
 
   parts.push("\nSITE NAME:");
   parts.push(domContext.siteName || "Unknown");
 
   parts.push("\nPAGE AREA (use this verbatim for the pageArea JSON field):");
-  parts.push(domContext.pageArea || "Unknown");
+  parts.push(domContext.pageArea || "(unknown — use empty string for pageArea)");
+
+  if (domContext.pageTitle || domContext.pageH1) {
+    parts.push("\nPAGE HEADER (for page-level grounding when feedback is about the page, not the selected element):");
+    const header: string[] = [];
+    if (domContext.pageTitle) header.push(`Title: "${domContext.pageTitle}"`);
+    if (domContext.pageH1) header.push(`H1: "${domContext.pageH1}"`);
+    parts.push(header.join(" | "));
+  }
 
   if (domContext.viewport) {
     parts.push("\nVIEWPORT:");
@@ -248,7 +294,11 @@ export function buildUserMessage(
 
   parts.push("\nREFERENCE CONTEXT — use it to identify what element or area the recorder is referring to, and to ground current values (colors, sizes, text) when the recorder references them. Never quote DOM text the recorder didn't reference, and never pad the description with properties they didn't mention:");
 
-  parts.push("Selected element:");
+  parts.push(
+    domContext.elementTag
+      ? `Selected element <${domContext.elementTag}>:`
+      : "Selected element:"
+  );
   parts.push(domContext.elementHTML || "None");
 
   parts.push("\nElement name (semantic identifier):");
@@ -259,6 +309,16 @@ export function buildUserMessage(
 
   parts.push("\nChildren of clicked element (for disambiguation when recorder mentions specific children):");
   parts.push(domContext.childrenList || "None (clicked element has no meaningful children)");
+
+  if (domContext.ancestorTrail) {
+    parts.push("\nLocated inside (ancestors, outermost first):");
+    parts.push(domContext.ancestorTrail);
+  }
+
+  if (domContext.siblingsList) {
+    parts.push("\nNamed siblings (next to the clicked element):");
+    parts.push(domContext.siblingsList);
+  }
 
   if (domContext.semanticType) {
     parts.push("\nSemantic type:");

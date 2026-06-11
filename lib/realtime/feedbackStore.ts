@@ -236,6 +236,10 @@ function mapFeedbackFromSnap(snap: QueryDocumentSnapshot<DocumentData>): Feedbac
       : undefined,
     userActionCount:
       typeof data.userActionCount === "number" ? data.userActionCount : undefined,
+    element:
+      data.element && typeof data.element === "object" && !Array.isArray(data.element)
+        ? (data.element as Feedback["element"])
+        : undefined,
     // AI Analysis: this is the path that auto-fills the open ticket's panel. The
     // analyze route writes ai* back to feedback/{id}; this onSnapshot tick maps
     // them onto the live Feedback object a beat after the ticket opens.

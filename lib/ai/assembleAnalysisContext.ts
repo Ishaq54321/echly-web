@@ -173,6 +173,7 @@ export type AnalyzableFeedback = Pick<
   | "exceptions"
   | "networkRequests"
   | "userActions"
+  | "element"
 >;
 
 /** Replace streaming/binary sentinels with a short note; truncate kept bodies. */
@@ -340,6 +341,20 @@ function buildMetaParts(feedback: AnalyzableFeedback): string[] {
   }
   if (feedback.userAgent)
     parts.push(`User agent: ${truncateForTokenBudget(feedback.userAgent, 200)}`);
+  // Element identity: one compact line naming the element the recorder selected,
+  // e.g. `Element: <button> "Choose Pro" (button) — color: #FFFFFF; background: #5A49BF`.
+  const el = feedback.element;
+  if (el && (el.tag || el.semanticIdentifier)) {
+    const pieces: string[] = [];
+    if (el.tag) pieces.push(`<${el.tag}>`);
+    if (el.semanticIdentifier)
+      pieces.push(`"${truncateForTokenBudget(el.semanticIdentifier, 120)}"`);
+    if (el.semanticType) pieces.push(`(${el.semanticType})`);
+    let line = `Element: ${pieces.join(" ")}`;
+    if (el.computedStyles) line += ` — ${truncateForTokenBudget(el.computedStyles, 200)}`;
+    if (el.modalContext) line += ` — inside ${truncateForTokenBudget(el.modalContext, 120)}`;
+    parts.push(line);
+  }
   return parts;
 }
 

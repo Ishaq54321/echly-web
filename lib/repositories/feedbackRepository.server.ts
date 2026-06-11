@@ -7,6 +7,7 @@ import type {
   ConsoleLogEntry,
   ExceptionEntry,
   Feedback,
+  FeedbackElement,
   NetworkRequestEntry,
   StructuredFeedback,
   UserAction,
@@ -69,6 +70,7 @@ const feedbackPayload = (
     networkErrorCount?: number;
     userActions?: UserAction[];
     userActionCount?: number;
+    element?: FeedbackElement;
   };
   const consoleFields: Record<string, unknown> = {};
   if (Array.isArray(consoleExtras.consoleLogs) && consoleExtras.consoleLogs.length > 0) {
@@ -114,6 +116,17 @@ const feedbackPayload = (
     actionsFields.userActionCount = consoleExtras.userActionCount;
   }
 
+  // Element identity block. Same undefined-skip contract — omit entirely when
+  // the client didn't send a block (old extensions / no element selected).
+  const elementFields: Record<string, unknown> = {};
+  if (
+    consoleExtras.element &&
+    typeof consoleExtras.element === "object" &&
+    !Array.isArray(consoleExtras.element)
+  ) {
+    elementFields.element = consoleExtras.element;
+  }
+
   return {
     userId,
     sessionId,
@@ -147,6 +160,7 @@ const feedbackPayload = (
     ...consoleFields,
     ...networkFields,
     ...actionsFields,
+    ...elementFields,
   };
 };
 
@@ -171,6 +185,7 @@ export function feedbackFromCreateInsert(args: {
     networkErrorCount?: number;
     userActions?: UserAction[];
     userActionCount?: number;
+    element?: FeedbackElement;
   };
   return {
     id: args.id,
@@ -236,6 +251,12 @@ export function feedbackFromCreateInsert(args: {
       : {}),
     ...(typeof consoleExtras.userActionCount === "number" && consoleExtras.userActionCount > 0
       ? { userActionCount: consoleExtras.userActionCount }
+      : {}),
+    // Element identity block. Same undefined-skip semantics.
+    ...(consoleExtras.element &&
+    typeof consoleExtras.element === "object" &&
+    !Array.isArray(consoleExtras.element)
+      ? { element: consoleExtras.element }
       : {}),
   };
 }
@@ -996,6 +1017,10 @@ function docToFeedback(docSnap: QueryDocumentSnapshot): Feedback {
       : {}),
     ...(typeof data.userActionCount === "number" && data.userActionCount > 0
       ? { userActionCount: data.userActionCount }
+      : {}),
+    // Element identity block: optional; only include if persisted as a plain object.
+    ...(data.element && typeof data.element === "object" && !Array.isArray(data.element)
+      ? { element: data.element as FeedbackElement }
       : {}),
     // AI Analysis: optional; only include if persisted (written lazily on first
     // ticket view by the analyze route, never at create). aiGeneratedAt is an
