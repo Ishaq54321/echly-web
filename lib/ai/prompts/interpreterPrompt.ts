@@ -230,7 +230,7 @@ Return raw JSON only.
 Schema:
 {
   "title": "[Page Name] Most actionable claim",
-  "description": "Clean restatement. Use \\n for newlines in JSON. Use - for bullets. No bold labels, no headings.",
+  "description": "Clean restatement. Use \\n for newlines in JSON. Use - for bullets and **Label** heading groups exactly as DESCRIPTION FORMAT specifies. No markdown headings (#).",
   "pageArea": "Site · Page",
   "tags": ["bug", "search-filter"]
 }

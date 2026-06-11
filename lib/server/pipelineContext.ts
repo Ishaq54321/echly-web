@@ -3,14 +3,6 @@
  * Used by structure-feedback API, extension, and dashboard.
  */
 
-export interface PipelineContextElement {
-  type: string;
-  label?: string | null;
-  text?: string | null;
-  /** e.g. "button", "input", "heading" */
-  role?: string | null;
-}
-
 export interface PipelineContext {
   url?: string;
   viewportWidth?: number;
@@ -19,12 +11,8 @@ export interface PipelineContext {
   scrollX?: number;
   scrollY?: number;
   devicePixelRatio?: number;
-  /** OCR text from screenshot when sent separately. */
-  screenshotOCRText?: string | null;
   /** Client-sent text for the DOM subtree of the selected element (spatial scope). */
   subtreeText?: string | null;
-  /** Weak selected element type hint for wording only. */
-  elementType?: string | null;
   /** Semantic type of the clicked element (button, link, input, heading, paragraph, image, icon, card, section). */
   semanticType?: "button" | "link" | "input" | "heading" | "paragraph" | "image" | "icon" | "card" | "section" | null;
   /** Best human-readable name for the clicked element (aria-label/alt/title/placeholder/innerText). */
@@ -41,14 +29,4 @@ export interface PipelineContext {
   modalContext?: string;
   /** Current value of the input element (with privacy filtering). */
   inputValue?: string;
-  /** Iframe context when element is inside an embedded frame. */
-  iframeContext?: string;
-  /** Structured DOM elements for disambiguation. */
-  elements?: PipelineContextElement[];
-  /** Legacy/compat: same as elements if needed */
-  visibleElements?: PipelineContextElement[];
-  interactiveElements?: PipelineContextElement[];
-  formFields?: PipelineContextElement[];
-  buttons?: PipelineContextElement[];
-  headings?: PipelineContextElement[];
 }

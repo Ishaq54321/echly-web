@@ -151,14 +151,6 @@ export async function POST(req: NextRequest): Promise<Response> {
     });
   }
 
-  console.log("\n═══ AI IMPROVE REQUEST ═══");
-  console.log("Action:", action);
-  console.log("Input text (" + text.length + " chars):");
-  console.log(text);
-  console.log("System prompt:");
-  console.log(buildSystemPrompt(action));
-  console.log("═══════════════════════\n");
-
   const result = streamText({
     model: openai("gpt-5.4-nano"),
     system: buildSystemPrompt(action),
@@ -185,10 +177,6 @@ export async function POST(req: NextRequest): Promise<Response> {
         }
 
         const fullText = await result.text;
-        console.log("\n═══ AI IMPROVE RESPONSE ═══");
-        console.log("Output (" + fullText.length + " chars):");
-        console.log(fullText);
-        console.log("═══════════════════════════\n");
         controller.enqueue(
           encoder.encode(
             `data: ${JSON.stringify({ type: "end", fullText })}\n\n`,

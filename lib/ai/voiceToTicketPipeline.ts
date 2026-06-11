@@ -1,5 +1,5 @@
 /**
- * Minimal voice → ticket pipeline: one transcript, one GPT-4o-mini call, one ticket.
+ * Minimal voice → ticket pipeline: one transcript, one interpreter model call, one ticket.
  * The AI refines what the recorder said into a clean ticket — no prescription, no invention.
  */
 
@@ -11,104 +11,14 @@ import { whitelistTags, ALL_TAG_KEYS } from "@/lib/constants/ticketTags";
 import { parsePageInfo } from "@/lib/utils/urlParsing";
 import { logger } from "@/lib/logger";
 
-/**
- * TEMPORARY DEBUG LOGGER — delete after testing.
- * Logs the exact DOM context and full user message sent to OpenAI
- * for every ticket. Helps debug AI behavior on real recordings.
- */
-function logDomContextToAI(
-  transcript: string,
-  domContext: DomContextForAI,
-  finalUserMessage: string
-): void {
-  const sep = "═".repeat(80);
-  const subSep = "─".repeat(80);
-
-  console.log("\n");
-  console.log(sep);
-  console.log("  AI INPUT DEBUG — exact data sent to the model");
-  console.log(sep);
-
-  console.log("\n📝 TRANSCRIPT:");
-  console.log(`   "${transcript.trim()}"`);
-  console.log(`   [${transcript.trim().length} chars]`);
-
-  console.log(`\n${subSep}`);
-  console.log("🌐 PAGE IDENTIFICATION (deterministic from URL parsing):");
-  console.log(subSep);
-  console.log(`   pageURL:  "${domContext.pageURL}"`);
-  console.log(`   pageName: "${domContext.pageName}"`);
-  console.log(`   siteName: "${domContext.siteName}"`);
-  console.log(`   pageArea: "${domContext.pageArea}"`);
-
-  console.log(`\n${subSep}`);
-  console.log("🎯 RING 1 — SELECTED ELEMENT");
-  console.log(subSep);
-
-  console.log("\n   ► Selected element text (subtree):");
-  const elText = domContext.elementHTML || "(empty)";
-  console.log(`     "${elText}"`);
-  console.log(`     [${elText.length} chars]`);
-
-  console.log("\n   ► Element name (semantic identifier):");
-  const semId = domContext.semanticIdentifier || "(empty)";
-  console.log(`     "${semId}"`);
-  console.log(`     [${semId.length} chars]`);
-
-  console.log("\n   ► Element computed styles:");
-  const styles = domContext.computedStyles || "(empty)";
-  console.log(`     "${styles}"`);
-  console.log(`     [${styles.length} chars]`);
-
-  console.log("\n   ► Semantic type:");
-  console.log(`     "${domContext.semanticType || "None"}"`);
-
-  console.log("\n   ► Children of clicked element:");
-  const children = domContext.childrenList || "(empty - clicked element has < 2 meaningful children)";
-  console.log(`     "${children}"`);
-  console.log(`     [${children.length} chars]`);
-
-  console.log(`\n${subSep}`);
-  console.log("💰 BUDGET USAGE:");
-  console.log(subSep);
-
-  const ring1Total = (domContext.elementHTML?.length || 0) +
-                     (domContext.semanticIdentifier?.length || 0) +
-                     (domContext.computedStyles?.length || 0) +
-                     (domContext.childrenList?.length || 0);
-
-  const overhead = (domContext.pageURL?.length || 0) +
-                   (domContext.pageName?.length || 0) +
-                   (domContext.siteName?.length || 0) +
-                   (domContext.pageArea?.length || 0);
-
-  console.log(`   Page identification:           ${overhead} chars`);
-  console.log(`   Ring 1 (selected element):     ${ring1Total} chars`);
-  console.log(`   ────────────────────────────────────────`);
-  console.log(`   Total:                         ${ring1Total + overhead} chars`);
-  console.log(`   Approximate tokens:            ~${Math.round((ring1Total + overhead) / 4)} tokens`);
-  console.log(`   Budget cap:                    ~1000 tokens (~4000 chars)`);
-
-  const utilization = ((ring1Total + overhead) / 4000) * 100;
-  console.log(`   Budget utilization:            ${utilization.toFixed(1)}%`);
-
-  console.log(`\n${subSep}`);
-  console.log("📤 FULL USER MESSAGE SENT TO OPENAI:");
-  console.log(subSep);
-  console.log(finalUserMessage);
-
-  console.log(`\n${sep}`);
-  console.log("  END OF AI INPUT DEBUG");
-  console.log(sep);
-  console.log("\n");
-}
+/** Interpreter model — shared with the verify harness so both always test the same thing. */
+export const INTERPRETER_MODEL = "gpt-5.4-nano";
 
 /* ===== DOM CONTEXT & TYPES ===== */
 
 /** DOM context sent to the AI. Limited to <1000 tokens total. */
 export interface DomContextForAI {
   elementHTML: string | null;
-  elementType: string | null;
   semanticType?: "button" | "link" | "input" | "heading" | "paragraph" | "image" | "icon" | "card" | "section" | null;
   pageURL: string;
   pageName: string;
@@ -128,8 +38,8 @@ export interface DomContextForAI {
   modalContext?: string;
   /** Current value of the input element (with privacy filtering). */
   inputValue?: string;
-  /** Iframe context when element is inside an embedded frame. */
-  iframeContext?: string;
+  /** Human-readable viewport line, e.g. "1280×720 @2x (scrolled 1400px down)". */
+  viewport?: string;
 }
 
 /** Max tokens for combined DOM context (element subtree + page identification). */
@@ -152,11 +62,27 @@ export interface VoiceTicket {
   tags: string[];
 }
 
+/** Format viewport/scroll/DPR into one human-readable line. Empty string when unknown. */
+function formatViewport(ctx: PipelineContext): string {
+  const w = ctx.viewportWidth;
+  const h = ctx.viewportHeight;
+  if (typeof w !== "number" || typeof h !== "number" || w <= 0 || h <= 0) return "";
+  let out = `${Math.round(w)}×${Math.round(h)}`;
+  const dpr = ctx.devicePixelRatio;
+  if (typeof dpr === "number" && dpr > 0 && dpr !== 1) {
+    out += ` @${Math.round(dpr * 100) / 100}x`;
+  }
+  const scrollY = ctx.scrollY;
+  if (typeof scrollY === "number" && Math.round(scrollY) > 0) {
+    out += ` (scrolled ${Math.round(scrollY)}px down)`;
+  }
+  return out;
+}
+
 function buildDomContextFromPipelineContext(ctx: PipelineContext | null): DomContextForAI {
   if (!ctx) {
     return {
       elementHTML: null,
-      elementType: null,
       semanticType: null,
       pageURL: "",
       pageName: "",
@@ -169,12 +95,11 @@ function buildDomContextFromPipelineContext(ctx: PipelineContext | null): DomCon
       disabledState: "",
       modalContext: "",
       inputValue: "",
-      iframeContext: "",
+      viewport: "",
     };
   }
   const rawUrl = (typeof ctx.url === "string" ? ctx.url : "").split("#")[0];
   const pageInfo = parsePageInfo(rawUrl);
-  const elementType = ctx.elementType ?? null;
   const semanticType = ctx.semanticType ?? null;
   const subtreeText = ctx.subtreeText ?? null;
   const elementHTML = subtreeText ?? null;
@@ -185,10 +110,8 @@ function buildDomContextFromPipelineContext(ctx: PipelineContext | null): DomCon
   const disabledState = typeof ctx.disabledState === "string" ? ctx.disabledState : "";
   const modalContext = typeof ctx.modalContext === "string" ? ctx.modalContext : "";
   const inputValue = typeof ctx.inputValue === "string" ? ctx.inputValue : "";
-  const iframeContext = typeof ctx.iframeContext === "string" ? ctx.iframeContext : "";
   return {
     elementHTML,
-    elementType,
     semanticType,
     pageURL: pageInfo.sanitizedUrl,
     pageName: pageInfo.pageName,
@@ -201,7 +124,7 @@ function buildDomContextFromPipelineContext(ctx: PipelineContext | null): DomCon
     disabledState,
     modalContext,
     inputValue,
-    iframeContext,
+    viewport: formatViewport(ctx),
   };
 }
 
@@ -223,7 +146,7 @@ function truncateDomContextToBudget(ctx: DomContextForAI): DomContextForAI {
     (ctx.disabledState?.length ?? 0) +
     (ctx.modalContext?.length ?? 0) +
     (ctx.inputValue?.length ?? 0) +
-    (ctx.iframeContext?.length ?? 0);
+    (ctx.viewport?.length ?? 0);
   const remaining = Math.max(0, maxChars - fixedChars);
 
   return {
@@ -231,7 +154,6 @@ function truncateDomContextToBudget(ctx: DomContextForAI): DomContextForAI {
       ctx.elementHTML && remaining > 0
         ? truncateForTokenBudget(ctx.elementHTML, remaining)
         : null,
-    elementType: ctx.elementType ?? null,
     semanticType: ctx.semanticType ?? null,
     pageURL: ctx.pageURL,
     pageName: ctx.pageName,
@@ -244,7 +166,7 @@ function truncateDomContextToBudget(ctx: DomContextForAI): DomContextForAI {
     disabledState: ctx.disabledState ?? "",
     modalContext: ctx.modalContext ?? "",
     inputValue: ctx.inputValue ?? "",
-    iframeContext: ctx.iframeContext ?? "",
+    viewport: ctx.viewport ?? "",
   };
 }
 
@@ -263,9 +185,12 @@ function normalizeRawContext(raw: unknown): PipelineContext | null {
   const o = raw as Record<string, unknown>;
   return {
     url: typeof o.url === "string" ? o.url : undefined,
-    screenshotOCRText: o.screenshotOCRText != null && typeof o.screenshotOCRText === "string" ? o.screenshotOCRText : null,
+    viewportWidth: typeof o.viewportWidth === "number" ? o.viewportWidth : undefined,
+    viewportHeight: typeof o.viewportHeight === "number" ? o.viewportHeight : undefined,
+    scrollX: typeof o.scrollX === "number" ? o.scrollX : undefined,
+    scrollY: typeof o.scrollY === "number" ? o.scrollY : undefined,
+    devicePixelRatio: typeof o.devicePixelRatio === "number" ? o.devicePixelRatio : undefined,
     subtreeText: o.subtreeText != null && typeof o.subtreeText === "string" ? o.subtreeText : null,
-    elementType: o.elementType != null && typeof o.elementType === "string" ? o.elementType : null,
     semanticType:
       o.semanticType != null && typeof o.semanticType === "string"
         ? (o.semanticType as PipelineContext["semanticType"])
@@ -286,7 +211,6 @@ function normalizeRawContext(raw: unknown): PipelineContext | null {
     disabledState: typeof o.disabledState === "string" ? o.disabledState : undefined,
     modalContext: typeof o.modalContext === "string" ? o.modalContext : undefined,
     inputValue: typeof o.inputValue === "string" ? o.inputValue : undefined,
-    iframeContext: typeof o.iframeContext === "string" ? o.iframeContext : undefined,
   };
 }
 
@@ -296,7 +220,7 @@ function dedupeLines(text: string | null): string | null {
   return [...new Set(lines)].join("\n");
 }
 
-function buildUserMessage(
+export function buildUserMessage(
   transcript: string,
   domContext: DomContextForAI,
 ): string {
@@ -317,7 +241,12 @@ function buildUserMessage(
   parts.push("\nPAGE AREA (use this verbatim for the pageArea JSON field):");
   parts.push(domContext.pageArea || "Unknown");
 
-  parts.push("\nREFERENCE CONTEXT (USE FOR NAMING AND IDENTIFICATION ONLY — never generate description content from DOM, only use it to identify what element or area the recorder is referring to):");
+  if (domContext.viewport) {
+    parts.push("\nVIEWPORT:");
+    parts.push(domContext.viewport);
+  }
+
+  parts.push("\nREFERENCE CONTEXT — use it to identify what element or area the recorder is referring to, and to ground current values (colors, sizes, text) when the recorder references them. Never quote DOM text the recorder didn't reference, and never pad the description with properties they didn't mention:");
 
   parts.push("Selected element:");
   parts.push(domContext.elementHTML || "None");
@@ -357,18 +286,13 @@ function buildUserMessage(
     parts.push(`"${domContext.inputValue}"`);
   }
 
-  if (domContext.iframeContext) {
-    parts.push("\nFrame context:");
-    parts.push(domContext.iframeContext);
-  }
-
   return parts.join("\n");
 }
 
 /* ===== EXTRACTION & PARSING ===== */
 
 /** JSON schema for strict extraction output. Enforced via response_format. */
-const FEEDBACK_JSON_SCHEMA = {
+export const FEEDBACK_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
   properties: {
@@ -441,9 +365,24 @@ function sanitizeDescription(description: string): string {
 /* ===== GPT CALLS ===== */
 
 /**
- * Single GPT-4o-mini call: transcript + domContext → structured JSON.
+ * Output-token ceiling for the interpreter call. With a strict JSON schema, a
+ * length-truncated response fails parsing and degrades the ticket to the raw
+ * transcript — long, detailed voice notes need real headroom here.
+ */
+const INTERPRETER_MAX_OUTPUT_TOKENS = 1200;
+
+/** Appended to the user message when retrying after an output-length truncation. */
+const RETRY_CONCISE_INSTRUCTION =
+  "IMPORTANT: Your previous attempt exceeded the output length limit and was cut off. " +
+  "Produce a more concise ticket — shorter description, fewer and tighter bullets — " +
+  "while still covering every distinct issue the recorder raised.";
+
+/**
+ * Single interpreter call: transcript + domContext → structured JSON.
  * Uses response_format json_schema so output is always valid JSON matching the schema.
- * On parse failure or missing description, returns fallback (transcript as description).
+ * If the model hits the output-token ceiling, retries once with a be-more-concise
+ * instruction. On parse failure or missing description, returns fallback
+ * (transcript as description) — logged so degradation is never silent.
  */
 export async function extractStructuredFeedback(
   client: OpenAI,
@@ -456,37 +395,62 @@ export async function extractStructuredFeedback(
   });
   const userMessage = buildUserMessage(transcript, domContext);
 
-  // TEMPORARY DEBUG — delete after testing
-  logDomContextToAI(transcript, domContext, userMessage);
-
-  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-    { role: "system", content: SYSTEM_PROMPT },
-    { role: "user", content: userMessage },
-  ];
-  const completion = await client.chat.completions.create({
-    model: "gpt-5.4-nano",
-    temperature: 0.0, // Deterministic output for reliable Ring 1 reliance
-    max_completion_tokens: 500,
-    response_format: {
-      type: "json_schema",
-      json_schema: {
-        name: "feedback_ticket",
-        schema: FEEDBACK_JSON_SCHEMA as Record<string, unknown>,
-        strict: true,
+  const callModel = (extraInstruction?: string) => {
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      { role: "system", content: SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: extraInstruction
+          ? `${userMessage}\n\n${extraInstruction}`
+          : userMessage,
       },
-    },
-    messages,
-  });
-  const raw = completion.choices[0]?.message?.content?.trim() ?? "";
+    ];
+    return client.chat.completions.create({
+      model: INTERPRETER_MODEL,
+      temperature: 0.0, // Deterministic output for reliable Ring 1 reliance
+      max_completion_tokens: INTERPRETER_MAX_OUTPUT_TOKENS,
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "feedback_ticket",
+          schema: FEEDBACK_JSON_SCHEMA as Record<string, unknown>,
+          strict: true,
+        },
+      },
+      messages,
+    });
+  };
+
+  let completion = await callModel();
+  let choice = completion.choices[0];
+  if (choice?.finish_reason === "length") {
+    logger.warn("ai", "interpreter_output_truncated", {
+      transcriptChars: transcript.length,
+      retrying: true,
+    });
+    completion = await callModel(RETRY_CONCISE_INSTRUCTION);
+    choice = completion.choices[0];
+    if (choice?.finish_reason === "length") {
+      logger.error("ai", "interpreter_output_truncated_after_retry", {
+        transcriptChars: transcript.length,
+      });
+    }
+  }
+
+  const raw = choice?.message?.content?.trim() ?? "";
   const json = parseStructuredResponse(raw);
-  logger.debug("ai", "processing_success", {
-    title: json?.title,
-    descriptionLength: json?.description?.length ?? 0,
-    tags: json?.tags
-  });
   if (!json || !json.description) {
+    logger.error("ai", "interpreter_fallback_raw_transcript", {
+      finishReason: choice?.finish_reason ?? "unknown",
+      rawChars: raw.length,
+      transcriptChars: transcript.length,
+    });
     return { json: fallbackStructuredFeedback(transcript), raw };
   }
+  logger.debug("ai", "processing_success", {
+    descriptionLength: json.description.length,
+    tags: json.tags,
+  });
   return { json, raw };
 }
 

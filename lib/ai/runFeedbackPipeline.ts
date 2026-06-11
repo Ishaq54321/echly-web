@@ -6,7 +6,7 @@
  *   User Voice Recording
  *   → Speech-to-text (client)
  *   → Context Builder (transcript + DOM context, <1000 tokens)
- *   → Single GPT-4o-mini call
+ *   → Single interpreter-model call (INTERPRETER_MODEL)
  *   → Structured JSON → ONE ticket
  *   → Return to UI
  *

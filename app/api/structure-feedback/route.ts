@@ -156,13 +156,6 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
 
   const result = pipelineSettled.value;
-  console.log("[PHASE3_FINAL]", {
-    fields: Object.keys(result.tickets?.[0] || {}),
-  });
-  console.log("[PHASE3_READY]", {
-    status: "clean",
-    readyForPhase4: true,
-  });
 
   return apiSuccess(
     {

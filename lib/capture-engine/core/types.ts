@@ -79,8 +79,6 @@ export type CaptureContext = {
   screenHeight?: number;
   /** Visible text from the DOM subtree of the selected element (Ring 1). */
   subtreeText?: string | null;
-  /** Weak reference hint for selected element kind; never a decision input. */
-  elementType?: string | null;
   /** Best human-readable name for the clicked element (aria-label, alt, title, placeholder, or innerText). */
   semanticIdentifier?: string | null;
   /** Computed styles (color, background, font-size, padding, size) for the clicked element. */
@@ -97,8 +95,6 @@ export type CaptureContext = {
   modalContext?: string | null;
   /** Current value of the input element (with privacy filtering). */
   inputValue?: string | null;
-  /** Iframe context when element is inside an embedded frame. */
-  iframeContext?: string | null;
   capturedAt: number;
   /** When set, OCR should run on this image (e.g. selection crop) instead of the UI screenshot. */
   ocrImageDataUrl?: string | null;

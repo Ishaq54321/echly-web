@@ -42,8 +42,6 @@ export type CaptureContext = {
   modalContext?: string | null;
   /** Current value of the input element (with privacy filtering). */
   inputValue?: string | null;
-  /** Iframe context when element is inside an embedded frame. */
-  iframeContext?: string | null;
   capturedAt: number;
   /** When set, OCR should run on this image (e.g. selection crop) instead of the UI screenshot. */
   ocrImageDataUrl?: string | null;
@@ -809,29 +807,6 @@ function extractInputValue(el: Element | null): string {
 }
 
 /**
- * Detects if the clicked element is inside an iframe.
- * Returns context info for same-origin frames; flags cross-origin frames
- * so the AI knows context is limited.
- */
-function detectIframeContext(win: Window | null): string {
-  if (!win) return "";
-
-  const isInFrame = win.self !== win.top;
-  if (!isInFrame) return "";
-
-  try {
-    const parentUrl = win.parent.location.href;
-    if (parentUrl) {
-      return `Embedded frame within: ${new URL(parentUrl).hostname}`;
-    }
-  } catch {
-    return "Cross-origin embedded frame (limited context)";
-  }
-
-  return "";
-}
-
-/**
  * Checks if an element is a button-like interactive element whose own styles
  * (background, color, padding) represent its visible identity regardless of
  * inner structure.
@@ -1423,7 +1398,6 @@ export function buildCaptureContext(
   const disabledState: string = element ? extractDisabledState(element) : "";
   const modalContext: string = element ? detectModalContext(element) : "";
   const inputValue: string = element ? extractInputValue(element) : "";
-  const iframeContext: string = detectIframeContext(win);
 
   if (element && !isAnnoteElement(element) && element !== win.document?.body) {
     if (!subtreeText?.trim()) {
@@ -1452,7 +1426,6 @@ export function buildCaptureContext(
     disabledState: disabledState || null,
     modalContext: modalContext || null,
     inputValue: inputValue || null,
-    iframeContext: iframeContext || null,
     capturedAt: Date.now(),
   };
 
