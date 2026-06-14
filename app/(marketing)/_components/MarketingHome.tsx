@@ -5,6 +5,7 @@ import { MarketingFooter } from "./MarketingFooter";
 import { Hero } from "./sections/Hero";
 import { ClickToTicket } from "./sections/ClickToTicket";
 import { BuiltForAgenciesDark } from "./sections/BuiltForAgenciesDark";
+import { EvidenceTrust } from "./sections/EvidenceTrust";
 import { Pricing } from "./sections/Pricing";
 import { FAQ } from "./sections/FAQ";
 import { FinalCTA } from "./sections/FinalCTA";
@@ -17,6 +18,7 @@ export function MarketingHome() {
         <Hero />
         <ClickToTicket />
         <BuiltForAgenciesDark />
+        <EvidenceTrust />
         <Pricing />
         <FAQ />
         <FinalCTA />

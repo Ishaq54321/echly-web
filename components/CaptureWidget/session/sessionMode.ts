@@ -30,6 +30,16 @@ export function isFormFieldElement(element: Element | null): boolean {
   return false;
 }
 
+/**
+ * True when a document-level event originated on Echly UI. Events from inside
+ * the widget's shadow root are retargeted to #echly-shadow-host by the time
+ * they reach document listeners, so checking the (retargeted) target covers
+ * every widget surface: tray, session controls bar, capture pill.
+ */
+export function isEventFromAnnoteUi(e: Event): boolean {
+  return e.target instanceof Element && isAnnoteElement(e.target);
+}
+
 /** Elements we must never treat as capture targets (Echly UI, body/html). */
 export function isSessionCaptureTarget(element: Element | null): boolean {
   if (!element || element === document.body || element === document.documentElement) {

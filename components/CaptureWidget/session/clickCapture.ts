@@ -6,6 +6,7 @@
 
 import {
   findCaptureTargetAtPoint,
+  isEventFromAnnoteUi,
   isFormFieldElement,
   isSessionCaptureTarget,
   logSession,
@@ -18,6 +19,11 @@ let callbackRef: (element: Element) => void = () => {};
 function handleClick(e: MouseEvent) {
   if (e.button !== 0) return;
   if (!enabledRef()) return;
+  // Clicks on Echly UI (session controls, tray, pill) must pass through to
+  // their own handlers untouched. Without this bail, the point-based fallback
+  // below would see through the widget, swallow the click, and capture the
+  // page element underneath it.
+  if (isEventFromAnnoteUi(e)) return;
   // Same resolution as the hover highlighter, so the highlighted element is
   // exactly the captured one.
   const direct = e.target as Element | null;

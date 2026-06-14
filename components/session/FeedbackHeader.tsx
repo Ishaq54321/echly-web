@@ -13,7 +13,7 @@ import {
   Check,
   Clock,
   Lock,
-  Terminal,
+  Sparkles,
   Trash2,
   RotateCcw,
   PencilLine,
@@ -546,10 +546,10 @@ export function SessionFeedbackHeader({
                   aria-pressed={isDevToolsPanelOpen}
                   aria-label={isDevToolsPanelOpen ? "Close dev tools panel" : "Open dev tools panel"}
                 >
-                  <Terminal
+                  <Sparkles
                     size={14}
                     strokeWidth={1.5}
-                    className={isDevToolsPanelOpen ? "text-[var(--brand)]" : undefined}
+                    className="text-[var(--brand)]"
                   />
                   Dev Tools
                   {(() => {

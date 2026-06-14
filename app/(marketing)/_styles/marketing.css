@@ -889,35 +889,84 @@
   max-width: 640px;
 }
 
-/* ---- Contained card (Superhuman pattern) ---- */
+/* ---- Sticky-stacking deck ----
+   The deck is the tall scroll container. Each card pins (position: sticky) at
+   --ctt-top, so as you scroll the next card rises up and STACKS over it. The
+   gap between cards is what gives the scroll distance for one card to travel
+   over the previous one. Newer cards carry a higher z-index (set per-card via
+   --ctt-i) so the rising card sits on top of the receding one. */
+.marketing-root .ctt-deck {
+  --ctt-top: 12vh;        /* sticky pin offset from the top of the viewport */
+  --ctt-peek: 20px;       /* how far each receded card peeks below the stack  */
+  --ctt-scale-min: 0.88;  /* scale of a fully-receded card                    */
+  display: flex;
+  flex-direction: column;
+  /* Generous gap = scroll runway for the stacking motion between cards. */
+  gap: 56vh;
+  width: 100%;
+  /* Small tail so the last card can settle at the pin line — it has no card
+     stacking over it, so it needs no full-height runway (avoids dead space). */
+  padding-bottom: 8vh;
+}
+
+/* ---- Contained card (Superhuman pattern), now a deck layer ---- */
 .marketing-root .ctt-card {
-  position: relative;
+  /* --ctt-recede: 0 (active, front) → 1 (fully receded behind the next card),
+     written by the scroll handler in ClickToTicket.tsx.
+     --ctt-i: the card's index, used so later cards stack on top. */
+  --ctt-recede: 0;
+  --ctt-i: 0;
+
+  position: sticky;
+  top: var(--ctt-top);
+  z-index: calc(1 + var(--ctt-i));
+
   width: 100%;
   max-width: 1280px;
-  margin: 0 auto 40px;
+  margin: 0 auto;
 
   background: #ffffff;
   border: 1px solid #D9D7D2;
   border-radius: 20px;
   overflow: hidden;
 
+  /* Recede transform: as the next card stacks on top, this one scales down a
+     touch and drops a few px so the stack reads as a layered deck. */
+  transform-origin: center top;
+  transform:
+    translateY(calc(var(--ctt-recede) * var(--ctt-peek)))
+    scale(calc(1 - (1 - var(--ctt-scale-min)) * var(--ctt-recede)));
+  /* Subtle dim on receded cards so they recede in depth behind the active one. */
+  filter: brightness(calc(1 - 0.12 * var(--ctt-recede)));
+
   box-shadow:
     0 1px 2px rgba(15, 23, 42, 0.04),
     0 8px 24px -8px rgba(15, 23, 42, 0.08),
+    /* deeper lift as the card recedes, so the stack casts real depth */
+    0 calc(18px + 24px * var(--ctt-recede))
+      calc(40px + 40px * var(--ctt-recede)) -20px
+      rgba(15, 23, 42, calc(0.10 + 0.10 * var(--ctt-recede))),
     inset 0 1px 0 rgba(255, 255, 255, 1);
 
-  /* Scroll-reveal fade + rise */
+  /* Smooth, physical easing on the recede; quick enough to track scroll. */
+  transition:
+    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.18s ease-out,
+    opacity 0.5s ease-out;
+
+  /* Reveal fade — opacity only (positioning is handled by sticky). */
   opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.7s ease-out,
-    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.marketing-root .ctt-card:last-child {
-  margin-bottom: 0;
 }
 .marketing-root .ctt-card.ctt-in-view {
   opacity: 1;
-  transform: translateY(0);
+}
+/* Safety net: if JS never runs (scripting disabled), the reveal class is never
+   added — so show the cards unconditionally rather than leaving them invisible.
+   The deck still renders as a plain stacked list (sticky needs no JS). */
+@media (scripting: none) {
+  .marketing-root .ctt-card {
+    opacity: 1;
+  }
 }
 
 /* Decorative diagonal side stripes â€” structural texture */
@@ -972,11 +1021,14 @@
   letter-spacing: -0.005em;
 }
 
-/* ---- Two-column body ---- */
+/* ---- Two-column body ----
+   Sized so the pinned card occupies roughly 70vh on large screens (the header
+   bar adds ~70px on top). Clamped to a comfortable floor/ceiling so it never
+   gets cramped on short laptops nor cavernous on tall monitors. */
 .marketing-root .ctt-card-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-  min-height: 480px;
+  min-height: clamp(440px, 64vh, 620px);
 }
 .marketing-root .ctt-card-body--visual-left {
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
@@ -1007,23 +1059,18 @@
   margin: 0 0 28px;
   max-width: 420px;
 }
-.marketing-root .ctt-card-learn-more {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #5A49BF;
-  text-decoration: none;
-  margin: 0 0 32px;
-  transition: gap 0.2s ease-out;
-}
-.marketing-root .ctt-card-learn-more:hover {
-  gap: 10px;
-}
-.marketing-root .ctt-card-learn-more svg {
-  width: 14px;
-  height: 14px;
+/* Oversized grey step numeral above the title (01 / 02 / 03). Decorative —
+   hidden from assistive tech via aria-hidden on the element. */
+.marketing-root .ctt-card-num {
+  display: block;
+  font-size: clamp(60px, 6.5vw, 92px);
+  font-weight: 500;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  color: #D8D8DA;
+  margin: 0 0 10px -2px;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
 }
 .marketing-root .ctt-card-bullets {
   list-style: none;
@@ -2792,6 +2839,19 @@
     padding: 64px 0 56px;
   }
 }
+/* "What they see" + dashboard demo, lifted onto the normal light page
+   background. This wrapper supplies the vertical rhythm the dark .ag-root
+   panel used to provide for this block. */
+.marketing-root .signature-session-section--light {
+  position: relative;
+  width: 100%;
+  padding: 56px 0 144px;
+}
+@media (max-width: 860px) {
+  .marketing-root .signature-session-section--light {
+    padding: 40px 0 72px;
+  }
+}
 .marketing-root .signature-session-header {
   text-align: center;
   max-width: 820px;
@@ -2806,24 +2866,21 @@
 .marketing-root .signature-session-header .section-eyebrow {
   margin-left: auto;
   margin-right: auto;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--ink-2);
 }
-/* On the dark shared surface the eyebrow ✦ glyph (inherits --violet) reads
-   too purple/dim — lift it to a soft white so the lockup stays legible. */
 .marketing-root .signature-session-header .section-eyebrow .section-eyebrow-dash {
-  color: rgba(255, 255, 255, 0.70);
+  color: var(--violet);
 }
 .marketing-root .signature-session-headline {
   font-size: 48px;
   font-weight: 600;
   line-height: 1.05;
   letter-spacing: -0.04em;
-  color: #FFFFFF;
+  color: var(--ink-1);
   margin: 0 0 14px;
 }
 .marketing-root .signature-session-headline-gradient {
-  /* Lighter purple tones so the gradient pops against the dark surface. */
-  background: linear-gradient(90deg, #B8A8F0 0%, #9580E8 100%);
+  background: linear-gradient(90deg, var(--violet-2) 0%, var(--violet) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -2832,7 +2889,7 @@
 .marketing-root .signature-session-sub {
   font-size: clamp(17px, 1.35vw, 21px);
   line-height: 1.55;
-  color: rgba(255, 255, 255, 0.70);
+  color: var(--ink-2);
   margin: 0 auto;
   max-width: 780px;
   text-wrap: balance;
@@ -2851,7 +2908,8 @@
 }
 /* Backlight: two soft purple glows confined to small boxes anchored just
    behind the dashboard's bottom-left and bottom-right corners. Each glow
-   sits in its own corner region — no bleed across the full bottom. */
+   sits in its own corner region — no bleed across the full bottom. Softened
+   for the light page background so it reads as a gentle tint, not a hotspot. */
 .marketing-root .signature-session-demo-wrapper::before,
 .marketing-root .signature-session-demo-wrapper::after {
   content: "";
@@ -2861,14 +2919,14 @@
   height: 240px;
   background: radial-gradient(
     ellipse 60% 80% at 50% 30%,
-    rgba(160, 120, 240, 0.55) 0%,
-    rgba(130, 95, 220, 0.30) 30%,
-    rgba(90, 65, 180, 0.10) 60%,
+    rgba(150, 115, 230, 0.32) 0%,
+    rgba(130, 95, 220, 0.16) 30%,
+    rgba(90, 65, 180, 0.05) 60%,
     rgba(60, 45, 130, 0) 85%
   );
   pointer-events: none;
   z-index: 0;
-  filter: blur(28px);
+  filter: blur(32px);
 }
 .marketing-root .signature-session-demo-wrapper::before {
   left: 32px;
@@ -2880,6 +2938,57 @@
   position: relative;
   z-index: 2;
 }
+
+/* "Demo" pill — a rounded badge that overlaps the top edge of the dashboard.
+   Light glassy capsule with a coloured tag segment, a label, and a trailing
+   arrow (modelled on the reference "New · …" pill). */
+.marketing-root .signature-demo-pill {
+  position: absolute;
+  top: -19px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 16px 5px 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    0 10px 26px -10px rgba(20, 16, 31, 0.5),
+    0 2px 8px -2px rgba(20, 16, 31, 0.3);
+  backdrop-filter: blur(10px);
+  white-space: nowrap;
+  user-select: none;
+}
+.marketing-root .signature-demo-pill-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #6557CC, #5A49BF);
+  color: #fff;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  box-shadow: 0 1px 2px rgba(90, 73, 191, 0.4);
+}
+.marketing-root .signature-demo-pill-label {
+  display: inline-flex;
+  align-items: center;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.005em;
+  color: #15101F;
+}
+
 .marketing-root .signature-session-demo-wrapper.in-view {
   opacity: 1;
   transform: translateY(0) scale(1);
@@ -2902,14 +3011,14 @@
      the top edge of the dashboard. */
   /* All diffuse layers use negative spread so the shadow concentrates
      directly underneath the dashboard rather than bleeding equally onto
-     the left and right sides. The thin rim border + inset top highlight
-     handle the side edges themselves. */
+     the left and right sides. Tuned for the light page background: soft
+     black elevation and a hairline rim. */
   box-shadow:
-    0 30px 40px -20px rgba(0, 0, 0, 0.75),
-    0 60px 80px -40px rgba(0, 0, 0, 0.65),
-    0 100px 120px -50px rgba(140, 100, 230, 0.35),
+    0 30px 40px -20px rgba(0, 0, 0, 0.18),
+    0 60px 90px -45px rgba(0, 0, 0, 0.16),
+    0 100px 120px -50px rgba(0, 0, 0, 0.14),
     inset 0 1px 0 rgba(255, 255, 255, 1),
-    0 0 0 1px rgba(255, 255, 255, 0.08);
+    0 0 0 1px rgba(0, 0, 0, 0.08);
   height: 790px;
 }
 @media (max-width: 1099px) and (min-width: 901px) {
@@ -4318,10 +4427,19 @@
   .marketing-root .vtdemo-polished {
     transition: none !important;
   }
-  /* Show from-click-to-ticket content immediately; skip fade + rise. */
+  /* Sticky-stacking deck falls back to a plain stacked vertical list: no
+     pinning, no scale/dim transforms, cards simply shown in document order. */
+  .marketing-root .ctt-deck {
+    gap: 40px;
+    padding-bottom: 0;
+  }
   .marketing-root .ctt-card {
+    position: relative !important;
+    top: auto !important;
+    z-index: auto !important;
     opacity: 1 !important;
     transform: none !important;
+    filter: none !important;
     transition: none !important;
   }
   /* Mockup motion: freeze shimmer/wave/pulse for reduced-motion users. */
@@ -4390,11 +4508,21 @@
 }
 
 /* From-click-to-ticket cards: collapse to single column (copy on top, visual
-   below), tighten padding, hide the decorative side stripes. */
+   below), tighten padding, hide the decorative side stripes. The deck still
+   stacks the same way — just with a smaller pin offset and shorter runway so a
+   taller single-column card fits the viewport. */
 @media (max-width: 1099px) {
+  .marketing-root .ctt-deck {
+    --ctt-top: 6vh;
+    --ctt-peek: 16px;
+    gap: 44vh;
+  }
   .marketing-root .ctt-card-body,
   .marketing-root .ctt-card-body--visual-left {
     grid-template-columns: 1fr;
+    /* Let the stacked copy + visual size to content rather than enforcing the
+       large desktop height, so the card stays within the viewport when pinned. */
+    min-height: 0;
   }
   .marketing-root .ctt-card-body--visual-left .ctt-card-visual {
     order: 2;
@@ -4407,7 +4535,7 @@
   }
   .marketing-root .ctt-card-visual {
     padding: 32px;
-    min-height: 400px;
+    min-height: 360px;
   }
   .marketing-root .ctt-card-header {
     padding: 16px 24px;
@@ -4435,6 +4563,20 @@
     overflow: auto;
   }
   .marketing-root .ag-flow { grid-template-columns: 1fr; }
+
+  /* Sticky deck at phone scale (legible at 375px): shorter runway, tighter
+     padding, slightly smaller mockup area. Cards still pin + stack. */
+  .marketing-root .ctt-deck {
+    --ctt-top: 4vh;
+    gap: 36vh;
+  }
+  .marketing-root .ctt-card-copy {
+    padding: 26px 20px;
+  }
+  .marketing-root .ctt-card-visual {
+    padding: 22px;
+    min-height: 300px;
+  }
 }
 
 /* =================================================================
@@ -6036,6 +6178,10 @@
    text the click handler frames, and the CTA which carves itself out). */
 .marketing-root .hcd-hero-copy {
   position: absolute;
+  /* The hero marketing copy (pill, headline, sub, CTAs) uses DM Sans to match
+     the rest of the homepage — overriding the `.hcd` `--echly-font` (Plus Jakarta
+     Sans), which stays scoped to the simulated extension UI (tray/pill/modal). */
+  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   /* v19: vertically center the copy block in the stage instead of pinning it to
      the top with a fixed margin. The block fills the stage (inset 0) and uses
      flex to center its children; translateY pulls them above true center so the
@@ -6175,10 +6321,10 @@
      the lighter bg), then dialed back per feedback â€” smaller and lighter than
      the full Shadcnspace display register. ~48â€“76px, semibold (600) not bold,
      with tight line-height + tracking for a confident-but-not-shouting feel. */
-  font-size: clamp(48px, 5.5vw, 76px);
+  font-size: clamp(42px, 4.8vw, 66px);
   font-weight: 600;
   line-height: 1.0;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.02em;
   margin: 0 auto;
   color: #15101F;
   /* Wider column to let the bigger type breathe across two balanced lines. */
@@ -6214,11 +6360,11 @@
      present (65% ink vs the old washed-out 70% translucency) so it reads as
      clear supporting context against the bigger headline, not a competing line.
      The 32px gap opens up the headline â†’ sub hierarchy step. */
-  font-size: clamp(18px, 1.5vw, 22px);
-  font-weight: 400;
+  font-size: 18px;
+  font-weight: 500;
   color: rgba(21, 16, 31, 0.65);
   margin: 32px auto 0;
-  max-width: clamp(440px, 34vw, 620px);
+  max-width: clamp(560px, 46vw, 820px);
   letter-spacing: -0.003em;
   line-height: 1.5;
 }
@@ -6615,6 +6761,13 @@
   --shadow-level-3: 0 8px 24px rgba(0,0,0,0.14);
   --color-primary-ring: rgba(90,73,191,0.18); /* tokens.css:179 */
   --layer-2-bg: #F4F2F8;            /* screenshot frame backdrop */
+  /* Dev Tools panel (imported real DevToolsPanel) + Activity panel tokens.
+     Pinned here so the panels render identically to production regardless of
+     any marketing-root overrides. */
+  --border-subtle: rgba(0,0,0,0.05);          /* tokens.css:212 — devtools tab divider */
+  --color-warning-text: #9B573E;              /* tokens.css:82 — network/console warn */
+  --color-accent: #155DFC;                    /* globals.css:2125 — AI tab accent */
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04); /* tokens.css:127 — devtools toast */
 }
 
 /* ---- Layout (mirrors SessionPageClient.tsx:3947-4086, two columns) ---- */
@@ -6662,6 +6815,73 @@
   /* Fill the remaining stage height below the topbar. */
   flex: 1;
   min-height: 0;
+  /* Smooth open/close of the right-aside track (Dev Tools / Activity). */
+  transition: grid-template-columns 220ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* Right-aside open: sidebar + detail + 360px panel (matches the real session
+   route's 360px default aside). Proper grid track — NOT an overflow hack.
+   Activity uses this 360px default; Dev Tools gets a wider track (below). */
+.marketing-root .session-demo-grid--with-panel {
+  grid-template-columns: 346px minmax(0, 1fr) 360px;
+}
+/* Dev Tools open: the right track is wider than the 360px Activity default so
+   the console/network/actions streams have room to breathe (the real route uses
+   a wider, draggable Dev Tools width — we pin a fixed wider value here). */
+.marketing-root .session-demo-grid--with-panel.session-demo-grid--devtools {
+  grid-template-columns: 346px minmax(0, 1fr) 480px;
+}
+/* Sidebar auto-collapse (Dev Tools open): the ticket list shrinks to a 64px
+   icon rail, mirroring the production session route (RAIL_COLLAPSED_WIDTH = 64).
+   The grid-template-columns transition on .session-demo-grid animates the
+   collapse/restore. --rail only co-occurs with --with-panel in practice (only
+   Dev Tools collapses the rail), but the no-panel variant is defined too so the
+   state stays self-consistent. */
+.marketing-root .session-demo-grid--rail {
+  grid-template-columns: 64px 1fr;
+}
+.marketing-root .session-demo-grid--with-panel.session-demo-grid--rail {
+  grid-template-columns: 64px minmax(0, 1fr) 360px;
+}
+.marketing-root .session-demo-grid--with-panel.session-demo-grid--rail.session-demo-grid--devtools {
+  grid-template-columns: 64px minmax(0, 1fr) 480px;
+}
+.marketing-root .session-demo-rightpanel {
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* The imported DevToolsPanel / DemoActivityPanel use a flex column internally
+     (header pinned, body scrolls) — give them a definite height to fill. */
+}
+/* The panels (DevToolsPanel / DemoActivityPanel) render .ticket-activity-panel
+   at width:100%; ensure it fills the aside's height and lets its body scroll. */
+.marketing-root .session-demo-rightpanel .ticket-activity-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+/* Mobile guard: the Dev Tools / Activity toggle buttons are hidden below the md
+   breakpoint (hidden md:inline-flex), so the right panel can't be opened there.
+   This keeps the grid at two columns even if --with-panel somehow applies, so a
+   resize that crosses the breakpoint never leaves a broken 3-column layout. */
+@media (max-width: 767px) {
+  .marketing-root .session-demo-grid--with-panel,
+  .marketing-root .session-demo-grid--with-panel.session-demo-grid--rail,
+  .marketing-root .session-demo-grid--with-panel.session-demo-grid--devtools,
+  .marketing-root .session-demo-grid--with-panel.session-demo-grid--rail.session-demo-grid--devtools {
+    grid-template-columns: 346px minmax(0, 1fr);
+  }
+  .marketing-root .session-demo-grid--rail {
+    grid-template-columns: 346px 1fr;
+  }
+  .marketing-root .session-demo-rightpanel {
+    display: none;
+  }
 }
 .marketing-root .session-demo-sidebar {
   background: var(--surface);
@@ -6966,15 +7186,21 @@
   --ag-green: oklch(74% 0.14 155);
 
   position: relative;
-  width: 100%;
-  padding: 88px 32px 96px;
-  /* Superhuman-style ambient backdrop: deep near-black canvas with two
-     soft glows spanning the full height — cool blue rising from the
-     left, warm magenta rising from the right. */
+  /* Inset the dark panel from the page edges so the off-white page shows as
+     left/right margins — the panel reads as a contained block, not a full-bleed
+     band. Inner content keeps its own max-width, so nothing inside resizes. */
+  width: calc(100% - 96px);
+  max-width: 1440px;
+  margin-inline: auto;
+  padding: 72px 32px 96px;
+  border-radius: 32px;
+  /* Near-black canvas with soft purple/blue ambient glows bleeding in from the
+     corners — the cards read as floating over a lit backdrop. */
   background:
-    radial-gradient(75% 90% at 8% 50%, rgba(40, 70, 150, 0.42) 0%, rgba(40, 70, 150, 0) 65%),
-    radial-gradient(70% 85% at 92% 55%, rgba(150, 50, 110, 0.34) 0%, rgba(150, 50, 110, 0) 65%),
-    radial-gradient(120% 100% at 50% 0%, #07070a 0%, #050507 70%, #030305 100%);
+    radial-gradient(900px 520px at 12% 2%, oklch(48% 0.18 295 / 0.18), transparent 60%),
+    radial-gradient(880px 560px at 92% 30%, oklch(48% 0.16 250 / 0.14), transparent 62%),
+    radial-gradient(1000px 600px at 50% 108%, oklch(46% 0.15 285 / 0.12), transparent 60%),
+    #09090c;
   color: var(--ag-text);
   font-family: "DM Sans", system-ui, sans-serif;
   font-feature-settings: "ss01";
@@ -7020,7 +7246,7 @@
   position: relative;
   z-index: 2;
   max-width: 1280px;
-  margin: 140px auto 56px;
+  margin: 0 auto 56px;
   display: grid;
   grid-template-columns: 1.05fr 0.95fr;
   gap: 64px;
@@ -7098,7 +7324,8 @@
   }
 }
 
-/* GRID */
+/* GRID — floating, separated cards (no hairline seams) so each tile reads as
+   its own panel over the lit backdrop, like the reference. */
 .marketing-root .ag-grid {
   position: relative;
   z-index: 2;
@@ -7106,30 +7333,64 @@
   margin: 0 auto;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1px;
-  background: var(--ag-line);
-  border: 1px solid var(--ag-line);
-  border-radius: 18px;
-  overflow: hidden;
+  gap: 22px;
 }
 
-/* CARD BASE — neutral black cards with a lighter purple eyebrow only. */
+/* CARD BASE — rounded glassy panels with a thin border, a soft top sheen, and
+   a per-card accent glow (set via --ag-card-accent on each card). */
 .marketing-root .ag-card {
+  --ag-card-accent: 295;
   position: relative;
-  background: linear-gradient(180deg, #0c0c10 0%, #0a0a0c 100%);
+  background:
+    radial-gradient(130% 80% at 50% -10%, oklch(60% 0.16 var(--ag-card-accent) / 0.14), transparent 58%),
+    linear-gradient(180deg, #101015 0%, #0b0b0f 100%);
+  border: 1px solid var(--ag-line-2);
+  border-radius: 22px;
   padding: 36px 36px 0;
   display: flex;
   flex-direction: column;
   min-height: 510px;
   overflow: hidden;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.05) inset,
+    0 28px 60px -30px rgba(0, 0, 0, 0.7);
+  transition: border-color 0.4s ease, box-shadow 0.4s ease, transform 0.4s ease;
+}
+/* Bloom that bleeds out of the card edge — mirrors the colored glow on the
+   reference's feature cards. */
+.marketing-root .ag-card::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(180deg, oklch(70% 0.16 var(--ag-card-accent) / 0.32), transparent 42%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.7;
+}
+.marketing-root .ag-card:hover {
+  border-color: oklch(70% 0.16 var(--ag-card-accent) / 0.38);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 34px 70px -28px rgba(0, 0, 0, 0.72),
+    0 0 60px -16px oklch(60% 0.18 var(--ag-card-accent) / 0.28);
 }
 .marketing-root .ag-card::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(120% 60% at 50% 0%, rgba(255, 255, 255, 0.025), transparent 60%);
+  border-radius: inherit;
+  background: radial-gradient(120% 60% at 50% 0%, rgba(255, 255, 255, 0.03), transparent 60%);
   pointer-events: none;
 }
+/* Per-card accent hues: QA purple, Team blue, Review violet, Ship warm. */
+.marketing-root .ag-card--qa { --ag-card-accent: 295; }
+.marketing-root .ag-card--team { --ag-card-accent: 245; }
+.marketing-root .ag-card--review { --ag-card-accent: 285; }
+.marketing-root .ag-card--ship { --ag-card-accent: 32; }
 .marketing-root .ag-card-head {
   max-width: 460px;
   position: relative;
@@ -7140,7 +7401,9 @@
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.22em;
-  color: rgba(170, 140, 240, 0.85);
+  /* Tinted to the card's own accent so each step carries its colour, like the
+     reference's per-card mono labels. */
+  color: oklch(78% 0.14 var(--ag-card-accent, 295));
   margin-bottom: 18px;
 }
 .marketing-root .ag-h {
@@ -8110,6 +8373,9 @@
 /* Responsive: collapse 2-col grid + header on narrow viewports */
 @media (max-width: 960px) {
   .marketing-root .ag-root {
+    /* Tighter inset + softer rounding on narrow screens. */
+    width: calc(100% - 32px);
+    border-radius: 24px;
     padding: 64px 24px 72px;
   }
   .marketing-root .ag-head {
@@ -8371,3 +8637,881 @@
   }
 }
 
+
+/* ============================================================
+   THE EVIDENCE (dark) + TRUST (light)
+   The Evidence block renders INSIDE the shared .ag-root dark section
+   (BuiltForAgenciesDark), so it inherits the --ag-* dark tokens and
+   shares one continuous background with the "Made for the people…"
+   block. The Trust band is its own light section before Pricing.
+   ============================================================ */
+
+/* ---------- THE EVIDENCE (dark — a full-width 5th card) ----------
+   .ev-card inherits the whole .ag-card treatment (surface gradient, border,
+   ::before sheen, ::after accent bloom, hover glow). We only override what a
+   full-width card needs: a wider footprint, its own accent hue, and a two-
+   column internal layout (header + supporting points | DevTools "stage"). */
+.marketing-root .ev-block {
+  position: relative;
+  z-index: 2;
+  max-width: 1280px;
+  margin: 22px auto 0; /* same gutter as the 2x2 .ag-grid gap above */
+  padding: 0;
+}
+
+/* Distinct hue from QA/Team/Review/Ship (295/245/285/32) — green reads as
+   "verified evidence / dev-ready". */
+.marketing-root .ev-card {
+  --ag-card-accent: 155;
+  min-height: 0; /* full-width card sizes to its content, not the 510px grid min */
+  padding: 40px 40px 40px;
+}
+
+/* Internal two-column layout: card head (left) + DevTools stage (right).
+   Cells bottom-align by default so the DevTools panel sits flush with the
+   bottom of the row; the head is pinned back to the top via align-self. */
+.marketing-root .ev-card-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 0.78fr 1.22fr;
+  gap: 48px;
+  align-items: end;
+}
+.marketing-root .ev-card-head {
+  max-width: 460px;
+  align-self: start;
+}
+
+/* Eyebrow: same .ag-eyebrow recipe, plus a leading accent mark like .ag-kicker. */
+.marketing-root .ev-card-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+.marketing-root .ev-card-eyebrow-mark {
+  color: oklch(78% 0.14 var(--ag-card-accent, 155));
+  font-size: 13px;
+}
+.marketing-root .ev-card-h {
+  font-size: 30px;
+  max-width: 440px;
+}
+.marketing-root .ev-card-p {
+  margin-bottom: 26px;
+}
+
+/* The DevTools panel sits in the card's stage column, bottom-aligned so it
+   sits flush with the bottom of the row. */
+.marketing-root .ev-card-stage {
+  position: relative;
+  z-index: 1;
+  align-self: end;
+}
+
+/* supporting points */
+.marketing-root .ev-points {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--ag-line);
+}
+.marketing-root .ev-point {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 16px 0;
+  border-top: 1px solid var(--ag-line);
+}
+.marketing-root .ev-point:first-child {
+  border-top: 0;
+}
+.marketing-root .ev-pt-ic {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: oklch(70% 0.14 var(--ag-card-accent, 155) / 0.1);
+  border: 1px solid oklch(70% 0.14 var(--ag-card-accent, 155) / 0.22);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: oklch(80% 0.13 var(--ag-card-accent, 155));
+}
+.marketing-root .ev-pt-ic svg {
+  width: 17px;
+  height: 17px;
+  display: block;
+}
+.marketing-root .ev-pt-tx {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ag-body);
+  letter-spacing: -0.004em;
+}
+.marketing-root .ev-pt-tx b {
+  color: #fafafc;
+  font-weight: 500;
+}
+
+/* ---------- DEVTOOLS PANEL ---------- */
+.marketing-root .dt {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #15151d 0%, #0d0d12 100%);
+  border: 1px solid var(--ag-line-2);
+  box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.75),
+    0 0 90px -30px rgba(165, 137, 255, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.marketing-root .dt-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--ag-line);
+  background: rgba(255, 255, 255, 0.015);
+}
+.marketing-root .dt-dots {
+  display: flex;
+  gap: 6px;
+}
+.marketing-root .dt-dots i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.13);
+}
+.marketing-root .dt-bar-id {
+  margin-left: 4px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ag-mute);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.marketing-root .dt-bar-id b {
+  color: var(--ag-body);
+  font-weight: 500;
+}
+.marketing-root .dt-bar-right {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--ag-mute);
+  white-space: nowrap;
+}
+.marketing-root .dt-live {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ag-green);
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.14);
+  animation: ev-pulse 2.2s infinite;
+}
+@keyframes ev-pulse {
+  50% {
+    box-shadow: 0 0 0 6px rgba(74, 222, 128, 0.04);
+  }
+}
+
+.marketing-root .dt-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--ag-line);
+  background: rgba(0, 0, 0, 0.18);
+}
+.marketing-root .dt-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 13px 14px 12px;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: -0.003em;
+  color: var(--ag-mute);
+  cursor: pointer;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  transition: color 0.18s;
+}
+.marketing-root .dt-tab .tdot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.55;
+}
+.marketing-root .dt-tab:hover {
+  color: var(--ag-body);
+}
+.marketing-root .dt-tab[aria-selected="true"] {
+  color: #fafafc;
+}
+.marketing-root .dt-tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ag-accent);
+  box-shadow: 0 0 14px -1px var(--ag-accent);
+}
+.marketing-root .dt-tab .cnt {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--ag-faint);
+  letter-spacing: 0.04em;
+}
+
+.marketing-root .dt-body {
+  position: relative;
+  min-height: 340px;
+}
+.marketing-root .dt-panel {
+  padding: 22px 22px 24px;
+}
+.marketing-root .dt-panel[data-on="1"] {
+  animation: dt-rise 0.34s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes dt-rise {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* AI panel */
+.marketing-root .dt-aitop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.marketing-root .dt-verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 99px;
+  background: rgba(165, 137, 255, 0.12);
+  border: 1px solid rgba(165, 137, 255, 0.22);
+  color: oklch(85% 0.09 295);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.003em;
+}
+.marketing-root .dt-verdict svg {
+  width: 13px;
+  height: 13px;
+  color: var(--ag-accent);
+}
+.marketing-root .dt-verdict .sep {
+  width: 1px;
+  height: 11px;
+  background: rgba(255, 255, 255, 0.18);
+}
+.marketing-root .dt-verdict .conf {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 500;
+  color: oklch(80% 0.12 155);
+}
+.marketing-root .dt-verdict .conf i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ag-green);
+}
+.marketing-root .dt-aibadge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--ag-faint);
+  text-transform: uppercase;
+}
+.marketing-root .dt-aibadge .mk {
+  color: var(--ag-accent);
+  font-family: "DM Sans", sans-serif;
+  letter-spacing: 0;
+  font-size: 12px;
+}
+
+.marketing-root .dt-cause {
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--ag-text);
+  letter-spacing: -0.004em;
+  margin: 0 0 18px;
+}
+.marketing-root .dt-cause code {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12.5px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(165, 137, 255, 0.12);
+  color: oklch(86% 0.08 295);
+  border: 1px solid rgba(165, 137, 255, 0.14);
+}
+.marketing-root .dt-cause b {
+  color: #fff;
+  font-weight: 600;
+}
+
+.marketing-root .dt-fixlabel {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ag-faint);
+  margin: 0 0 11px;
+}
+.marketing-root .dt-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.marketing-root .dt-step {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.marketing-root .dt-step .n {
+  flex-shrink: 0;
+  width: 21px;
+  height: 21px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--ag-line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ag-body);
+}
+.marketing-root .dt-step .st {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ag-body);
+  letter-spacing: -0.003em;
+  padding-top: 1px;
+}
+.marketing-root .dt-step .st code {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  color: oklch(86% 0.06 295);
+  padding: 0 2px;
+}
+.marketing-root .dt-pill {
+  margin-top: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--ag-line);
+  font-size: 11.5px;
+  color: var(--ag-mute);
+  letter-spacing: -0.002em;
+}
+.marketing-root .dt-pill svg {
+  width: 12px;
+  height: 12px;
+  color: var(--ag-amber);
+}
+
+/* Console panel */
+.marketing-root .dt-console {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+}
+.marketing-root .dt-crow {
+  display: flex;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  align-items: flex-start;
+}
+.marketing-root .dt-crow + .dt-crow {
+  margin-top: 3px;
+}
+.marketing-root .dt-crow .gl {
+  flex-shrink: 0;
+  width: 13px;
+  text-align: center;
+  margin-top: 1px;
+}
+.marketing-root .dt-crow.err {
+  background: rgba(255, 90, 76, 0.07);
+  border: 1px solid rgba(255, 90, 76, 0.16);
+  color: oklch(80% 0.13 28);
+}
+.marketing-root .dt-crow.warn {
+  background: rgba(245, 183, 58, 0.06);
+  border: 1px solid rgba(245, 183, 58, 0.14);
+  color: oklch(83% 0.12 78);
+}
+.marketing-root .dt-crow .src {
+  color: var(--ag-mute);
+}
+.marketing-root .dt-trace {
+  padding: 6px 10px 2px 33px;
+  color: var(--ag-mute);
+  font-size: 11px;
+}
+.marketing-root .dt-trace .fn {
+  color: var(--ag-body);
+}
+.marketing-root .dt-cmeta {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  color: var(--ag-faint);
+  letter-spacing: 0.04em;
+  padding-top: 12px;
+  border-top: 1px dashed var(--ag-line);
+}
+
+/* Network panel */
+.marketing-root .dt-net {
+  font-size: 12px;
+}
+.marketing-root .dt-netgrid {
+  border: 1px solid var(--ag-line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.marketing-root .dt-nethead,
+.marketing-root .dt-netrow {
+  display: grid;
+  grid-template-columns: 1fr 64px 64px 66px;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+}
+.marketing-root .dt-nethead {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ag-faint);
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--ag-line);
+}
+.marketing-root .dt-netrow {
+  border-top: 1px solid var(--ag-line);
+  position: relative;
+}
+.marketing-root .dt-netrow:first-of-type {
+  border-top: 0;
+}
+.marketing-root .dt-netrow .nm {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  color: var(--ag-body);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.marketing-root .dt-netrow .verb {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.marketing-root .dt-netrow .verb.post {
+  background: rgba(165, 137, 255, 0.16);
+  color: oklch(85% 0.09 295);
+}
+.marketing-root .dt-netrow .verb.get {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ag-mute);
+}
+.marketing-root .dt-netrow .nm .path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.marketing-root .dt-netrow .st {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.marketing-root .dt-netrow .st i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.marketing-root .dt-netrow .st.ok {
+  color: var(--ag-green);
+}
+.marketing-root .dt-netrow .st.ok i {
+  background: var(--ag-green);
+}
+.marketing-root .dt-netrow .st.notmod {
+  color: var(--ag-mute);
+}
+.marketing-root .dt-netrow .st.notmod i {
+  background: var(--ag-mute);
+}
+.marketing-root .dt-netrow .ty,
+.marketing-root .dt-netrow .tm {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: var(--ag-mute);
+}
+.marketing-root .dt-netrow.sel {
+  background: rgba(165, 137, 255, 0.07);
+}
+.marketing-root .dt-netrow.sel::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--ag-accent);
+}
+.marketing-root .dt-curl {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: #070709;
+  border: 1px solid var(--ag-line-2);
+}
+.marketing-root .dt-curl .pre {
+  flex: 1;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: var(--ag-body);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.marketing-root .dt-curl .pre s {
+  color: var(--ag-accent);
+  text-decoration: none;
+}
+.marketing-root .dt-curl .pre em {
+  color: var(--ag-mute);
+  font-style: normal;
+}
+.marketing-root .dt-copy {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: 7px;
+  background: var(--ag-accent);
+  color: #0a0a0c;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  border: 0;
+  font-family: inherit;
+  transition: filter 0.15s;
+}
+.marketing-root .dt-copy:hover {
+  filter: brightness(1.08);
+}
+.marketing-root .dt-copy svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Actions panel */
+.marketing-root .dt-acthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.marketing-root .dt-actlabel {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ag-faint);
+}
+.marketing-root .dt-toggle {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--ag-line);
+}
+.marketing-root .dt-toggle button {
+  padding: 5px 11px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ag-mute);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.18s;
+}
+.marketing-root .dt-toggle button[aria-pressed="true"] {
+  background: var(--ag-accent);
+  color: #0a0a0c;
+}
+.marketing-root .dt-acts {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.marketing-root .dt-act {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 14px;
+  border-radius: 10px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.025),
+    rgba(255, 255, 255, 0.01)
+  );
+  border: 1px solid var(--ag-line);
+}
+.marketing-root .dt-act .ai {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--ag-line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ag-accent);
+}
+.marketing-root .dt-act .ai svg {
+  width: 15px;
+  height: 15px;
+}
+.marketing-root .dt-act .atx {
+  min-width: 0;
+  flex: 1;
+}
+.marketing-root .dt-act .at {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #fafafc;
+  letter-spacing: -0.005em;
+}
+.marketing-root .dt-act .ad {
+  display: block;
+  margin-top: 2px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  color: var(--ag-mute);
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.marketing-root .dt-act .ats {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--ag-faint);
+  letter-spacing: 0.04em;
+}
+
+/* closing line — sits inside the card, divided from the grid by a hairline */
+.marketing-root .ev-closer {
+  position: relative;
+  z-index: 1;
+  margin: 36px 0 0;
+  padding-top: 30px;
+  border-top: 1px solid var(--ag-line);
+  text-align: center;
+  font-size: clamp(18px, 2vw, 23px);
+  line-height: 1.45;
+  letter-spacing: -0.018em;
+  color: var(--ag-mute);
+  font-weight: 400;
+}
+.marketing-root .ev-closer q {
+  quotes: "“" "”";
+}
+.marketing-root .ev-closer q::before,
+.marketing-root .ev-closer q::after {
+  color: var(--ag-faint);
+}
+.marketing-root .ev-closer b {
+  color: #fafafc;
+  font-weight: 500;
+}
+
+/* ---------- TRUST (light, own section) ---------- */
+.marketing-root .ev-trust-root {
+  background: var(--bg-0);
+  padding: 104px 0 110px;
+}
+.marketing-root .ev-trust-wrap {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 0 64px;
+  text-align: center;
+}
+.marketing-root .ev-trust-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--violet);
+  margin-bottom: 16px;
+  white-space: nowrap;
+}
+.marketing-root .ev-trust-kicker .mk {
+  font-size: 13px;
+}
+.marketing-root .ev-trust-h {
+  margin: 0;
+  font-size: clamp(28px, 3.2vw, 40px);
+  line-height: 1.08;
+  letter-spacing: -0.028em;
+  font-weight: 500;
+  color: var(--ink-1);
+}
+.marketing-root .ev-trust-p {
+  margin: 18px auto 0;
+  max-width: 600px;
+  font-size: 16.5px;
+  line-height: 1.62;
+  color: var(--ink-2);
+  letter-spacing: -0.004em;
+}
+.marketing-root .ev-trust-p b {
+  color: var(--ink-1);
+  font-weight: 500;
+}
+.marketing-root .ev-trust-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 26px auto 0;
+}
+.marketing-root .ev-trust-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 13px;
+  border-radius: 99px;
+  background: #fff;
+  border: 1px solid var(--line-1);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-1);
+  letter-spacing: -0.003em;
+  box-shadow: var(--mk-sh-xs);
+  white-space: nowrap;
+}
+.marketing-root .ev-trust-chip i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--violet);
+  opacity: 0.7;
+}
+
+/* ---------- RESPONSIVE ---------- */
+@media (max-width: 1000px) {
+  .marketing-root .ev-card-grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    align-items: start;
+  }
+  /* Panel first, then the supporting copy below it — matches how the cards
+     above lead with the visual. */
+  .marketing-root .ev-card-stage {
+    order: 1;
+  }
+  .marketing-root .ev-card-head {
+    order: 2;
+    max-width: none;
+  }
+}
+@media (max-width: 640px) {
+  .marketing-root .ev-card {
+    padding: 28px 24px;
+  }
+  .marketing-root .ev-card-h {
+    font-size: 26px;
+  }
+  .marketing-root .ev-trust-wrap {
+    padding: 0 22px;
+  }
+  .marketing-root .ev-trust-root {
+    padding: 80px 0 84px;
+  }
+  .marketing-root .dt-tab {
+    padding: 11px 9px;
+  }
+  .marketing-root .dt-tab .cnt {
+    display: none;
+  }
+  .marketing-root .dt-nethead,
+  .marketing-root .dt-netrow {
+    grid-template-columns: 1fr 52px 56px;
+    gap: 6px;
+  }
+  .marketing-root .dt-netrow .ty,
+  .marketing-root .dt-nethead span:nth-child(3) {
+    display: none;
+  }
+}

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { SessionDemoStage } from "../demos/session/SessionDemoStage";
+import { EvidenceBlock } from "./EvidenceTrust";
 
 /**
  * <BuiltForAgenciesDark />
@@ -513,63 +514,76 @@ export function BuiltForAgenciesDark() {
   }, []);
 
   return (
-    <section id="personas" className="ag-root">
-      <div className="ag-bg-grain"></div>
-
-      <header id="teams" className="signature-session-header">
-        <div className="section-eyebrow">
-          <span className="section-eyebrow-dash">✦</span>
-          <span className="section-eyebrow-text">What they see</span>
-        </div>
-        <h2 className="signature-session-headline">
-          Send one link. Everyone
-          <br />
-          <span className="signature-session-headline-gradient">
-            sees the same thing.
-          </span>
-        </h2>
-        <p className="signature-session-sub">
-          Tickets, comments, screenshots, status — all live. No accounts, no
-          installs.
-        </p>
-      </header>
-
-      <div
-        ref={demoRef}
-        className={`signature-session-demo-wrapper${inView ? " in-view" : ""}`}
-      >
-        <SessionDemoStage />
-      </div>
-
-      <header className="ag-head">
-        <div className="ag-head-left">
-          <div className="ag-kicker">
-            <span className="ag-kicker-mark">✦</span>
-            <span>BUILT FOR AGENCIES</span>
+    <>
+      {/* "What they see" + dashboard demo — sits on the normal light page
+         background (lifted out of the dark .ag-root panel below). */}
+      <section id="teams" className="signature-session-section--light">
+        <header className="signature-session-header">
+          <div className="section-eyebrow">
+            <span className="section-eyebrow-dash">✦</span>
+            <span className="section-eyebrow-text">What they see</span>
           </div>
-          <h2 className="ag-title">
-            Made for the people
+          <h2 className="signature-session-headline">
+            Send one link. Everyone
             <br />
-            who ship work <em>for other people.</em>
+            <span className="signature-session-headline-gradient">
+              sees the same thing.
+            </span>
           </h2>
-        </div>
-        <div className="ag-head-right">
-          <p className="ag-lede">
-            First QA pass to dev handoff. One place. One workflow.
+          <p className="signature-session-sub">
+            Tickets, comments, screenshots, status — all live. No accounts, no
+            installs.
           </p>
-          <div className="ag-head-meta">
-            <span className="ag-head-dot"></span>
-            Built for studios and in-house teams shipping client work.
-          </div>
-        </div>
-      </header>
+        </header>
 
-      <div className="ag-grid">
-        <CardQA />
-        <CardTeam />
-        <CardReview />
-        <CardShip />
-      </div>
-    </section>
+        <div
+          ref={demoRef}
+          className={`signature-session-demo-wrapper${inView ? " in-view" : ""}`}
+        >
+          <span className="signature-demo-pill" aria-hidden="true">
+            <span className="signature-demo-pill-tag">Demo</span>
+            <span className="signature-demo-pill-label">Live session preview</span>
+          </span>
+          <SessionDemoStage />
+        </div>
+      </section>
+
+      <section id="personas" className="ag-root">
+        <div className="ag-bg-grain"></div>
+
+        <header className="ag-head">
+          <div className="ag-head-left">
+            <div className="ag-kicker">
+              <span className="ag-kicker-mark">✦</span>
+              <span>BUILT FOR AGENCIES</span>
+            </div>
+            <h2 className="ag-title">
+              Made for the people
+              <br />
+              who ship work <em>for other people.</em>
+            </h2>
+          </div>
+          <div className="ag-head-right">
+            <p className="ag-lede">
+              First QA pass to dev handoff. One place. One workflow.
+            </p>
+            <div className="ag-head-meta">
+              <span className="ag-head-dot"></span>
+              Built for studios and in-house teams shipping client work.
+            </div>
+          </div>
+        </header>
+
+        <div className="ag-grid">
+          <CardQA />
+          <CardTeam />
+          <CardReview />
+          <CardShip />
+        </div>
+
+        {/* THE EVIDENCE — shares this same .ag-root dark background. */}
+        <EvidenceBlock />
+      </section>
+    </>
   );
 }

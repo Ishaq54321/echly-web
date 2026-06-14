@@ -469,13 +469,14 @@ export function HeroCaptureDemo() {
           </span>
         </a>
         <h1 className="hcd-hero-h1">
-          Feedback at the
+          The fastest way to report a bug
           <br />
-          speed of <span className="hcd-hero-accent">seeing it.</span>
+          and the <span className="hcd-hero-accent">easiest to fix.</span>
         </h1>
         <p className="hcd-hero-sub">
-          Click. Speak. Send the link. AI turns rough notes into polished
-          tickets your team can ship.
+          Click the element, say what&apos;s wrong, and Annote writes the
+          polished ticket. Your engineers get the full technical evidence — plus
+          an AI that&apos;s already flagged the likely cause.
         </p>
         <div className="hcd-cta-group">
           <Link

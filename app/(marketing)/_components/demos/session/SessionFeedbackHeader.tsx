@@ -31,6 +31,7 @@ import {
 import {
   CalendarCheck2,
   Check,
+  Sparkles,
   Trash2,
   RotateCcw,
 } from "lucide-react";
@@ -87,6 +88,10 @@ export interface SessionFeedbackHeaderProps {
   onResolvedChange?: (isResolved: boolean) => void;
   onToggleActivity?: () => void;
   isActivityPanelOpen?: boolean;
+  /** Phase 5 forklift: open/close the Dev Tools side panel (mutually exclusive
+      with Activity — SessionDemoStage enforces the exclusivity). */
+  onToggleDevTools?: () => void;
+  isDevToolsPanelOpen?: boolean;
   onDelete?: () => void;
   /** Demo-local assignment/priority for the selected ticket + their setters. */
   members?: DemoMember[];
@@ -101,6 +106,8 @@ export function SessionFeedbackHeader({
   onResolvedChange,
   onToggleActivity,
   isActivityPanelOpen = false,
+  onToggleDevTools,
+  isDevToolsPanelOpen = false,
   onDelete,
   members,
   assignment,
@@ -187,12 +194,15 @@ export function SessionFeedbackHeader({
               onPriorityChanged={onPriorityChanged}
             />
           ) : null}
-          {/* Activity — toggle (no-op panel in the marketing demo) */}
+          {/* Activity — toggle (opens DemoActivityPanel in the right slot).
+              Hidden on mobile (md:): the 3-column demo can't host a right panel
+              on small screens. */}
           {onToggleActivity ? (
             <button
               type="button"
+              data-action="activity"
               onClick={onToggleActivity}
-              className={isActivityPanelOpen ? actionBtnActive : actionBtn}
+              className={`hidden md:inline-flex ${isActivityPanelOpen ? actionBtnActive : actionBtn}`}
               aria-pressed={isActivityPanelOpen}
               aria-label={isActivityPanelOpen ? "Close activity panel" : "Open activity panel"}
             >
@@ -202,6 +212,26 @@ export function SessionFeedbackHeader({
                 className={isActivityPanelOpen ? "text-[var(--orange)]" : undefined}
               />
               Activity
+            </button>
+          ) : null}
+          {/* Dev Tools — sibling toggle (forklift of FeedbackHeader.tsx:541-568).
+              Mutually exclusive with Activity (enforced in SessionDemoStage).
+              Hidden on mobile alongside Activity. */}
+          {onToggleDevTools ? (
+            <button
+              type="button"
+              data-action="devtools"
+              onClick={onToggleDevTools}
+              className={`hidden md:inline-flex ${isDevToolsPanelOpen ? actionBtnActive : actionBtn}`}
+              aria-pressed={isDevToolsPanelOpen}
+              aria-label={isDevToolsPanelOpen ? "Close dev tools panel" : "Open dev tools panel"}
+            >
+              <Sparkles
+                size={14}
+                strokeWidth={1.5}
+                className="text-[var(--brand)]"
+              />
+              Dev Tools
             </button>
           ) : null}
           {/* Spacer */}

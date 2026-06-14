@@ -3,7 +3,7 @@
  * Single overlay element; no React re-renders on mousemove.
  */
 
-import { findCaptureTargetAtPoint, logSession } from "./sessionMode";
+import { findCaptureTargetAtPoint, isEventFromAnnoteUi, logSession } from "./sessionMode";
 
 const HIGHLIGHT_STYLE = {
   outline: "2px solid #5A49BF",
@@ -37,7 +37,7 @@ function updateOverlay(rect: DOMRect | null) {
 }
 
 function handleMouseMove(e: MouseEvent, active: () => boolean) {
-  if (!active()) {
+  if (!active() || isEventFromAnnoteUi(e)) {
     if (overlay) overlay.style.display = "none";
     lastTarget = null;
     return;

@@ -19,7 +19,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { ChevronRight, Eye, UsersRound } from "lucide-react";
+import { ChevronRight, Eye, PanelLeftOpen, UsersRound } from "lucide-react";
 import { TicketItem } from "./TicketItem";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { CanvasEmptyState } from "@/components/empty/CanvasEmptyState";
@@ -48,6 +48,10 @@ export interface TicketListProps {
   onOpenExpandedChange: () => void;
   resolvedExpanded: boolean;
   onResolvedExpandedChange: () => void;
+  /** When true, render a compact 64px icon rail (Dev Tools auto-collapse mode). */
+  collapsed?: boolean;
+  /** Click handler for the expand toggle shown in collapsed mode. */
+  onExpandRail?: () => void;
 }
 
 export function TicketList({
@@ -65,10 +69,96 @@ export function TicketList({
   onOpenExpandedChange,
   resolvedExpanded,
   onResolvedExpandedChange,
+  collapsed = false,
+  onExpandRail,
 }: TicketListProps) {
   const { total, open, resolved } = counts;
   const openItems = items.filter((i) => !i.isResolved);
   const resolvedItems = items.filter((i) => i.isResolved);
+
+  // Collapsed icon rail — mirrors the production TicketList Dev Tools auto-collapse
+  // mode (components/layout/operating-system/TicketList.tsx). Shows all tickets as
+  // tooltip'd icon squares plus an expand toggle at the top.
+  if (collapsed) {
+    return (
+      <div className="flex flex-col h-full min-h-0 overflow-hidden py-3">
+        {/* Top: expand toggle — closes Dev Tools, which restores the sidebar. */}
+        <div className="flex items-center justify-center pb-2 shrink-0">
+          <Tooltip content="Close Dev Tools" position="right">
+            <button
+              type="button"
+              onClick={onExpandRail}
+              aria-label="Close Dev Tools"
+              className="w-9 h-9 grid place-items-center rounded-full text-[var(--text-tertiary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-secondary)] transition-colors border-0 bg-transparent cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]/40"
+            >
+              <PanelLeftOpen size={16} strokeWidth={2} />
+            </button>
+          </Tooltip>
+        </div>
+
+        <div className="h-px mx-3 bg-[var(--border-subtle)]" aria-hidden />
+
+        {/* Scrollable list area */}
+        <div className="flex-1 min-h-0 overflow-y-auto pt-2 px-2 flex flex-col gap-3">
+          {/* Open section */}
+          <section className="flex flex-col items-center gap-1">
+            <Tooltip content={`Open (${open})`} position="right">
+              <span
+                className="text-[10px] font-semibold uppercase tracking-[0.05em] text-[var(--text-tertiary)] tabular-nums select-none"
+                aria-label={`Open: ${open}`}
+              >
+                {open}
+              </span>
+            </Tooltip>
+            {openItems.map((item, idx) => (
+              <TicketItem
+                key={item.id}
+                id={item.id}
+                title={item.title}
+                isResolved={false}
+                index={idx + 1}
+                active={item.id === selectedId}
+                onSelect={onSelect}
+                isNewTicket={item.id === newTicketId}
+                tags={item.tags}
+                collapsed
+              />
+            ))}
+          </section>
+
+          {(resolved > 0 || resolvedItems.length > 0) && (
+            <>
+              <div className="h-px mx-2 bg-[var(--border-subtle)]" aria-hidden />
+              <section className="flex flex-col items-center gap-1">
+                <Tooltip content={`Resolved (${resolved})`} position="right">
+                  <span
+                    className="text-[10px] font-semibold uppercase tracking-[0.05em] text-[var(--text-tertiary)] tabular-nums select-none"
+                    aria-label={`Resolved: ${resolved}`}
+                  >
+                    {resolved}
+                  </span>
+                </Tooltip>
+                {resolvedItems.map((item, idx) => (
+                  <TicketItem
+                    key={item.id}
+                    id={item.id}
+                    title={item.title}
+                    isResolved={true}
+                    index={openItems.length + idx + 1}
+                    active={item.id === selectedId}
+                    onSelect={onSelect}
+                    isNewTicket={item.id === newTicketId}
+                    tags={item.tags}
+                    collapsed
+                  />
+                ))}
+              </section>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden p-4">

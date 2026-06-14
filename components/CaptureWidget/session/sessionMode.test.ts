@@ -48,7 +48,7 @@ const html = new StubElement("html");
   getElementById: () => null,
 };
 
-import { isFormFieldElement, isSessionCaptureTarget } from "./sessionMode";
+import { isEventFromAnnoteUi, isFormFieldElement, isSessionCaptureTarget } from "./sessionMode";
 
 describe("isFormFieldElement", () => {
   it("recognizes input/textarea/select", () => {
@@ -102,5 +102,25 @@ describe("isSessionCaptureTarget", () => {
   it("rejects Echly UI elements", () => {
     const annote = new StubElement("div", { "data-annote-ui": "true" });
     assert.equal(isSessionCaptureTarget(annote as unknown as Element), false);
+  });
+});
+
+describe("isEventFromAnnoteUi", () => {
+  const eventFor = (target: unknown) => ({ target }) as unknown as Event;
+
+  it("detects the shadow host (retargeted widget clicks)", () => {
+    const host = new StubElement("div");
+    host.id = "echly-shadow-host";
+    assert.equal(isEventFromAnnoteUi(eventFor(host)), true);
+  });
+
+  it("detects data-annote-ui elements", () => {
+    const annote = new StubElement("div", { "data-annote-ui": "true" });
+    assert.equal(isEventFromAnnoteUi(eventFor(annote)), true);
+  });
+
+  it("passes through ordinary page elements and non-elements", () => {
+    assert.equal(isEventFromAnnoteUi(eventFor(new StubElement("button"))), false);
+    assert.equal(isEventFromAnnoteUi(eventFor(null)), false);
   });
 });

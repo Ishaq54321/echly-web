@@ -3,12 +3,11 @@
 /**
  * <ClickToTicket />
  *
- * Three vertically stacked, scroll-revealed cards tell the workflow story.
- * Layout & section chrome are unchanged from the prior pass — only the inner
- * mockup compositions inside each card's visual column were swapped to match
- * the "From Click to Ticket" design file (photo placeholder + product mockup
- * + floating accent). The outer card gradient wrappers
- * (.ctt-card-visual--capture / --voice / --sessions) stay as-is.
+ * The page's signature interaction: a "sticky stacking cards on scroll" deck.
+ * As you scroll, each step-card pins to the viewport (position: sticky) and the
+ * next card rises up and STACKS on top of it. The card now behind scales down
+ * (1.0 → ~0.88) and dims, so the stack physically recedes in depth — like
+ * thumbing through a deck of the three steps of the flow.
  *
  *   1. Capture   (copy left / visual right) — portrait photo + browser mockup
  *                                              with highlight + capture pill
@@ -17,8 +16,18 @@
  *   3. Sessions  (copy left / visual right) — landscape photo + ticket stack +
  *                                              session URL card + comment
  *
- * Each card fades + rises into view via a single shared IntersectionObserver.
- * Respects prefers-reduced-motion (handled in CSS).
+ * Mechanics (see .ctt-deck / .ctt-card rules in marketing.css):
+ *   - .ctt-deck is the tall scroll container; each .ctt-card is position: sticky
+ *     with a top offset, so it pins as it reaches the top and the next card
+ *     stacks over it (newer cards carry higher z-index).
+ *   - A rAF-throttled scroll handler (below) measures how far the NEXT card has
+ *     risen over each card and writes that 0→1 progress to a `--ctt-recede`
+ *     custom property. CSS turns it into scale-down + dim + a small downward
+ *     peek so stacked cards read as a layered deck.
+ *   - It also flips `.ctt-in-view` on each card as it enters the viewport, which
+ *     still gates the internal mockup animations (cursor, waveform, pulses).
+ *   - prefers-reduced-motion users get a plain stacked vertical list (handled in
+ *     CSS): no sticky, no transforms, cards simply shown in order.
  */
 
 import { useEffect } from "react";
@@ -31,23 +40,6 @@ import {
   Send,
   Link2,
 } from "lucide-react";
-
-/* ---------------- Icons ---------------- */
-
-function ArrowRightIcon({ size = 14 }: { size?: number }) {
-  return (
-    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
-      <path
-        d="M4 12 H20 M14 6 L20 12 L14 18"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 /* ---------------- Card primitives ---------------- */
 
@@ -63,26 +55,21 @@ function CardHeader({ icon, label }: { icon: React.ReactNode; label: string }) {
 }
 
 function CardCopy({
+  number,
   title,
   sub,
-  learnMoreLabel,
-  learnMoreHref,
   bullets,
 }: {
+  number: string;
   title: string;
   sub: string;
-  learnMoreLabel: string;
-  learnMoreHref: string;
   bullets: string[];
 }) {
   return (
     <div className="ctt-card-copy">
+      <span className="ctt-card-num" aria-hidden="true">{number}</span>
       <h3 className="ctt-card-title">{title}</h3>
       <p className="ctt-card-sub">{sub}</p>
-      <a href={learnMoreHref} className="ctt-card-learn-more">
-        Learn more about {learnMoreLabel}
-        <ArrowRightIcon />
-      </a>
       <ul className="ctt-card-bullets">
         {bullets.map((bullet) => (
           <li key={bullet}>{bullet}</li>
@@ -93,25 +80,101 @@ function CardCopy({
 }
 
 export function ClickToTicket() {
-  // Single observer for all three cards — adds .ctt-in-view as each enters the
-  // viewport, driving the fade + rise reveal.
+  // Sticky-stacking deck driver.
+  //
+  // Two jobs, both keyed off scroll position:
+  //   1. Reveal — add `.ctt-in-view` the first time a card enters the viewport,
+  //      which un-pauses its internal mockup animations (cursor, waveform, …).
+  //   2. Recede — for every card, measure how far the NEXT card has risen over
+  //      it (0 = next card still fully below, 1 = next card fully covering it)
+  //      and write that to `--ctt-recede`. CSS maps it to scale-down + dim, so
+  //      the card sinks behind the one stacking on top of it.
+  //
+  // We bail out entirely when prefers-reduced-motion is set: no transforms, the
+  // CSS fallback renders a plain stacked list, and we just reveal every card.
   useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") return;
-    const els = Array.from(document.querySelectorAll<HTMLElement>(".ctt-card"));
-    if (els.length === 0) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("ctt-in-view");
-            observer.unobserve(entry.target);
-          }
-        }
-      },
-      { threshold: 0.2 },
+    const cards = Array.from(
+      document.querySelectorAll<HTMLElement>(".ctt-deck .ctt-card"),
     );
-    els.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
+    if (cards.length === 0) return;
+
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+    if (reduceMotion) {
+      cards.forEach((card) => card.classList.add("ctt-in-view"));
+      return;
+    }
+
+    // The marketing shell scrolls inside .marketing-root (html/body are pinned
+    // to 100% height), so window 'scroll' events don't bubble from it by
+    // default. Listen on the deck's actual scrollable ancestor; fall back to
+    // window for layouts where the document itself scrolls.
+    const findScroller = (el: HTMLElement | null): HTMLElement | Window => {
+      let node = el?.parentElement ?? null;
+      while (node) {
+        const oy = getComputedStyle(node).overflowY;
+        if (
+          (oy === "auto" || oy === "scroll") &&
+          node.scrollHeight - node.clientHeight > 4
+        ) {
+          return node;
+        }
+        node = node.parentElement;
+      }
+      return window;
+    };
+    const scroller = findScroller(cards[0]);
+
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const vh = window.innerHeight;
+      cards.forEach((card, i) => {
+        const rect = card.getBoundingClientRect();
+        // Reveal once the card is meaningfully on screen.
+        if (rect.top < vh * 0.8 && rect.bottom > 0) {
+          card.classList.add("ctt-in-view");
+        }
+
+        const next = cards[i + 1];
+        if (!next) {
+          card.style.setProperty("--ctt-recede", "0");
+          return;
+        }
+        // This card pins at rect.top (≈ the sticky offset). The next card rises
+        // up toward that same line. `gap` is how far the next card still has to
+        // travel before it fully overlaps this one:
+        //   gap ≈ cardHeight  → next card is one card-height below → recede 0
+        //   gap ≈ 0           → next card has reached the pin line → recede 1
+        // We spread the motion over one card-height so the recede tracks the
+        // approach smoothly rather than snapping at the very end.
+        const span = Math.max(rect.height, 1);
+        const gap = next.getBoundingClientRect().top - rect.top;
+        const progress = Math.min(Math.max(1 - gap / span, 0), 1);
+        card.style.setProperty("--ctt-recede", progress.toFixed(4));
+      });
+    };
+
+    const onScroll = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(update);
+    };
+
+    update();
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    // Window scroll too, in case the page also scrolls at the document level.
+    if (scroller !== window) {
+      window.addEventListener("scroll", onScroll, { passive: true });
+    }
+    window.addEventListener("resize", onScroll, { passive: true });
+    return () => {
+      scroller.removeEventListener("scroll", onScroll);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
   }, []);
 
   return (
@@ -127,15 +190,17 @@ export function ClickToTicket() {
         looking at it.&rdquo;
       </p>
 
+      {/* Sticky-stacking deck: each card pins, the next rises and stacks over
+          it, cards behind scale down + dim (driven by --ctt-recede above). */}
+      <div className="ctt-deck">
       {/* Section 1: Capture (copy left / visual right) */}
-      <div className="ctt-card">
+      <div className="ctt-card" style={{ "--ctt-i": 0 } as React.CSSProperties}>
         <CardHeader icon={<MousePointerClick size={17} strokeWidth={2} />} label="Capture" />
         <div className="ctt-card-body">
           <CardCopy
+            number="01"
             title="Capture anything in one click."
             sub="Annote grabs the element, the page, and the context. No selection tool, no cropping."
-            learnMoreLabel="Capture"
-            learnMoreHref="#capture"
             bullets={[
               "Element, page, viewport — all captured",
               "Works on any URL, live or staging",
@@ -149,17 +214,16 @@ export function ClickToTicket() {
       </div>
 
       {/* Section 2: Voice (visual left / copy right) */}
-      <div className="ctt-card">
+      <div className="ctt-card" style={{ "--ctt-i": 1 } as React.CSSProperties}>
         <CardHeader icon={<AudioLines size={17} strokeWidth={2} />} label="Speak" />
         <div className="ctt-card-body ctt-card-body--visual-left">
           <div className="ctt-card-visual ctt-card-visual--voice">
 <VoiceMockup />
           </div>
           <CardCopy
+            number="02"
             title="Talk through it. Send a ticket."
             sub="Speak in your own words. AI turns the recording into a structured ticket — title, description, severity, tags."
-            learnMoreLabel="Voice"
-            learnMoreHref="#voice"
             bullets={[
               "One-tap recording in the extension",
               "Rough notes become a polished ticket",
@@ -170,14 +234,13 @@ export function ClickToTicket() {
       </div>
 
       {/* Section 3: Sessions (copy left / visual right) */}
-      <div className="ctt-card">
+      <div className="ctt-card" style={{ "--ctt-i": 2 } as React.CSSProperties}>
         <CardHeader icon={<Share size={17} strokeWidth={2} />} label="Share" />
         <div className="ctt-card-body">
           <CardCopy
+            number="03"
             title="Auto-grouped. Share the whole session."
             sub="Every capture from your session lives in one place. Send the link — clients, teammates, anyone sees the same thing."
-            learnMoreLabel="Sessions"
-            learnMoreHref="#sessions"
             bullets={[
               "One URL, no signup required",
               "Real-time comments and replies",
@@ -189,6 +252,7 @@ export function ClickToTicket() {
           </div>
         </div>
       </div>
+      </div>{/* /.ctt-deck */}
     </section>
   );
 }
