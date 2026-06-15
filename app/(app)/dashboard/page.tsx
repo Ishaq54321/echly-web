@@ -1,7 +1,7 @@
-﻿"use client";
+"use client";
 
 // deep_data_latency_trace_phase3b_v2
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useWorkspaceStore } from "@/lib/client/workspaceStore";
@@ -65,6 +65,7 @@ function sessionSortKey(session: Session): number {
 import { useSessionEntryCta } from "@/components/dashboard/hooks/useSessionEntryCta";
 import { useStableState } from "@/lib/client/perception/useStableState";
 import { useWorkspace } from "@/lib/client/workspaceContext";
+import { markEnd } from "@/lib/client/perfMarkers";
 import { SessionRowSkeleton } from "@/components/dashboard/SessionRowSkeleton";
 import { SESSION_FEEDBACK_PATH } from "@/utils/getSessionLink";
 
@@ -98,6 +99,20 @@ function DashboardContent() {
   const [debouncedSearch, setDebouncedSearch] = useState(search);
   const isLoading =
     !isIdentityResolved || (sessionsLoading && sessions.length === 0);
+
+  // PERF (Batch 0.3): Segment 3 (sessions→painted) ends once the list is
+  // actually rendered — isLoading is false and we have rows. rAF defers the
+  // markEnd to just after the browser commits the paint so the delta reflects
+  // real render cost. Fires once; gated inside markEnd by ECHLY_PERF, so this
+  // is a no-op (beyond the ref check) in production and in dev without the flag.
+  const paintMarkedRef = useRef(false);
+  useEffect(() => {
+    if (paintMarkedRef.current) return;
+    if (isLoading || sessions.length === 0) return;
+    paintMarkedRef.current = true;
+    const raf = requestAnimationFrame(() => markEnd("sessions→painted"));
+    return () => cancelAnimationFrame(raf);
+  }, [isLoading, sessions.length]);
 
   const [captureOpen, setCaptureOpen] = useState(false);
   const { startingRecorder, triggerCta } = useSessionEntryCta();

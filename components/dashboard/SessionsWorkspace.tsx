@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import dynamic from "next/dynamic";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useUserAvatars } from "@/lib/hooks/useUserAvatars";
 import {
@@ -20,7 +20,6 @@ import {
 import type { SessionWithCounts } from "@/app/(app)/dashboard/hooks/useWorkspaceOverview";
 import type { Session } from "@/lib/domain/session";
 import ProgressPie from "@/components/ui/ProgressPie";
-import { WorkspaceCard } from "@/components/dashboard/WorkspaceCard";
 import { SessionsViewModeToggle } from "@/components/dashboard/SessionsViewModeToggle";
 import { SessionActionsDropdown } from "@/components/dashboard/SessionActionsDropdown";
 import { triggerAddMoreTickets } from "@/components/dashboard/hooks/triggerAddMoreTickets";
@@ -31,6 +30,7 @@ import {
   useWorkspace,
 } from "@/lib/client/workspaceContext";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { toast } from "sonner";
 import {
   useShareController,
   type ShareGeneralAccess,
@@ -41,6 +41,16 @@ import { useSessionsSearch } from "@/components/dashboard/context/SessionsSearch
 
 const ShareModal = dynamic(
   () => import("@/components/share/ShareModal").then((m) => m.ShareModal),
+  { ssr: false }
+);
+
+// PERF (Tier 1, T1.5): WorkspaceCard renders only in grid view, but list is the
+// default. Lazy-loading it keeps its chunk (and its avatar/tooltip deps) out of
+// the first dashboard paint; the chunk loads only when the user switches to
+// grid view. ssr:false because the card is interactive and only ever mounts
+// client-side inside this already-"use client" tree.
+const WorkspaceCard = dynamic(
+  () => import("@/components/dashboard/WorkspaceCard").then((m) => m.WorkspaceCard),
   { ssr: false }
 );
 
@@ -458,6 +468,78 @@ export const SessionWorkspaceRow = memo(function SessionWorkspaceRow({
   );
 });
 
+/**
+ * PERF (Tier 1, T1.1 + T1.2): viewport-gated row mount.
+ *
+ * The list previously rendered EVERY row at once. Each row mounts a ProgressPie,
+ * avatar stack, dropdown, tooltips, hover state, AND a live Firestore avatar
+ * listener per distinct named viewer (useUserAvatars). With dozens of rows that
+ * meant dozens of simultaneous onSnapshot listeners opening during the critical
+ * load window — the dominant render+listener cost on the dashboard.
+ *
+ * Rather than a windowing library (rejected: rows are responsive/variable-height
+ * — desktop is one line, mobile is the 3-line layout — and absolute-positioned
+ * windowing risks breaking the pixel-identical desktop + mobile constraint, plus
+ * it would add a dependency), this keeps rows in normal document flow and only
+ * MOUNTS a row's heavy subtree once it scrolls within `rootMargin` of the
+ * viewport. Until then it renders a same-height spacer so scroll position and
+ * the scrollbar stay stable.
+ *
+ * Mount-once: a row never unmounts after first appearing. Scrolling back up
+ * keeps hover/copy state and avoids re-opening avatar listeners or re-fetching.
+ * Net effect: at first paint only the on-screen rows mount → only those rows
+ * open avatar listeners (this is what makes T1.1 also resolve T1.2 on load).
+ *
+ * Visual identity: the wrapper is a plain <div> with no styling of its own, so
+ * the row's own classes (height, spacing, hover) are byte-for-byte unchanged.
+ * The placeholder reserves an estimated min-height; because the observer mounts
+ * rows BEFORE they reach the viewport (overscan), the estimate only needs to be
+ * close enough to avoid a large scrollbar jump for far-below-fold rows.
+ */
+const LAZY_ROW_ROOT_MARGIN = "600px 0px"; // overscan: mount ~600px before visible
+// Estimated collapsed-row height (desktop single-line row incl. py-4 + content).
+// Only used to reserve space for not-yet-mounted rows; mounted rows use auto height.
+const LAZY_ROW_ESTIMATED_HEIGHT = 72;
+
+const LazySessionRow = memo(function LazySessionRow({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  // Lazy initializer: when IntersectionObserver is unavailable (very old
+  // browsers / SSR edge) start mounted so the row is never stuck as a
+  // placeholder. Otherwise start unmounted and let the observer flip it. Doing
+  // this in the initializer (not via a synchronous setState in the effect)
+  // avoids a cascading-render lint and an extra render on first paint.
+  const [mounted, setMounted] = useState(
+    () => typeof IntersectionObserver === "undefined"
+  );
+
+  useEffect(() => {
+    if (mounted) return;
+    const node = ref.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setMounted(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: LAZY_ROW_ROOT_MARGIN }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [mounted]);
+
+  return (
+    <div ref={ref} style={mounted ? undefined : { minHeight: LAZY_ROW_ESTIMATED_HEIGHT }}>
+      {mounted ? children : null}
+    </div>
+  );
+});
+
 interface ShareModalForSessionProps {
   session: Session;
   onClose: () => void;
@@ -718,18 +800,23 @@ export function SessionsWorkspace({
               {viewMode === "list" ? (
                 <div className={`${listWrap} mt-0 space-y-3`}>
                   {section.items.map((rowItem) => (
-                    <SessionWorkspaceRow
-                      key={rowItem.session.id}
-                      item={rowItem}
-                      onView={onView}
-                      onRenameSuccess={onRenameSuccess}
-                      onSetArchived={onSetArchived}
-                      onRequestDelete={onRequestDelete}
-                      onRequestShare={handleRequestShare}
-                      isSelectionMode={isSelectionMode}
-                      isSelected={selectedSessions.includes(rowItem.session.id)}
-                      onToggleSelected={toggleSelected}
-                    />
+                    // PERF (T1.1/T1.2): mount each row only once it nears the
+                    // viewport so off-screen rows don't open avatar listeners
+                    // or render their heavy subtree at first paint. The wrapper
+                    // is unstyled, so list spacing/height/hover are unchanged.
+                    <LazySessionRow key={rowItem.session.id}>
+                      <SessionWorkspaceRow
+                        item={rowItem}
+                        onView={onView}
+                        onRenameSuccess={onRenameSuccess}
+                        onSetArchived={onSetArchived}
+                        onRequestDelete={onRequestDelete}
+                        onRequestShare={handleRequestShare}
+                        isSelectionMode={isSelectionMode}
+                        isSelected={selectedSessions.includes(rowItem.session.id)}
+                        onToggleSelected={toggleSelected}
+                      />
+                    </LazySessionRow>
                   ))}
                 </div>
               ) : (
@@ -774,7 +861,16 @@ export function SessionsWorkspace({
             <div className="flex items-center gap-4">
               <button
                 type="button"
-                onClick={() => void (allArchived ? unarchiveSelected() : archiveSelected())}
+                onClick={() => {
+                  (allArchived ? unarchiveSelected() : archiveSelected()).catch((e) => {
+                    console.error("Bulk archive failed:", e);
+                    toast.error(
+                      allArchived
+                        ? "Couldn't unarchive the selected sessions. Please try again."
+                        : "Couldn't archive the selected sessions. Please try again."
+                    );
+                  });
+                }}
                 disabled={bulkBusy || !onSetArchived}
                 aria-disabled={bulkBusy || !onSetArchived}
                 className="flex items-center gap-2 hover:opacity-80 disabled:opacity-50"
@@ -851,7 +947,12 @@ export function SessionsWorkspace({
               </button>
               <button
                 type="button"
-                onClick={() => void confirmBulkDelete()}
+                onClick={() => {
+                  confirmBulkDelete().catch((e) => {
+                    console.error("Bulk delete failed:", e);
+                    toast.error("Couldn't delete the selected sessions. Please try again.");
+                  });
+                }}
                 disabled={bulkDeleting || selectedSessions.length === 0 || !onDeleteSession}
                 className="inline-flex h-[38px] items-center gap-2 px-4 rounded-[var(--radius-btn)] border-none bg-[var(--color-danger)] text-white text-[14px] font-medium hover:opacity-95 transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
               >

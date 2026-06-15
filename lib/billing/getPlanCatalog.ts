@@ -109,10 +109,24 @@ async function fetchPlans(): Promise<PlanCatalog> {
   }
 }
 
+// PERF (Tier 1, T1.3): the plans collection is global (not user-scoped), so it
+// is safe to cache process-wide. Re-added a short-lived in-memory cache so the
+// dashboard's billing path doesn't hit the `plans` collection on every load.
+// 5 min TTL — plans change rarely, and stale data beyond 5 min is unacceptable.
+// In serverless this cache is per-instance: warm instances reuse it; cold
+// starts re-fetch. That's expected and fine.
+const PLAN_CATALOG_TTL_MS = 5 * 60 * 1000;
+let cachedCatalog: { data: PlanCatalog; expiresAt: number } | null = null;
+
 export async function getPlanCatalog(): Promise<PlanCatalog> {
-  return fetchPlans();
+  if (cachedCatalog && Date.now() < cachedCatalog.expiresAt) {
+    return cachedCatalog.data;
+  }
+  const data = await fetchPlans();
+  cachedCatalog = { data, expiresAt: Date.now() + PLAN_CATALOG_TTL_MS };
+  return data;
 }
 
 export function invalidatePlanCatalogCache(): void {
-  // No-op: plan catalog caching was removed.
+  cachedCatalog = null;
 }

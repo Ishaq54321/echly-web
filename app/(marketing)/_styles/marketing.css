@@ -863,7 +863,7 @@
   padding: 96px 24px 64px;
   width: 100%;
   max-width: none;
-  background: #FAF9F7;
+  background: #FFFFFF;
 }
 .marketing-root .ctt-section-eyebrow {
   align-self: center;
@@ -871,7 +871,7 @@
 }
 
 .marketing-root .ctt-headline {
-  font-size: clamp(40px, 5vw, 64px);
+  font-size: 48px;
   font-weight: 600;
   line-height: 1;
   letter-spacing: -0.04em;
@@ -1996,109 +1996,186 @@
   position: relative;
   width: 100%;
   max-width: 700px;
-  height: 440px;
+  height: 500px;
   margin: 0 auto;
 }
-/* Back-layer ticket stack — peeks behind the URL hero from the upper-left. */
-.marketing-root .ctt-sess-stack {
+/* AI DIAGNOSIS CARD — the "already diagnosed" lead, anchored top-left.
+   Ported verbatim from the reference design (Figtree + JetBrains Mono). */
+.marketing-root .ctt-diag {
   position: absolute;
-  left: -30px;
-  top: 30px;
-  width: 340px;
-  display: flex;
-  flex-direction: column;
-  transform: rotate(-3deg);
-  z-index: 1;
-}
-.marketing-root .ctt-sess-tile {
+  left: -24px;
+  top: -10px;
+  width: 430px;
   background: #fff;
-  border: 1px solid #E8E2D4;
-  border-radius: 13px;
-  padding: 13px 15px;
-  box-shadow: 0 18px 34px -22px rgba(26, 20, 36, 0.24);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 18px;
+  padding: 22px 24px 20px;
+  transform: rotate(-2.4deg);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 38, 0.05),
+    0 6px 16px rgba(15, 23, 38, 0.06),
+    0 34px 60px -22px rgba(15, 23, 38, 0.40);
+  z-index: 4;
+}
+.marketing-root .ctt-diag-head {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 11px;
 }
-.marketing-root .ctt-sess-tile + .ctt-sess-tile {
+.marketing-root .ctt-diag-ico {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  flex: none;
+  background: linear-gradient(180deg, #eef0ff, #e7e9ff);
+  border: 1px solid #dcdcfb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 2px rgba(99, 102, 241, 0.18);
+}
+.marketing-root .ctt-diag-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  letter-spacing: -0.005em;
+}
+.marketing-root .ctt-diag-conf {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #eafaf0;
+  border: 1px solid #cdeedb;
+  color: #15724a;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 999px;
+  letter-spacing: -0.005em;
+}
+.marketing-root .ctt-diag-conf-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #1f8a5b;
+}
+.marketing-root .ctt-diag-summary {
+  margin-top: 17px;
+  font-size: 20px;
+  line-height: 1.32;
+  font-weight: 700;
+  color: #0e1726;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.marketing-root .ctt-diag-sec-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+.marketing-root .ctt-diag-cause {
+  margin-top: 17px;
+}
+.marketing-root .ctt-diag-body {
+  margin-top: 8px;
+  font-size: 13.5px;
+  line-height: 1.62;
+  color: #475569;
+  letter-spacing: -0.003em;
+}
+.marketing-root .ctt-diag-inl {
+  font-family: var(--mk-font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  background: #f4f5f8;
+  border: 1px solid #e7e9ef;
+  color: #334155;
+  padding: 1px 5px;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+.marketing-root .ctt-diag-inl.ok {
+  background: #e9f8f0;
+  border-color: #cdeedb;
+  color: #15724a;
+  font-weight: 600;
+}
+.marketing-root .ctt-diag-inl.id {
+  background: #eef0ff;
+  border-color: #dcdcfb;
+  color: #4f46e5;
+}
+.marketing-root .ctt-diag-divider {
+  height: 1px;
+  background: #eceef2;
+  margin: 20px 0 0;
+}
+.marketing-root .ctt-diag-evidence {
+  margin-top: 18px;
+}
+.marketing-root .ctt-diag-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-top: 11px;
 }
-.marketing-root .ctt-sess-thumb {
-  width: 52px;
-  height: 36px;
-  border-radius: 7px;
-  background: linear-gradient(135deg, #E9E2F3, #D6CCEC);
-  flex-shrink: 0;
-  position: relative;
-  overflow: hidden;
-}
-.marketing-root .ctt-sess-thumb::after {
-  content: "";
-  position: absolute;
-  left: 5px;
-  right: 14px;
-  top: 7px;
-  height: 4px;
-  border-radius: 99px;
-  background: rgba(26, 20, 36, 0.10);
-}
-.marketing-root .ctt-sess-thumb::before {
-  content: "";
-  position: absolute;
-  left: 5px;
-  top: 15px;
-  width: 60%;
-  height: 3px;
-  border-radius: 99px;
-  background: rgba(26, 20, 36, 0.07);
-}
-.marketing-root .ctt-sess-tile.t-voice .ctt-sess-thumb {
-  background: linear-gradient(135deg, #F4E4C9, #E8C896);
-}
-.marketing-root .ctt-sess-tile.t-sess .ctt-sess-thumb {
-  background: linear-gradient(135deg, #CFE0DA, #A9C8BD);
-}
-.marketing-root .ctt-sess-tinfo {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
-}
-.marketing-root .ctt-sess-tt {
-  font-size: 12.5px;
-  color: #1A1424;
+.marketing-root .ctt-diag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  font-family: var(--mk-font-mono);
+  font-size: 11.5px;
   font-weight: 500;
+  color: #5b6675;
+  background: #f6f7f9;
+  border: 1px solid #e9ebf0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  letter-spacing: -0.01em;
+}
+.marketing-root .ctt-diag-pill-sep {
+  color: #c2c8d2;
+  padding: 0 6px;
+}
+.marketing-root .ctt-diag-pill-ok {
+  color: #1f8a5b;
+  font-weight: 600;
+}
+.marketing-root .ctt-diag-foot {
+  margin-top: 18px;
+  display: flex;
+}
+.marketing-root .ctt-diag-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 500;
+  background: #f7f8fa;
+  border: 1px solid #eef0f3;
+  padding: 6px 11px;
+  border-radius: 999px;
   letter-spacing: -0.005em;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
-.marketing-root .ctt-sess-tmeta {
-  font-family: var(--mk-font-mono);
-  font-size: 10.5px;
-  color: #8A8298;
-  letter-spacing: 0.03em;
+.marketing-root .ctt-diag-tag-g {
+  width: 11px;
+  height: 11px;
+  color: #aab2bf;
+  flex: none;
 }
-.marketing-root .ctt-sess-status {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 3px 8px;
-  border-radius: 6px;
-  flex-shrink: 0;
-}
-.marketing-root .ctt-sess-status.open { background: #FEE9DC; color: #9F4A12; }
-.marketing-root .ctt-sess-status.prog { background: var(--violet-soft); color: #3B2F8C; }
-.marketing-root .ctt-sess-status.resv { background: #DEEFE3; color: #1F6F3D; }
-/* HERO: shareable session URL card — the "share the whole session" moment. */
+/* HERO: shareable session URL card — the "share the whole session" moment.
+   Sits toward the lower-right; the AI diagnosis card leads from the top-left. */
 .marketing-root .ctt-sess-url {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-46%, -52%) rotate(2deg);
-  width: 520px;
+  right: -16px;
+  bottom: -14px;
+  transform: rotate(2deg);
+  width: 480px;
   background: #fff;
   border: 1px solid #E8E2D4;
   border-radius: 20px;
@@ -2291,54 +2368,6 @@
   font-weight: 500;
   box-shadow: 0 6px 14px -6px rgba(47, 122, 110, 0.5);
 }
-.marketing-root .ctt-sess-comment {
-  position: absolute;
-  right: -30px;
-  bottom: 28px;
-  width: 260px;
-  background: #fff;
-  border: 1px solid #E8E2D4;
-  border-radius: 14px;
-  box-shadow: 0 26px 50px -20px rgba(26, 20, 36, 0.32);
-  padding: 14px 15px;
-  transform: rotate(-4deg);
-  z-index: 4;
-}
-.marketing-root .ctt-sess-comment-h {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-.marketing-root .ctt-sess-comment-av {
-  width: 24px;
-  height: 24px;
-  border-radius: 99px;
-  background-color: var(--violet);
-  background-size: cover;
-  background-position: center;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
-  flex-shrink: 0;
-}
-.marketing-root .ctt-sess-comment-n {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: #1A1424;
-}
-.marketing-root .ctt-sess-comment-t {
-  font-size: 10.5px;
-  color: #8A8298;
-  font-family: var(--mk-font-mono);
-  letter-spacing: 0.04em;
-  margin-left: auto;
-}
-.marketing-root .ctt-sess-comment-c {
-  font-size: 13px;
-  line-height: 1.45;
-  color: #2A2235;
-  margin: 0;
-}
-
 /* ---- Responsive: visual column collapses to a stack on tablets/phones ----
    The new mockups use absolute positioning, which falls apart in a narrow
    column. Below 1099px (where the card body collapses to single-column),
@@ -2386,103 +2415,461 @@
     margin: 8px auto 0;
     transform: none;
   }
-  .marketing-root .ctt-sess-stack {
+  .marketing-root .ctt-diag {
     position: relative;
     left: 0;
     top: 0;
     width: 100%;
-    margin-top: 18px;
+    max-width: 452px;
+    margin: 0 auto;
+    transform: none;
   }
   .marketing-root .ctt-sess-url {
     position: relative;
-    left: 0;
-    top: 0;
+    right: 0;
+    bottom: 0;
     width: 100%;
     margin: 18px auto 0;
     transform: none;
-  }
-  .marketing-root .ctt-sess-comment {
-    position: relative;
-    right: 0;
-    bottom: 0;
-    width: 80%;
-    margin: 18px auto 0;
-    transform: rotate(-1deg);
   }
 }
 
 
 /* ============================================================
-   FINAL CTA â€” closing moment of the marketing page.
-   Replaces the old "Feedback at the speed of seeing it" tagline repeat.
+   FINAL CTA BAND â€” atmospheric, branded closing moment.
+   Ported verbatim from the reference design (deep indigo core lifting to
+   periwinkle, drifting clouds, ghosted flowing code, technical grid, bloom).
    ============================================================ */
-.marketing-root .final-cta-section {
-  width: 100%;
-  background: #E8E0FF;
-  padding: 96px 32px 80px;
-  text-align: center;
+
+/* reveal-on-scroll (self-contained; base.css was not ported) */
+.marketing-root .cta .reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--d, 0s);
 }
-.marketing-root .final-cta-container {
-  max-width: 680px;
-  margin: 0 auto;
+.marketing-root .cta .reveal.in {
+  opacity: 1;
+  transform: none;
 }
-.marketing-root .final-cta-headline {
-  font-size: clamp(36px, 4vw, 56px);
-  font-weight: 700;
-  line-height: 1.05;
-  letter-spacing: -0.04em;
-  margin: 0 0 16px;
-  background: linear-gradient(90deg, #15101F 0%, #15101F 40%, #54495F 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: #15101F;
+
+/* ---------- the band ---------- */
+.marketing-root .cta {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  padding: 88px 0 92px;
+  /* Near-black canvas with soft purple/blue ambient glows bleeding in from the
+     corners — matches the BuiltForAgenciesDark (.ag-root) section. */
+  background:
+    radial-gradient(900px 520px at 12% 2%, oklch(48% 0.18 295 / 0.18), transparent 60%),
+    radial-gradient(880px 560px at 92% 30%, oklch(48% 0.16 250 / 0.14), transparent 62%),
+    radial-gradient(1000px 600px at 50% 108%, oklch(46% 0.15 285 / 0.12), transparent 60%),
+    #09090c;
 }
-.marketing-root .final-cta-sub {
-  font-size: 17px;
-  line-height: 1.55;
-  color: rgba(15, 23, 42, 0.65);
-  margin: 0 auto 36px;
-  max-width: 520px;
+/* lighter periwinkle wash drifting over the deep base */
+.marketing-root .cta-wash {
+  position: absolute;
+  inset: -10%;
+  z-index: -3;
+  pointer-events: none;
+  background: radial-gradient(
+      40% 50% at 22% 18%,
+      rgba(165, 180, 252, 0.06),
+      transparent 60%
+    ),
+    radial-gradient(46% 56% at 82% 30%, rgba(129, 140, 248, 0.05), transparent 62%),
+    linear-gradient(180deg, rgba(99, 102, 241, 0.025) 0%, transparent 46%);
+  mix-blend-mode: soft-light;
 }
-.marketing-root .final-cta-buttons {
+
+/* ---------- drifting soft-light clouds ---------- */
+.marketing-root .cta-clouds {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  overflow: hidden;
+}
+.marketing-root .cloud {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(46px);
+  mix-blend-mode: soft-light;
+  will-change: transform;
+}
+.marketing-root .cloud.c1 {
+  width: 760px;
+  height: 560px;
+  left: -8%;
+  top: -14%;
+  background: radial-gradient(
+    closest-side,
+    rgba(199, 210, 254, 0.09),
+    rgba(199, 210, 254, 0)
+  );
+}
+.marketing-root .cloud.c2 {
+  width: 680px;
+  height: 520px;
+  right: -10%;
+  top: 6%;
+  background: radial-gradient(
+    closest-side,
+    rgba(165, 180, 252, 0.08),
+    rgba(165, 180, 252, 0)
+  );
+}
+.marketing-root .cloud.c3 {
+  width: 840px;
+  height: 600px;
+  left: 18%;
+  bottom: -30%;
+  background: radial-gradient(
+    closest-side,
+    rgba(129, 140, 248, 0.07),
+    rgba(129, 140, 248, 0)
+  );
+}
+.marketing-root .cloud.c4 {
+  width: 520px;
+  height: 420px;
+  right: 14%;
+  bottom: -18%;
+  background: radial-gradient(
+    closest-side,
+    rgba(224, 231, 255, 0.075),
+    rgba(224, 231, 255, 0)
+  );
+}
+.marketing-root .cloud.c1 {
+  animation: cta-drift1 26s ease-in-out infinite;
+}
+.marketing-root .cloud.c2 {
+  animation: cta-drift2 32s ease-in-out infinite;
+}
+.marketing-root .cloud.c3 {
+  animation: cta-drift3 38s ease-in-out infinite;
+}
+.marketing-root .cloud.c4 {
+  animation: cta-drift2 30s ease-in-out infinite reverse;
+}
+@keyframes cta-drift1 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(70px, 38px) scale(1.08);
+  }
+}
+@keyframes cta-drift2 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-58px, 30px) scale(1.1);
+  }
+}
+@keyframes cta-drift3 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(46px, -44px) scale(1.06);
+  }
+}
+
+/* ---------- ghosted flowing code / log text ---------- */
+.marketing-root .cta-code {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  overflow: hidden;
+  /* fades toward the centre where the message sits */
+  -webkit-mask-image: radial-gradient(
+    72% 88% at 50% 50%,
+    transparent 0%,
+    transparent 30%,
+    #000 78%
+  );
+  mask-image: radial-gradient(
+    72% 88% at 50% 50%,
+    transparent 0%,
+    transparent 30%,
+    #000 78%
+  );
+}
+.marketing-root .cta-code-col {
+  position: absolute;
+  top: -6%;
   display: flex;
-  gap: 16px;
-  justify-content: center;
-  align-items: center;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 11px;
+  font-family: var(--mk-font-mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  color: rgba(226, 232, 255, 0.085);
+  will-change: transform;
+  animation: cta-codeflow var(--dur, 60s) linear infinite;
 }
-.marketing-root .final-cta-primary,
-.marketing-root .final-cta-secondary {
+.marketing-root .cta-code-col .lo {
+  color: rgba(199, 210, 254, 0.07);
+}
+.marketing-root .cta-code-col .hi {
+  color: rgba(237, 240, 255, 0.11);
+}
+@keyframes cta-codeflow {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-50%);
+  }
+}
+
+/* ---------- technical grid, faded at edges ---------- */
+.marketing-root .cta-grid {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background-image: linear-gradient(
+      to right,
+      rgba(224, 231, 255, 0.08) 1px,
+      transparent 1px
+    ),
+    linear-gradient(to bottom, rgba(224, 231, 255, 0.08) 1px, transparent 1px);
+  background-size: 62px 62px;
+  -webkit-mask-image: radial-gradient(90% 100% at 50% 50%, #000 6%, transparent 70%);
+  mask-image: radial-gradient(90% 100% at 50% 50%, #000 6%, transparent 70%);
+}
+
+/* ---------- radial light bloom behind the heading ---------- */
+.marketing-root .cta-bloom {
+  display: none;
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  width: 1200px;
+  height: 720px;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+      42% 50% at 50% 46%,
+      rgba(232, 236, 255, 0.1),
+      transparent 66%
+    ),
+    radial-gradient(60% 70% at 50% 50%, rgba(165, 180, 252, 0.08), transparent 72%);
+  filter: blur(12px);
+}
+
+/* fine top/bottom hairlines to seat the band */
+.marketing-root .cta::before,
+.marketing-root .cta::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  z-index: 1;
+  pointer-events: none;
+}
+.marketing-root .cta::before {
+  top: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(224, 231, 255, 0.28),
+    transparent
+  );
+}
+.marketing-root .cta::after {
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(44, 38, 117, 0.6), transparent);
+}
+
+/* ---------- foreground ---------- */
+.marketing-root .cta .wrap {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+.marketing-root .cta-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 48px;
+  margin: 0 auto;
+  text-align: left;
+}
+.marketing-root .cta-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.marketing-root .cta-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 22px;
+  font-family: var(--mk-font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.82);
+}
+.marketing-root .cta-eyebrow .mk {
+  display: inline-flex;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.2);
+}
+
+.marketing-root .cta-h {
+  font-size: clamp(34px, 5vw, 60px);
+  line-height: 1.03;
+  letter-spacing: -0.034em;
+  font-weight: 720;
+  color: #ffffff;
+  text-wrap: balance;
+  margin: 0;
+}
+.marketing-root .cta-sub {
+  margin: 22px 0 0;
+  max-width: 520px;
+  font-size: clamp(16px, 1.6vw, 18.5px);
+  line-height: 1.58;
+  letter-spacing: -0.006em;
+  color: rgba(255, 255, 255, 0.88);
+  text-wrap: pretty;
+}
+
+.marketing-root .cta-btns {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 0;
+}
+.marketing-root .cta-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 48px;
-  padding: 0 22px;
-  border-radius: 12px;
-  font-size: 15px;
+  gap: 10px;
+  height: 54px;
+  padding: 0 28px;
+  border-radius: 13px;
+  border: 1px solid transparent;
+  font-family: inherit;
+  font-size: 15.5px;
   font-weight: 600;
-  letter-spacing: -0.005em;
-  text-decoration: none;
-  border: none;
+  letter-spacing: -0.012em;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.15s ease;
+  text-decoration: none;
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.24s cubic-bezier(0.22, 1, 0.36, 1), background 0.18s, color 0.18s;
+  white-space: nowrap;
 }
-.marketing-root .final-cta-primary {
-  background: #15101F;
-  color: #FFFFFF;
+.marketing-root .cta-btn svg {
+  width: 17px;
+  height: 17px;
 }
-.marketing-root .final-cta-primary:hover {
-  background: #1C1729;
-  transform: translateY(-1px);
+.marketing-root .cta-btn .arr {
+  display: inline-flex;
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.marketing-root .final-cta-secondary {
-  background: #FFFFFF;
-  color: #15101F;
+.marketing-root .cta-btn:hover .arr {
+  transform: translateX(3px);
 }
-.marketing-root .final-cta-secondary:hover {
-  background: #F5F5F5;
-  transform: translateY(-1px);
+.marketing-root .cta-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* primary â€” plum/orchid */
+.marketing-root .cta-btn--primary {
+  background: #81296e;
+  color: #ffffff;
+  box-shadow: none;
+}
+.marketing-root .cta-btn--primary:hover {
+  transform: translateY(-2px);
+  background: #93307e;
+  box-shadow: 0 16px 36px -12px rgba(20, 16, 60, 0.45);
+}
+
+/* secondary â€” light, soft shadow */
+.marketing-root .cta-btn--light {
+  background: rgba(255, 255, 255, 0.96);
+  color: #15101f;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 8px 22px -10px rgba(20, 16, 60, 0.5), 0 2px 6px rgba(20, 16, 60, 0.3);
+}
+.marketing-root .cta-btn--light:hover {
+  transform: translateY(-2px);
+  background: #fff;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 1) inset,
+    0 16px 36px -12px rgba(20, 16, 60, 0.55), 0 0 0 4px rgba(255, 255, 255, 0.16);
+}
+
+/* ---------- responsive ---------- */
+@media (max-width: 860px) {
+  .marketing-root .cta-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 32px;
+  }
+  .marketing-root .cta-btns {
+    align-self: stretch;
+  }
+}
+@media (max-width: 760px) {
+  .marketing-root .cta {
+    padding: 72px 0 78px;
+  }
+  .marketing-root .cta-h {
+    font-size: clamp(30px, 8vw, 40px);
+  }
+}
+@media (max-width: 480px) {
+  .marketing-root .cta {
+    padding: 60px 0 64px;
+  }
+  .marketing-root .cta-btns {
+    gap: 12px;
+  }
+  .marketing-root .cta-btn {
+    width: 100%;
+    max-width: 340px;
+  }
+  .marketing-root .cta-bloom {
+    width: 140%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketing-root .cloud,
+  .marketing-root .cta-code-col {
+    animation: none !important;
+  }
+  .marketing-root .cta .reveal {
+    transition: none;
+  }
 }
 
 /* ============ DARK EDITORIAL ============ */
@@ -2845,11 +3232,12 @@
 .marketing-root .signature-session-section--light {
   position: relative;
   width: 100%;
-  padding: 56px 0 144px;
+  padding: 144px 0;
+  background: #FFFFFF;
 }
 @media (max-width: 860px) {
   .marketing-root .signature-session-section--light {
-    padding: 40px 0 72px;
+    padding: 72px 0;
   }
 }
 .marketing-root .signature-session-header {
@@ -3518,9 +3906,11 @@
 .marketing-root .pricing-section {
   --pricing-grad: linear-gradient(135deg, #5A49BF 0%, #8B5CB8 50%, #D63384 100%);
   --pricing-grad-hover: linear-gradient(135deg, #6B5AC9 0%, #9C6DC0 50%, #E04590 100%);
-  background: linear-gradient(180deg, #FFFFFF 0%, #FFFFFF 70%, #E9EFFB 100%);
+  background: #FFFFFF;
   width: 100%;
-  padding: 100px 32px;
+  /* 125px bottom so the gap above the FAQ headline matches the FAQ's 125px
+     bottom padding (the FAQ itself has no top padding). */
+  padding: 100px 32px 125px;
 }
 .marketing-root .pricing-inner {
   width: 100%;
@@ -3915,11 +4305,16 @@
 .marketing-root .faq-section {
   width: 100%;
   background: #FFFFFF;
-  padding: 96px 32px 80px;
+  /* No top padding: the pricing section above contributes the 125px gap above
+     the headline, matching the 125px below the last question (where the dark
+     CTA band begins). */
+  padding: 0 32px 125px;
 }
 .marketing-root .faq-container {
   width: 100%;
-  max-width: 1080px;
+  /* Match the pricing section's inner width so the FAQ's left/right edges line
+     up with the pricing cards directly above it. */
+  max-width: 1280px;
   margin: 0 auto;
 }
 
@@ -6324,7 +6719,7 @@
   font-size: clamp(42px, 4.8vw, 66px);
   font-weight: 600;
   line-height: 1.0;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.04em;
   margin: 0 auto;
   color: #15101F;
   /* Wider column to let the bigger type breathe across two balanced lines. */
@@ -7168,6 +7563,11 @@
    class names are unique to this section.
    ============================================================ */
 
+/* White band behind the inset dark .ag-root panel — overrides the grey page
+   background so the panel's left/right gutters read as white, not greyish. */
+.marketing-root .ag-gutter {
+  background: #FFFFFF;
+}
 .marketing-root .ag-root {
   --ag-bg: #0a0a0c;
   --ag-bg-2: #0e0e12;
@@ -7273,9 +7673,10 @@
 }
 .marketing-root .ag-title {
   margin: 0;
-  font-size: clamp(40px, 5vw, 64px);
-  line-height: 1;
-  letter-spacing: -0.04em;
+  /* Match the site's other section headlines (cf. .pv-h / .dx-h). */
+  font-size: clamp(30px, 3.5vw, 46px);
+  line-height: 1.06;
+  letter-spacing: -0.032em;
   font-weight: 400;
   color: #fafafc;
   max-width: 720px;
@@ -8383,9 +8784,6 @@
     gap: 32px;
     align-items: start;
   }
-  .marketing-root .ag-title {
-    font-size: 44px;
-  }
   .marketing-root .ag-grid {
     grid-template-columns: 1fr;
   }
@@ -8604,6 +9002,42 @@
   border-color: rgba(21, 16, 31, 0.14);
 }
 
+/* Gradient stroke on hover â€” same mask-composite ring as .hcd-hero-pill.
+   Swap the solid border for a transparent one (clipped to padding-box) so the
+   ::before ring is what's visible, then fade in the brand gradient on hover. */
+.marketing-root .hcd-hero-cta-secondary {
+  position: relative;
+  border-color: transparent;
+  background-clip: padding-box;
+}
+.marketing-root .hcd-hero-cta-secondary::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: rgba(21, 16, 31, 0.08);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+  transition: background 0.2s ease;
+}
+.marketing-root .hcd-hero-cta-secondary:hover {
+  border-color: transparent;
+}
+.marketing-root .hcd-hero-cta-secondary:hover::before {
+  background: linear-gradient(
+    100deg,
+    #6E3FB0 0%,
+    #5A49BF 32%,
+    #5E6AD2 56%,
+    #C51A68 100%
+  );
+}
+
 /* â”€â”€ prefers-reduced-motion: global suppression for the polish-pass animations
    The original section-specific @media blocks above stay in place; this is an
    additional belt-and-braces rule covering the new keyframes introduced in
@@ -8676,11 +9110,18 @@
   display: grid;
   grid-template-columns: 0.78fr 1.22fr;
   gap: 48px;
-  align-items: end;
+  /* Top-align both columns: with the shorter headline/copy on the left, the
+     DevTools panel rises to sit alongside the head instead of being pinned to
+     the bottom of the row (which left a gap under the copy). */
+  align-items: start;
 }
 .marketing-root .ev-card-head {
   max-width: 460px;
   align-self: start;
+  /* Match the panel wrapper's reserved top band so the head's eyebrow lines up
+     with the panel window's title bar — the two columns read as symmetric at
+     the top. */
+  padding-top: 34px;
 }
 
 /* Eyebrow: same .ag-eyebrow recipe, plus a leading accent mark like .ag-kicker. */
@@ -8701,12 +9142,12 @@
   margin-bottom: 26px;
 }
 
-/* The DevTools panel sits in the card's stage column, bottom-aligned so it
-   sits flush with the bottom of the row. */
+/* The DevTools panel sits in the card's stage column, centered vertically in
+   the row so it reads as balanced against the (shorter) head copy on the left. */
 .marketing-root .ev-card-stage {
   position: relative;
   z-index: 1;
-  align-self: end;
+  align-self: center;
 }
 
 /* supporting points */
@@ -8766,6 +9207,53 @@
     0 0 90px -30px rgba(165, 137, 255, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
+/* "Live demo" tag floating just above the window's top-right corner. The
+   wrapper reserves a clear band above the .dt window (the parent .ag-card has
+   overflow:hidden, so the pill must stay within the card's box — it can't bleed
+   past the window's top edge). The pill sits in that band, fully clear of the
+   title-bar text below it. */
+.marketing-root .ev-panel-wrap {
+  position: relative;
+  padding-top: 34px;
+}
+.marketing-root .dt-livedemo {
+  position: absolute;
+  /* Straddle the window's top edge — the .dt window starts at the wrapper's
+     padding-top (34px); the ~28px pill sits slightly above center on that edge. */
+  top: 15px;
+  right: 14px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 99px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: oklch(88% 0.07 155);
+  background: linear-gradient(
+    180deg,
+    oklch(74% 0.14 155 / 0.18) 0%,
+    oklch(74% 0.14 155 / 0.1) 100%
+  );
+  border: 1px solid oklch(74% 0.14 155 / 0.3);
+  box-shadow: 0 8px 22px -8px rgba(0, 0, 0, 0.6),
+    0 0 18px -6px oklch(74% 0.14 155 / 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.marketing-root .dt-livedemo-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ag-green);
+  box-shadow: 0 0 0 3px oklch(74% 0.14 155 / 0.16);
+  animation: ev-pulse 2.2s infinite;
+}
+
 .marketing-root .dt-bar {
   display: flex;
   align-items: center;
@@ -9392,18 +9880,67 @@
   font-weight: 500;
 }
 
-/* ---------- TRUST (light, own section) ---------- */
-.marketing-root .ev-trust-root {
-  background: var(--bg-0);
-  padding: 104px 0 110px;
+/* ---------- PRIVACY / REDACTION (light, own section) ----------
+   Ported from the standalone "Annote Privacy Section" markup. The source's
+   foreign base.css theme vars (--primary/--surface/--ink/--green/…) are resolved
+   here to the marketing system's own tokens (--violet*, --ink-*, --line-*,
+   --bg-0, --mk-sh-*, --mk-font-mono) so the section reads consistently with the
+   rest of the page. Class names keep the source `.pv-*` namespace. */
+.marketing-root .pv {
+  position: relative;
+  overflow: hidden;
+  background: #FFFFFF;
+  padding: 108px 0;
 }
-.marketing-root .ev-trust-wrap {
-  max-width: 680px;
+/* faint technical grid, masked toward the card side */
+.marketing-root .pv-grid {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: linear-gradient(to right, rgba(90, 73, 191, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(90, 73, 191, 0.05) 1px, transparent 1px);
+  background-size: 58px 58px;
+  -webkit-mask-image: radial-gradient(80% 110% at 82% 50%, #000 8%, transparent 64%);
+  mask-image: radial-gradient(80% 110% at 82% 50%, #000 8%, transparent 64%);
+}
+/* violet glow behind the right card */
+.marketing-root .pv-glow {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  top: 50%;
+  right: -60px;
+  width: 780px;
+  height: 680px;
+  transform: translateY(-50%);
+  background: radial-gradient(42% 46% at 60% 46%, rgba(101, 87, 204, 0.3), transparent 72%),
+    radial-gradient(34% 38% at 72% 60%, rgba(165, 149, 240, 0.22), transparent 74%);
+  filter: blur(10px);
+}
+.marketing-root .pv-wrap {
+  position: relative;
+  z-index: 2;
+  /* Match the neighboring sections' content width (Pricing uses 1280px / 32px
+     side padding) so the band reads symmetrically with the rest of the page,
+     rather than sitting narrower/inset. */
+  width: 100%;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 0 64px;
-  text-align: center;
+  padding: 0 32px;
 }
-.marketing-root .ev-trust-kicker {
+.marketing-root .pv-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.02fr);
+  gap: 96px;
+  align-items: center;
+}
+
+/* ---------- LEFT : copy ---------- */
+.marketing-root .pv-copy {
+  max-width: 540px;
+}
+.marketing-root .pv-eyebrow {
   display: inline-flex;
   align-items: center;
   gap: 9px;
@@ -9412,61 +9949,1732 @@
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--violet);
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   white-space: nowrap;
 }
-.marketing-root .ev-trust-kicker .mk {
+.marketing-root .pv-eyebrow .mk {
   font-size: 13px;
 }
-.marketing-root .ev-trust-h {
-  margin: 0;
-  font-size: clamp(28px, 3.2vw, 40px);
-  line-height: 1.08;
-  letter-spacing: -0.028em;
+.marketing-root .pv-h {
+  font-size: clamp(30px, 3.5vw, 46px);
+  line-height: 1.04;
+  letter-spacing: -0.032em;
   font-weight: 500;
   color: var(--ink-1);
+  text-wrap: balance;
+  margin: 0;
 }
-.marketing-root .ev-trust-p {
-  margin: 18px auto 0;
-  max-width: 600px;
-  font-size: 16.5px;
+.marketing-root .pv-p {
+  margin-top: 20px;
+  font-size: 17.5px;
   line-height: 1.62;
   color: var(--ink-2);
-  letter-spacing: -0.004em;
+  letter-spacing: -0.006em;
+  text-wrap: pretty;
+  max-width: 480px;
 }
-.marketing-root .ev-trust-p b {
+.marketing-root .pv-p strong {
   color: var(--ink-1);
   font-weight: 500;
 }
-.marketing-root .ev-trust-chips {
+
+.marketing-root .pv-feats {
+  margin-top: 36px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px 30px;
+  max-width: 500px;
+}
+.marketing-root .pv-feat {
   display: flex;
-  flex-wrap: wrap;
+  gap: 13px;
+  align-items: flex-start;
+}
+.marketing-root .pv-feat-ic {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  margin-top: 1px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  margin: 26px auto 0;
+  background: var(--violet-soft);
+  color: var(--violet);
+  box-shadow: inset 0 0 0 1px rgba(90, 73, 191, 0.1);
 }
-.marketing-root .ev-trust-chip {
+.marketing-root .pv-feat-ic svg {
+  width: 17px;
+  height: 17px;
+}
+.marketing-root .pv-feat-t {
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--ink-1);
+  line-height: 1.3;
+}
+.marketing-root .pv-feat-d {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-3);
+  letter-spacing: -0.004em;
+}
+
+.marketing-root .pv-link {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 6px 13px;
-  border-radius: 99px;
+  margin-top: 38px;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--violet);
+  transition: color 0.15s;
+}
+.marketing-root .pv-link:hover {
+  color: var(--violet-dim);
+}
+.marketing-root .pv-link .arr {
+  transition: transform 0.18s ease;
+}
+.marketing-root .pv-link:hover .arr {
+  transform: translateX(3px);
+}
+
+/* ---------- RIGHT : redaction mockup ---------- */
+.marketing-root .pv-stage {
+  position: relative;
+  perspective: 1600px;
+}
+.marketing-root .pv-card {
+  position: relative;
   background: #fff;
   border: 1px solid var(--line-1);
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--ink-1);
-  letter-spacing: -0.003em;
-  box-shadow: var(--mk-sh-xs);
-  white-space: nowrap;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 2px 6px rgba(31, 38, 71, 0.05),
+    0 28px 60px -26px rgba(31, 38, 71, 0.34),
+    0 48px 90px -50px rgba(90, 73, 191, 0.3);
 }
-.marketing-root .ev-trust-chip i {
+.marketing-root .pv-card::after {
+  /* faint inner glow on the rim */
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(101, 87, 204, 0.08);
+}
+.marketing-root .pv-stage .pv-card {
+  animation: pvfloat 7s ease infinite;
+}
+@keyframes pvfloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-9px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .marketing-root .pv-stage .pv-card {
+    animation: none;
+  }
+}
+
+/* card header — request line */
+.marketing-root .pv-cardhead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line-1);
+  background: var(--bg-0);
+}
+.marketing-root .pv-method {
+  font-family: var(--mk-font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--violet);
+  background: var(--violet-soft);
+  border: 1px solid rgba(90, 73, 191, 0.18);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+.marketing-root .pv-reqline {
+  font-family: var(--mk-font-mono);
+  font-size: 12.5px;
+  color: var(--ink-2);
+  letter-spacing: -0.01em;
+}
+.marketing-root .pv-reqline b {
+  color: var(--ink-1);
+  font-weight: 600;
+}
+.marketing-root .pv-status {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mk-font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: #1f9d6b;
+}
+.marketing-root .pv-status i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #1f9d6b;
+  box-shadow: 0 0 0 3px rgba(31, 157, 107, 0.14);
+}
+
+/* captured rows */
+.marketing-root .pv-rows {
+  padding: 8px 8px 6px;
+}
+.marketing-root .pv-sectlabel {
+  font-family: var(--mk-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  padding: 10px 12px 6px;
+}
+.marketing-root .pv-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  font-family: var(--mk-font-mono);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.marketing-root .pv-row + .pv-row {
+  margin-top: 1px;
+}
+.marketing-root .pv-key {
+  color: var(--ink-3);
+  min-width: 124px;
+  flex: none;
+}
+.marketing-root .pv-key .c {
+  color: var(--ink-4);
+}
+.marketing-root .pv-val {
+  color: var(--ink-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* redaction token */
+.marketing-root .pv-redacted {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px;
+  border-radius: 6px;
+  background: var(--violet-soft);
+  color: var(--violet-dim);
+  border: 1px solid rgba(90, 73, 191, 0.18);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.marketing-root .pv-redacted svg {
+  width: 11px;
+  height: 11px;
+  opacity: 0.85;
+}
+.marketing-root .pv-dots {
+  letter-spacing: 2px;
+  color: var(--ink-2);
+}
+
+/* the one visible, non-sensitive value */
+.marketing-root .pv-row.kept .pv-val {
+  color: var(--ink-1);
+}
+.marketing-root .pv-kept-tag {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink-3);
+  margin-left: 2px;
+}
+
+/* card footer caption */
+.marketing-root .pv-cardfoot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 13px 16px;
+  border-top: 1px solid var(--line-1);
+  background: var(--bg-0);
+}
+.marketing-root .pv-caption {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-2);
+  letter-spacing: -0.005em;
+}
+.marketing-root .pv-caption .dot {
   width: 5px;
   height: 5px;
   border-radius: 50%;
   background: var(--violet);
-  opacity: 0.7;
+}
+.marketing-root .pv-microtag {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mk-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: var(--ink-3);
+}
+.marketing-root .pv-microtag .pip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: #fff;
+  border: 1px solid var(--line-1);
+  color: var(--ink-2);
+}
+.marketing-root .pv-microtag .pip i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #1f9d6b;
+}
+
+/* floating "5ms" timing tag pinned to the card edge */
+.marketing-root .pv-timing {
+  position: absolute;
+  top: -14px;
+  right: 26px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 99px;
+  background: #fff;
+  border: 1px solid var(--line-1);
+  box-shadow: var(--mk-sh-md);
+  font-family: var(--mk-font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.marketing-root .pv-timing b {
+  color: var(--violet);
+}
+
+/* ---------- AI DIAGNOSIS — "Already diagnosed" flagship band ----------
+   Ported from the standalone "Annote — The cause is already there" markup: a
+   deep-indigo spotlight room (drifting ghosted log fragments + technical grid +
+   violet bloom) that interrupts the near-white page so the white diagnosis card
+   glows as a single spotlit object, framed by three supporting points and a
+   closing line. The source's foreign base.css theme vars resolve here to
+   concrete values.
+
+   Constraints vs. the source: the band is NOT full-bleed — it borrows the dark
+   .ag-root section's inset width (calc(100% - 96px) / max 1440px, centered) and
+   32px rounded corners, so it reads as a contained block. The source's
+   scroll-triggered reveal is driven by a React `.lit` class toggled via
+   IntersectionObserver; styles below mirror the source's `.flag.lit *` rules,
+   renamed to the `.dx-*` namespace. */
+.marketing-root .dxband-gutter {
+  background: #FFFFFF;
+}
+.marketing-root .dxflag {
+  /* shared easing for the card's "live diagnosis" timeline transitions */
+  --mk-e: var(--mk-ease, cubic-bezier(0.22, 1, 0.36, 1));
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  /* Borrow the dark .ag-root band's inset width + 32px rounded corners. */
+  width: calc(100% - 96px);
+  max-width: 1440px;
+  margin-inline: auto;
+  border-radius: 32px;
+  box-sizing: border-box;
+  /* Vertical rhythm matched to the dark .ag-root band (72/96) — the original
+     132/140 left far too much air top and bottom. */
+  padding: 96px 0 100px;
+  /* deep near-black core lifting to deep-indigo */
+  background: radial-gradient(125% 120% at 50% 8%, #1c1638 0%, #15102a 36%, #100c20 64%, #0b0813 100%);
+}
+/* fine top/bottom hairlines seating the band against the white page */
+.marketing-root .dxflag::before,
+.marketing-root .dxflag::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  z-index: 3;
+  pointer-events: none;
+}
+.marketing-root .dxflag::before {
+  top: 0;
+  background: linear-gradient(90deg, transparent, rgba(199, 210, 254, 0.12), transparent);
+}
+.marketing-root .dxflag::after {
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(11, 8, 19, 0.9), transparent);
+}
+
+/* faint technical grid, fading at the edges */
+.marketing-root .dxflag .dx-grid {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background-image: linear-gradient(to right, rgba(199, 210, 254, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(199, 210, 254, 0.05) 1px, transparent 1px);
+  background-size: 64px 64px;
+  -webkit-mask-image: radial-gradient(96% 100% at 50% 46%, #000 4%, transparent 72%);
+  mask-image: radial-gradient(96% 100% at 50% 46%, #000 4%, transparent 72%);
+}
+
+/* ghosted monospace log fragments drifting in the dark */
+.marketing-root .dx-code {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  overflow: hidden;
+  /* clear a hole in the centre where the card sits */
+  -webkit-mask-image: radial-gradient(64% 80% at 50% 50%, transparent 0%, transparent 36%, #000 80%);
+  mask-image: radial-gradient(64% 80% at 50% 50%, transparent 0%, transparent 36%, #000 80%);
+}
+.marketing-root .dx-code-col {
+  position: absolute;
+  top: -8%;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  font-family: var(--mk-font-mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  color: rgba(199, 210, 254, 0.055);
+  will-change: transform;
+  animation: dxlogdrift var(--dur, 80s) linear infinite;
+}
+.marketing-root .dx-code-col .lo {
+  color: rgba(165, 180, 252, 0.045);
+}
+.marketing-root .dx-code-col .hi {
+  color: rgba(224, 231, 255, 0.075);
+}
+@keyframes dxlogdrift {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-50%);
+  }
+}
+
+/* soft indigo/violet radial bloom behind the centerpiece. Anchored low — over
+   the card, not the band centre — so it doesn't bleed up behind the headline
+   and subhead as a white spot. */
+.marketing-root .dx-bloom {
+  position: absolute;
+  left: 50%;
+  top: 66%;
+  transform: translate(-50%, -50%) scale(0.86);
+  width: 1180px;
+  height: 720px;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(40% 42% at 50% 46%, rgba(129, 140, 248, 0.28), transparent 64%),
+    radial-gradient(58% 64% at 50% 52%, rgba(99, 102, 241, 0.18), transparent 72%),
+    radial-gradient(72% 80% at 50% 56%, rgba(79, 70, 229, 0.1), transparent 78%);
+  filter: blur(10px);
+  transition: opacity 1.1s var(--mk-ease, cubic-bezier(0.22, 1, 0.36, 1)),
+    transform 1.1s var(--mk-ease, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.marketing-root .dxflag.lit .dx-bloom {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+/* foreground scaffold — centered, matching the .ag-head content width */
+.marketing-root .dxflag .dx-wrap {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 32px;
+  box-sizing: border-box;
+}
+.marketing-root .dx-head {
+  max-width: 760px;
+  margin: 0 auto;
+  text-align: center;
+}
+.marketing-root .dx-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 22px;
+  font-family: var(--mk-font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #c7d2fe;
+}
+.marketing-root .dx-eyebrow .spk {
+  color: #a5b4fc;
+  font-size: 12px;
+  line-height: 1;
+  text-shadow: 0 0 10px rgba(129, 140, 248, 0.38);
+}
+.marketing-root .dx-h {
+  /* Match the site's section-heading scale (cf. .pv-h, the light section right
+     above) so the band reads symmetrically with the rest of the page rather
+     than oversized. */
+  font-size: clamp(30px, 3.6vw, 46px);
+  line-height: 1.06;
+  letter-spacing: -0.032em;
+  font-weight: 600;
+  color: #fbfbff;
+  text-wrap: balance;
+  margin: 0;
+  text-shadow: 0 1px 28px rgba(12, 9, 30, 0.32);
+}
+.marketing-root .dx-h .dim {
+  color: rgba(226, 231, 255, 0.5);
+}
+.marketing-root .dx-sub {
+  margin: 22px auto 0;
+  max-width: 600px;
+  /* Same lede scale the rest of the site uses (cf. .cta-sub / section subs). */
+  font-size: clamp(16px, 1.6vw, 18.5px);
+  line-height: 1.6;
+  letter-spacing: -0.006em;
+  color: rgba(220, 225, 250, 0.78);
+  text-wrap: pretty;
+}
+
+/* the centerpiece stage */
+.marketing-root .dxflag .dx-stage {
+  position: relative;
+  margin: 52px auto 0;
+  width: 520px;
+  max-width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+/* idle float — gentle breathing, enabled only once the card has settled */
+.marketing-root .dx-diag-wrap {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+.marketing-root .dx-diag-wrap.settled {
+  animation: dxCardBob 7s ease-in-out infinite;
+}
+@keyframes dxCardBob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+/* the diagnosis card — clean, bright, floating, spotlit */
+.marketing-root .dx-diag {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 24px 26px 22px;
+  box-shadow: 0 1px 2px rgba(8, 6, 24, 0.28),
+    0 10px 24px -12px rgba(8, 6, 24, 0.38),
+    0 40px 72px -34px rgba(8, 6, 28, 0.5),
+    0 0 0 1px rgba(99, 102, 241, 0.06),
+    0 0 40px -16px rgba(99, 102, 241, 0.16);
+}
+/* rises + settles on view — only when JS will animate, so SSR/no-JS shows it
+   already settled rather than invisible */
+.marketing-root .dx-js .dx-diag {
+  opacity: 0;
+  transform: translateY(46px) scale(0.975);
+  transition: opacity 0.7s var(--mk-e), transform 0.6s var(--mk-e),
+    box-shadow 0.5s var(--mk-e), border-color 0.4s var(--mk-e);
+}
+.marketing-root .dxflag.lit .dx-diag {
+  opacity: 1;
+  transform: none;
+}
+/* hover — lifts a touch; a soft white glow + brighter rim signal it's
+   interactive (kept subtle, not tacky) */
+.marketing-root .dxflag.lit .dx-diag:hover {
+  transform: translateY(-6px);
+  border-color: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 1px 2px rgba(8, 6, 24, 0.28),
+    0 16px 32px -12px rgba(8, 6, 24, 0.42),
+    0 50px 84px -34px rgba(8, 6, 28, 0.52),
+    /* crisp white top sheen on the inner rim */
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    /* tight white halo so the edge reads as lit */
+    0 0 0 1px rgba(255, 255, 255, 0.3),
+    0 0 30px -2px rgba(255, 255, 255, 0.42),
+    0 0 60px -6px rgba(255, 255, 255, 0.22),
+    /* a touch of the indigo glow underneath, for warmth */
+    0 0 64px -10px rgba(99, 102, 241, 0.3);
+}
+
+/* "Live demo" pill — the white frosted pill from the WhatTheySee section's
+   .signature-demo-pill, now wrapping just the purple "Live demo" tag (no label),
+   overlapping the card's top-right corner. */
+.marketing-root .dx-livepill {
+  position: absolute;
+  top: -15px;
+  right: 16px;
+  z-index: 8;
+  display: inline-flex;
+  align-items: center;
+  /* symmetric padding — no label on the right, so the white pill hugs the tag
+     evenly instead of leaving extra space on the right */
+  padding: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    0 10px 26px -10px rgba(20, 16, 31, 0.5),
+    0 2px 8px -2px rgba(20, 16, 31, 0.3);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  white-space: nowrap;
+  user-select: none;
+  pointer-events: none;
+}
+.marketing-root .dx-livepill-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #6557cc, #5a49bf);
+  color: #fff;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  box-shadow: 0 1px 2px rgba(90, 73, 191, 0.4);
+}
+
+/* analyzing beat — scanning shimmer sweep + top progress shimmer */
+.marketing-root .dx-diag-scan {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  opacity: 0;
+  overflow: hidden;
+  border-radius: 16px;
+}
+.marketing-root .dx-diag-scan::before {
+  content: "";
+  position: absolute;
+  top: -10%;
+  bottom: -10%;
+  width: 42%;
+  left: -55%;
+  background: linear-gradient(90deg, transparent, rgba(129, 140, 248, 0.1) 42%, rgba(199, 210, 254, 0.18) 50%, rgba(129, 140, 248, 0.1) 58%, transparent);
+  transform: skewX(-12deg);
+}
+.marketing-root .dx-diag.analyzing .dx-diag-scan {
+  opacity: 1;
+}
+.marketing-root .dx-diag.analyzing .dx-diag-scan::before {
+  animation: dxScanSweep 1s var(--mk-e) forwards;
+}
+@keyframes dxScanSweep {
+  from {
+    left: -55%;
+  }
+  to {
+    left: 115%;
+  }
+}
+.marketing-root .dx-diag-prog {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 7;
+  overflow: hidden;
+  opacity: 0;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  transition: opacity 0.25s var(--mk-e);
+}
+.marketing-root .dx-diag.analyzing .dx-diag-prog {
+  opacity: 1;
+}
+.marketing-root .dx-diag-prog::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 38%;
+  left: -38%;
+  background: linear-gradient(90deg, transparent, #818cf8, #6366f1, transparent);
+}
+.marketing-root .dx-diag.analyzing .dx-diag-prog::before {
+  animation: dxProgSlide 0.95s linear infinite;
+}
+@keyframes dxProgSlide {
+  from {
+    left: -38%;
+  }
+  to {
+    left: 100%;
+  }
+}
+
+.marketing-root .dx-d-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.marketing-root .dx-ai-ico {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  flex: none;
+  background: linear-gradient(180deg, var(--violet-soft), #e7e9ff);
+  border: 1px solid #dcdcfb;
+  color: var(--violet);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 2px rgba(99, 102, 241, 0.12);
+}
+.marketing-root .dx-ai-ico svg {
+  width: 17px;
+  height: 17px;
+}
+/* sparkle pulses while analyzing */
+.marketing-root .dx-diag.analyzing .dx-ai-ico {
+  animation: dxSpkPulse 0.8s ease-in-out infinite;
+}
+@keyframes dxSpkPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 1px 2px rgba(99, 102, 241, 0.2);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 5px rgba(129, 140, 248, 0.16), 0 1px 2px rgba(99, 102, 241, 0.3);
+  }
+}
+.marketing-root .dx-d-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+  letter-spacing: -0.005em;
+}
+/* right side of header: transient analyzing label sits over the verdict pill */
+.marketing-root .dx-head-right {
+  margin-left: auto;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 24px;
+}
+.marketing-root .dx-analyzing-label {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #6366f1;
+  letter-spacing: -0.005em;
+  opacity: 0;
+  transition: opacity 0.3s var(--mk-e);
+}
+.marketing-root .dx-diag.analyzing .dx-analyzing-label {
+  opacity: 1;
+}
+.marketing-root .dx-analyzing-label .dots {
+  display: inline-flex;
+  gap: 3px;
+}
+.marketing-root .dx-analyzing-label .dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #818cf8;
+  display: block;
+  animation: dxThink 1s ease-in-out infinite;
+}
+.marketing-root .dx-analyzing-label .dots i:nth-child(2) {
+  animation-delay: 0.16s;
+}
+.marketing-root .dx-analyzing-label .dots i:nth-child(3) {
+  animation-delay: 0.32s;
+}
+@keyframes dxThink {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+.marketing-root .dx-conf {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #eafaf0;
+  border: 1px solid #cdeedb;
+  color: #15724a;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 999px;
+  letter-spacing: -0.005em;
+}
+.marketing-root .dx-conf .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #1f8a5b;
+}
+/* verdict pill pops in with a soft overshoot, dot blinks on */
+.marketing-root .dx-js .dx-conf {
+  opacity: 0;
+  transform: scale(0.85);
+}
+.marketing-root .dx-diag.s-verdict .dx-conf {
+  animation: dxPillPop 0.5s var(--mk-e) forwards;
+}
+@keyframes dxPillPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  62% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.marketing-root .dx-diag.s-verdict .dx-conf .dot {
+  animation: dxDotBlink 1s var(--mk-e);
+}
+@keyframes dxDotBlink {
+  0% {
+    box-shadow: 0 0 0 0 rgba(31, 138, 91, 0);
+  }
+  35% {
+    box-shadow: 0 0 0 5px rgba(31, 138, 91, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(31, 138, 91, 0);
+  }
+}
+.marketing-root .dx-summary {
+  margin-top: 17px;
+  font-size: 20px;
+  line-height: 1.32;
+  font-weight: 700;
+  color: var(--ink-1);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+/* summary — fades up */
+.marketing-root .dx-js .dx-summary {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.5s var(--mk-e), transform 0.5s var(--mk-e);
+}
+.marketing-root .dx-diag.s-summary .dx-summary {
+  opacity: 1;
+  transform: none;
+}
+.marketing-root .dx-sec-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--ink-4);
+  text-transform: uppercase;
+}
+.marketing-root .dx-cause {
+  margin-top: 18px;
+}
+.marketing-root .dx-js .dx-cause {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.5s var(--mk-e), transform 0.5s var(--mk-e);
+}
+.marketing-root .dx-diag.s-cause .dx-cause {
+  opacity: 1;
+  transform: none;
+}
+.marketing-root .dx-cause .dx-body {
+  margin-top: 9px;
+  font-size: 13.5px;
+  line-height: 1.64;
+  color: var(--ink-2);
+  letter-spacing: -0.003em;
+}
+/* each streamed word fades in as the diagnosis writes itself */
+.marketing-root .dx-cause .dx-body .dx-w {
+  transition: opacity 0.26s var(--mk-e);
+}
+.marketing-root .dx-js .dx-cause .dx-body .dx-w {
+  opacity: 0;
+}
+.marketing-root .dx-cause .dx-body .dx-w.in {
+  opacity: 1;
+}
+/* streaming caret */
+.marketing-root .dx-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  background: #6366f1;
+  margin-left: 1px;
+  vertical-align: -2px;
+  border-radius: 1px;
+  animation: dxCaretBlink 0.8s steps(1) infinite;
+}
+@keyframes dxCaretBlink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+.marketing-root code.dx-inl {
+  font-family: var(--mk-font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  background: #f4f5f8;
+  border: 1px solid #e7e9ef;
+  color: var(--ink-2);
+  padding: 1px 5px;
+  border-radius: 5px;
+  white-space: nowrap;
+  transition: background 0.3s var(--mk-e), border-color 0.3s var(--mk-e),
+    color 0.3s var(--mk-e), box-shadow 0.3s var(--mk-e);
+}
+.marketing-root code.dx-inl.ok {
+  background: #e9f8f0;
+  border-color: #cdeedb;
+  color: #15724a;
+  font-weight: 600;
+}
+.marketing-root code.dx-inl.id {
+  background: var(--violet-soft);
+  border-color: #dcdcfb;
+  color: var(--violet-dim);
+}
+/* tokens begin as plain text, then "light up" as the AI recognises them */
+.marketing-root .dx-js code.dx-inl.dim {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-4);
+  box-shadow: none;
+}
+.marketing-root code.dx-inl.ok.pulse {
+  animation: dxOkPulse 1.1s var(--mk-e);
+}
+@keyframes dxOkPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(31, 138, 91, 0);
+  }
+  40% {
+    box-shadow: 0 0 0 4px rgba(31, 138, 91, 0.28);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(31, 138, 91, 0);
+  }
+}
+/* hover micro-reveal on the reassuring "all-clear" tokens */
+.marketing-root code.dx-inl.ok:hover {
+  background: #dbf3e6;
+  box-shadow: 0 0 0 3px rgba(31, 138, 91, 0.16);
+}
+/* tooltip-style micro-reveal on tokens + evidence chips */
+.marketing-root .dx-tip {
+  position: relative;
+}
+.marketing-root .dx-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 9px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: #0e1726;
+  color: #e8ecff;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: -0.004em;
+  line-height: 1.2;
+  padding: 6px 9px;
+  border-radius: 7px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s var(--mk-e), transform 0.18s var(--mk-e);
+  box-shadow: 0 10px 24px -10px rgba(8, 6, 24, 0.34);
+  z-index: 20;
+}
+.marketing-root .dx-tip::before {
+  content: "";
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #0e1726;
+  opacity: 0;
+  transition: opacity 0.18s var(--mk-e);
+  z-index: 20;
+}
+.marketing-root .dx-tip:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.marketing-root .dx-tip:hover::before {
+  opacity: 1;
+}
+.marketing-root .dx-divider {
+  height: 1px;
+  background: #eceef2;
+  margin: 20px 0 0;
+}
+.marketing-root .dx-js .dx-divider-w {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.45s var(--mk-e), transform 0.45s var(--mk-e);
+}
+.marketing-root .dx-diag.s-evid .dx-divider-w {
+  opacity: 1;
+  transform: none;
+}
+.marketing-root .dx-evidence {
+  margin-top: 18px;
+}
+.marketing-root .dx-js .dx-evidence {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.45s var(--mk-e), transform 0.45s var(--mk-e);
+}
+.marketing-root .dx-diag.s-evid .dx-evidence {
+  opacity: 1;
+  transform: none;
+}
+.marketing-root .dx-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.marketing-root .dx-pill {
+  display: inline-flex;
+  align-items: center;
+  cursor: default;
+  font-family: var(--mk-font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #5b6675;
+  background: #f6f7f9;
+  border: 1px solid #e9ebf0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  letter-spacing: -0.01em;
+  transition: opacity 0.3s var(--mk-e),
+    transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.18s var(--mk-e), border-color 0.18s var(--mk-e),
+    background 0.18s var(--mk-e);
+}
+/* chips snap in one by one, then feel clickable on hover */
+.marketing-root .dx-js .dx-pill {
+  opacity: 0;
+  transform: translateY(8px) scale(0.95);
+}
+.marketing-root .dx-pill.in {
+  opacity: 1;
+  transform: none;
+}
+.marketing-root .dx-pill:hover {
+  transform: translateY(-2px);
+  background: #fff;
+  border-color: #c7cdf5;
+  box-shadow: 0 6px 16px -10px rgba(99, 102, 241, 0.26);
+}
+.marketing-root .dx-pill .sep {
+  color: #c2c8d2;
+  padding: 0 6px;
+}
+.marketing-root .dx-pill .ok {
+  color: #1f8a5b;
+  font-weight: 600;
+}
+.marketing-root .dx-pill:hover .ok {
+  color: #15724a;
+}
+.marketing-root .dx-foot {
+  margin-top: 18px;
+  display: flex;
+}
+.marketing-root .dx-js .dx-foot {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.45s var(--mk-e), transform 0.45s var(--mk-e);
+}
+.marketing-root .dx-diag.s-foot .dx-foot {
+  opacity: 1;
+  transform: none;
+}
+.marketing-root .dx-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--ink-4);
+  font-weight: 500;
+  background: #f7f8fa;
+  border: 1px solid #eef0f3;
+  padding: 6px 11px;
+  border-radius: 999px;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+}
+.marketing-root .dx-tag .g {
+  width: 11px;
+  height: 11px;
+  color: #aab2bf;
+  flex: none;
+}
+
+/* ========== tabbed DevTools panel — AI · Console · Network · Actions ========== */
+.marketing-root .dx-tabs {
+  position: relative;
+  display: flex;
+  gap: 1px;
+  margin: 0 0 16px;
+  border-bottom: 1px solid #eceef2;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.marketing-root .dx-tabs::-webkit-scrollbar {
+  display: none;
+}
+.marketing-root .dx-tab {
+  appearance: none;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #9aa3b2;
+  padding: 8px 12px 11px;
+  border-radius: 8px 8px 0 0;
+  transition: color 0.2s var(--mk-e), background 0.2s var(--mk-e);
+}
+.marketing-root .dx-tab svg {
+  width: 14px;
+  height: 14px;
+  opacity: 0.85;
+}
+.marketing-root .dx-tab:hover {
+  color: #475569;
+  background: #f7f8fb;
+}
+.marketing-root .dx-tab.active {
+  color: #4f46e5;
+}
+.marketing-root .dx-tcount {
+  font-family: var(--mk-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: #aab2bf;
+  background: #f1f2f6;
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+.marketing-root .dx-tab.active .dx-tcount {
+  color: #6366f1;
+  background: #eef0ff;
+}
+.marketing-root .dx-tab:focus-visible {
+  outline: 2px solid #818cf8;
+  outline-offset: -2px;
+}
+.marketing-root .dx-tab-ind {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  width: 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #6366f1, #818cf8);
+  transition: left 0.34s var(--mk-e), width 0.34s var(--mk-e);
+  pointer-events: none;
+}
+.marketing-root .dx-tab-body {
+  position: relative;
+  transition: height 0.4s var(--mk-e);
+}
+.marketing-root .dx-tab-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity 0.3s var(--mk-e), transform 0.34s var(--mk-e),
+    visibility 0s linear 0.34s;
+}
+.marketing-root .dx-tab-panel.active {
+  position: relative;
+  z-index: 2;
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  pointer-events: auto;
+  transition: opacity 0.34s var(--mk-e) 0.05s, transform 0.4s var(--mk-e) 0.05s;
+}
+
+/* ----- Console panel ----- */
+.marketing-root .dx-con-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.marketing-root .dx-con-sum {
+  font-family: var(--mk-font-mono);
+  font-size: 11.5px;
+  color: #5b6675;
+  font-weight: 500;
+}
+.marketing-root .dx-con-sum .ok {
+  color: #1f8a5b;
+  font-weight: 700;
+}
+.marketing-root .dx-con-dot {
+  color: #c2c8d2;
+  padding: 0 5px;
+}
+.marketing-root .dx-con-filters {
+  margin-left: auto;
+  display: flex;
+  gap: 5px;
+}
+.marketing-root .dx-fchip {
+  appearance: none;
+  border: 1px solid #e9ebf0;
+  background: #f6f7f9;
+  cursor: pointer;
+  font-family: "Inter", sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: #8a93a3;
+  padding: 4px 9px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.18s var(--mk-e), border-color 0.18s var(--mk-e),
+    color 0.18s var(--mk-e);
+}
+.marketing-root .dx-fchip .fc {
+  font-family: var(--mk-font-mono);
+  font-size: 10px;
+  color: #aab2bf;
+}
+.marketing-root .dx-fchip:hover {
+  border-color: #c7cdf5;
+  color: #475569;
+}
+.marketing-root .dx-fchip.active {
+  background: #eef0ff;
+  border-color: #dcdcfb;
+  color: #4f46e5;
+}
+.marketing-root .dx-fchip.active .fc {
+  color: #6366f1;
+}
+.marketing-root .dx-con-rows {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--mk-font-mono);
+  font-size: 12px;
+  border: 1px solid #f1f2f6;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.marketing-root .dx-con-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 11px;
+  transition: background 0.16s var(--mk-e);
+}
+.marketing-root .dx-con-row + .dx-con-row {
+  border-top: 1px solid #f4f5f8;
+}
+.marketing-root .dx-con-row:hover {
+  background: #f8f9fc;
+}
+.marketing-root .dx-con-lvl {
+  flex: none;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 5px;
+  line-height: 1.3;
+  transform: translateY(-1px);
+}
+.marketing-root .dx-con-lvl.log {
+  background: #f1f2f6;
+  color: #8a93a3;
+}
+.marketing-root .dx-con-lvl.info {
+  background: #eef0ff;
+  color: #6366f1;
+}
+.marketing-root .dx-con-txt {
+  color: #475569;
+  word-break: break-word;
+}
+.marketing-root .dx-con-txt .ct-path {
+  color: #4f46e5;
+}
+.marketing-root .dx-con-txt .ct-obj {
+  color: #5b6675;
+}
+.marketing-root .dx-con-txt .ct-str {
+  color: #1f8a5b;
+}
+.marketing-root .dx-con-note {
+  margin-top: 11px;
+  font-size: 11.5px;
+  color: #9aa3b2;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.marketing-root .dx-con-note svg {
+  color: #1f8a5b;
+  flex: none;
+}
+
+/* ----- Network panel ----- */
+.marketing-root .dx-net-head {
+  display: grid;
+  grid-template-columns: 54px 54px 1fr auto;
+  gap: 8px;
+  padding: 0 11px 8px;
+  border-bottom: 1px solid #eceef2;
+}
+.marketing-root .dx-nh {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #aab2bf;
+}
+.marketing-root .dx-nh.time {
+  text-align: right;
+}
+.marketing-root .dx-net-rows {
+  display: flex;
+  flex-direction: column;
+}
+.marketing-root .dx-net-row {
+  border-bottom: 1px solid #f4f5f8;
+}
+.marketing-root .dx-net-row:last-child {
+  border-bottom: 0;
+}
+.marketing-root .dx-nr-cells {
+  display: grid;
+  grid-template-columns: 54px 54px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 11px;
+  font-family: var(--mk-font-mono);
+  font-size: 12px;
+  color: #5b6675;
+  transition: background 0.16s var(--mk-e);
+}
+.marketing-root .dx-net-row:hover .dx-nr-cells {
+  background: #f8f9fc;
+}
+.marketing-root .dx-net-row.culprit .dx-nr-cells {
+  cursor: pointer;
+  background: #fafaff;
+  box-shadow: inset 2px 0 0 #818cf8;
+}
+.marketing-root .dx-net-row.culprit:hover .dx-nr-cells {
+  background: #f4f4ff;
+}
+.marketing-root .dx-st-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #1f8a5b;
+  font-weight: 600;
+}
+.marketing-root .dx-st-ok::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #1f8a5b;
+  flex: none;
+}
+.marketing-root .dx-nr-method {
+  color: #8a93a3;
+  font-weight: 600;
+}
+.marketing-root .dx-nr-name {
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.marketing-root .dx-nr-name .dx-chev {
+  width: 12px;
+  height: 12px;
+  color: #aab2bf;
+  flex: none;
+  transition: transform 0.3s var(--mk-e);
+}
+.marketing-root .dx-net-row.open .dx-chev {
+  transform: rotate(90deg);
+}
+.marketing-root .dx-nr-time {
+  text-align: right;
+  color: #8a93a3;
+  white-space: nowrap;
+}
+.marketing-root .dx-nr-drawer {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.38s var(--mk-e);
+}
+.marketing-root .dx-net-row.open .dx-nr-drawer {
+  grid-template-rows: 1fr;
+}
+.marketing-root .dx-nr-drawer-in {
+  overflow: hidden;
+}
+.marketing-root .dx-dr-pad {
+  margin: 2px 11px 13px;
+  background: #0e1424;
+  border-radius: 10px;
+  padding: 12px 13px;
+  border: 1px solid #1c2740;
+}
+.marketing-root .dx-dr-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 9px;
+  gap: 10px;
+}
+.marketing-root .dx-dr-cap {
+  font-family: "Inter", sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7b88b8;
+}
+.marketing-root .dx-curl {
+  appearance: none;
+  border: 1px solid #2a3550;
+  background: #18213a;
+  color: #aeb9e6;
+  cursor: pointer;
+  font-family: var(--mk-font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: background 0.18s var(--mk-e), border-color 0.18s var(--mk-e),
+    color 0.18s var(--mk-e);
+}
+.marketing-root .dx-curl:hover {
+  background: #1f2942;
+  border-color: #3a4768;
+}
+.marketing-root .dx-curl.copied {
+  color: #7fe0a8;
+  border-color: #2a5a40;
+}
+.marketing-root .dx-dr-body {
+  font-family: var(--mk-font-mono);
+  font-size: 12px;
+  line-height: 1.65;
+  color: #c5cce8;
+  margin: 0;
+  white-space: pre;
+  overflow-x: auto;
+}
+.marketing-root .dx-dr-body .bad {
+  color: #ff9d8f;
+  background: rgba(255, 120, 100, 0.13);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+.marketing-root .dx-dr-note {
+  margin-top: 10px;
+  font-family: var(--mk-font-mono);
+  font-size: 11px;
+  color: #ff9d8f;
+  letter-spacing: -0.01em;
+}
+
+/* ----- Actions panel ----- */
+.marketing-root .dx-act-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 10px;
+}
+.marketing-root .dx-act-cap {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+.marketing-root .dx-seg {
+  display: inline-flex;
+  background: #f1f2f6;
+  border-radius: 8px;
+  padding: 2px;
+  flex: none;
+}
+.marketing-root .dx-seg-b {
+  appearance: none;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-family: "Inter", sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: #8a93a3;
+  padding: 4px 11px;
+  border-radius: 6px;
+  transition: background 0.18s var(--mk-e), color 0.18s var(--mk-e),
+    box-shadow 0.18s var(--mk-e);
+}
+.marketing-root .dx-seg-b:hover {
+  color: #475569;
+}
+.marketing-root .dx-seg-b.active {
+  background: #fff;
+  color: #4f46e5;
+  box-shadow: 0 1px 2px rgba(8, 6, 24, 0.12);
+}
+.marketing-root .dx-acts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+.marketing-root .dx-acts::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 10px;
+  bottom: 18px;
+  width: 2px;
+  background: linear-gradient(#e7e9ef, #eef0f3);
+  border-radius: 2px;
+}
+.marketing-root .dx-act {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 0 8px 24px;
+}
+.marketing-root .dx-act-node {
+  position: absolute;
+  left: 0;
+  top: 9px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #cbd2e0;
+  z-index: 1;
+  transition: all 0.2s var(--mk-e);
+}
+.marketing-root .dx-act:hover .dx-act-node {
+  border-color: #a5b0c4;
+}
+.marketing-root .dx-act.flagged .dx-act-node {
+  border-color: #d99a2b;
+  background: #fff7e8;
+  box-shadow: 0 0 0 3px rgba(217, 154, 43, 0.14);
+}
+.marketing-root .dx-act-txt {
+  font-size: 13.5px;
+  color: #475569;
+  letter-spacing: -0.005em;
+  line-height: 1.45;
+}
+.marketing-root .dx-acts.tech .dx-act-txt {
+  font-family: var(--mk-font-mono);
+  font-size: 12px;
+  color: #5b6675;
+}
+.marketing-root .dx-act.flagged .dx-act-txt {
+  color: #0e1726;
+  font-weight: 600;
+}
+.marketing-root .dx-act-flag {
+  margin-left: auto;
+  flex: none;
+  font-family: "Inter", sans-serif;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #9a6a00;
+  background: #fdf3dd;
+  border: 1px solid #f2e2b8;
+  padding: 3px 7px;
+  border-radius: 6px;
+  align-self: center;
+}
+
+/* reduced motion — show everything settled, kill the drift + reveals */
+@media (prefers-reduced-motion: reduce) {
+  .marketing-root .dx-code-col,
+  .marketing-root .dx-diag-wrap.settled {
+    animation: none !important;
+  }
+  /* Everything settled, no reveals/streaming — the runDiagnosis() effect also
+     short-circuits to its final state under reduced motion. */
+  .marketing-root .dx-bloom,
+  .marketing-root .dx-diag,
+  .marketing-root .dx-conf,
+  .marketing-root .dx-summary,
+  .marketing-root .dx-cause,
+  .marketing-root .dx-cause .dx-body .dx-w,
+  .marketing-root .dx-divider-w,
+  .marketing-root .dx-evidence,
+  .marketing-root .dx-pill,
+  .marketing-root .dx-foot {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+    animation: none !important;
+  }
+  .marketing-root .dx-diag-scan,
+  .marketing-root .dx-diag-prog,
+  .marketing-root .dx-caret {
+    display: none !important;
+  }
+  /* tabbed panel — keep switching instant, no morph/slide */
+  .marketing-root .dx-tab-body,
+  .marketing-root .dx-tab-panel,
+  .marketing-root .dx-tab-ind,
+  .marketing-root .dx-nr-drawer,
+  .marketing-root .dx-seg-b,
+  .marketing-root .dx-fchip,
+  .marketing-root .dx-act-node,
+  .marketing-root .dx-chev {
+    transition: none !important;
+  }
+  /* keep recognised tokens lit even though we skip the "light up" animation */
+  .marketing-root .dx-js code.dx-inl.dim {
+    background: #f4f5f8 !important;
+    border-color: #e7e9ef !important;
+    color: var(--ink-2) !important;
+  }
+  .marketing-root .dx-js code.dx-inl.ok.dim {
+    background: #e9f8f0 !important;
+    border-color: #cdeedb !important;
+    color: #15724a !important;
+  }
+  .marketing-root .dx-js code.dx-inl.id.dim {
+    background: var(--violet-soft) !important;
+    border-color: #dcdcfb !important;
+    color: var(--violet-dim) !important;
+  }
 }
 
 /* ---------- RESPONSIVE ---------- */
@@ -9485,6 +11693,28 @@
     order: 2;
     max-width: none;
   }
+  /* PRIVACY: collapse the two-column split to one column. */
+  .marketing-root .pv {
+    padding: 80px 0;
+  }
+  .marketing-root .pv-split {
+    grid-template-columns: 1fr;
+    gap: 48px;
+  }
+  .marketing-root .pv-copy {
+    max-width: none;
+  }
+  .marketing-root .pv-glow {
+    right: -30%;
+    width: 120%;
+  }
+  .marketing-root .pv-stage {
+    max-width: 520px;
+  }
+  /* AI DIAGNOSIS: tighten the band gutter on narrower screens. */
+  .marketing-root .dxflag {
+    width: calc(100% - 48px);
+  }
 }
 @media (max-width: 640px) {
   .marketing-root .ev-card {
@@ -9493,11 +11723,29 @@
   .marketing-root .ev-card-h {
     font-size: 26px;
   }
-  .marketing-root .ev-trust-wrap {
+  .marketing-root .pv-wrap {
     padding: 0 22px;
   }
-  .marketing-root .ev-trust-root {
-    padding: 80px 0 84px;
+  .marketing-root .pv-feats {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+  .marketing-root .pv-key {
+    min-width: 104px;
+  }
+  .marketing-root .pv-row {
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+  .marketing-root .pv-timing {
+    right: 14px;
+  }
+  .marketing-root .pv-cardfoot {
+    gap: 8px;
+  }
+  .marketing-root .pv-microtag {
+    margin-left: 0;
+    width: 100%;
   }
   .marketing-root .dt-tab {
     padding: 11px 9px;
@@ -9513,5 +11761,41 @@
   .marketing-root .dt-netrow .ty,
   .marketing-root .dt-nethead span:nth-child(3) {
     display: none;
+  }
+  /* AI DIAGNOSIS: tighten the band gutter + vertical padding on phones. The
+     stage is fluid (520px max, 100% otherwise), so it shrinks without scaling. */
+  .marketing-root .dxflag {
+    width: calc(100% - 32px);
+    padding: 72px 0 76px;
+  }
+  .marketing-root .dxflag .dx-wrap {
+    padding: 0 22px;
+  }
+  .marketing-root .dxflag .dx-stage {
+    margin-top: 44px;
+  }
+  .marketing-root .dx-h {
+    font-size: clamp(28px, 7vw, 38px);
+  }
+}
+@media (max-width: 460px) {
+  .marketing-root .dxflag {
+    padding: 60px 0 64px;
+  }
+  .marketing-root .dx-diag {
+    padding: 20px 18px 18px;
+  }
+  .marketing-root .dx-summary {
+    font-size: 18px;
+  }
+  .marketing-root .dx-tab {
+    padding: 8px 9px 11px;
+    font-size: 12px;
+    gap: 5px;
+  }
+  .marketing-root .dx-net-head,
+  .marketing-root .dx-nr-cells {
+    grid-template-columns: 48px 46px 1fr auto;
+    gap: 6px;
   }
 }

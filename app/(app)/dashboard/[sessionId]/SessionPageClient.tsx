@@ -52,6 +52,7 @@ import {
   usePresenceStore,
 } from "@/lib/realtime/presenceStore";
 import { retainAccessRequestsListener } from "@/lib/realtime/accessRequestStore";
+import { deserializeTicketPayload } from "@/lib/realtime/deserializeTicketPayload";
 import { useSessionCommentsAggregate } from "@/lib/realtime/commentsStore";
 import { usePresenceHeartbeat } from "@/lib/hooks/usePresenceHeartbeat";
 import { Timestamp } from "firebase/firestore";
@@ -79,17 +80,14 @@ import { useToast } from "@/components/dashboard/context/ToastContext";
 import { ImageViewer } from "@/components/ImageViewer";
 import { ResolveToast, type ResolveToastState } from "@/components/ui/ResolveToast";
 import { formatDistanceToNow } from "date-fns";
+import { toMillis, toDate } from "@/lib/utils/timestamp";
 import { toast } from "sonner";
 import type { ActionItemsSectionHandle } from "@/components/session/feedbackDetail/ActionItemsSection";
 
 function formatRelativeTime(timestamp: unknown): string {
+  const date = toDate(timestamp);
+  if (!date) return "Just now";
   try {
-    const date =
-      typeof timestamp === "object" &&
-      timestamp !== null &&
-      "seconds" in timestamp
-        ? new Date((timestamp as { seconds: number }).seconds * 1000)
-        : new Date(timestamp as string | number);
     return formatDistanceToNow(date, { addSuffix: true });
   } catch {
     return "Just now";
@@ -1153,14 +1151,8 @@ export default function SessionPageClient({
     }
     for (const item of baseFeedback) pushItem(item);
     merged.sort((a, b) => {
-      const ams =
-        a.createdAt && typeof (a.createdAt as Timestamp).toMillis === "function"
-          ? (a.createdAt as Timestamp).toMillis()
-          : 0;
-      const bms =
-        b.createdAt && typeof (b.createdAt as Timestamp).toMillis === "function"
-          ? (b.createdAt as Timestamp).toMillis()
-          : 0;
+      const ams = toMillis(a.createdAt) ?? 0;
+      const bms = toMillis(b.createdAt) ?? 0;
       const diff = bms - ams;
       if (diff !== 0) return diff;
       return b.id.localeCompare(a.id);
@@ -2326,9 +2318,15 @@ export default function SessionPageClient({
           setResolvedExpanded(true);
           setOpenExpanded(false);
         }
+        // Re-hydrate serialized timestamps before inserting so the deep-linked
+        // ticket carries real Timestamps like every other item in the list.
+        const normalizedDeepLink = {
+          ...t,
+          ...deserializeTicketPayload(t as unknown as Record<string, unknown>),
+        } as unknown as Feedback;
         setFeedback((prev) => {
           if (prev.some((f) => f.id === ticketIdFromUrl)) return prev;
-          return [...prev, t as unknown as Feedback];
+          return [...prev, normalizedDeepLink];
         });
       } catch (err) {
         console.error("[ECHLY] deep link ticket hydrate failed", err);
@@ -2428,7 +2426,7 @@ export default function SessionPageClient({
   // the only cases that clear the ref so the retry isn't separately blocked by it.
   const aiAnalyzeFiredRef = useRef<Set<string>>(new Set());
   const selectedAiStatus = selectedBaseItem?.aiAnalysisStatus ?? null;
-  const selectedAiGeneratedAtMs = selectedBaseItem?.aiGeneratedAt?.toMillis() ?? 0;
+  const selectedAiGeneratedAtMs = toMillis(selectedBaseItem?.aiGeneratedAt) ?? 0;
 
   // Client-side AI request state, keyed by ticket id. This is the panel's escape
   // hatch out of an infinite "Analyzing…": the analyze route can fail at a gate
@@ -3276,8 +3274,10 @@ export default function SessionPageClient({
       setFeedback((prev) =>
         prev.map((item) => {
           if (item.id !== effectiveSelectedId) return item;
-          const { createdAt, updatedAt, ...safePayload } = ticketPayload as Record<string, unknown>;
-          return { ...item, ...safePayload };
+          const normalized = deserializeTicketPayload(
+            ticketPayload as Record<string, unknown>
+          );
+          return { ...item, ...normalized };
         })
       );
       broadcastTicketUpdated(ticketPayload);
@@ -3371,11 +3371,13 @@ export default function SessionPageClient({
         setFeedback((prev) =>
           prev.map((item) => {
             if (item.id !== ticketId) return item;
-            const { createdAt, updatedAt, ...safePayload } = ticketPayload as Record<string, unknown>;
+            const normalized = deserializeTicketPayload(
+              ticketPayload as Record<string, unknown>
+            );
             // Skip re-writing description if it matches optimistic value, to
             // avoid re-parsing the markdown / hex chips and causing a flicker.
             const { description: serverDescription, ...nonDescriptionFields } =
-              safePayload as { description?: string | null } & Record<string, unknown>;
+              normalized as { description?: string | null } & Record<string, unknown>;
             const shouldUpdateDescription = serverDescription !== item.description;
             return {
               ...item,
@@ -3455,8 +3457,10 @@ export default function SessionPageClient({
       setFeedback((prev) =>
         prev.map((item) => {
           if (item.id !== ticketId) return item;
-          const { createdAt, updatedAt, ...safePayload } = ticketPayload as Record<string, unknown>;
-          return { ...item, ...safePayload };
+          const normalized = deserializeTicketPayload(
+            ticketPayload as Record<string, unknown>
+          );
+          return { ...item, ...normalized };
         })
       );
       broadcastTicketUpdated(ticketPayload);
@@ -3591,8 +3595,10 @@ export default function SessionPageClient({
             setFeedback((prev) =>
               prev.map((item) => {
                 if (item.id !== ticketId) return item;
-                const { createdAt, updatedAt, ...safePayload } = ticketPayload as Record<string, unknown>;
-                return { ...item, ...safePayload };
+                const normalized = deserializeTicketPayload(
+                  ticketPayload as Record<string, unknown>
+                );
+                return { ...item, ...normalized };
               })
             );
             broadcastTicketUpdated(ticketPayload);
@@ -3767,9 +3773,10 @@ export default function SessionPageClient({
         setFeedback((list) =>
           list.map((item) => {
             if (item.id !== ticketId) return item;
-            const { createdAt, updatedAt, ...safePayload } =
-              ticketPayload as Record<string, unknown>;
-            return { ...item, ...safePayload };
+            const normalized = deserializeTicketPayload(
+              ticketPayload as Record<string, unknown>
+            );
+            return { ...item, ...normalized };
           })
         );
       } catch (err) {
@@ -3861,9 +3868,12 @@ export default function SessionPageClient({
         setFeedback((list) =>
           list.map((item) => {
             if (item.id !== ticketId) return item;
-            const { createdAt, updatedAt, ...safePayload } =
-              ticketPayload as Record<string, unknown>;
-            return { ...item, ...safePayload };
+            // Re-hydrate serialized timestamps (createdAt/lastCommentAt/aiGeneratedAt)
+            // to real Timestamps so the merged item never holds a { seconds } object.
+            const normalized = deserializeTicketPayload(
+              ticketPayload as Record<string, unknown>
+            );
+            return { ...item, ...normalized };
           })
         );
       } catch (err) {

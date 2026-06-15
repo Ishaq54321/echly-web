@@ -22,6 +22,7 @@ import {
 } from "@/lib/client/workspaceContext";
 import { SESSION_FEEDBACK_PATH } from "@/utils/getSessionLink";
 import { retainSessionsListTickle } from "@/lib/realtime/sessionsListTickle";
+import { markEnd, markStart } from "@/lib/client/perfMarkers";
 
 const SESSIONS_CACHE_PREFIX = "annote_sessions";
 
@@ -380,6 +381,12 @@ function useWorkspaceStoreState(viewMode: ViewMode = "all") {
           setAwaitingSessions(false);
           return;
         }
+        // PERF (Batch 0.3): Segment 2 (claims→sessions) ends here — the first
+        // GET /api/sessions bootstrap has resolved and we have the list data.
+        // Segment 3 (sessions→painted) starts now; it ends after the dashboard
+        // commits the list (see app/(app)/dashboard/page.tsx).
+        markEnd("claims→sessions");
+        markStart("sessions→painted");
         setFetchError(null);
         nextCursorRef.current = result.hasMore ? result.nextCursor : null;
         setHasMoreSessions(result.hasMore);

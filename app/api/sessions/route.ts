@@ -77,24 +77,14 @@ export async function GET(req: NextRequest) {
     return withCors(req, toAuthorizationResponse(err));
   }
 
-  const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const apiTimer = `API /sessions ${requestId}`;
-  console.time(apiTimer);
   try {
     const cursorParam = req.nextUrl.searchParams.get("cursor");
     const offset = decodeCursor(cursorParam);
 
-    const queryTimer = `Firestore query ${requestId}`;
-    console.time(queryTimer);
-    let sessions: Session[];
-    try {
-      sessions = await listAccessibleSessionsForUser({
-        userId: user.uid,
-        limit: 100,
-      });
-    } finally {
-      console.timeEnd(queryTimer);
-    }
+    const sessions = await listAccessibleSessionsForUser({
+      userId: user.uid,
+      limit: 100,
+    });
 
     sessions.forEach((s) => {
       assert(s.accessLevel, "Session missing accessLevel");
@@ -206,8 +196,6 @@ export async function GET(req: NextRequest) {
       status: 500,
       init: { headers: corsHeaders(req) },
     });
-  } finally {
-    console.timeEnd(apiTimer);
   }
 }
 

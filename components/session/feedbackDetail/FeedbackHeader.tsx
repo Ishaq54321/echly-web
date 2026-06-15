@@ -4,22 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import { MessageSquare, Trash2, Pencil, Check } from "lucide-react";
 import { ResolvedToggle } from "@/components/ui/ResolvedToggle";
 import type { Timestamp } from "firebase/firestore";
+import { toDate } from "@/lib/utils/timestamp";
 import type { FeedbackItemShape } from "./types";
-
-function toDate(value: string | Timestamp | null | undefined): Date | null {
-  if (value == null) return null;
-  if (typeof value === "string") {
-    const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? null : d;
-  }
-  const t = value as Timestamp;
-  if (typeof t.toDate === "function") return t.toDate();
-  if (typeof (t as { seconds?: number }).seconds === "number") {
-    const d = new Date((t as { seconds: number }).seconds * 1000);
-    return Number.isNaN(d.getTime()) ? null : d;
-  }
-  return null;
-}
 
 function formatRelative(isoOrTimestamp: string | Timestamp | null | undefined): string {
   const d = toDate(isoOrTimestamp);

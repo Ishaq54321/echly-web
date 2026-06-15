@@ -15,6 +15,7 @@ import {
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import type { Comment } from "@/lib/domain/comment";
+import { asTimestamp } from "@/lib/utils/asTimestamp";
 import {
   recordListenerAttach,
   recordListenerDetach,
@@ -105,17 +106,6 @@ function setState(
   const e = getOrCreateEntry(sessionId, feedbackId);
   e.state = { ...e.state, ...patch, version: e.state.version + 1 };
   emitFor(sessionId, feedbackId);
-}
-
-function asTimestamp(value: unknown): Timestamp | null {
-  if (value == null) return null;
-  if (value instanceof Timestamp) return value;
-  if (value instanceof Date) return Timestamp.fromDate(value);
-  const v = value as { seconds?: number; nanoseconds?: number };
-  if (typeof v.seconds === "number") {
-    return new Timestamp(v.seconds, typeof v.nanoseconds === "number" ? v.nanoseconds : 0);
-  }
-  return null;
 }
 
 function getMillis(ts: Timestamp | null): number {

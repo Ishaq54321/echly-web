@@ -200,11 +200,11 @@ export function ClickToTicket() {
           <CardCopy
             number="01"
             title="Capture anything in one click."
-            sub="Annote grabs the element, the page, and the context. No selection tool, no cropping."
+            sub="Annote grabs the element, the page, and the live console and network behind it. No selection tool, no cropping."
             bullets={[
               "Element, page, viewport — all captured",
+              "Console, network, and clicks, automatically",
               "Works on any URL, live or staging",
-              "Browser, OS, screen size attached",
             ]}
           />
           <div className="ctt-card-visual ctt-card-visual--capture">
@@ -223,7 +223,7 @@ export function ClickToTicket() {
           <CardCopy
             number="02"
             title="Talk through it. Send a ticket."
-            sub="Speak in your own words. AI turns the recording into a structured ticket — title, description, severity, tags."
+            sub="Speak in your own words. The AI turns your rough notes into a structured ticket — title, description, and tags — grounded in what you clicked."
             bullets={[
               "One-tap recording in the extension",
               "Rough notes become a polished ticket",
@@ -239,11 +239,11 @@ export function ClickToTicket() {
         <div className="ctt-card-body">
           <CardCopy
             number="03"
-            title="Auto-grouped. Share the whole session."
-            sub="Every capture from your session lives in one place. Send the link — clients, teammates, anyone sees the same thing."
+            title="One link. Already diagnosed."
+            sub="Every capture lands in one session, and the AI reads the logs to flag the likely cause before anyone opens it. Share the link — everyone sees the same thing."
             bullets={[
               "One URL, no signup required",
-              "Real-time comments and replies",
+              "AI cites real evidence, honestly",
               "Open → in progress → resolved",
             ]}
           />
@@ -475,30 +475,62 @@ function VoiceMockup() {
 function SessionsMockup() {
   return (
     <div className="ctt-sess">
-      <div className="ctt-sess-stack">
-        <div className="ctt-sess-tile">
-          <div className="ctt-sess-thumb" />
-          <div className="ctt-sess-tinfo">
-            <span className="ctt-sess-tt">CTA overlaps footer at md</span>
-            <span className="ctt-sess-tmeta">capture · 0:54 · maya</span>
-          </div>
-          <span className="ctt-sess-status open">Open</span>
+      {/* AI diagnosis card — the "already diagnosed" moment, top-left. */}
+      <div className="ctt-diag">
+        <div className="ctt-diag-head">
+          <span className="ctt-diag-ico" aria-hidden="true">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="#6366F1">
+              <path d="M12 2.2c.35 3.06 1.1 5.18 2.46 6.54C15.82 10.1 17.94 10.85 21 11.2c-3.06.35-5.18 1.1-6.54 2.46C13.1 15.02 12.35 17.14 12 20.2c-.35-3.06-1.1-5.18-2.46-6.54C8.18 12.3 6.06 11.55 3 11.2c3.06-.35 5.18-1.1 6.54-2.46C10.9 7.38 11.65 5.26 12 2.2Z" />
+              <path d="M19 3.2c.16 1 .42 1.64.96 2.18.54.54 1.18.8 2.18.96-1 .16-1.64.42-2.18.96-.54.54-.8 1.18-.96 2.18-.16-1-.42-1.64-.96-2.18-.54-.54-1.18-.8-2.18-.96 1-.16 1.64-.42 2.18-.96.54-.54.8-1.18.96-2.18Z" opacity="0.7" />
+            </svg>
+          </span>
+          <span className="ctt-diag-label">AI analysis</span>
+          <span className="ctt-diag-conf">
+            <span className="ctt-diag-conf-dot" />
+            Related · High confidence
+          </span>
         </div>
-        <div className="ctt-sess-tile t-voice">
-          <div className="ctt-sess-thumb" />
-          <div className="ctt-sess-tinfo">
-            <span className="ctt-sess-tt">Pricing copy reads as $9 not $90</span>
-            <span className="ctt-sess-tmeta">voice · 0:31 · sam</span>
-          </div>
-          <span className="ctt-sess-status prog">In progress</span>
+
+        <div className="ctt-diag-summary">
+          Profile page shows another user&rsquo;s name after login.
         </div>
-        <div className="ctt-sess-tile t-sess">
-          <div className="ctt-sess-thumb" />
-          <div className="ctt-sess-tinfo">
-            <span className="ctt-sess-tt">FAQ accordion stuck open on mobile</span>
-            <span className="ctt-sess-tmeta">capture · maya</span>
+
+        <div className="ctt-diag-cause">
+          <div className="ctt-diag-sec-label">Likely cause</div>
+          <div className="ctt-diag-body">
+            <code className="ctt-diag-inl">GET /api/me</code> returned{" "}
+            <code className="ctt-diag-inl ok">200</code> with a cached response for a
+            different <code className="ctt-diag-inl id">userId</code> — the request
+            succeeded, so no error surfaced. The stale payload is the bug.
           </div>
-          <span className="ctt-sess-status resv">Resolved</span>
+        </div>
+
+        <div className="ctt-diag-divider" />
+
+        <div className="ctt-diag-evidence">
+          <div className="ctt-diag-sec-label">Cited evidence</div>
+          <div className="ctt-diag-pills">
+            <span className="ctt-diag-pill">
+              GET /api/me<span className="ctt-diag-pill-sep">·</span>
+              <span className="ctt-diag-pill-ok">200</span>
+              <span className="ctt-diag-pill-sep">·</span>38ms
+            </span>
+            <span className="ctt-diag-pill">response: userId mismatch</span>
+            <span className="ctt-diag-pill">
+              console: <span className="ctt-diag-pill-ok">0 errors</span>
+            </span>
+          </div>
+        </div>
+
+        <div className="ctt-diag-foot">
+          <span className="ctt-diag-tag">
+            <svg className="ctt-diag-tag-g" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="9" />
+              <line x1="12" y1="11" x2="12" y2="16" />
+              <circle cx="12" cy="7.6" r="0.6" fill="currentColor" stroke="none" />
+            </svg>
+            AI-generated · review before acting
+          </span>
         </div>
       </div>
 
@@ -549,22 +581,6 @@ function SessionsMockup() {
             Share <span style={{ opacity: 0.8 }}>→</span>
           </a>
         </div>
-      </div>
-
-      <div className="ctt-sess-comment">
-        <div className="ctt-sess-comment-h">
-          <span
-            className="ctt-sess-comment-av"
-            style={{ backgroundImage: "url(/marketing/people/Jordan.jpg)" }}
-            aria-label="Sam"
-          />
-
-          <span className="ctt-sess-comment-n">Sam</span>
-          <span className="ctt-sess-comment-t">2m</span>
-        </div>
-        <p className="ctt-sess-comment-c">
-          Got it — this is the same as the bug from Friday. Reopening.
-        </p>
       </div>
     </div>
   );

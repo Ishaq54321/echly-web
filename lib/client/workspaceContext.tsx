@@ -28,6 +28,7 @@ import { PLANS, type PlanId } from "@/lib/billing/plans";
 import { composeFullName } from "@/lib/utils/nameSplit";
 import { setActiveWorkspaceForNotifications } from "@/lib/store/notificationStore";
 import { fetchMembers as prefetchWorkspaceMembers } from "@/lib/client/workspaceMembersStore";
+import { markStart, markEnd } from "@/lib/client/perfMarkers";
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([
@@ -409,6 +410,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setNeedsOnboarding(false);
       setWorkspaceError(null);
       setClaimsReady(true);
+      // PERF (Batch 0.3): Segment 1 (auth→claims) ends here — claims are ready.
+      // Segment 2 (claims→sessions) starts now: the sessions fetch is gated on
+      // isIdentityReady, which becomes true off the back of this claimsReady.
+      markEnd("auth→claims");
+      markStart("claims→sessions");
       retryCountRef.current = 0;
       setWorkspaceLoading(false);
       if (syncLockUidRef.current === uid) {
@@ -503,6 +509,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       }
 
       const uid = user.uid;
+      // PERF (Batch 0.3) Segment 1 start: onAuthStateChanged fired with a user.
+      // Ends when claimsReady flips true (see the success path in runIdentitySync).
+      markStart("auth→claims");
       setAuthUid(uid);
       setUidHint(uid);
       setAuthEmail(user.email ?? null);

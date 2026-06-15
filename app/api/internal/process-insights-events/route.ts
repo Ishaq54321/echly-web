@@ -2,6 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/server/firebaseAdmin";
+import { apiError } from "@/lib/server/apiResponse";
 import {
   processInsightsEventWithIdempotencyRepo,
 } from "@/lib/repositories/insightsRepository.server";
@@ -87,6 +88,16 @@ function toErrorMessage(error: unknown): string {
 }
 
 export async function GET(req: Request) {
+  // Internal worker endpoint — gate on CRON_SECRET, matching the cron routes
+  // (e.g. app/api/cron/workspace-purge/route.ts:12-17). Reject before any
+  // Firestore work so an unauthenticated caller can't drive the worker.
+  const secret = process.env.CRON_SECRET;
+  const authHeader = req.headers.get("authorization");
+  const bearer = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!secret || bearer !== secret) {
+    return apiError({ code: "UNAUTHORIZED", message: "Unauthorized", status: 401 });
+  }
+
   const requestUrl = new URL(req.url);
   const retryFailed = requestUrl.searchParams.get("retryFailed") === "true";
   console.log("[insights-worker] batch start", {

@@ -1,19 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { SessionDemoStage } from "../demos/session/SessionDemoStage";
 import { EvidenceBlock } from "./EvidenceTrust";
 
 /**
  * <BuiltForAgenciesDark />
  *
- * Two-part section sharing one ambient backdrop:
- *  1. "What they see" — signature session demo (forklifted SessionDemoStage),
- *     animated in via IntersectionObserver.
- *  2. Dark 2x2 lifecycle grid: QA → Team → Review → Ship.
- *
- * Both share the .ag-root background so the seam is invisible. All `.ag-*`
- * styles live in marketing.css scoped under `.marketing-root`.
+ * The dark "BUILT FOR AGENCIES" block: a 2x2 lifecycle grid
+ * (QA → Team → Review → Ship) plus the full-width EVIDENCE card, all sharing
+ * one inset dark .ag-root panel. ("What they see" used to lead this component
+ * but now lives in its own <WhatTheySee /> so the two can be ordered
+ * independently.) All `.ag-*` styles live in marketing.css scoped under
+ * `.marketing-root`.
  */
 
 /**
@@ -181,7 +178,7 @@ function CardTeam() {
       <div className="ag-card-head">
         <Eyebrow>02 · TEAM</Eyebrow>
         <h3 className="ag-h">
-          Everyone&apos;s notes
+          Every feedback
           <br />
           in one place.
         </h3>
@@ -488,66 +485,12 @@ function CardShip() {
 }
 
 export function BuiltForAgenciesDark() {
-  const demoRef = useRef<HTMLDivElement>(null);
-  const [inView, setInView] = useState(false);
-
-  useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") {
-      setInView(true);
-      return;
-    }
-    const node = demoRef.current;
-    if (!node) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setInView(true);
-            observer.unobserve(entry.target);
-          }
-        }
-      },
-      { threshold: 0.15 },
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
-
   return (
     <>
-      {/* "What they see" + dashboard demo — sits on the normal light page
-         background (lifted out of the dark .ag-root panel below). */}
-      <section id="teams" className="signature-session-section--light">
-        <header className="signature-session-header">
-          <div className="section-eyebrow">
-            <span className="section-eyebrow-dash">✦</span>
-            <span className="section-eyebrow-text">What they see</span>
-          </div>
-          <h2 className="signature-session-headline">
-            Send one link. Everyone
-            <br />
-            <span className="signature-session-headline-gradient">
-              sees the same thing.
-            </span>
-          </h2>
-          <p className="signature-session-sub">
-            Tickets, comments, screenshots, status — all live. No accounts, no
-            installs.
-          </p>
-        </header>
-
-        <div
-          ref={demoRef}
-          className={`signature-session-demo-wrapper${inView ? " in-view" : ""}`}
-        >
-          <span className="signature-demo-pill" aria-hidden="true">
-            <span className="signature-demo-pill-tag">Demo</span>
-            <span className="signature-demo-pill-label">Live session preview</span>
-          </span>
-          <SessionDemoStage />
-        </div>
-      </section>
-
+      {/* White gutter behind the inset dark panel — the panel is inset from the
+         page edges, so this band replaces the grey page background that would
+         otherwise show as left/right margins around it. */}
+      <div className="ag-gutter">
       <section id="personas" className="ag-root">
         <div className="ag-bg-grain"></div>
 
@@ -558,14 +501,13 @@ export function BuiltForAgenciesDark() {
               <span>BUILT FOR AGENCIES</span>
             </div>
             <h2 className="ag-title">
-              Made for the people
-              <br />
-              who ship work <em>for other people.</em>
+              From client QA to dev handoff, <em>in one place.</em>
             </h2>
           </div>
           <div className="ag-head-right">
             <p className="ag-lede">
-              First QA pass to dev handoff. One place. One workflow.
+              Walk the build, capture every issue, and hand developers tickets
+              that are already complete. One session, one link, one workflow.
             </p>
             <div className="ag-head-meta">
               <span className="ag-head-dot"></span>
@@ -584,6 +526,7 @@ export function BuiltForAgenciesDark() {
         {/* THE EVIDENCE — shares this same .ag-root dark background. */}
         <EvidenceBlock />
       </section>
+      </div>
     </>
   );
 }

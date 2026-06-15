@@ -54,16 +54,18 @@ export function AppBootGate({ children }: { children: ReactNode }) {
  * Claims, workspace id, sessions, and billing load progressively and must not block boot.
  */
 export function AppBootReadinessBridge() {
+  // All hooks must run unconditionally on every render (rules of hooks). The
+  // early return for a missing chrome context happens AFTER the hooks below.
   const chrome = useAppBootChromeOptional();
-  if (!chrome) return null;
-  const { reportSurfaceReady } = chrome;
   const { authReady } = useWorkspace();
-
   const bootReady = useAppBoot(authReady);
 
+  const reportSurfaceReady = chrome?.reportSurfaceReady;
   useEffect(() => {
-    reportSurfaceReady(bootReady);
+    reportSurfaceReady?.(bootReady);
   }, [bootReady, reportSurfaceReady]);
+
+  if (!chrome) return null;
 
   return null;
 }

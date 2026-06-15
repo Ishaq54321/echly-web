@@ -4,6 +4,7 @@ import React, { useMemo, useState, useRef, useEffect, useCallback } from "react"
 import { ChevronRight, Eye, UsersRound, PencilLine, PanelLeftOpen } from "lucide-react";
 import { InviteMemberModal } from "@/components/workspace/InviteMemberModal";
 import { formatDistanceToNow } from "date-fns";
+import { toDate } from "@/lib/utils/timestamp";
 import type { Feedback } from "@/lib/domain/feedback";
 import { getTicketStatus } from "@/lib/domain/feedback";
 import { TicketItem } from "./TicketItem";
@@ -15,11 +16,10 @@ import {
   NoResolvedTicketsIllu,
 } from "@/components/empty/canvasIllustrations";
 
-function formatRelativeTime(timestamp: any): string {
+function formatRelativeTime(timestamp: unknown): string {
+  const date = toDate(timestamp);
+  if (!date) return "Just now";
   try {
-    const date = typeof timestamp === 'object' && 'seconds' in timestamp
-      ? new Date(timestamp.seconds * 1000)
-      : new Date(timestamp);
     return formatDistanceToNow(date, { addSuffix: true });
   } catch {
     return "Just now";

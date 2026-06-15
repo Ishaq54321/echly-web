@@ -8,21 +8,12 @@ import { useWorkspace } from "@/lib/client/workspaceContext";
 import type { Session, SharedSessionMembership } from "@/lib/domain/session";
 import { SESSION_FEEDBACK_PATH } from "@/utils/getSessionLink";
 import { authFetch } from "@/lib/authFetch";
+import { toMillis } from "@/lib/utils/timestamp";
 
 export const OPEN_SEARCH_EVENT = "annote:open-search-overlay";
 
 function sessionUpdatedMs(updatedAt: Session["updatedAt"]): number {
-  if (updatedAt == null) return 0;
-  if (
-    typeof updatedAt === "object" &&
-    updatedAt !== null &&
-    "toMillis" in updatedAt &&
-    typeof (updatedAt as { toMillis?: () => number }).toMillis === "function"
-  ) {
-    return (updatedAt as { toMillis: () => number }).toMillis();
-  }
-  const t = new Date(updatedAt as string | Date).getTime();
-  return Number.isFinite(t) ? t : 0;
+  return toMillis(updatedAt) ?? 0;
 }
 
 function formatSessionMeta(s: Session): string {

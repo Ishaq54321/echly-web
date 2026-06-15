@@ -16,6 +16,7 @@
 import type { NextRequest } from "next/server";
 import OpenAI from "openai";
 import { FieldValue } from "firebase-admin/firestore";
+import { toMillis as coerceMillis } from "@/lib/utils/timestamp";
 import { requireAuth, toAuthorizationResponse } from "@/lib/server/auth/authorize";
 import { buildRequestContext } from "@/lib/server/requestContext";
 import { getFeedbackByIdRepo } from "@/lib/repositories/feedbackRepository.server";
@@ -111,15 +112,13 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-/** Epoch-ms of an Admin Timestamp / Date / {seconds} value, else 0. */
+/**
+ * Epoch-ms of an Admin Timestamp / Date / {seconds} value, else 0.
+ * Thin server adapter over the SDK-agnostic canonical helper (which returns
+ * null for unparseable input) — local call sites here expect 0, not null.
+ */
 function toMillis(value: unknown): number {
-  if (value == null) return 0;
-  const v = value as { toMillis?: () => number; toDate?: () => Date; seconds?: number };
-  if (typeof v.toMillis === "function") return v.toMillis();
-  if (typeof v.toDate === "function") return v.toDate().getTime();
-  if (typeof v.seconds === "number") return v.seconds * 1000;
-  if (value instanceof Date) return value.getTime();
-  return 0;
+  return coerceMillis(value) ?? 0;
 }
 
 /**

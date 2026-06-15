@@ -2,6 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/server/firebaseAdmin";
+import { apiError } from "@/lib/server/apiResponse";
 
 export const runtime = "nodejs";
 
@@ -14,7 +15,17 @@ async function countByStatus(status: "pending" | "processing" | "failed"): Promi
   return snapshot.data().count ?? 0;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  // Internal health endpoint — gate on CRON_SECRET, matching the cron routes
+  // (e.g. app/api/cron/workspace-purge/route.ts:12-17). It only reads, but it
+  // still leaks internal pipeline state, so reject unauthenticated callers.
+  const secret = process.env.CRON_SECRET;
+  const authHeader = req.headers.get("authorization");
+  const bearer = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!secret || bearer !== secret) {
+    return apiError({ code: "UNAUTHORIZED", message: "Unauthorized", status: 401 });
+  }
+
   const [pending, processing, failed, recentSnapshot] = await Promise.all([
     countByStatus("pending"),
     countByStatus("processing"),

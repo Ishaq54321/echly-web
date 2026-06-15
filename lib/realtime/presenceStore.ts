@@ -18,6 +18,7 @@ import {
   recordListenerError,
   recordListenerUpdate,
 } from "@/lib/observability/listenerEvents";
+import { asTimestamp } from "@/lib/utils/asTimestamp";
 
 export interface PresentUser {
   userId: string;
@@ -90,17 +91,6 @@ function setState(sessionId: string, patch: Partial<PresenceState>) {
   const e = getOrCreateEntry(sessionId);
   e.state = { ...e.state, ...patch, version: e.state.version + 1 };
   emitFor(sessionId);
-}
-
-function asTimestamp(value: unknown): Timestamp | null {
-  if (value == null) return null;
-  if (value instanceof Timestamp) return value;
-  if (value instanceof Date) return Timestamp.fromDate(value);
-  const v = value as { seconds?: number; nanoseconds?: number };
-  if (typeof v.seconds === "number") {
-    return new Timestamp(v.seconds, typeof v.nanoseconds === "number" ? v.nanoseconds : 0);
-  }
-  return null;
 }
 
 function mapPresentUserFromSnap(

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { DM_Sans } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ToastProvider } from "@/components/dashboard/context/ToastContext";
 
 // RootProviders intentionally NOT mounted at the root.
@@ -84,6 +85,9 @@ export default function RootLayout({
             },
           }}
         />
+        {/* PERF (Batch 0.1): Vercel Speed Insights — real field metrics (LCP,
+            INP, TTFB, CLS) once deployed. No-ops outside Vercel. */}
+        <SpeedInsights />
       </body>
     </html>
   );

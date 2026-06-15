@@ -24,6 +24,13 @@ export const metadata: Metadata = {
 };
 
 export default async function Home() {
+  // PERF (Tier 1, T1.4): this verifySessionToken is NOT redundant with the
+  // middleware. `/` is on the middleware's public allowlist (isPublicPath
+  // returns true for "/") AND is absent from the middleware matcher, so the
+  // STEP-5 auth gate that verifies annote_session never runs for this route.
+  // The smart root therefore must verify the cookie itself to decide whether to
+  // send an authed user to /dashboard or render marketing for a logged-out
+  // visitor. Removing this verify would break that redirect decision.
   const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
   const session = token ? await verifySessionToken(token) : null;
   // Smart root: authed users always go to /dashboard. Middleware (steps 6/7)
