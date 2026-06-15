@@ -6548,7 +6548,9 @@
     rgba(90, 73, 191, 0) 72%
   );
   pointer-events: none;
-  z-index: 0;
+  /* z:1 so it sits above the constellation canvas (z:0) but still below the
+     copy (z:2) and tray (z:3/4). */
+  z-index: 1;
 }
 @media (max-width: 1099px) {
   /* On narrow viewports the tray drops below the copy; soften the wash so it
@@ -6566,6 +6568,23 @@
   .marketing-root .hcd {
     height: 100vh;
   }
+}
+
+/* Constellation canvas — decorative particle field for the LIGHT hero. Pinned
+   behind the violet wash (.hcd::before is z:0 too, painted first here since the
+   canvas is the FIRST child of .hcd), the copy (z:2) and the tray (z:3/4).
+   pointer-events:none so it never intercepts clicks/scroll; the real mouse
+   position is read via a passive pointermove listener on .hcd. Decorative →
+   aria-hidden in the markup. */
+.marketing-root .hcd-constellation {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  /* Decorative: don't let it bleed past the rounded/overflow stage. */
+  display: block;
 }
 
 /* v15: marketing copy as part of the capture surface. Centered, upper-middle,
