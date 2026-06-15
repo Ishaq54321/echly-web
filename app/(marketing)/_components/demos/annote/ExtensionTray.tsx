@@ -41,6 +41,7 @@ import React from "react";
 import { Link as LinkIcon, Mic, X } from "lucide-react";
 import FeedbackItem, { type DemoTicket } from "./FeedbackItem";
 import { iconForType } from "./icons";
+import { AnnoteLogo } from "../../AnnoteLogo";
 import type { MockTicket } from "./mockTickets";
 
 export interface ExtensionTrayProps {
@@ -82,11 +83,8 @@ export function ExtensionTray({
         {/* ── Session header ── */}
         <div className="tl-head">
           <span className="pill-mark pill-mark-logo">
-            <img
-              src="/annote-logo-icon.svg"
-              alt="Annote"
-              style={{ width: 24, height: 30, objectFit: "contain", display: "block" }}
-            />
+            {/* White logo for the dark tray (per feedback). */}
+            <AnnoteLogo width={24} height={30} variant="white" />
           </span>
 
           <div className="tl-title-block">

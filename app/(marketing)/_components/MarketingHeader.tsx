@@ -14,7 +14,7 @@ export function MarketingHeader() {
       <div className="mk-nav-inner">
         <Link href="/" className="mk-logo" aria-label="Annote">
           <span className="mk-logo-mark">
-            <AnnoteLogo width={22} height={28} variant="gradient" />
+            <AnnoteLogo width={22} height={28} variant="white" />
           </span>
           <span className="mk-logo-word">Annote</span>
         </Link>

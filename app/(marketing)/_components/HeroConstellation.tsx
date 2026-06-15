@@ -1,14 +1,15 @@
 "use client";
 
 /**
- * HeroConstellation — a subtle, decorative particle field for the LIGHT hero.
+ * HeroConstellation — a subtle, decorative particle field for the DARK hero.
  *
- * Drifting indigo/slate dots connect with faint constellation lines and softly
- * react to the cursor. Tuned for a near-WHITE background: the dots are DARK
- * (indigo/slate) at low opacity so they read as quiet texture, never bright
- * white (which would vanish on white). A radial density+opacity mask keeps the
- * field SPARSE and faint behind the centred headline/sub/CTAs and slightly
- * denser toward the empty top/edges, so the copy always reads cleanly.
+ * Drifting indigo/light dots connect with faint constellation lines and softly
+ * react to the cursor. Tuned for a near-BLACK / dark-indigo background: the dots
+ * are LIGHT (bright indigo + soft off-white) at low opacity so they GLOW against
+ * the dark field, never dark (which would vanish on dark). A radial
+ * density+opacity mask keeps the field SPARSE and faint behind the centred
+ * headline/sub/CTAs and slightly denser toward the empty top/edges, so the copy
+ * always reads cleanly.
  *
  * Hygiene (this is the first thing users see):
  *   • Canvas is absolutely positioned, z-index 0 inside `.hcd`, pointer-events
@@ -24,27 +25,30 @@
 
 import { useEffect, useRef } from "react";
 
-// ── Tuning constants (all chosen for a LIGHT background) ──────────────────────
+// ── Tuning constants (all chosen for a DARK background) ───────────────────────
 
-// Dot color: indigo (brand) for most, slate for a few, so the web reads as
-// intentional brand texture rather than noise. RGB tuples; alpha applied later.
-const DOT_INDIGO = [99, 102, 241] as const; // #6366F1
-const DOT_SLATE = [148, 163, 184] as const; // #94A3B8
+// Dot color: bright indigo (brand) for most, soft off-white for a few, so the
+// web GLOWS on the dark field and reads as intentional brand texture rather
+// than noise. RGB tuples; alpha applied later.
+const DOT_INDIGO = [129, 140, 248] as const; // #818CF8 (indigo-400, glows on dark)
+const DOT_SLATE = [203, 213, 225] as const; // #CBD5E1 (slate-300, soft starlight)
 
-// Base per-dot opacity envelope — deliberately faint on white.
-const DOT_ALPHA_MIN = 0.1;
-const DOT_ALPHA_MAX = 0.34;
+// Base per-dot opacity envelope — faint, but a touch stronger than the
+// light-bg version since light dots on dark need a little more presence to glow.
+const DOT_ALPHA_MIN = 0.16;
+const DOT_ALPHA_MAX = 0.5;
 
-// Constellation line: indigo, very low alpha, fades to 0 at the link distance.
-const LINE_RGB = [99, 102, 241] as const;
-const LINE_MAX_ALPHA = 0.14;
+// Constellation line: indigo, low alpha, fades to 0 at the link distance. A bit
+// brighter than the light-bg tune so the faint web is visible on dark.
+const LINE_RGB = [129, 140, 248] as const;
+const LINE_MAX_ALPHA = 0.18;
 const LINK_DIST = 130; // px (CSS px) at which dots stop connecting
 const LINK_DIST_SQ = LINK_DIST * LINK_DIST;
 
 // Mouse interaction (desktop only): faint lines to the cursor + a soft pull.
 const MOUSE_DIST = 160;
 const MOUSE_DIST_SQ = MOUSE_DIST * MOUSE_DIST;
-const MOUSE_LINE_ALPHA = 0.16;
+const MOUSE_LINE_ALPHA = 0.22;
 const MOUSE_PULL = 0.0009; // acceleration scale toward the cursor (very gentle)
 
 // Density: roughly one particle per AREA_PER_DOT px², capped hard.
@@ -280,7 +284,7 @@ export function HeroConstellation() {
         const mask = centerMask(p.x, p.y, width, height);
         const alpha = Math.max(
           0,
-          Math.min(0.5, p.alphaBase * twinkleMul * mask),
+          Math.min(0.7, p.alphaBase * twinkleMul * mask),
         );
         if (alpha < 0.004) continue;
         ctx!.fillStyle = `rgba(${p.rgb[0]}, ${p.rgb[1]}, ${p.rgb[2]}, ${alpha})`;
