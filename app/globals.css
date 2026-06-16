@@ -6015,9 +6015,7 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
 ====================================== */
 
 .description-editor-shell {
-  background: var(--glass-surface-elevated);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
+  background: var(--surface-card);
   border: 1px solid var(--border);
   border-radius: 12px;
   overflow: visible;
@@ -6029,9 +6027,7 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
   position: sticky;
   top: 0;
   z-index: 5;
-  background: var(--glass-surface-elevated);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
+  background: var(--surface-card);
   border-top-left-radius: 12px;
   border-top-right-radius: 12px;
   border-bottom: 1px solid var(--border) !important;
