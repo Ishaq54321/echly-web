@@ -1685,21 +1685,11 @@ function injectShadowStyles(shadowRoot: ShadowRoot): void {
   shadowRoot.appendChild(reset);
 }
 
-/** Inject minimal page-level styles only. Do NOT inject popup.css into document.head (would lock host page scroll). */
-function injectPageStyles(): void {
-  /* Restore host page scroll if any extension CSS ever set overflow: hidden (use auto, not visible, to preserve scroll container). */
-  if (!document.getElementById("echly-page-scroll-restore")) {
-    const scrollRestore = document.createElement("style");
-    scrollRestore.id = "echly-page-scroll-restore";
-    scrollRestore.textContent =
-      "html, body { overflow: auto !important; }";
-    document.head.appendChild(scrollRestore);
-  }
-}
-
-/** Create shadow root, styles, container; mount React. Call only once per host. Popup styles live only in shadow DOM. */
+/** Create shadow root, styles, container; mount React. Call only once per host. Popup styles live only in shadow DOM.
+ *  We deliberately do NOT inject any page-level (document.head) styles: all widget CSS is sandboxed in the shadow
+ *  root via the linked popup.css, so nothing of ours ever locks host-page scroll. Forcing `html, body { overflow }`
+ *  used to spawn a phantom second scrollbar on body-scroll / fixed-shell sites — see the removed injectPageStyles. */
 function mountReactApp(host: HTMLDivElement): void {
-  injectPageStyles();
   const shadowRoot = host.attachShadow({ mode: "open" });
   injectShadowStyles(shadowRoot);
 
