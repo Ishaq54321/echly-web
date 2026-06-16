@@ -41,7 +41,6 @@ import React from "react";
 import { Link as LinkIcon, Mic, X } from "lucide-react";
 import FeedbackItem, { type DemoTicket } from "./FeedbackItem";
 import { iconForType } from "./icons";
-import { AnnoteLogo } from "../../AnnoteLogo";
 import type { MockTicket } from "./mockTickets";
 
 export interface ExtensionTrayProps {
@@ -66,6 +65,8 @@ function toDemoTicket(t: MockTicket): DemoTicket {
     // array of the right length. Contents are unused by the collapsed row.
     tags: Array.from({ length: t.tagCount }, (_, i) => `tag-${i}`),
     type: t.type === "bug" ? "high" : "medium",
+    // Original capture type → per-type thumb icon color (see marketing.css).
+    iconType: t.type,
   };
 }
 
@@ -80,13 +81,8 @@ export function ExtensionTray({
     <div className="echly-v2" data-annote-ui="true">
       <div className="pill pill-tickets">
 
-        {/* ── Session header ── */}
+        {/* ── Session header (logo removed per feedback; title block leads) ── */}
         <div className="tl-head">
-          <span className="pill-mark pill-mark-logo">
-            {/* White logo for the dark tray (per feedback). */}
-            <AnnoteLogo width={24} height={30} variant="white" />
-          </span>
-
           <div className="tl-title-block">
             <div className="tl-eyebrow">
               <span className="live-dot" aria-hidden />

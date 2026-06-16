@@ -39,6 +39,9 @@ export interface DemoTicket {
   description?: string;
   tags?: string[];
   type?: string;
+  /** Original capture type (copy/ui/broken-link/content/bug) — drives the
+   *  per-type thumb icon color via `data-type` (see marketing.css). */
+  iconType?: string;
 }
 
 function priorityFromType(type: string | undefined): "critical" | "high" | "medium" | "low" {
@@ -119,7 +122,11 @@ function FeedbackItem({
       onKeyDown={handleRowKeyDown}
       style={{ cursor: "pointer" }}
     >
-      <span className={`ticket-thumb${highlighted ? " ticket-thumb--highlighted" : ""}`} aria-hidden>
+      <span
+        className={`ticket-thumb${highlighted ? " ticket-thumb--highlighted" : ""}`}
+        data-type={ticket.iconType}
+        aria-hidden
+      >
         <IconComponent size={14} strokeWidth={2} />
       </span>
 

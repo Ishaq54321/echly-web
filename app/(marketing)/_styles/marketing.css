@@ -260,13 +260,13 @@
   max-width: 1180px;
   padding: 12px 16px 12px 22px;
   border-radius: 18px;
-  background: rgba(28, 25, 50, 0.55);
-  border: 1px solid rgba(199, 205, 230, 0.10);
+  /* Matched to the hero's near-top indigo tone (.dxflag band lifts to ~#1c1638
+     at the top); the island sits a hair above that. */
+  background: #181436;
+  border: 1px solid rgba(199, 205, 230, 0.1);
   box-shadow:
     0 1px 0 rgba(199, 205, 230, 0.04) inset,
     0 8px 30px -12px rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(16px) saturate(150%);
-  -webkit-backdrop-filter: blur(16px) saturate(150%);
 }
 .marketing-root .mk-nav--hero .mk-logo-word {
   color: #F5F6FA;
@@ -6576,8 +6576,10 @@
      anchor to the real viewport edges â€” clear the inherited cap + centering. */
   max-width: none;
   width: 100%;
-  margin-left: 0;
-  margin-right: 0;
+  /* Clear the base .hero-stage's `margin: 24px auto 0` entirely — the 24px top
+     margin left a gap above the hero, so the dark field wasn't touching the top
+     under the floating nav. */
+  margin: 0;
 }
 .marketing-root .hcd {
   position: relative;
@@ -6588,10 +6590,11 @@
      Everything â€” stageRef coords, pill anchor, highlight rect â€” now shares one
      viewport-wide coordinate system. */
   width: 100%;
-  /* Final polish: signature canvas. The hero is the SHOWCASE — bigger min-height
-     so the headline + sub + tray all read as co-equal anchors. */
-  height: calc(100vh - 160px);
-  min-height: clamp(760px, 94vh, 1040px);
+  /* The hero fills the FULL viewport height so the dark field reaches the bottom
+     edge — no light page strip showing below it (per feedback). Was
+     `calc(100vh - 160px)` + a 94vh min-height, which left a ~6vh light gap. */
+  height: 100vh;
+  min-height: 760px;
   margin: 0 auto;
   overflow: hidden;
   /* v14 (Annote-as-hero): the demo container is fully TRANSPARENT â€” no white
@@ -6648,7 +6651,7 @@
    pointer-events:none so it never intercepts clicks/scroll; the real mouse
    position is read via a passive pointermove listener on .hcd. Decorative →
    aria-hidden in the markup. */
-.marketing-root .hcd-constellation {
+.marketing-root .hcd-capture-stream {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -6943,47 +6946,40 @@
         that flagship section read as one designed dark system. The constellation
         canvas (z:0) glows on top of this. */
 .marketing-root .hero {
-  background: radial-gradient(125% 120% at 50% 8%, #1c1638 0%, #15102a 36%, #100c20 64%, #0b0813 100%);
+  /* Near-black #09090c with the .ag-root purple/blue ambient corner glows, at a
+     subtle-but-present intensity (between flat and the full band). */
+  /* Matched to the "The cause is already there" band (.dxflag): a deep near-black
+     lifting to deep-indigo. The bottom violet glow is layered over it. */
+  background:
+    radial-gradient(1000px 600px at 50% 108%, oklch(46% 0.15 285 / 0.15), transparent 60%),
+    radial-gradient(125% 120% at 50% 8%, #1c1638 0%, #15102a 36%, #100c20 64%, #0b0813 100%);
 }
-/* The right-side brand wash was tuned for white — brighten it slightly so it
-   still reads as a soft glow behind the tray on the dark field. */
+/* The right-side brand wash (a radial glow behind the tray) is removed per
+   feedback — it read as a glow on the outer side of the tray. */
 .marketing-root .hcd::before {
-  background: radial-gradient(
-    ellipse 65% 55% at 82% 50%,
-    rgba(129, 140, 248, 0.12) 0%,
-    rgba(129, 140, 248, 0.05) 40%,
-    rgba(129, 140, 248, 0) 72%
-  );
-}
-@media (max-width: 1099px) {
-  .marketing-root .hcd::before {
-    background: radial-gradient(
-      ellipse 70% 40% at 50% 85%,
-      rgba(129, 140, 248, 0.12) 0%,
-      rgba(129, 140, 248, 0) 70%
-    );
-  }
+  background: none;
 }
 
 /* 2 ── Hero copy ──────────────────────────────────────────────────────────── */
 /* Headline → near-white, matching the .dx-h headline in the reference band. */
 .marketing-root .hcd-hero-h1 {
   color: #fbfbff;
+  font-size: 64px;
 }
-/* Accent phrase ("easiest to fix.") → per feedback, DROP the violet→magenta
-   gradient and use the same dimmed lavender-white as the reference band's
-   ".dim" run ("The cause is already there.", L10738). Must cancel the clipped-
-   text gradient setup from the base rule so the solid color shows. */
+/* Accent phrase ("easiest to fix.") → same near-white as the rest of the
+   headline (per feedback). Cancels the clipped-text gradient from the base rule
+   so the solid color shows. */
 .marketing-root .hcd-hero-accent {
   background: none;
   -webkit-background-clip: border-box;
   background-clip: border-box;
-  -webkit-text-fill-color: rgba(226, 231, 255, 0.5);
-  color: rgba(226, 231, 255, 0.5);
+  -webkit-text-fill-color: #fbfbff;
+  color: #fbfbff;
 }
 /* Subhead → light slate-gray (was 65% ink). AA on the hero bg. */
 .marketing-root .hcd-hero-sub {
   color: #A8B0C0;
+  font-size: 17px;
 }
 
 /* Eyebrow pill → dark translucent surface, light text, subtle light border. */
@@ -7016,64 +7012,76 @@
 }
 /* The "New" badge keeps its magenta fill (#81296E + white text) — pops on dark. */
 
-/* 3 ── CTAs ───────────────────────────────────────────────────────────────── */
-/* Primary "Get Annote for free" → flipped to a LIGHT button with dark text so
-   it's the unmistakable primary on the dark field (was a dark button for the
-   white bg). Soft indigo glow on hover for life. */
-.marketing-root .hcd .mk-hero-cta {
-  background: #F5F6FA;
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.35),
-    0 12px 28px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(255, 255, 255, 0.06);
+/* 3 ── CTAs (attachment style) ─────────────────────────────────────────────────
+   Primary = a filled deep-violet pill with light-violet text (the "Create"
+   pill). Secondary = a dark ghost/outline with light-grey text (the "Apps" /
+   "Workflows" pills). BOTH get a masked ::before stroke ring that's a quiet
+   neutral by default and swaps to the brand violet→magenta gradient on hover —
+   exactly like the "Voice-to-ticket" pill (.hcd-hero-pill). */
+
+/* Shared ring scaffolding: relative + transparent border + padding-box clip so
+   the ::before ring is what defines the edge, then the gradient fades in on
+   hover. Applied to both CTAs. */
+.marketing-root .hcd .mk-hero-cta,
+.marketing-root .hcd .hcd-hero-cta-secondary {
+  position: relative;
+  border: 1px solid transparent;
+  background-clip: padding-box;
 }
-.marketing-root .hcd .mk-hero-cta:hover {
-  background: #FFFFFF;
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.35),
-    0 14px 32px rgba(129, 140, 248, 0.28),
-    0 0 0 1px rgba(255, 255, 255, 0.08);
+.marketing-root .hcd .mk-hero-cta::before,
+.marketing-root .hcd .hcd-hero-cta-secondary::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: rgba(255, 255, 255, 0.14); /* quiet neutral stroke at rest */
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+  transition: background 0.2s ease;
 }
-.marketing-root .hcd .mk-hero-cta-label {
-  color: #15101F; /* dark text on the light button */
-}
-.marketing-root .hcd .mk-hero-cta-arrow {
-  background: #5A49BF; /* brand-violet chip stays — white glyph reads on it */
-  color: #FFFFFF;
+.marketing-root .hcd .mk-hero-cta:hover::before,
+.marketing-root .hcd .hcd-hero-cta-secondary:hover::before {
+  background: linear-gradient(100deg, #6E3FB0 0%, #5A49BF 32%, #5E6AD2 56%, #C51A68 100%);
 }
 
-/* Secondary "Install Chrome Extension" → SAME solid white as the primary CTA
-   (per feedback), with black text + icon. NOTE: a later "polish pass" (≈L9420)
-   re-applies a translucent white surface + a ::before gradient-stroke ring at
-   0-2-0 specificity, so these overrides use the `.hcd` ancestor (0-3-0) to win,
-   and the ::before ring is neutralised so there's no grey-on-top and no gradient
-   stroke on hover (both flagged in feedback). */
-.marketing-root .hcd .hcd-hero-cta-secondary {
-  background: #F5F6FA;
-  color: #15101F;
-  border: 1px solid transparent;
-  background-clip: border-box;
+/* Primary "Get Annote for free" → filled deep-violet pill, light-violet text. */
+.marketing-root .hcd .mk-hero-cta {
+  background: #2E2150; /* deep violet fill */
   box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.35),
-    0 12px 28px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(255, 255, 255, 0.06);
+    0 1px 3px rgba(0, 0, 0, 0.4),
+    0 12px 28px rgba(0, 0, 0, 0.45),
+    0 8px 30px -10px rgba(124, 92, 230, 0.4);
+}
+.marketing-root .hcd .mk-hero-cta:hover {
+  background: #38275F;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.4),
+    0 14px 34px -10px rgba(124, 92, 230, 0.55);
+}
+.marketing-root .hcd .mk-hero-cta-label {
+  color: #D9C7F7; /* light-violet text (matches the "Create" pill) */
+}
+.marketing-root .hcd .mk-hero-cta-arrow {
+  background: rgba(217, 199, 247, 0.16);
+  color: #D9C7F7;
+}
+
+/* Secondary "Install Chrome Extension" → dark ghost/outline, light-grey text. */
+.marketing-root .hcd .hcd-hero-cta-secondary {
+  background: rgba(255, 255, 255, 0.02);
+  color: #C9CDD6;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 .marketing-root .hcd .hcd-hero-cta-secondary:hover {
-  background: #FFFFFF;
-  border-color: transparent;
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.35),
-    0 14px 32px rgba(129, 140, 248, 0.28),
-    0 0 0 1px rgba(255, 255, 255, 0.08);
-}
-/* Kill the gradient-stroke ::before ring entirely (default + hover). */
-.marketing-root .hcd .hcd-hero-cta-secondary::before,
-.marketing-root .hcd .hcd-hero-cta-secondary:hover::before {
-  background: none;
-  content: none;
+  background: rgba(255, 255, 255, 0.05);
 }
 .marketing-root .hcd .hcd-hero-cta-secondary svg {
-  color: #15101F;
+  color: #C9CDD6;
 }
 
 /* Both CTAs → slightly smaller + less rounded corners (per feedback). The base
@@ -7134,22 +7142,36 @@
    to win on specificity (0-5-0 vs the originals' 0-4-0) regardless of order. */
 .marketing-root .hero .hcd-tray-anchor .echly-v2 .pill,
 .marketing-root .hero .hcd-tray-anchor .echly-v2 .pill-tickets {
-  /* Flat dark indigo surface, no glow (per feedback). */
-  background: linear-gradient(180deg, #1A1830 0%, #141228 60%, #110F22 100%);
-  backdrop-filter: blur(20px) saturate(150%);
-  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  /* Indigo-tinted dark panel matched to the "The cause is already there" band
+     (.dxflag) — one step lighter than the band's deepest so it reads as an
+     elevated card on the indigo hero. */
+  background: linear-gradient(180deg, #1c1838 0%, #161232 60%, #120f29 100%);
   border: 1px solid rgba(199, 205, 230, 0.12);
 }
 .marketing-root .hero .hcd-tray-anchor .echly-v2 .pill-tickets {
-  /* Clean, neutral dark shadows — flat-but-elevated, no colored glow. */
+  /* Clean dark shadows only — no warm bloom at rest. */
   box-shadow:
-    0 2px 10px rgba(0, 0, 0, 0.4),
-    0 28px 70px -24px rgba(0, 0, 0, 0.7);
+    0 1px 0 rgba(255, 255, 255, 0.05) inset,
+    0 28px 60px -30px rgba(0, 0, 0, 0.7);
+}
+/* Hover → the SHIP card's hover treatment: warm border + warm outer glow. */
+.marketing-root .hero .hcd-tray-anchor .echly-v2 .pill-tickets:hover {
+  border-color: oklch(70% 0.16 32 / 0.38);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 34px 70px -28px rgba(0, 0, 0, 0.72),
+    0 0 60px -16px oklch(60% 0.18 32 / 0.28);
 }
 /* Kill the top edge-highlight sheen entirely — the glassy white/blue line read
    as a glow on dark. The 1px border now carries all the edge definition. */
 .marketing-root .hcd .echly-v2 .pill::before {
   background: none;
+}
+
+/* Logo removed from the tray header (per feedback) → drop the leading 25px logo
+   column so the title block leads flush-left. */
+.marketing-root .hcd .echly-v2 .tl-head {
+  grid-template-columns: 1fr auto;
 }
 
 /* Header: eyebrow uses the brand token (indigo-400) — lift it so "ACTIVE
@@ -7179,16 +7201,16 @@
 .marketing-root .hcd-tray-anchor .tl-vrow:hover:not([aria-current="true"]) {
   background: rgba(129, 140, 248, 0.12);
 }
-/* Thumb chip: a brand-tinted dark chip with a soft inner ring + the indigo
-   icon, so the leading glyph reads as a deliberate accent (not muddy grey). */
+/* Thumb chip: a neutral dark chip with a WHITE icon (per feedback — was a
+   per-type multicolor set). */
 .marketing-root .hcd .echly-v2 .ticket-thumb {
-  background: rgba(129, 140, 248, 0.14);
-  color: #AEB4F7;
-  box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.18);
+  background: rgba(255, 255, 255, 0.07);
+  color: #FFFFFF;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 .marketing-root .hcd .echly-v2 .ticket-thumb--highlighted {
-  background: rgba(129, 140, 248, 0.24);
-  color: #C7CCFF;
+  background: rgba(255, 255, 255, 0.12);
+  color: #FFFFFF;
 }
 /* Footer AI dot → brand glow. */
 .marketing-root .hcd .echly-v2 .ai-dot {

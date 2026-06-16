@@ -27,7 +27,7 @@ import { useCallback, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence } from "framer-motion";
 import { ArrowIcon, DownloadIcon } from "../icons";
-import { HeroConstellation } from "../HeroConstellation";
+import { HeroCaptureStream } from "../HeroCaptureStream";
 import { ExtensionTray } from "./annote/ExtensionTray";
 import { EditModal } from "./annote/EditModal";
 import {
@@ -67,10 +67,10 @@ export function HeroCaptureDemo() {
 
   return (
     <div className={stageCls} aria-label="Annote hero">
-      {/* Decorative constellation field — pinned behind all hero content
+      {/* Decorative "live capture stream" — pinned behind all hero content
           (z-index 0, pointer-events:none). Mounts alongside the copy, never
-          gates its paint. See HeroConstellation.tsx. */}
-      <HeroConstellation />
+          gates its paint. See HeroCaptureStream.tsx. */}
+      <HeroCaptureStream />
 
       {/* The marketing copy + the real CTAs. The "click anywhere to record"
           interaction that previously wrapped this whole surface is gone (see
