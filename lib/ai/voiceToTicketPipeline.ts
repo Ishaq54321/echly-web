@@ -292,7 +292,7 @@ export function buildUserMessage(
     parts.push(domContext.viewport);
   }
 
-  parts.push("\nREFERENCE CONTEXT — use it to identify what element or area the recorder is referring to, and to ground current values (colors, sizes, text) when the recorder references them. Never quote DOM text the recorder didn't reference, and never pad the description with properties they didn't mention:");
+  parts.push("\nREFERENCE CONTEXT — use it to identify what element or area the recorder is referring to. Ground current values (colors, sizes, text) ONLY for VISUAL/DESIGN feedback that is about that property; for BEHAVIORAL feedback (broken, missing, doesn't respond/navigate, errors) the captured styling is irrelevant and must NOT appear in the description. Never quote DOM text the recorder didn't reference, and never pad the description with properties they didn't mention:");
 
   parts.push(
     domContext.elementTag

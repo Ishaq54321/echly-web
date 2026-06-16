@@ -112,6 +112,47 @@ const SCENARIOS: Scenario[] = [
     ],
   },
   {
+    name: "behavioral-bug-styled-element",
+    kind: "Pure behavioral bug on a visually-styled element",
+    expect:
+      "Navigation bug on a white button. Styling is captured (color #FFFFFF, font-size) but IRRELEVANT — must NOT appear. A single behavioral observation stays prose; the model must NOT pad it into a restated bullet list. (Baseline reproduces the redundancy: it splits this one bug into a prose lead plus bullets that merely re-say it.)",
+    transcript:
+      "the View Press Release button doesn't go to the next page, and honestly I have no idea if it's even hooked up to anything, it just feels dead when you click it",
+    context: ctx({
+      elementTag: "button",
+      ancestorTrail: 'main > section "Hero"',
+      subtreeText: "View Press Release",
+      semanticIdentifier: "View Press Release",
+      semanticType: "button",
+      computedStyles:
+        "color: #FFFFFF; font-size: 14px; font-weight: 600; background: #5A49BF; padding: 12px 24px; border-radius: 8px; size: 200x44px",
+    }),
+    checks: [
+      {
+        name: "no hex code leaked (styling irrelevant to a behavioral bug)",
+        test: (t) => !/#[0-9A-Fa-f]{3,8}/.test(t.description),
+      },
+      {
+        name: "no styling token leaked (color/font-size/px)",
+        test: (t) => !/\bcolor\b|font-size|\d+px/i.test(t.description),
+      },
+      {
+        name: "prose, not bullets (single observation stays one line)",
+        test: (t) => !/(^|\n)\s*- /.test(t.description),
+      },
+      {
+        name: "behavioral claim survives (button named + navigate/next page)",
+        test: (t) =>
+          hasAny(t.title + " " + t.description, ["view press release"]) &&
+          hasAny(t.title + " " + t.description, ["navigate", "next page", "go to"]),
+      },
+      {
+        name: "tagged as bug",
+        test: (t) => t.tags.includes("bug"),
+      },
+    ],
+  },
+  {
     name: "deictic-wrapper",
     kind: "Deictic on an unlabeled wrapper",
     expect:
