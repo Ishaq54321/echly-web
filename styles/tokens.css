@@ -416,6 +416,45 @@
   /* Warm, translucent shimmer */
   --glass-shimmer-base:      rgba(245, 243, 240, 0.45);
   --glass-shimmer-highlight: rgba(255, 255, 255, 0.85);
+
+  /* ─── DEVTOOLS READABILITY (session-page DevTools tabs) ──────
+     The dashboard DevTools tabs (AI · Console · Network · Actions ·
+     Metadata) read as a flat, low-contrast wall: content text rendered
+     in --text-tertiary (#8A8096, ~3.4:1 on white — fails WCAG-AA), no
+     focal hierarchy, technical data as plain prose. These tokens bring
+     the marketing "Already Diagnosed" card's readability into the light
+     theme: a richer body slate, an inline monospace code-pill, and
+     stronger status colors — without darkening any surface or touching
+     the near-black --text-heading branding ink.
+
+     Body tier for DevTools content. #3A3343 ≈ 9.3:1 on white (AAA), a
+     notch darker than --text-secondary so streamed prose / stack traces
+     / args read crisply without becoming the near-black heading ink. */
+  --dt-text-body:        #3A3343;
+
+  /* Inline monospace code-pill (the marketing card's signature move).
+     Mirrors code.dx-inl: faint tinted chip behind technical tokens so
+     endpoints / status codes / ids / durations separate from prose. */
+  --dt-code-bg:          #F4F5F8;
+  --dt-code-border:      #E5E2EC;
+  --dt-code-text:        #3A3343;
+
+  /* Status code-coding — richer, AA-legible foregrounds + matching faint
+     tints for the pill backgrounds. Green 2xx · amber 4xx/slow · red 5xx/
+     errored · violet 3xx. Amber is intentionally a deeper, less-muddy tone
+     than the legacy --color-warning-text (#9B573E). */
+  --dt-status-ok-text:     #15724A;
+  --dt-status-ok-bg:       #E9F8F0;
+  --dt-status-ok-border:   #CDEEDB;
+  --dt-status-warn-text:   #9A5B12;
+  --dt-status-warn-bg:     #FBF1E3;
+  --dt-status-warn-border: #F0DEC2;
+  --dt-status-err-text:    #C0353A;
+  --dt-status-err-bg:      #FCEDED;
+  --dt-status-err-border:  #F6D4D5;
+  --dt-status-info-text:   #4A3BA6;
+  --dt-status-info-bg:     #EFEBF9;
+  --dt-status-info-border: #DCDCFB;
 }
 
 /* Duplicate of the :root block above, scoped to :host so shadow DOM
@@ -826,6 +865,24 @@
   /* Warm, translucent shimmer */
   --glass-shimmer-base:      rgba(245, 243, 240, 0.45);
   --glass-shimmer-highlight: rgba(255, 255, 255, 0.85);
+
+  /* ─── DEVTOOLS READABILITY (kept identical to the :root block) ── */
+  --dt-text-body:        #3A3343;
+  --dt-code-bg:          #F4F5F8;
+  --dt-code-border:      #E5E2EC;
+  --dt-code-text:        #3A3343;
+  --dt-status-ok-text:     #15724A;
+  --dt-status-ok-bg:       #E9F8F0;
+  --dt-status-ok-border:   #CDEEDB;
+  --dt-status-warn-text:   #9A5B12;
+  --dt-status-warn-bg:     #FBF1E3;
+  --dt-status-warn-border: #F0DEC2;
+  --dt-status-err-text:    #C0353A;
+  --dt-status-err-bg:      #FCEDED;
+  --dt-status-err-border:  #F6D4D5;
+  --dt-status-info-text:   #4A3BA6;
+  --dt-status-info-bg:     #EFEBF9;
+  --dt-status-info-border: #DCDCFB;
 }
 
 /* ─── GLOBAL BASE ────────────────────────── */
@@ -1189,4 +1246,48 @@ body {
 @keyframes modal-enter {
   from { opacity: 0; transform: scale(0.96) translateY(8px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ─── DevTools shared readability primitives ─────────────────────
+   Reusable inline monospace code-pill + status-coded variant, shared
+   across the session-page DevTools tabs so technical data (endpoints,
+   status codes, methods, ids, durations) reads as distinct scannable
+   chips instead of prose — the marketing card's signature treatment,
+   ported into the light theme. Each tab still owns its layout CSS;
+   these are the cross-tab atoms only. */
+.dt-code {
+  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  font-weight: 500;
+  background: var(--dt-code-bg);
+  border: 1px solid var(--dt-code-border);
+  color: var(--dt-code-text);
+  padding: 1px 5px;
+  border-radius: 5px;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.dt-code--ok {
+  background: var(--dt-status-ok-bg);
+  border-color: var(--dt-status-ok-border);
+  color: var(--dt-status-ok-text);
+  font-weight: 600;
+}
+.dt-code--warn {
+  background: var(--dt-status-warn-bg);
+  border-color: var(--dt-status-warn-border);
+  color: var(--dt-status-warn-text);
+  font-weight: 600;
+}
+.dt-code--err {
+  background: var(--dt-status-err-bg);
+  border-color: var(--dt-status-err-border);
+  color: var(--dt-status-err-text);
+  font-weight: 600;
+}
+.dt-code--info {
+  background: var(--dt-status-info-bg);
+  border-color: var(--dt-status-info-border);
+  color: var(--dt-status-info-text);
+  font-weight: 600;
 }

@@ -68,40 +68,83 @@ function isPending(entry: NetworkRequestEntry): boolean {
   return !entry.errored && entry.status == null;
 }
 
-function statusBadgeColor(lifecycle: Lifecycle): string {
+/** A pill's full colour set — foreground + faint tinted background + border —
+ *  applied via CSS custom properties so one .nettab-badge rule renders every
+ *  variant. Matches the marketing Network rows' tinted-chip treatment. */
+interface PillColors {
+  color: string;
+  bg: string;
+  border: string;
+}
+
+function badgeVars(p: PillColors): React.CSSProperties {
+  return {
+    ["--badge-color" as string]: p.color,
+    ["--badge-bg" as string]: p.bg,
+    ["--badge-border" as string]: p.border,
+  };
+}
+
+const PILL_OK: PillColors = {
+  color: "var(--dt-status-ok-text)",
+  bg: "var(--dt-status-ok-bg)",
+  border: "var(--dt-status-ok-border)",
+};
+const PILL_WARN: PillColors = {
+  color: "var(--dt-status-warn-text)",
+  bg: "var(--dt-status-warn-bg)",
+  border: "var(--dt-status-warn-border)",
+};
+const PILL_ERR: PillColors = {
+  color: "var(--dt-status-err-text)",
+  bg: "var(--dt-status-err-bg)",
+  border: "var(--dt-status-err-border)",
+};
+const PILL_INFO: PillColors = {
+  color: "var(--dt-status-info-text)",
+  bg: "var(--dt-status-info-bg)",
+  border: "var(--dt-status-info-border)",
+};
+const PILL_NEUTRAL: PillColors = {
+  color: "var(--text-secondary)",
+  bg: "var(--surface-subtle)",
+  border: "var(--border)",
+};
+
+function statusBadgeColors(lifecycle: Lifecycle): PillColors {
   switch (lifecycle) {
     case "success":
-      return "var(--color-success)";
+      return PILL_OK;
     case "redirect":
-      return "var(--brand)";
+      return PILL_INFO;
     case "clientError":
-      return "var(--color-warning-text)";
+      return PILL_WARN;
     case "serverError":
     case "errored":
-      return "var(--color-danger)";
+      return PILL_ERR;
     case "informational":
-      return "var(--text-secondary)";
+      return PILL_NEUTRAL;
     case "pending":
     default:
-      return "var(--text-tertiary)";
+      return PILL_NEUTRAL;
   }
 }
 
-function methodColor(method: string): string {
+function methodColors(method: string): PillColors {
   const m = method.toUpperCase();
-  if (m === "GET") return "var(--brand)";
-  if (m === "POST") return "var(--color-success)";
-  if (m === "PUT" || m === "PATCH") return "var(--color-warning-text)";
-  if (m === "DELETE") return "var(--color-danger)";
+  if (m === "GET") return PILL_INFO;
+  if (m === "POST") return PILL_OK;
+  if (m === "PUT" || m === "PATCH") return PILL_WARN;
+  if (m === "DELETE") return PILL_ERR;
   // OPTIONS, HEAD, anything else
-  return "var(--text-tertiary)";
+  return PILL_NEUTRAL;
 }
 
 function timeColor(durationMs: number | null): string {
   if (durationMs == null) return "var(--text-tertiary)";
-  if (durationMs >= 1000) return "var(--color-danger)";
-  if (durationMs >= 500) return "var(--color-warning-text)";
-  return "var(--text-tertiary)";
+  if (durationMs >= 1000) return "var(--dt-status-err-text)";
+  if (durationMs >= 500) return "var(--dt-status-warn-text)";
+  return "var(--text-secondary)";
 }
 
 function formatDuration(durationMs: number | null): string {
@@ -430,7 +473,7 @@ export function NetworkTabContent({
           grid-template-columns: 28px 52px 56px minmax(0, 1fr) minmax(0, 1fr) 60px 56px;
           align-items: center;
           gap: 8px;
-          height: 26px;
+          height: 30px;
           padding: 0 10px;
           border-bottom: 1px solid var(--border);
           cursor: pointer;
@@ -472,23 +515,32 @@ export function NetworkTabContent({
           text-align: right;
           padding-right: 2px;
         }
+        /* Status & method badges read as tinted monospace pills (the marketing
+           Network rows' treatment): a faint background + hairline border in the
+           badge's own colour, so they separate from prose and the status colour
+           is instantly scannable. Colour is supplied per-badge via --badge-color
+           / --badge-bg / --badge-border so a single rule serves every variant. */
         .nettab-badge {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          height: 18px;
+          height: 19px;
           padding: 0 6px;
-          border-radius: 4px;
+          border-radius: 5px;
           font-size: 10.5px;
-          font-weight: 600;
+          font-weight: 700;
           font-variant-numeric: tabular-nums;
-          letter-spacing: 0;
+          letter-spacing: 0.01em;
           font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
           line-height: 1;
+          color: var(--badge-color, var(--text-secondary));
+          background: var(--badge-bg, transparent);
+          border: 1px solid var(--badge-border, transparent);
         }
         .nettab-cell-name {
           font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
           font-size: 11.5px;
+          font-weight: 500;
           color: var(--text-heading);
           white-space: nowrap;
           overflow: hidden;
@@ -498,7 +550,7 @@ export function NetworkTabContent({
         .nettab-cell-domain {
           font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
           font-size: 10.5px;
-          color: var(--text-tertiary);
+          color: var(--text-secondary);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -507,7 +559,7 @@ export function NetworkTabContent({
         .nettab-cell-type {
           font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
           font-size: 10.5px;
-          color: var(--text-tertiary);
+          color: var(--text-secondary);
         }
         .nettab-cell-time {
           font-size: 10.5px;
@@ -535,12 +587,12 @@ export function NetworkTabContent({
           grid-template-columns: 28px 52px 56px minmax(0, 1fr) minmax(0, 1fr) 60px 56px;
           gap: 8px;
           padding: 0 10px;
-          height: 22px;
+          height: 24px;
           align-items: center;
           font-size: 10.5px;
-          font-weight: 600;
+          font-weight: 700;
           text-transform: uppercase;
-          letter-spacing: 0.08em;
+          letter-spacing: 0.1em;
           color: var(--text-tertiary);
           border-bottom: 1px solid var(--border);
           background: var(--surface-subtle);
@@ -834,8 +886,8 @@ function RequestRow({
   const lifecycle = classifyLifecycle(entry);
   const pending = isPending(entry);
   const errored = entry.errored;
-  const statusColor = statusBadgeColor(lifecycle);
-  const methodHex = methodColor(entry.method);
+  const statusPill = statusBadgeColors(lifecycle);
+  const methodPill = methodColors(entry.method);
   const name = extractName(entry.url);
   const domain = extractDomain(entry.url);
   const type = compactContentType(entry.responseContentType);
@@ -879,7 +931,7 @@ function RequestRow({
           className={`nettab-badge${errored ? " nettab-status-errored" : ""}${
             pending ? " nettab-pending" : ""
           }`}
-          style={{ color: statusColor }}
+          style={badgeVars(statusPill)}
           title={
             pending
               ? "Request still pending — page navigated or buffer flushed before response"
@@ -891,7 +943,7 @@ function RequestRow({
       </div>
 
       <div>
-        <span className="nettab-badge" style={{ color: methodHex }}>
+        <span className="nettab-badge" style={badgeVars(methodPill)}>
           {entry.method.toUpperCase()}
         </span>
       </div>

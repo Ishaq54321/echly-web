@@ -65,7 +65,7 @@ export function refundIssuedEmailHtml(props: RefundIssuedProps): string {
           `If you didn't expect this, or have questions about the refund, just reply directly.`
         )}
         ${ctaBlock}
-        ${emailSignoffV2("— Ishaq, Founder, Annote")}
+        ${emailSignoffV2("— Annote")}
       `,
     }),
   });
@@ -85,6 +85,6 @@ The refund covers ${reason}.
 
 If you didn't expect this, or have questions about the refund, just reply directly.
 ${ctaLine}
-— Ishaq, Founder, Annote`,
+— Annote`,
   });
 }

@@ -5,6 +5,14 @@ import { useState } from "react";
 
 export const PUBLIC_NAV_HEIGHT = 60;
 
+// Public session links are shared anywhere (incl. whitelabel/custom domains), so
+// the marketing CTAs point at absolute annote.ai URLs rather than relative paths.
+const ANNOTE_SITE = "https://annote.ai";
+const ANNOTE_LEARN_URL = ANNOTE_SITE; // no dedicated /learn page — home is the "learn about Annote" destination
+const ANNOTE_PRICING_URL = `${ANNOTE_SITE}/#pricing`;
+const ANNOTE_SIGNIN_URL = `${ANNOTE_SITE}/login`;
+const ANNOTE_CREATE_ACCOUNT_URL = `${ANNOTE_SITE}/signup`;
+
 export interface PublicSessionNavProps {
   /** Session-owner's brand logo. Server-side entitlement-checked (always safe to render when set with brandingEnabled). */
   brandLogoUrl?: string | null;
@@ -118,8 +126,8 @@ export default function PublicSessionNav({
               className="public-nav-links"
               style={{ display: "flex", alignItems: "center", gap: 8 }}
             >
-              <NavLink href="#">Learn</NavLink>
-              <NavLink href="#">Pricing</NavLink>
+              <NavLink href={ANNOTE_LEARN_URL}>Learn</NavLink>
+              <NavLink href={ANNOTE_PRICING_URL}>Pricing</NavLink>
             </div>
           )}
           <SignInButton />
@@ -140,6 +148,8 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
   return (
     <a
       href={href}
+      target="_blank"
+      rel="noopener noreferrer"
       className="font-medium"
       style={{
         fontSize: 15,
@@ -183,8 +193,8 @@ function SignInButton() {
         transition: "all 140ms ease",
       }}
       onClick={() => {
-        window.location.href = `/login?returnUrl=${encodeURIComponent(
-          window.location.pathname + window.location.search
+        window.location.href = `${ANNOTE_SIGNIN_URL}?returnUrl=${encodeURIComponent(
+          window.location.href
         )}`;
       }}
       onMouseEnter={(e) => {
@@ -221,7 +231,7 @@ function GetStartedButton() {
         transition: "all 140ms ease",
       }}
       onClick={() => {
-        window.location.href = "/signup";
+        window.location.href = ANNOTE_CREATE_ACCOUNT_URL;
       }}
       onMouseEnter={(e) => {
         const btn = e.currentTarget;

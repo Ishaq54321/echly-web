@@ -64,6 +64,8 @@ function PublicSessionView({ sessionId }: { sessionId: string }) {
           height: `calc(100dvh - ${PUBLIC_NAV_HEIGHT}px)`,
           overflowY: "auto",
           overflowX: "hidden",
+          background: "var(--surface-page)",
+          paddingTop: "24px",
           paddingBottom: "88px",
         }}
       >

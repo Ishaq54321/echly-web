@@ -164,7 +164,13 @@ export class StripeProvider implements PaymentProvider {
     }
     await stripe.subscriptionItems.update(item.id, {
       quantity: newSeatCount,
-      proration_behavior: "always_invoice",
+      // DEFERRED seat billing: the quantity (and thus access) updates
+      // immediately, but the prorated cost is NOT charged now. With
+      // "create_prorations" Stripe accrues the proration as line items that are
+      // billed on the customer's next renewal invoice — no surprise mid-cycle
+      // charge. (Plan upgrades deliberately stay "always_invoice"; see
+      // updateSubscriptionPlan.)
+      proration_behavior: "create_prorations",
     });
   }
 
@@ -192,11 +198,16 @@ export class StripeProvider implements PaymentProvider {
       // invoices.retrieveUpcoming. Pass the subscription id explicitly along
       // with the new quantity so the preview reflects the proration that would
       // result from updateSubscriptionSeats.
+      //
+      // Must mirror updateSubscriptionSeats' "create_prorations" so the
+      // previewed amount equals what the deferred change actually bills at the
+      // next renewal. "always_invoice" would surface the immediate-charge
+      // figure, which is no longer how seat adds are billed.
       const preview = await stripe.invoices.createPreview({
         subscription: subscriptionId,
         subscription_details: {
           items: [{ id: item.id, quantity: newSeatCount }],
-          proration_behavior: "always_invoice",
+          proration_behavior: "create_prorations",
         },
       });
 

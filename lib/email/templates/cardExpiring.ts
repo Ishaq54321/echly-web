@@ -44,7 +44,7 @@ export function cardExpiringEmailHtml(props: CardExpiringProps): string {
           "Updating takes about 30 seconds. If you have any questions, just reply — comes straight to me.",
           { spaceAfter: 0 }
         )}
-        ${emailSignoffV2("— Ishaq, Founder, Annote")}
+        ${emailSignoffV2("— Annote")}
       `,
     }),
   });
@@ -65,6 +65,6 @@ ${portalUrl}
 
 Updating takes about 30 seconds. If you have any questions, just reply — comes straight to me.
 
-— Ishaq, Founder, Annote`,
+— Annote`,
   });
 }

@@ -75,7 +75,7 @@ export function upcomingRenewalReminderEmailHtml(
         ${emailButtonRowV2(
           emailButtonV2({ label: "Open billing settings", href: settingsUrl, align: "full" })
         )}
-        ${emailSignoffV2("— Ishaq, Founder, Annote")}
+        ${emailSignoffV2("— Annote")}
       `,
     }),
   });
@@ -113,6 +113,6 @@ Renewal date: ${formatDate(nextBillingDate)}
 No action needed. To change your plan, cancel, or update payment method:
 ${settingsUrl}
 
-— Ishaq, Founder, Annote`,
+— Annote`,
   });
 }

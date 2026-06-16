@@ -37,7 +37,7 @@ export function paymentMethodUpdatedEmailHtml(
           "If you didn't make this change, please reply right away.",
           { spaceAfter: 0 }
         )}
-        ${emailSignoffV2("— Ishaq, Founder, Annote")}
+        ${emailSignoffV2("— Annote")}
       `,
     }),
   });
@@ -55,6 +55,6 @@ Just a confirmation that ${cardBrand} ending in ${cardLast4} is now the card on 
 
 If you didn't make this change, please reply right away.
 
-— Ishaq, Founder, Annote`,
+— Annote`,
   });
 }

@@ -169,8 +169,10 @@ export function MetadataTabContent({ feedback }: MetadataTabContentProps) {
   if (hasViewport) {
     rows.push(
       <MetaRow key="viewport" label="Viewport">
-        <span className="devtools-meta-value devtools-meta-value-mono">
-          {vw} × {vh}
+        <span className="devtools-meta-value">
+          <span className="devtools-meta-pill">
+            {vw} × {vh}
+          </span>
         </span>
       </MetaRow>
     );
@@ -179,8 +181,10 @@ export function MetadataTabContent({ feedback }: MetadataTabContentProps) {
   if (hasScreen) {
     rows.push(
       <MetaRow key="screen" label="Screen">
-        <span className="devtools-meta-value devtools-meta-value-mono">
-          {sw} × {sh}
+        <span className="devtools-meta-value">
+          <span className="devtools-meta-pill">
+            {sw} × {sh}
+          </span>
         </span>
       </MetaRow>
     );
@@ -189,8 +193,8 @@ export function MetadataTabContent({ feedback }: MetadataTabContentProps) {
   if (hasDpr) {
     rows.push(
       <MetaRow key="dpr" label="Device pixel ratio">
-        <span className="devtools-meta-value devtools-meta-value-mono">
-          {dpr}x
+        <span className="devtools-meta-value">
+          <span className="devtools-meta-pill">{dpr}x</span>
         </span>
       </MetaRow>
     );
@@ -226,9 +230,9 @@ export function MetadataTabContent({ feedback }: MetadataTabContentProps) {
           display: flex;
           align-items: flex-start;
           gap: 12px;
-          padding: 10px 10px;
+          padding: 11px 10px;
           border-radius: 6px;
-          min-height: 32px;
+          min-height: 34px;
           transition: background-color 120ms ease;
         }
         .devtools-meta-row:hover {
@@ -236,10 +240,10 @@ export function MetadataTabContent({ feedback }: MetadataTabContentProps) {
         }
         .devtools-meta-label {
           flex: 0 0 120px;
-          padding-top: 1px;
+          padding-top: 2px;
           font-size: 10.5px;
-          font-weight: 600;
-          letter-spacing: 0.08em;
+          font-weight: 700;
+          letter-spacing: 0.1em;
           text-transform: uppercase;
           color: var(--text-tertiary);
           user-select: none;
@@ -259,6 +263,26 @@ export function MetadataTabContent({ feedback }: MetadataTabContentProps) {
         .devtools-meta-wrap {
           white-space: pre-wrap;
           overflow-wrap: anywhere;
+        }
+        /* Short, atomic numeric values (viewport, screen, DPR) get the inline
+           monospace code-pill so they read as scannable technical data rather
+           than plain text — matching the other tabs' pill treatment. Long
+           wrapping strings (URL, user agent) stay as plain dark mono so they
+           don't fragment across a chip boundary. */
+        .devtools-meta-pill {
+          display: inline-flex;
+          align-items: center;
+          font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+          font-size: 11.5px;
+          font-weight: 500;
+          background: var(--dt-code-bg);
+          border: 1px solid var(--dt-code-border);
+          color: var(--dt-code-text);
+          padding: 2px 7px;
+          border-radius: 5px;
+          letter-spacing: -0.01em;
+          line-height: 1.3;
+          white-space: nowrap;
         }
         .devtools-meta-actions {
           flex: 0 0 auto;

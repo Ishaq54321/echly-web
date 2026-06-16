@@ -340,9 +340,9 @@ export function ConsoleTabContent({
           align-items: center;
           gap: 6px;
           text-transform: uppercase;
-          letter-spacing: 0.08em;
+          letter-spacing: 0.1em;
           font-size: 10.5px;
-          font-weight: 600;
+          font-weight: 700;
           color: var(--text-tertiary);
         }
 
@@ -350,7 +350,7 @@ export function ConsoleTabContent({
           background: rgba(229, 72, 77, 0.04);
           border: 1px solid rgba(229, 72, 77, 0.18);
           border-radius: 10px;
-          padding: 14px 14px;
+          padding: 14px 16px;
           transition: background-color 150ms ease, border-color 150ms ease;
           cursor: pointer;
         }
@@ -361,11 +361,11 @@ export function ConsoleTabContent({
         .devtools-exception-stack {
           background: var(--surface-subtle);
           border-radius: 6px;
-          padding: 8px 10px;
+          padding: 9px 11px;
           font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
           font-size: 11px;
-          line-height: 1.55;
-          color: var(--text-secondary);
+          line-height: 1.6;
+          color: var(--dt-text-body);
           white-space: pre;
           overflow-x: auto;
         }
@@ -396,7 +396,7 @@ export function ConsoleTabContent({
           grid-template-columns: 14px 64px 1fr 22px;
           align-items: center;
           gap: 8px;
-          height: 26px;
+          height: 28px;
           padding: 0 10px;
           border-radius: 6px;
           cursor: pointer;
@@ -415,7 +415,7 @@ export function ConsoleTabContent({
         }
         .devtools-log-row-message {
           font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
-          font-size: 11.5px;
+          font-size: 11.75px;
           color: var(--text-heading);
           white-space: nowrap;
           overflow: hidden;
@@ -460,12 +460,13 @@ export function ConsoleTabContent({
 
         .devtools-log-args {
           margin-left: 22px;
-          padding: 8px 10px;
+          padding: 9px 11px;
           background: var(--surface-subtle);
           border-radius: 0 0 6px 6px;
           font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
           font-size: 11px;
-          color: var(--text-secondary);
+          line-height: 1.6;
+          color: var(--dt-text-body);
           white-space: pre-wrap;
           word-break: break-word;
         }
@@ -783,8 +784,9 @@ function ExceptionCard({
         <span
           style={{
             fontSize: 12.5,
-            fontWeight: 500,
+            fontWeight: 600,
             color: "var(--text-heading)",
+            letterSpacing: "-0.005em",
           }}
         >
           {exceptionTypeLabel(entry)}
@@ -803,12 +805,13 @@ function ExceptionCard({
       </div>
 
       <div
-        className="mt-1.5"
+        className="mt-2"
         style={{
           fontFamily:
             'ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace',
-          fontSize: 12,
+          fontSize: 12.5,
           lineHeight: 1.55,
+          fontWeight: 500,
           color: "var(--text-heading)",
           wordBreak: "break-word",
         }}
@@ -823,7 +826,7 @@ function ExceptionCard({
               className="devtools-exception-stack mt-2"
               style={{
                 whiteSpace: "pre",
-                color: "var(--text-tertiary)",
+                color: "var(--text-secondary)",
               }}
             >
               {preview}

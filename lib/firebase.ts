@@ -3,8 +3,7 @@ import { getAuth } from "firebase/auth";
 import {
   getFirestore,
   initializeFirestore,
-  persistentLocalCache,
-  persistentSingleTabManager,
+  memoryLocalCache,
 } from "firebase/firestore";
 import type { FirebaseStorage } from "firebase/storage";
 import { firebaseConfig } from "./firebase/config";
@@ -13,28 +12,33 @@ const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 
-// PERF R-001: enable SDK-level IndexedDB persistence so recently-read documents
-// are served from the local cache on re-navigation without a network round-trip.
-// Uses the Firebase v10+ non-deprecated API (initializeFirestore +
-// persistentLocalCache). The typeof window guard is REQUIRED — this module may
-// be imported in server/API-route context where IndexedDB does not exist.
-// Falls back to a memory-only Firestore instance on the server.
+// Firestore local cache: MEMORY-ONLY on the client (memoryLocalCache).
 //
-// SINGLE-tab manager with forceOwnership: multi-tab persistence
-// (persistentMultipleTabManager) coordinates the IndexedDB lock across tabs,
-// and that coordination plus a listener detach/re-attach during a concurrent
-// server write produces the "FIRESTORE INTERNAL ASSERTION FAILED ID: ca9"
-// crash. Single-tab eliminates that surface: at most one tab owns the cache.
-// forceOwnership means a newly-opened second tab steals the lock and the
-// previous tab silently falls back to memory cache — no assertion, no crash.
-// Trade-off: same-user multi-tab no longer shares cached reads (minor; the
-// 95% one-tab case is unaffected, multi-user/different-account is unaffected).
+// We previously enabled SDK-level IndexedDB persistence (persistentLocalCache,
+// PERF R-001) so recently-read documents survived a page reload. That repeatedly
+// drove the app into Firestore's "INTERNAL ASSERTION FAILED: Unexpected state"
+// crash family — first ID: ca9, then ID: b7de / ID: b815 (CONTEXT {"batchId":N}).
+// These asserts live entirely inside the IndexedDB persistence + local
+// mutation-queue layer. They are triggered by the rapid snapshot churn and
+// listener detach/re-attach our realtime stores produce, and the SINGLE-tab
+// forceOwnership manager made it worse: when a second tab steals the lock it
+// tears persistence out from under in-flight write batches — a documented path
+// into the assert. The bug is unfixed upstream across 12.x
+// (firebase/firebase-js-sdk #9267, #8250), so there is no version to upgrade to.
+//
+// memoryLocalCache removes the subsystem the bug lives in entirely: no IndexedDB,
+// no persistent mutation queue, so the "Unexpected state" crash class is
+// structurally impossible. Reads are still cached in memory within a session
+// (snapshot listeners and repeated gets stay local); the only thing lost is
+// cross-reload read persistence — exactly the fragile path. Worthwhile trade for
+// a realtime app where listeners re-fetch on mount regardless.
+//
+// The typeof window guard remains: on the server we use getFirestore(app), which
+// is memory-backed anyway and avoids touching browser-only cache plumbing.
 export const db =
   typeof window !== "undefined"
     ? initializeFirestore(app, {
-        localCache: persistentLocalCache({
-          tabManager: persistentSingleTabManager({ forceOwnership: true }),
-        }),
+        localCache: memoryLocalCache(),
       })
     : getFirestore(app);
 

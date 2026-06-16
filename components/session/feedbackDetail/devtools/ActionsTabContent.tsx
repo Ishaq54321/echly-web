@@ -801,8 +801,8 @@ export function ActionsTabContent({
           grid-template-columns: 44px 16px minmax(0, 1fr);
           align-items: center;
           gap: 10px;
-          min-height: 30px;
-          padding: 4px 10px 4px 12px;
+          min-height: 34px;
+          padding: 6px 10px 6px 12px;
           border-bottom: 1px solid var(--border);
           cursor: pointer;
           transition: background-color 120ms ease, opacity 120ms ease;
@@ -837,42 +837,49 @@ export function ActionsTabContent({
           justify-content: center;
         }
         .actab-desc {
-          font-size: 12px;
-          color: var(--text-heading);
+          font-size: 12.5px;
+          color: var(--dt-text-body);
           min-width: 0;
           white-space: normal;
           word-break: break-word;
-          line-height: 1.45;
+          line-height: 1.5;
           display: flex;
           flex-wrap: wrap;
           align-items: baseline;
           gap: 4px;
         }
+        /* The action verb ("Clicked", "Navigated to") reads as dark body prose,
+           with the element/URL chip carrying the monospace contrast. */
         .actab-desc-text {
-          color: var(--text-secondary);
+          color: var(--dt-text-body);
+          font-weight: 500;
         }
         .actab-readable {
           color: var(--text-heading);
-          font-size: 12px;
-          line-height: 1.45;
+          font-size: 12.5px;
+          line-height: 1.5;
           min-width: 0;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
         }
+        /* Element / URL descriptor chip — tinted monospace pill matching the
+           shared .dt-code atom so it reads as scannable technical data. */
         .actab-element {
           display: inline-flex;
           align-items: center;
           max-width: 100%;
           padding: 1px 6px;
           height: 18px;
-          border-radius: 4px;
-          background: var(--surface-hover);
-          border: 1px solid var(--border);
+          border-radius: 5px;
+          background: var(--dt-code-bg);
+          border: 1px solid var(--dt-code-border);
           font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
           font-size: 10.5px;
-          color: var(--text-heading);
+          font-weight: 500;
+          color: var(--dt-code-text);
           line-height: 1;
+          letter-spacing: -0.01em;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -888,12 +895,12 @@ export function ActionsTabContent({
           grid-template-columns: 44px 16px minmax(0, 1fr);
           gap: 10px;
           padding: 0 10px 0 12px;
-          height: 22px;
+          height: 24px;
           align-items: center;
           font-size: 10.5px;
-          font-weight: 600;
+          font-weight: 700;
           text-transform: uppercase;
-          letter-spacing: 0.08em;
+          letter-spacing: 0.1em;
           color: var(--text-tertiary);
           border-bottom: 1px solid var(--border);
           background: var(--surface-subtle);

@@ -37,28 +37,83 @@ function formatDuration(durationMs: number | null): string {
 
 function timeColor(durationMs: number | null): string {
   if (durationMs == null) return "var(--text-tertiary)";
-  if (durationMs >= 1000) return "var(--color-danger)";
-  if (durationMs >= 500) return "var(--color-warning-text)";
-  return "var(--text-tertiary)";
-}
-
-function statusColorForCode(status: number | null, errored: boolean): string {
-  if (errored) return "var(--color-danger)";
-  if (status == null) return "var(--text-tertiary)";
-  if (status >= 500) return "var(--color-danger)";
-  if (status >= 400) return "var(--color-warning-text)";
-  if (status >= 300) return "var(--brand)";
-  if (status >= 200) return "var(--color-success)";
+  if (durationMs >= 1000) return "var(--dt-status-err-text)";
+  if (durationMs >= 500) return "var(--dt-status-warn-text)";
   return "var(--text-secondary)";
 }
 
-function methodColor(method: string): string {
+/** A pill's foreground + faint tint + border, applied via CSS custom
+ *  properties so one .netdrawer-badge rule renders every variant — the same
+ *  tinted-chip treatment as the Network list rows. */
+interface PillColors {
+  color: string;
+  bg: string;
+  border: string;
+}
+
+function badgeVars(p: PillColors): React.CSSProperties {
+  return {
+    ["--badge-color" as string]: p.color,
+    ["--badge-bg" as string]: p.bg,
+    ["--badge-border" as string]: p.border,
+  };
+}
+
+const PILL_OK: PillColors = {
+  color: "var(--dt-status-ok-text)",
+  bg: "var(--dt-status-ok-bg)",
+  border: "var(--dt-status-ok-border)",
+};
+const PILL_WARN: PillColors = {
+  color: "var(--dt-status-warn-text)",
+  bg: "var(--dt-status-warn-bg)",
+  border: "var(--dt-status-warn-border)",
+};
+const PILL_ERR: PillColors = {
+  color: "var(--dt-status-err-text)",
+  bg: "var(--dt-status-err-bg)",
+  border: "var(--dt-status-err-border)",
+};
+const PILL_INFO: PillColors = {
+  color: "var(--dt-status-info-text)",
+  bg: "var(--dt-status-info-bg)",
+  border: "var(--dt-status-info-border)",
+};
+const PILL_NEUTRAL: PillColors = {
+  color: "var(--text-secondary)",
+  bg: "var(--surface-subtle)",
+  border: "var(--border)",
+};
+
+/** Bare foreground colour for the Status Code value in the General kv section
+ *  (text, not a pill — keeps the kv grid visually calm). */
+function statusColorForCode(status: number | null, errored: boolean): string {
+  if (errored) return "var(--dt-status-err-text)";
+  if (status == null) return "var(--text-tertiary)";
+  if (status >= 500) return "var(--dt-status-err-text)";
+  if (status >= 400) return "var(--dt-status-warn-text)";
+  if (status >= 300) return "var(--dt-status-info-text)";
+  if (status >= 200) return "var(--dt-status-ok-text)";
+  return "var(--text-secondary)";
+}
+
+function statusPillForCode(status: number | null, errored: boolean): PillColors {
+  if (errored) return PILL_ERR;
+  if (status == null) return PILL_NEUTRAL;
+  if (status >= 500) return PILL_ERR;
+  if (status >= 400) return PILL_WARN;
+  if (status >= 300) return PILL_INFO;
+  if (status >= 200) return PILL_OK;
+  return PILL_NEUTRAL;
+}
+
+function methodPill(method: string): PillColors {
   const m = method.toUpperCase();
-  if (m === "GET") return "var(--brand)";
-  if (m === "POST") return "var(--color-success)";
-  if (m === "PUT" || m === "PATCH") return "var(--color-warning-text)";
-  if (m === "DELETE") return "var(--color-danger)";
-  return "var(--text-tertiary)";
+  if (m === "GET") return PILL_INFO;
+  if (m === "POST") return PILL_OK;
+  if (m === "PUT" || m === "PATCH") return PILL_WARN;
+  if (m === "DELETE") return PILL_ERR;
+  return PILL_NEUTRAL;
 }
 
 function extractHost(url: string): string {
@@ -385,15 +440,19 @@ export function NetworkRequestDrawer({
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          height: 20px;
-          padding: 0 7px;
-          border-radius: 4px;
+          height: 21px;
+          padding: 0 8px;
+          border-radius: 5px;
           font-size: 12px;
-          font-weight: 600;
+          font-weight: 700;
           font-variant-numeric: tabular-nums;
+          letter-spacing: 0.01em;
           font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
           line-height: 1;
           flex-shrink: 0;
+          color: var(--badge-color, var(--text-secondary));
+          background: var(--badge-bg, transparent);
+          border: 1px solid var(--badge-border, transparent);
         }
         .netdrawer-url {
           flex: 1;
@@ -440,7 +499,7 @@ export function NetworkRequestDrawer({
           gap: 0;
           font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
           font-size: 11px;
-          color: var(--text-tertiary);
+          color: var(--text-secondary);
         }
         .netdrawer-meta-sep {
           margin: 0 6px;
@@ -551,14 +610,14 @@ export function NetworkRequestDrawer({
           align-items: center;
           gap: 6px;
           text-transform: uppercase;
-          letter-spacing: 0.08em;
+          letter-spacing: 0.1em;
           font-size: 10.5px;
-          font-weight: 600;
+          font-weight: 700;
           color: var(--text-tertiary);
           margin-bottom: 8px;
         }
         .netdrawer-section + .netdrawer-section {
-          margin-top: 20px;
+          margin-top: 22px;
         }
 
         .netdrawer-kv {
@@ -566,7 +625,7 @@ export function NetworkRequestDrawer({
           grid-template-columns: 140px minmax(0, 1fr) 24px;
           align-items: start;
           gap: 12px;
-          padding: 6px 4px;
+          padding: 7px 4px;
           border-radius: 4px;
           transition: background-color 120ms ease;
         }
@@ -775,8 +834,8 @@ function DrawerHeader({
   closeBtnRef: React.RefObject<HTMLButtonElement | null>;
   onCopyUrl: () => void;
 }) {
-  const statusColor = statusColorForCode(entry.status, entry.errored);
-  const methodHex = methodColor(entry.method);
+  const statusPill = statusPillForCode(entry.status, entry.errored);
+  const methodPillColors = methodPill(entry.method);
   const time = formatDuration(entry.durationMs);
   const tColor = timeColor(entry.durationMs);
   const size = formatBytes(entry.responseBodyOriginalSize);
@@ -809,13 +868,13 @@ function DrawerHeader({
         <span
           className="netdrawer-badge"
           style={{
-            color: statusColor,
+            ...badgeVars(statusPill),
             textDecoration: entry.errored ? "line-through" : undefined,
           }}
         >
           {statusText}
         </span>
-        <span className="netdrawer-badge" style={{ color: methodHex }}>
+        <span className="netdrawer-badge" style={badgeVars(methodPillColors)}>
           {entry.method.toUpperCase()}
         </span>
         <span className="netdrawer-url" title={entry.url}>{entry.url}</span>

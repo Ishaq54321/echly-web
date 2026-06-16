@@ -100,7 +100,7 @@ export function subscriptionConfirmationEmailHtml(
             "If anything looks off or you have questions, just reply — comes straight to me.",
             { spaceAfter: 0 }
           )}
-          ${emailSignoffV2("— Ishaq, Founder, Annote")}
+          ${emailSignoffV2("— Annote")}
         `,
       }),
   });
@@ -140,6 +140,6 @@ Open billing settings: ${settingsUrl}
 
 If anything looks off or you have questions, just reply — comes straight to me.
 
-— Ishaq, Founder, Annote`,
+— Annote`,
   });
 }

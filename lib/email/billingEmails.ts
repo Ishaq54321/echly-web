@@ -86,7 +86,6 @@ export async function sendSubscriptionConfirmationEmail(params: {
       subject: "You're on Annote Business — here's what's next",
       html: subscriptionConfirmationEmailHtml(props),
       text: subscriptionConfirmationEmailText(props),
-      fromVariant: "founder",
       templateName: "subscriptionConfirmation",
       templateCategory: "transactional",
     });
@@ -193,7 +192,6 @@ export async function sendRenewalReceiptEmail(params: {
       subject: `Your Annote receipt — ${params.amount}`,
       html: renewalReceiptEmailHtml(props),
       text: renewalReceiptEmailText(props),
-      fromVariant: "founder",
       templateName: "renewalReceipt",
       templateCategory: "transactional",
     });
@@ -230,7 +228,6 @@ export async function sendUpcomingRenewalReminderEmail(params: {
       subject: "Heads up — your Annote subscription renews soon",
       html: upcomingRenewalReminderEmailHtml(props),
       text: upcomingRenewalReminderEmailText(props),
-      fromVariant: "founder",
       templateName: "upcomingRenewalReminder",
       templateCategory: "transactional",
     });
@@ -263,7 +260,6 @@ export async function sendCardExpiringEmail(params: {
       subject: "Your card is expiring soon",
       html: cardExpiringEmailHtml(props),
       text: cardExpiringEmailText(props),
-      fromVariant: "founder",
       templateName: "cardExpiring",
       templateCategory: "transactional",
     });
@@ -291,7 +287,6 @@ export async function sendPaymentMethodUpdatedEmail(params: {
       subject: "Payment method updated",
       html: paymentMethodUpdatedEmailHtml(props),
       text: paymentMethodUpdatedEmailText(props),
-      fromVariant: "founder",
       templateName: "paymentMethodUpdated",
       templateCategory: "transactional",
     });
@@ -364,7 +359,6 @@ export async function sendPlanChangedEmail(params: {
       subject,
       html: planChangedEmailHtml(props),
       text: planChangedEmailText(props),
-      fromVariant: "founder",
       templateName: "planChanged",
       templateCategory: "transactional",
     });
@@ -406,7 +400,6 @@ export async function sendRefundIssuedEmail(params: {
       subject: refundIssuedSubject(amountFormatted),
       html: refundIssuedEmailHtml(props),
       text: refundIssuedEmailText(props),
-      fromVariant: "founder",
       templateName: "refundIssued",
       templateCategory: "transactional",
     });
@@ -461,7 +454,6 @@ export async function sendSeatAddedEmail(params: {
       subject: `A new seat was added to ${params.workspaceName}`,
       html: seatAddedEmailHtml(props),
       text: seatAddedEmailText(props),
-      fromVariant: "founder",
       templateName: "seatAdded",
       templateCategory: "transactional",
     });

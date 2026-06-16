@@ -38,12 +38,12 @@ function bodyParagraphs(
 
   if (props.prorationFormatted) {
     const amount = escape(props.prorationFormatted);
-    const line2 = `A prorated charge of ${amount} will hit your card today, covering ${member}'s seat through ${nextBilling}. After that, your full plan price reflects the new seat count.`;
+    const line2 = `There's nothing to pay right now — we won't charge your card today. A prorated ${amount} for ${member}'s seat (covering the rest of this cycle) will be added to your next invoice on ${nextBilling}, alongside your regular renewal. After that, your full plan price reflects the new seat count.`;
     const closing = "Nothing else needed from you. If anything looks wrong, just reply.";
     return { greeting, line1, line2, closing };
   }
 
-  const line2 = `You'll see a prorated charge on your card today for the new seat, billed for the remainder of your current cycle. Your next renewal on ${nextBilling} will reflect the full plan price.`;
+  const line2 = `There's nothing to pay right now — we won't charge your card today. The prorated cost for the new seat (for the rest of this cycle) will be added to your next invoice on ${nextBilling}, alongside your regular renewal at the full plan price.`;
   const closing = "View the exact breakdown in your billing portal. If anything looks wrong, just reply.";
   return { greeting, line1, line2, closing };
 }
@@ -54,13 +54,13 @@ export function seatAddedEmailHtml(props: SeatAddedProps): string {
     escapeEmailHtml
   );
   const metadata = props.prorationFormatted
-    ? `+1 seat · ${escapeEmailHtml(props.prorationFormatted)} prorated charge today`
+    ? `+1 seat · ${escapeEmailHtml(props.prorationFormatted)} prorated, added to your next invoice`
     : undefined;
 
   return emailShellV2({
     preheader: props.prorationFormatted
-      ? `Prorated charge ${props.prorationFormatted} today.`
-      : "A prorated charge will hit your card today.",
+      ? `Prorated ${props.prorationFormatted} added to your next invoice — no charge today.`
+      : "Prorated cost added to your next invoice — no charge today.",
     category: "Subscription update",
     title: "A new seat was added to your workspace",
     metadata,
@@ -75,7 +75,7 @@ export function seatAddedEmailHtml(props: SeatAddedProps): string {
         )}
         ${emailSpacerV2({ height: 8 })}
         ${emailParagraphV2(closing, { spaceAfter: 0 })}
-        ${emailSignoffV2("— Ishaq, Founder, Annote")}
+        ${emailSignoffV2("— Annote")}
       `,
     }),
   });
@@ -98,6 +98,6 @@ View billing: ${props.billingUrl}
 
 ${closing}
 
-— Ishaq, Founder, Annote`,
+— Annote`,
   });
 }

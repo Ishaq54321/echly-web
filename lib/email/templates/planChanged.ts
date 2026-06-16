@@ -97,7 +97,7 @@ export function planChangedEmailHtml(props: PlanChangedProps): string {
         ${emailButtonRowV2(
           emailButtonV2({ label: "View billing", href: props.billingUrl })
         )}
-        ${emailSignoffV2("— Ishaq, Founder, Annote")}
+        ${emailSignoffV2("— Annote")}
       `,
     }),
   });
@@ -134,6 +134,6 @@ ${title}
 
 ${middle}View billing: ${props.billingUrl}
 
-— Ishaq, Founder, Annote`,
+— Annote`,
   });
 }

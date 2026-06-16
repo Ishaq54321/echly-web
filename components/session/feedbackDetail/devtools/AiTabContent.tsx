@@ -80,6 +80,141 @@ export interface AiTabContentProps {
  */
 const LOADING_TIMEOUT_MS = 35 * 1000;
 
+/**
+ * Presentation-only enrichment: wrap recognizable technical tokens in a
+ * monospace code-pill so endpoints / status codes / durations / ids / hex
+ * codes separate from prose and become instantly scannable — the marketing
+ * card's signature move, brought to the AI tab's free-text summary & cause.
+ *
+ * This is STRICTLY visual: the model's text is untouched; we only segment it
+ * for rendering. Patterns are deliberately conservative — each must look
+ * unambiguously technical so ordinary prose (years, plain numbers, sentence
+ * words) is never pilled. Order matters: the alternation is tried left-to-
+ * right per match position, longest/most-specific first.
+ */
+const TECH_TOKEN_RE = new RegExp(
+  [
+    // Backtick / single-quote wrapped code: `foo`, 'GET /x' (strip the marks)
+    "`[^`]+`",
+    // HTTP method + path optionally followed by a status (GET /api/me → 500).
+    // The prompt forbids backticks, so this un-fenced shape is the common one.
+    // Named group `mps` flags the trailing status so the renderer can colour
+    // just that segment (e.g. the 500 in red) while pilling the whole thing.
+    "\\b(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\\s+/[\\w\\-./:{}?=&%]*(?:\\s*(?:→|->|—|-|:)?\\s*(?<mps>[1-5]\\d\\d))?\\b",
+    // Bare API-ish path: /api/..., /v1/..., at least one more segment
+    "/(?:api|v\\d+|graphql|auth|users?|sessions?)\\b[\\w\\-./:{}?=&%]*",
+    // HTTP status code in prose, but ONLY when a trigger word makes it
+    // unambiguous (status / code / returned / responded / HTTP / a/an + 3 digits).
+    // The trigger is matched as context; named group `st` is the code itself, so
+    // ordinary 3-digit numbers (years, counts) in prose are never pilled.
+    "(?:\\b(?:status(?:\\scode)?|code|returned|returning|responded|response|HTTP|with|threw|got|a|an)\\s+)(?<st>[1-5]\\d\\d)\\b",
+    // Durations: 38ms, 1.2s, 250 ms
+    "\\b\\d+(?:\\.\\d+)?\\s?(?:ms|s)\\b",
+    // Hex color: #15101F or #fff. A BALANCED wrapping "( … )" is consumed and
+    // stripped from the pill so the model's "(#15101F)" renders as a clean
+    // chip — the first alternative matches the parenthesised form, the second
+    // the bare form, so a lone prose paren is never swallowed.
+    "\\(#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\\)",
+    "#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\\b",
+    // camelCase / snake technical identifiers: userId, sessionId, request_id
+    "\\b[a-z]+(?:[A-Z][a-z0-9]+)+\\b",
+    "\\b[a-z]+_[a-z0-9_]+\\b",
+  ].join("|"),
+  "g"
+);
+
+/** Pill class for an HTTP status code, colour-coded exactly like the Network
+ *  status badges: green 2xx · violet 3xx · amber 4xx · red 5xx. */
+function statusPillClass(code: number): string {
+  if (code >= 500) return "aitab-code dt-code--err";
+  if (code >= 400) return "aitab-code dt-code--warn";
+  if (code >= 300) return "aitab-code dt-code--info";
+  if (code >= 200) return "aitab-code dt-code--ok";
+  return "aitab-code";
+}
+
+/** A bare 3-digit HTTP status code (string) → its colour-coded pill class. */
+function statusClassFor(code: string): string {
+  return statusPillClass(Number(code));
+}
+
+/** Splits a string into plain-text and code-pill React nodes. Returns the
+ *  original string as a single text node when nothing technical is found. */
+function renderTechnical(text: string): React.ReactNode {
+  if (!text) return text;
+  const nodes: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let key = 0;
+  let m: RegExpExecArray | null;
+  TECH_TOKEN_RE.lastIndex = 0;
+  while ((m = TECH_TOKEN_RE.exec(text)) !== null) {
+    const raw = m[0];
+    const start = m.index;
+    const groups = m.groups ?? {};
+    if (start > lastIndex) nodes.push(text.slice(lastIndex, start));
+
+    // Case 1: prose status code with a trigger word ("returned a 500"). Only
+    // the digits pill (coloured); the trigger word stays plain text.
+    if (groups.st) {
+      const codeStart = raw.lastIndexOf(groups.st);
+      const lead = raw.slice(0, codeStart); // e.g. "returned a "
+      if (lead) nodes.push(lead);
+      nodes.push(
+        <code key={`c${key++}`} className={statusClassFor(groups.st)}>
+          {groups.st}
+        </code>
+      );
+      lastIndex = start + raw.length;
+      continue;
+    }
+
+    // Case 2: method+path with a trailing status ("GET /checkout → 500"). The
+    // path pills neutral, the status pills coloured, separator stays plain.
+    if (groups.mps) {
+      const codeStart = raw.lastIndexOf(groups.mps);
+      const head = raw.slice(0, codeStart); // "GET /checkout → "
+      // Trim a trailing separator/space off the head so it renders as prose.
+      const sepMatch = head.match(/(\s*(?:→|->|—|-|:)?\s*)$/);
+      const sep = sepMatch ? sepMatch[0] : "";
+      const path = sep ? head.slice(0, head.length - sep.length) : head;
+      nodes.push(
+        <code key={`c${key++}`} className="aitab-code">
+          {path}
+        </code>
+      );
+      if (sep) nodes.push(sep);
+      nodes.push(
+        <code key={`c${key++}`} className={statusClassFor(groups.mps)}>
+          {groups.mps}
+        </code>
+      );
+      lastIndex = start + raw.length;
+      continue;
+    }
+
+    // Case 3: everything else — pill the whole token. Strip wrapping marks:
+    // backticks/quotes around code, and a balanced "( … )" around a hex colour.
+    const display =
+      raw.length >= 2 &&
+      (raw[0] === "`" || raw[0] === "'" || (raw[0] === "(" && raw.endsWith(")")))
+        ? raw.slice(1, -1)
+        : raw;
+    // A standalone status code inside backticks still colour-codes.
+    const asStatus = /^[1-5]\d\d$/.test(display) ? Number(display) : null;
+    nodes.push(
+      <code
+        key={`c${key++}`}
+        className={asStatus != null ? statusPillClass(asStatus) : "aitab-code"}
+      >
+        {display}
+      </code>
+    );
+    lastIndex = start + raw.length;
+  }
+  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
+  return nodes.length === 0 ? text : nodes;
+}
+
 /** Human label for the model's 0-1 confidence, or null to hide. */
 function confidenceLabel(c: number | null | undefined): string | null {
   if (typeof c !== "number" || !Number.isFinite(c)) return null;
@@ -137,12 +272,24 @@ export function AiTabContent({
     <div className="relative">
       <style>{`
         .aitab-wrap { padding: 16px 16px 24px; }
+        /* Row holding the AI-generated affordance + the relatedness verdict
+           badge. A flex row with align-items:center keeps the two pills
+           vertically centred on each other (they have slightly different
+           heights), and the gap gives them clear horizontal separation
+           instead of butting together. flex-wrap lets the verdict drop to a
+           second line on narrow panels. */
+        .aitab-badges {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 8px;
+        }
         .aitab-affordance {
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          height: 22px;
-          padding: 0 8px 0 6px;
+          height: 24px;
+          padding: 0 9px 0 7px;
           border-radius: 999px;
           background: var(--surface-subtle);
           border: 1px solid var(--border);
@@ -156,8 +303,8 @@ export function AiTabContent({
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          margin-top: 14px;
-          padding: 4px 10px 4px 8px;
+          height: 24px;
+          padding: 0 10px 0 8px;
           border-radius: 999px;
           font-size: 11px;
           font-weight: 600;
@@ -177,28 +324,36 @@ export function AiTabContent({
           color: var(--text-secondary);
           overflow-wrap: anywhere;
         }
-        .aitab-section { margin-top: 18px; }
-        .aitab-section:first-of-type { margin-top: 16px; }
+        .aitab-section { margin-top: 22px; }
+        .aitab-section:first-of-type { margin-top: 18px; }
+        /* Hairline divider between labeled blocks so SUMMARY / cause / steps
+           read as distinct chunks rather than one continuous column — the
+           marketing card's .dx-divider, scaled to the panel. */
+        .aitab-section--divided {
+          margin-top: 20px;
+          padding-top: 20px;
+          border-top: 1px solid var(--border);
+        }
         .aitab-label {
           font-size: 10.5px;
-          font-weight: 600;
-          letter-spacing: 0.08em;
+          font-weight: 700;
+          letter-spacing: 0.1em;
           text-transform: uppercase;
           color: var(--text-tertiary);
-          margin-bottom: 6px;
+          margin-bottom: 8px;
         }
         .aitab-body {
-          font-size: 13px;
+          font-size: 14.5px;
           line-height: 1.6;
           color: var(--text-heading);
           white-space: pre-wrap;
           overflow-wrap: anywhere;
         }
         .aitab-cause {
-          font-size: 13px;
+          font-size: 14.5px;
           line-height: 1.55;
           color: var(--text-heading);
-          padding: 10px 12px;
+          padding: 12px 14px;
           border-radius: 10px;
           background: var(--surface-subtle);
           border: 1px solid var(--border);
@@ -211,14 +366,14 @@ export function AiTabContent({
           counter-reset: aitab-step;
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 12px;
         }
         .aitab-step {
           counter-increment: aitab-step;
           display: flex;
           align-items: flex-start;
-          gap: 9px;
-          font-size: 13px;
+          gap: 10px;
+          font-size: 14.5px;
           line-height: 1.55;
           color: var(--text-heading);
           overflow-wrap: anywhere;
@@ -226,16 +381,17 @@ export function AiTabContent({
         .aitab-step::before {
           content: counter(aitab-step);
           flex: 0 0 auto;
-          width: 18px;
-          height: 18px;
+          width: 20px;
+          height: 20px;
           margin-top: 1px;
           border-radius: 999px;
-          background: var(--surface-subtle);
-          border: 1px solid var(--border);
-          color: var(--text-secondary);
-          font-size: 10.5px;
-          font-weight: 600;
-          line-height: 16px;
+          background: var(--brand-subtle);
+          border: 1px solid var(--brand-muted);
+          color: var(--brand-text);
+          font-size: 11px;
+          font-weight: 700;
+          font-variant-numeric: tabular-nums;
+          line-height: 18px;
           text-align: center;
         }
         .aitab-confidence {
@@ -243,7 +399,7 @@ export function AiTabContent({
           align-items: center;
           gap: 6px;
           margin-top: 14px;
-          font-size: 11.5px;
+          font-size: 12.5px;
           color: var(--text-secondary);
         }
         .aitab-confidence-dot {
@@ -289,6 +445,54 @@ export function AiTabContent({
           font-weight: 600;
           color: var(--text-heading);
           margin-bottom: 4px;
+        }
+        /* Inline technical tokens render as pills matching the Network tab's
+           status/method badges (e.g. the green "204" / "POST" chips):
+           monospace, weight 700, 5px radius, a tinted background + hairline
+           border. The DEFAULT pill uses the same GREEN tint as those Network
+           badges so every code token reads with that look. HTTP status codes
+           keep their semantic colour (4xx amber / 5xx red / 3xx violet) by
+           layering the .dt-code--warn/err/info set on top. */
+        .aitab-code {
+          display: inline-flex;
+          align-items: center;
+          font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+          font-size: 0.82em;
+          font-weight: 700;
+          font-variant-numeric: tabular-nums;
+          background: var(--dt-status-ok-bg);
+          border: 1px solid var(--dt-status-ok-border);
+          color: var(--dt-status-ok-text);
+          padding: 1px 6px;
+          border-radius: 5px;
+          letter-spacing: 0.01em;
+          white-space: nowrap;
+          word-break: keep-all;
+          vertical-align: baseline;
+          line-height: 1.35;
+        }
+        /* Status-coded variants defined in THIS block (after .aitab-code) so
+           their tint reliably wins regardless of stylesheet order — same
+           palette as the Network status pills. */
+        .aitab-code.dt-code--ok {
+          background: var(--dt-status-ok-bg);
+          border-color: var(--dt-status-ok-border);
+          color: var(--dt-status-ok-text);
+        }
+        .aitab-code.dt-code--warn {
+          background: var(--dt-status-warn-bg);
+          border-color: var(--dt-status-warn-border);
+          color: var(--dt-status-warn-text);
+        }
+        .aitab-code.dt-code--err {
+          background: var(--dt-status-err-bg);
+          border-color: var(--dt-status-err-border);
+          color: var(--dt-status-err-text);
+        }
+        .aitab-code.dt-code--info {
+          background: var(--dt-status-info-bg);
+          border-color: var(--dt-status-info-border);
+          color: var(--dt-status-info-text);
         }
         @media (prefers-reduced-motion: reduce) {
           .aitab-skeleton, .aitab-spin { animation: none !important; }
@@ -429,16 +633,17 @@ function NoFaultState({
       {aiSummary ? (
         <div className="aitab-section">
           <div className="aitab-label">Summary</div>
-          <div className="aitab-body">{aiSummary}</div>
+          <div className="aitab-body">{renderTechnical(aiSummary)}</div>
         </div>
       ) : null}
       <div className="aitab-no-fault">
         <div className="aitab-no-fault-title">
           No code fault detected
         </div>
-        <div className="aitab-body" style={{ fontSize: 12.5 }}>
-          {aiFixSuggestion ||
-            "No console or network errors in the captured window — this appears to be a usability or design observation rather than a code defect."}
+        <div className="aitab-body" style={{ fontSize: 13 }}>
+          {aiFixSuggestion
+            ? renderTechnical(aiFixSuggestion)
+            : "No console or network errors in the captured window — this appears to be a usability or design observation rather than a code defect."}
         </div>
       </div>
     </div>
@@ -566,8 +771,10 @@ function CompleteState({
 
   return (
     <div>
-      <AiAffordance />
-      <RelationBadge relation={aiSignalRelation} />
+      <div className="aitab-badges">
+        <AiAffordance />
+        <RelationBadge relation={aiSignalRelation} />
+      </div>
       {showWindowNote ? (
         <div className="aitab-relation-note">
           Capture window began after an earlier ticket from this session — older
@@ -576,32 +783,36 @@ function CompleteState({
       ) : null}
       <div className="aitab-section">
         <div className="aitab-label">Summary</div>
-        <div className="aitab-body">{aiSummary || "No summary available."}</div>
+        <div className="aitab-body">
+          {aiSummary ? renderTechnical(aiSummary) : "No summary available."}
+        </div>
       </div>
 
       {hasStructured ? (
         <>
-          <div className="aitab-section">
+          <div className="aitab-section aitab-section--divided">
             <div className="aitab-label">{presentation.causeLabel}</div>
-            <div className="aitab-cause">{aiCause}</div>
+            <div className="aitab-cause">{renderTechnical(aiCause ?? "")}</div>
           </div>
           <div className="aitab-section">
             <div className="aitab-label">{presentation.fixLabel}</div>
             <ol className="aitab-steps">
               {steps.map((step, i) => (
                 <li key={i} className="aitab-step">
-                  <span>{step}</span>
+                  <span>{renderTechnical(step)}</span>
                 </li>
               ))}
             </ol>
           </div>
         </>
       ) : (
-        // Legacy shape — single prose block, unchanged from before.
-        <div className="aitab-section">
+        // Legacy shape — single prose block, unchanged structure.
+        <div className="aitab-section aitab-section--divided">
           <div className="aitab-label">Likely cause &amp; fix</div>
           <div className="aitab-body">
-            {aiFixSuggestion || "No suggestion available."}
+            {aiFixSuggestion
+              ? renderTechnical(aiFixSuggestion)
+              : "No suggestion available."}
           </div>
         </div>
       )}

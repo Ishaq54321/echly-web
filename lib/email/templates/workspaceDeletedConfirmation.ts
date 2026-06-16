@@ -64,7 +64,7 @@ export function workspaceDeletedConfirmationHtml({
             "If you deleted this by mistake or have questions, just reply.",
             { spaceAfter: 0 }
           )}
-          ${emailSignoffV2("— Ishaq, Founder, Annote")}
+          ${emailSignoffV2("— Annote")}
         `,
       }),
     });
@@ -88,7 +88,7 @@ export function workspaceDeletedConfirmationHtml({
           "If you deleted this by mistake and want to cancel, just reply to this email within 30 days and we'll stop the deletion before it runs.",
           { spaceAfter: 0 }
         )}
-        ${emailSignoffV2("— Ishaq, Founder, Annote")}
+        ${emailSignoffV2("— Annote")}
       `,
     }),
   });
@@ -116,7 +116,7 @@ After ${purgeDate}, the workspace and all its data is gone. There's no recovery 
 
 If you deleted this by mistake or have questions, just reply.
 
-— Ishaq, Founder, Annote`,
+— Annote`,
     });
   }
 
@@ -129,6 +129,6 @@ After ${purgeDate}, the workspace and all its data is gone. There's no recovery 
 
 If you deleted this by mistake and want to cancel, just reply to this email within 30 days and we'll stop the deletion before it runs.
 
-— Ishaq, Founder, Annote`,
+— Annote`,
   });
 }

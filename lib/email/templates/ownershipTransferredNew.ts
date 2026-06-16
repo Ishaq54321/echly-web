@@ -95,7 +95,7 @@ export function ownershipTransferredNewHtml(
           "Anything looks wrong? Reply directly — this comes to me.",
           { spaceAfter: 0 }
         )}
-        ${emailSignoffV2("— Ishaq, Founder, Annote")}
+        ${emailSignoffV2("— Annote")}
       `,
     }),
   });
@@ -118,6 +118,6 @@ Manage workspace: ${props.settingsUrl}
 
 Anything looks wrong? Reply directly — this comes to me.
 
-— Ishaq, Founder, Annote`,
+— Annote`,
   });
 }

@@ -87,7 +87,7 @@ export function renewalReceiptEmailHtml(props: RenewalReceiptProps): string {
             `Manage your subscription, switch plans, or update payment method in <a href="${settingsUrl}" style="color:#5A49BF;text-decoration:underline;">Billing settings</a>.`,
             { spaceAfter: 0 }
           )}
-          ${emailSignoffV2("— Ishaq, Founder, Annote")}
+          ${emailSignoffV2("— Annote")}
         `,
       }),
   });
@@ -126,6 +126,6 @@ ${invoicePdfUrl ? `\nDownload PDF: ${invoicePdfUrl}\n` : ""}
 Manage your subscription, switch plans, or update payment method:
 ${settingsUrl}
 
-— Ishaq, Founder, Annote`,
+— Annote`,
   });
 }

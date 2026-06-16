@@ -335,7 +335,6 @@ export async function sendWorkspaceDeletionConfirmationEmail({
       subject: `Your workspace "${workspaceName}" has been scheduled for deletion`,
       html: workspaceDeletedConfirmationHtml(props),
       text: workspaceDeletedConfirmationText(props),
-      fromVariant: "founder",
       templateName: "workspaceDeletedConfirmation",
       templateCategory: "transactional",
     });
@@ -515,7 +514,6 @@ export async function sendOwnershipTransferredNewEmail({
       subject: ownershipTransferredNewSubject(workspaceName),
       html: ownershipTransferredNewHtml(props),
       text: ownershipTransferredNewText(props),
-      fromVariant: "founder",
       templateName: "ownershipTransferredNew",
       templateCategory: "transactional",
     });
