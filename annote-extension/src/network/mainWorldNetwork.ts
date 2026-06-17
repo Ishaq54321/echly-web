@@ -18,6 +18,7 @@
 import { NetworkBuffer } from "./buffer";
 import { isNetworkDenylisted } from "./denylist";
 import { redactBody, redactHeaders, redactUrl } from "./redactNetwork";
+import { installCaptureGate, isCaptureEnabled } from "../shared/captureGate";
 import type {
   NetworkRequestEntry,
   NetworkSnapshotRequest,
@@ -39,6 +40,15 @@ declare global {
 (function initNetworkCapture() {
   if (window.__ECHLY_NETWORK_WRAPPED__) return;
   window.__ECHLY_NETWORK_WRAPPED__ = true;
+
+  // Capture-enabled gate. The wrappers below stay installed for the page realm's
+  // lifetime (M3: can't be uninstalled), but read isCaptureEnabled() on EVERY
+  // invocation. When OFF (the default — see captureGate.ts) every wrapper is a
+  // native-call-and-return passthrough indistinguishable from the unwrapped
+  // function: no request clone, no body read, no response clone, no extra
+  // promise, no header touch, no added latency. The gate flips ON only while
+  // this tab is part of an active Annote engagement.
+  installCaptureGate();
 
   const buffer = new NetworkBuffer();
 
@@ -217,6 +227,11 @@ declare global {
   let circuitBreakerActive = false;
 
   setInterval(() => {
+    // GATE OFF → skip. While disabled the wrappers never increment
+    // requestsThisSecond, so there is nothing to evaluate; this is pure internal
+    // bookkeeping that touches no page state, but we short-circuit it anyway to
+    // keep the disabled footprint minimal.
+    if (!isCaptureEnabled()) return;
     if (requestsThisSecond > REQUEST_RATE_THRESHOLD) {
       hotSeconds += 1;
       coolSeconds = 0;
@@ -650,6 +665,17 @@ declare global {
 
   function makeFetchWrapper(): typeof window.fetch {
     const wrapper = function (this: unknown, ...args: unknown[]): Promise<Response> {
+      // GATE OFF → TRUE PASSTHROUGH. Call previousFetch (the function that was in
+      // window.fetch when we installed — the page's real fetch or a downstream
+      // wrapper) with the original `this` + args and return its result UNTOUCHED.
+      // No clone, no body read, no response clone, no microtask of ours, no
+      // header touch. The returned Promise/Response is the native one: the page
+      // can read the body (not locked/consumed), timing is native, and any throw
+      // propagates exactly as the native call would. This is the line that makes
+      // a disabled wrapper indistinguishable from never having wrapped at all.
+      if (!isCaptureEnabled()) {
+        return (previousFetch as (...a: unknown[]) => Promise<Response>).apply(this, args);
+      }
       // Recursion guard: if a downstream wrapper calls back into ours, bypass
       // capture entirely and call through to the captured native (which is
       // bound to the main window — see callNativeFetch). previousFetch may
@@ -872,6 +898,13 @@ declare global {
 
   function makeXhrOpenWrapper(): typeof originalOpen {
     return function (this: XMLHttpRequest, ...args: unknown[]): void {
+      // GATE OFF → TRUE PASSTHROUGH. Call previousOpen with the original args
+      // and return. We set NO per-instance state (no xhrState, no header
+      // collector) and read nothing, so the XHR object is byte-for-byte as if
+      // unwrapped.
+      if (!isCaptureEnabled()) {
+        return (previousOpen as (...a: unknown[]) => void).apply(this, args);
+      }
       // Recursion guard (mirrors the fetch wrapper): if a downstream wrapper
       // calls back into ours while we're already inside a previous* call-
       // through, skip our capture work and pass straight to previous so we
@@ -917,6 +950,10 @@ declare global {
 
   function makeXhrSetRequestHeaderWrapper(): typeof originalSetRequestHeader {
     return function (this: XMLHttpRequest, name: string, value: string): void {
+      // GATE OFF → TRUE PASSTHROUGH. Set the header natively; collect nothing.
+      if (!isCaptureEnabled()) {
+        return (previousSetRequestHeader as (...a: unknown[]) => void).apply(this, [name, value]);
+      }
       if (isCapturing) {
         return (previousSetRequestHeader as (...a: unknown[]) => void).apply(this, [name, value]);
       }
@@ -938,6 +975,13 @@ declare global {
 
   function makeXhrSendWrapper(): typeof originalSend {
     return function (this: XMLHttpRequest, body?: Document | XMLHttpRequestBodyInit | null): void {
+      // GATE OFF → TRUE PASSTHROUGH. Send natively with the original body. We
+      // attach NO loadend/error/abort/timeout listeners, read NO body, touch NO
+      // rate counter, and add nothing to the buffer — the request runs exactly
+      // as if XMLHttpRequest.prototype.send were never wrapped.
+      if (!isCaptureEnabled()) {
+        return (previousSend as (...a: unknown[]) => void).apply(this, [body]);
+      }
       // Recursion guard (mirrors the fetch wrapper): a re-entrant call while
       // we're inside a previousSend call-through skips capture (including the
       // rate counter) and passes straight to previous.
@@ -1133,6 +1177,12 @@ declare global {
     return typeof current === "function" && knownXhrSendWrappers.has(current as unknown as object);
   }
   setInterval(() => {
+    // GATE OFF → DO NOTHING. While capture is disabled we make zero attempt to
+    // re-assert our wrappers, re-read window.fetch/XHR prototypes, or touch the
+    // page in any way. A disabled wrapper that's been replaced by the page stays
+    // replaced; our own disabled wrapper is already a transparent passthrough.
+    // Work resumes only when the gate flips back ON.
+    if (!isCaptureEnabled()) return;
     // Fetch: only re-wrap if the slot is a function we've never seen.
     // Identity-equal to ourFetchWrapper → fine. Function we previously
     // installed (knownFetchWrappers) → page/SDK has us delegated, leave it.

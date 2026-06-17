@@ -1294,7 +1294,14 @@ async function ensureContentScriptInjected(tabId: number): Promise<boolean> {
  * lifecycle for free — there is no separate gating needed.
  */
 async function ensureCaptureInjected(tabId: number): Promise<boolean> {
-  if (captureInjectedTabs.has(tabId)) return true;
+  if (captureInjectedTabs.has(tabId)) {
+    // Already injected for this engagement — but the gate may have been turned
+    // OFF since (e.g. a prior non-engaged activation of this same tab id) or the
+    // MAIN gate may have missed the broadcast (late install race). Re-assert ON
+    // so an engaged tab is never left transparent. Cheap idempotent message.
+    setTabCaptureEnabled(tabId, true);
+    return true;
+  }
   try {
     await chrome.scripting.executeScript({
       target: { tabId },
@@ -1303,6 +1310,11 @@ async function ensureCaptureInjected(tabId: number): Promise<boolean> {
       injectImmediately: true,
     });
     captureInjectedTabs.add(tabId);
+    // Capture scripts install with the gate DEFAULT-OFF (transparent). This tab
+    // is being armed as part of an active engagement, so flip the gate ON now.
+    // The relay re-posts into MAIN; the gate's own STATE_REQUEST handles the
+    // race where this message races the bundle's install.
+    setTabCaptureEnabled(tabId, true);
     return true;
   } catch (e) {
     if (ECHLY_DEBUG) console.debug("[ECHLY] Failed to inject capture scripts", { tabId, error: e });
@@ -1314,6 +1326,43 @@ async function ensureCaptureInjected(tabId: number): Promise<boolean> {
  *  realm dies, so the next inject call must re-install) and session teardown (M3). */
 function clearCaptureInjection(tabId: number): void {
   captureInjectedTabs.delete(tabId);
+}
+
+/**
+ * Tell a tab's MAIN-world wrappers whether to capture (gate ON) or behave as
+ * perfectly transparent passthroughs (gate OFF). Sent to the isolated-world
+ * relay (installCaptureGateRelay in bootstrap), which re-posts it into the MAIN
+ * realm where the gate listens. Fire-and-forget — a tab without bootstrap (a
+ * restricted page, or a tab gone) silently no-ops.
+ *
+ * FAIL-SAFE CONTRACT: the gate defaults OFF in the page, so a DROPPED enable
+ * message merely leaves a tab transparent (we lose capture, never leak). A
+ * dropped disable message is the dangerous direction, so disable is also re-
+ * asserted at the structural OFF points (navigation, non-engaged activation)
+ * and, ultimately, the lingering wrapper dies on the next navigation regardless.
+ */
+function setTabCaptureEnabled(tabId: number, enabled: boolean): void {
+  if (typeof tabId !== "number") return;
+  chrome.tabs
+    .sendMessage(tabId, { type: "ECHLY_SET_CAPTURE_ENABLED", enabled: enabled === true })
+    .catch(() => {
+      /* no bootstrap / restricted page / tab gone — nothing to gate */
+    });
+}
+
+/**
+ * Broadcast capture-gate OFF to ALL tabs. Used at every stop-signal (tray-close,
+ * session-end hard/soft, idle-end): the engagement is over, so EVERY tab that
+ * still has a lingering MAIN-world wrapper (M3: can't be uninstalled) must be
+ * told to go transparent immediately — not just the active tab. Cheap: tabs
+ * without bootstrap no-op. Disabling broadly is the safe direction.
+ */
+function disableCaptureAllTabs(): void {
+  chrome.tabs.query({}, (tabs) => {
+    for (const t of tabs) {
+      if (typeof t.id === "number") setTabCaptureEnabled(t.id, false);
+    }
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2115,8 +2164,13 @@ function purgeEngagement(engagementId: string | null): void {
 function stopAndPurgeCapture(engagementId: string | null = currentEngagementId): void {
   // (a) Stop: drop all tabs from the capture-injected cache. The MAIN-world
   // wrappers can't be cleanly uninstalled from the isolated world (M3 limit);
-  // they live in the page realm and die on navigation, harmless meanwhile.
+  // they live in the page realm and die on navigation. Previously they kept
+  // running (harmless to the buffer, but NOT to the page — a lingering fetch/XHR
+  // wrapper broke LinkedIn's form validation). Now we flip the capture gate OFF
+  // on every tab so those lingering wrappers become transparent passthroughs the
+  // instant the engagement ends, before they can interfere with the host page.
   captureInjectedTabs.clear();
+  disableCaptureAllTabs();
   // (b) Purge the engagement buffer (in-memory + persisted mirror + tab bindings).
   purgeEngagement(engagementId);
   if (engagementId === currentEngagementId) {
@@ -2269,7 +2323,24 @@ async function openRecorderUI(tabId?: number): Promise<boolean> {
 /** Loom-style: when user switches tabs and Echly is active, inject content script so widget appears on every tab. */
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
   activeOwnerTabId = activeInfo.tabId;
-  if (!cachedEchlyActive) return;
+  if (!cachedEchlyActive) {
+    // Not engaged: this tab must never be capturing. If it carries a lingering
+    // wrapper from a prior engagement (M3: can't uninstall), assert the gate OFF
+    // so it stays a transparent passthrough. No-op on tabs without bootstrap.
+    //
+    // But only bother if capture was EVER injected somewhere this SW lifetime:
+    // captureInjectedTabs is non-empty iff some tab got a MAIN-world wrapper, i.e.
+    // an engagement happened (or is winding down). On a provably-never-engaged
+    // browser no wrapper exists anywhere, so the per-tab-switch assert-off is a
+    // pointless cross-process message — skip it. The set still holds entries
+    // after a session ends (cleared lazily on tab close/navigation), so the
+    // load-bearing "turn wrappers off when switching tabs during/after a session"
+    // path keeps firing exactly as before.
+    if (captureInjectedTabs.size > 0) {
+      setTabCaptureEnabled(activeInfo.tabId, false);
+    }
+    return;
+  }
   const sessionIdForRehydrate = activeSessionId ?? globalUIState.sessionId;
   if (sessionIdForRehydrate && shouldForceRehydrate(sessionIdForRehydrate)) {
     globalUIState.sessionLoading = true;
@@ -2354,6 +2425,11 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 
 /** New tabs will get state on activation; avoid background-tab state broadcasts. */
 chrome.tabs.onCreated.addListener((tab) => {
+  // Dormant (never-engaged) browsers have no state worth pushing to a new tab,
+  // and bootstrap.js is already declaratively injected — so the probe+broadcast
+  // below is pure redundant SW chatter. Gate on engagement like onUpdated does;
+  // engaged browsers keep the existing new-tab handling unchanged.
+  if (!cachedEchlyActive) return;
   if (!tab.active) return;
   if (!tab.id) return;
   const tabId = tab.id;
@@ -3172,6 +3248,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const tabId = tabs[0]?.id;
         if (typeof tabId === "number") {
           bindTabToCurrentEngagement(tabId);
+          /* Gate sequencing: stopAndPurgeCapture() above broadcast capture-OFF to
+             ALL tabs (turning the just-ended engagement transparent). This re-inject
+             re-asserts capture-ON for the still-engaged active tab. ensureCaptureInjected's
+             enable is the LAST SW write to this tab, and the relay caches it as
+             lastEnabled, which the freshly-injected bundle's STATE_REQUEST also pulls —
+             so the active tab converges to ON regardless of message-arrival order, while
+             every OTHER tab stays OFF (correct: they belong to the purged engagement). */
           void ensureCaptureInjected(tabId);
         }
       } catch (e) {

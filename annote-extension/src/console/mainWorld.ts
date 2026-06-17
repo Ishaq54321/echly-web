@@ -29,6 +29,7 @@ import { ConsoleBuffer } from "./buffer";
 import { isDenylisted, isExtensionOrigin } from "./denylist";
 import { redact } from "./redact";
 import { serializeNode } from "./serializeElement";
+import { installCaptureGate, isCaptureEnabled } from "../shared/captureGate";
 import type {
   ConsoleLogEntry,
   ConsoleLogLevel,
@@ -52,6 +53,14 @@ declare global {
 (function initConsoleCapture() {
   if (window.__ECHLY_CONSOLE_WRAPPED__) return;
   window.__ECHLY_CONSOLE_WRAPPED__ = true;
+
+  // Capture-enabled gate. When OFF (the default — see captureGate.ts) each
+  // console wrapper calls through to previousWrap and returns with no capture,
+  // the exception/rejection listeners record nothing (but window.onerror still
+  // chains to the page's own handler), and the integrity/breaker intervals do
+  // nothing. The gate flips ON only while this tab is part of an active
+  // engagement.
+  installCaptureGate();
 
   const LEVELS: readonly ConsoleLogLevel[] = ["log", "info", "warn", "error", "debug"];
   const INTEGRITY_CHECK_INTERVAL_MS = 2000;
@@ -236,6 +245,10 @@ declare global {
   let circuitBreakerActive = false;
 
   setInterval(() => {
+    // GATE OFF → skip. captureLevel never runs while disabled, so logsThisSecond
+    // stays 0 and there is nothing to evaluate; short-circuit to keep the
+    // disabled footprint minimal.
+    if (!isCaptureEnabled()) return;
     if (logsThisSecond > LOG_RATE_THRESHOLD) {
       hotSeconds += 1;
       coolSeconds = 0;
@@ -372,10 +385,17 @@ declare global {
           }
           return undefined;
         }
-        try {
-          captureLevel(level, args);
-        } catch {
-          // never throw from the wrapper
+        // GATE OFF → no capture. Skip captureLevel entirely (no stringify, no
+        // redact, no queued microtask, no buffer write) and fall straight
+        // through to the previousWrap callthrough below — which is the exact
+        // native-equivalent behavior that delivers the log to the real console.
+        // The page sees an ordinary console call.
+        if (isCaptureEnabled()) {
+          try {
+            captureLevel(level, args);
+          } catch {
+            // never throw from the wrapper
+          }
         }
         const prev = previousWrap[level];
         if (typeof prev !== "function") return undefined;
@@ -419,6 +439,11 @@ declare global {
   // (from 250ms) because late-init wrappers install once at page load,
   // not continuously.
   setInterval(() => {
+    // GATE OFF → DO NOTHING. While capture is disabled we make no attempt to
+    // re-assert our console wrappers or re-read window.console. A disabled
+    // wrapper that the page replaced stays replaced; our own disabled wrapper is
+    // already a transparent passthrough. Work resumes when the gate flips ON.
+    if (!isCaptureEnabled()) return;
     let needsReinstall = false;
     for (const level of LEVELS) {
       const current = (window.console as Console & Record<string, unknown>)[level] as unknown;
@@ -511,6 +536,10 @@ declare global {
   }
 
   window.addEventListener("error", (event) => {
+    // GATE OFF → observe nothing. This is a passive listener (it never calls
+    // preventDefault), so the page's error handling is unaffected either way; we
+    // simply skip recording when disabled.
+    if (!isCaptureEnabled()) return;
     try {
       const message = redact(event.message || "");
       const stack =
@@ -547,6 +576,9 @@ declare global {
   window.addEventListener(
     "error",
     (event) => {
+      // GATE OFF → observe nothing. Passive capture-phase listener; the page is
+      // unaffected either way.
+      if (!isCaptureEnabled()) return;
       try {
         const target = event.target as unknown;
         // Uncaught JS errors arrive with target === window and are handled by
@@ -604,18 +636,24 @@ declare global {
       colno?: number,
       error?: Error,
     ): boolean {
-      try {
-        const msgStr = typeof message === "string" ? message : "";
-        const redMessage = redact(msgStr || "");
-        const stack = error && typeof error.stack === "string" ? redact(error.stack) : null;
-        const redSource = source ? redact(source) : null;
-        const line = typeof lineno === "number" ? lineno : null;
-        const column = typeof colno === "number" ? colno : null;
-        // Deduped against the addEventListener("error") path — for a normal
-        // uncaught error that fires both, only the first records.
-        recordError(redMessage, stack, redSource, line, column);
-      } catch {
-        // swallow — never break the page's error handling.
+      // GATE OFF → record nothing, but ALWAYS still chain to the page's own
+      // previous handler below. The page assigned window.onerror expecting its
+      // handler to run; skipping the chain would change observable behavior. So
+      // we gate only OUR recording, never the passthrough.
+      if (isCaptureEnabled()) {
+        try {
+          const msgStr = typeof message === "string" ? message : "";
+          const redMessage = redact(msgStr || "");
+          const stack = error && typeof error.stack === "string" ? redact(error.stack) : null;
+          const redSource = source ? redact(source) : null;
+          const line = typeof lineno === "number" ? lineno : null;
+          const column = typeof colno === "number" ? colno : null;
+          // Deduped against the addEventListener("error") path — for a normal
+          // uncaught error that fires both, only the first records.
+          recordError(redMessage, stack, redSource, line, column);
+        } catch {
+          // swallow — never break the page's error handling.
+        }
       }
       if (previousOnError) {
         try {
@@ -642,6 +680,8 @@ declare global {
   }
 
   window.addEventListener("unhandledrejection", (event) => {
+    // GATE OFF → observe nothing. Passive listener; the page is unaffected.
+    if (!isCaptureEnabled()) return;
     try {
       const reason = event.reason as unknown;
       let message = "";

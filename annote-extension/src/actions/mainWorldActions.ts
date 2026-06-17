@@ -41,6 +41,7 @@ import {
   isNoisyTag,
 } from "./denylist";
 import { getPrivacyTreatment } from "../shared/privacy";
+import { installCaptureGate, isCaptureEnabled } from "../shared/captureGate";
 import { redactAttributes, redactElementText, redactUrl } from "./redactAction";
 import type {
   ActionsSnapshot,
@@ -74,6 +75,13 @@ declare global {
 (function initActionsCapture() {
   if (window.__ECHLY_ACTIONS_WRAPPED__) return;
   window.__ECHLY_ACTIONS_WRAPPED__ = true;
+
+  // Capture-enabled gate. Every listener below returns IMMEDIATELY at its top
+  // when the gate is OFF (the default — see captureGate.ts), before ANY DOM
+  // read, descriptor build, querySelector, or privacy call. The history
+  // wrappers always call the native FIRST and only record when the gate is ON.
+  // The gate flips ON only while this tab is part of an active engagement.
+  installCaptureGate();
 
   const buffer = new ActionBuffer();
 
@@ -391,6 +399,8 @@ declare global {
 
   // ─── Click ─────────────────────────────────────────────────────
   function onClick(event: Event): void {
+    // GATE OFF → return before ANY DOM read / descriptor build / privacy call.
+    if (!isCaptureEnabled()) return;
     try {
       if (isAnnoteEvent(event)) return;
       const target = resolveTarget(event);
@@ -411,6 +421,8 @@ declare global {
 
   // ─── Submit ────────────────────────────────────────────────────
   function onSubmit(event: Event): void {
+    // GATE OFF → return before any DOM read / descriptor build / privacy call.
+    if (!isCaptureEnabled()) return;
     try {
       if (isAnnoteEvent(event)) return;
       const target = resolveTarget(event);
@@ -438,6 +450,8 @@ declare global {
   const inputPending = new WeakMap<Element, PendingInput>();
 
   function onInput(event: Event): void {
+    // GATE OFF → return before any DOM read / label extraction / privacy call.
+    if (!isCaptureEnabled()) return;
     try {
       if (isAnnoteEvent(event)) return;
       const target = resolveTarget(event);
@@ -484,6 +498,8 @@ declare global {
   let lastFocusActionPushed = false;
 
   function onFocusIn(event: Event): void {
+    // GATE OFF → return before any DOM read / descriptor build / privacy call.
+    if (!isCaptureEnabled()) return;
     try {
       if (isAnnoteEvent(event)) return;
       const target = resolveTarget(event);
@@ -508,6 +524,8 @@ declare global {
   }
 
   function onFocusOut(event: Event): void {
+    // GATE OFF → return before any DOM read / descriptor build / privacy call.
+    if (!isCaptureEnabled()) return;
     try {
       if (isAnnoteEvent(event)) return;
       const target = resolveTarget(event);
@@ -557,6 +575,8 @@ declare global {
   let resizeTimer: ReturnType<typeof setTimeout> | null = null;
 
   function onResize(): void {
+    // GATE OFF → return before scheduling the debounce / reading viewport.
+    if (!isCaptureEnabled()) return;
     try {
       if (resizeTimer !== null) clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
@@ -585,6 +605,12 @@ declare global {
   let lastNavUrl = safeLocationHref();
 
   function recordNavigationIfChanged(method: NavigationMethod): void {
+    // GATE OFF → record nothing. The history wrappers already called the native
+    // pushState/replaceState BEFORE reaching here, and popstate/hashchange are
+    // pure observers, so the page's navigation is wholly unaffected — we simply
+    // skip our recording. This also updates nothing (not even lastNavUrl): while
+    // disabled we hold no navigation state at all.
+    if (!isCaptureEnabled()) return;
     try {
       const next = safeLocationHref();
       if (!next || next === lastNavUrl) return;

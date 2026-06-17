@@ -12,6 +12,7 @@ import "./sessionRelay";
 import { installBridgeListener } from "./console/bridge";
 import { installNetworkBridgeListener } from "./network/bridge";
 import { installActionsBridgeListener } from "./actions/bridge";
+import { installCaptureGateRelay, applyCaptureEnabled, SET_CAPTURE_ENABLED_MESSAGE } from "./shared/captureGateRelay";
 
 declare global {
   interface Window {
@@ -54,6 +55,7 @@ type RuntimeMessage = {
   state?: GlobalUIState;
   ticket?: { id: string; title: string; description?: string; type?: string };
   sessionId?: string;
+  enabled?: boolean;
 };
 
 type GlobalStateResponse = { state?: GlobalUIState } | undefined;
@@ -215,22 +217,47 @@ if (window.__ECHLY_BOOTSTRAP_LOADED__) {
 } else {
   window.__ECHLY_BOOTSTRAP_LOADED__ = true;
 
-  // Console-capture bridge listener: caches MAIN-world flush pushes so we
-  // can still return a snapshot during a hard navigation that tears down
-  // the MAIN script before the next requestSnapshot fires. Must be
-  // installed before any widget code runs.
-  installBridgeListener();
-  // Sibling listener for the network capture stream. Same contract — cache
-  // the most recent NETWORK_FLUSH_PUSH so a click-time snapshot request after
-  // a hard navigation has a fallback. Phase R8: previously dead code (defined
-  // in network/bridge.ts but never called), so a navigation between capture
-  // and ticket LOST network data with no fallback. Now wired for parity with
-  // console + actions.
-  installNetworkBridgeListener();
-  // Sibling listener for the user-actions capture stream. Same
-  // contract — cache the most recent ACTIONS_FLUSH_PUSH so a click-time
-  // snapshot request after a hard navigation has a fallback.
-  installActionsBridgeListener();
+  // ─── Capture bridges: LAZY-INSTALLED on first engagement (dormant-footprint fix) ───
+  // The four capture-related listeners — console bridge, network bridge, actions
+  // bridge, and the capture-gate relay — each add a window "message" listener that
+  // runs SYNCHRONOUSLY on EVERY postMessage the host page fires. On postMessage-
+  // saturated SPAs (LinkedIn's iframe/embed/analytics traffic = thousands of messages
+  // during load), four such listeners at document_start were 4× per-message main-thread
+  // work during the load window, which delayed the page from settling (confirmed: the
+  // symptom vanished with the extension disabled).
+  //
+  // They are meaningless on a never-engaged page (no MAIN-world capture bundle is ever
+  // injected until the tray opens — that's already engagement-gated in background.ts).
+  // So we DON'T install them at load. We install them the first time the SW tells this
+  // tab capture is arming (ECHLY_SET_CAPTURE_ENABLED, handled in the onMessage listener
+  // below). A genuinely dormant page carries ZERO of these four — only sessionRelay's
+  // window listener (for install-detection) plus this chrome.runtime.onMessage listener.
+  //
+  // Once installed they stay for the page's life (matching prior behavior). Idempotent:
+  // every install*() guards on its own listenerInstalled/relayInstalled flag.
+  let captureBridgesInstalled = false;
+  function installCaptureBridges(): void {
+    if (captureBridgesInstalled) return;
+    captureBridgesInstalled = true;
+    // Console-capture bridge listener: caches MAIN-world flush pushes so we
+    // can still return a snapshot during a hard navigation that tears down
+    // the MAIN script before the next requestSnapshot fires.
+    installBridgeListener();
+    // Sibling listener for the network capture stream. Same contract — cache
+    // the most recent NETWORK_FLUSH_PUSH so a click-time snapshot request after
+    // a hard navigation has a fallback.
+    installNetworkBridgeListener();
+    // Sibling listener for the user-actions capture stream. Same contract —
+    // cache the most recent ACTIONS_FLUSH_PUSH so a click-time snapshot request
+    // after a hard navigation has a fallback.
+    installActionsBridgeListener();
+    // Capture-enabled gate relay: answers a freshly-injected MAIN gate's
+    // STATE_REQUEST (window.postMessage) with the last value the SW pushed.
+    // The SET decision itself is routed through THIS file's onMessage listener
+    // (→ applyCaptureEnabled) rather than a relay-owned chrome.runtime listener,
+    // so the very first ECHLY_SET_CAPTURE_ENABLED is never lost to the lazy gate.
+    installCaptureGateRelay();
+  }
 
   let widgetLoaded = false;
   let widgetLoading: Promise<void> | null = null;
@@ -465,6 +492,37 @@ if (window.__ECHLY_BOOTSTRAP_LOADED__) {
   chrome.runtime.onMessage.addListener((msg: RuntimeMessage) => {
     const type = msg?.type;
     if (!type) return false;
+
+    if (type === SET_CAPTURE_ENABLED_MESSAGE) {
+      const enabled = (msg as { enabled?: unknown }).enabled === true;
+      // The SW's capture on/off decision for this tab. This is the lazy-install
+      // trigger for the four capture bridges (dormant-footprint fix above).
+      //
+      // ENABLE (true) — capture is arming. Install the bridges NOW, BEFORE applying
+      // the value, so the relay's window listener exists to answer the MAIN gate's
+      // STATE_REQUEST and the console/network/actions flush listeners are present
+      // before any capture data can flow. Then applyCaptureEnabled caches the value
+      // (for the STATE_REQUEST answer) and posts it into the MAIN realm — driving
+      // the gate ON directly, so a STATE_REQUEST that raced ahead of this message
+      // (the MAIN bundle posts it during executeScript, before the SW sends enable)
+      // converges regardless. Idempotent on re-arm.
+      //
+      // DISABLE (false) — must NOT install anything. The SW broadcasts OFF defensively
+      // to every tab the user activates while not engaged (background.ts onActivated),
+      // including pages that were NEVER engaged and so carry no MAIN wrapper and no
+      // bridges. Installing listeners here would re-create the dormant footprint this
+      // fix removes. If the bridges ARE already installed (this tab was engaged before
+      // — a lingering M3 wrapper may still be live in MAIN), drive the gate OFF so that
+      // wrapper goes transparent. If they are NOT installed, there is nothing to gate:
+      // no-op, page stays truly untouched.
+      if (enabled) {
+        installCaptureBridges();
+        applyCaptureEnabled(true);
+      } else if (captureBridgesInstalled) {
+        applyCaptureEnabled(false);
+      }
+      return false;
+    }
 
     if (type === "ECHLY_OPENING") {
       // Fix 3.2: the SW fired this as the very first thing on an explicit open. Paint the

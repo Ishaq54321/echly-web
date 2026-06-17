@@ -347,7 +347,7 @@ function CardReview() {
               />
             </svg>
             <span className="rev-url-text">
-              <span className="rev-url-host">annote.app/s/</span>
+              <span className="rev-url-host">annote.ai/s/</span>
               <span className="rev-url-slug">aurora-may18</span>
             </span>
             <span className="rev-url-caret"></span>
