@@ -12298,16 +12298,41 @@
    privacy violet glow was removed in the base .pv rules.)
    ===================================================================== */
 
-/* ---- Hero: center the extension tray + tame the headline on phones ---- */
-@media (max-width: 640px) {
+/* ---- Hero (phones/tablets): the desktop hero pins the copy absolutely
+   (inset:0, vertically centered) and floats the tray at the bottom — on a short
+   mobile viewport those overlap and the top of the copy gets clipped. Switch to
+   natural vertical FLOW so the hero grows to fit: the full copy sits at the top
+   and the extension tray sits BELOW it with breathing room. ---- */
+@media (max-width: 767px) {
+  .marketing-root .hcd {
+    height: auto;
+    min-height: 100svh;
+  }
+  .marketing-root .hcd-hero-copy {
+    position: relative;
+    inset: auto;
+    transform: none;
+    /* Clear the sticky header with comfortable breathing room above the "New ·
+       Voice-to-ticket" pill; add a gap before the tray below. */
+    padding-top: 120px;
+    padding-bottom: 36px;
+  }
+  .marketing-root .hcd-annote-layer {
+    position: relative;
+    inset: auto;
+  }
   .marketing-root .hcd-tray-anchor {
-    left: 50%;
+    position: relative;
+    left: auto;
     right: auto;
-    transform: translateX(-50%);
+    bottom: auto;
+    transform: none;
+    margin: 0 auto 48px;
     width: 320px;
     max-width: calc(100% - 40px);
-    bottom: 48px;
   }
+}
+@media (max-width: 640px) {
   .marketing-root .hcd-hero-h1 {
     /* Pull the lower bound down so it doesn't dominate small screens. */
     font-size: clamp(31px, 8.5vw, 42px);

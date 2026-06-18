@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Getting Started — Annote</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#FAF7F2;
+    --paper-2:#F2EEE6;
+    --paper-3:#EDE8DC;
+    --paper-line:#E8E2D4;
+    --ink:#1A1424;
+    --ink-2:#2A2235;
+    --body:#5C5468;
+    --muted:#8A8298;
+    --line:#EBE6DC;
+    --line-2:#F0EDE3;
+    --primary:#5A49BF;
+    --primary-hover:#4A3BA6;
+    --primary-soft:#EFEBF9;
+    --primary-soft-2:#E2DAF4;
+    --primary-ink:#3B2F8C;
+    --green:#1F8A4C;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  html,body{margin:0}
+  body{
+    font-family:"DM Sans",system-ui,sans-serif;
+    background:var(--paper);color:var(--ink);
+    -webkit-font-smoothing:antialiased;text-rendering:geometricPrecision;
+    font-feature-settings:"ss01","cv11";
+    line-height:1.5;
+  }
+  a{color:inherit;text-decoration:none}
+  button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+  .mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+  .ser{font-family:"Fraunces",Georgia,serif;font-style:italic}
+  .wrap{max-width:1240px;margin:0 auto;padding:0 40px}
+
+  /* ===== NAV ===== */
+  .nav{position:sticky;top:0;z-index:60;background:rgba(250,247,242,0.82);backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid rgba(232,226,212,0.6)}
+  .nav-inner{display:flex;align-items:center;gap:30px;height:68px}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:600;letter-spacing:-0.02em;font-size:18px}
+  .brand .mark{width:21px;height:27px;display:block;color:var(--ink)}
+  .crumb{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--muted);font-weight:400}
+  .crumb .sep{color:var(--paper-line)}
+  .crumb b{color:var(--ink-2);font-weight:500}
+  .nav-cta{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .btn{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 17px;border-radius:10px;font-size:14px;font-weight:500;letter-spacing:-0.003em;transition:all .15s;white-space:nowrap}
+  .btn-ghost{color:var(--ink)}
+  .btn-ghost:hover{background:rgba(26,20,36,0.05)}
+  .btn-primary{background:var(--primary);color:#fff;box-shadow:0 6px 16px -6px rgba(90,73,191,0.45)}
+  .btn-primary:hover{background:var(--primary-hover);transform:translateY(-1px)}
+  .btn .arr{transition:transform .15s}
+  .btn:hover .arr{transform:translateX(2px)}
+
+  /* ===== HERO ===== */
+  .hero{padding:72px 0 8px}
+  .hero .wrap{max-width:1240px}
+  .hero-eyebrow{display:inline-flex;align-items:center;gap:10px;white-space:nowrap;font-size:12px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:var(--primary)}
+  .hero-eyebrow .pip{width:6px;height:6px;border-radius:99px;background:var(--primary)}
+  h1{margin:20px 0 0;font-size:clamp(46px,6vw,72px);line-height:0.98;letter-spacing:-0.04em;font-weight:500;max-width:14ch}
+  .hero-sub{margin:22px 0 0;font-size:20px;line-height:1.5;color:var(--body);max-width:42ch;font-weight:400}
+  .hero-meta{display:flex;align-items:center;gap:18px;margin-top:30px;font-size:13px;color:var(--muted)}
+  .hero-meta .dot{width:4px;height:4px;border-radius:99px;background:#D4CCBE}
+  .hero-meta .mono{letter-spacing:0.04em}
+
+  /* ===== DOC GRID ===== */
+  .doc{padding:56px 0 120px}
+  .doc-grid{display:grid;grid-template-columns:minmax(0,1fr) 252px;gap:80px;align-items:start}
+
+  /* ===== MAIN COLUMN ===== */
+  .col-main{min-width:0;max-width:740px}
+  section.sec{padding-top:14px;scroll-margin-top:96px}
+  section.sec + section.sec{margin-top:30px;padding-top:56px;border-top:1px solid var(--line)}
+  .sec-head{display:flex;align-items:flex-start;gap:18px;margin-bottom:30px}
+  .sec-ico{flex:none;width:50px;height:50px;border-radius:13px;display:flex;align-items:center;justify-content:center;background:var(--primary-soft);border:1px solid var(--primary-soft-2);color:var(--primary)}
+  .sec-ico svg{width:24px;height:24px}
+  .sec-headtext{padding-top:1px}
+  .sec-num{font-family:"JetBrains Mono",monospace;font-size:12.5px;font-weight:500;letter-spacing:0.14em;color:var(--muted);text-transform:uppercase}
+  .sec-num b{color:var(--primary);font-weight:500}
+  h2{margin:7px 0 0;font-size:clamp(30px,3.4vw,38px);line-height:1.08;letter-spacing:-0.028em;font-weight:500;color:var(--ink)}
+
+  /* ===== PROSE ===== */
+  .prose{color:var(--body);font-size:17.5px;line-height:1.68}
+  .prose p{margin:0 0 20px}
+  .prose p:last-child{margin-bottom:0}
+  .prose strong{color:var(--ink-2);font-weight:600}
+  .prose a.link{color:var(--primary);font-weight:500;border-bottom:1px solid var(--primary-soft-2);transition:border-color .15s}
+  .prose a.link:hover{border-bottom-color:var(--primary)}
+  .prose code{font-family:"JetBrains Mono",monospace;font-size:0.86em;background:#fff;border:1px solid var(--line);border-radius:6px;padding:2px 7px;color:var(--ink-2)}
+
+  /* lead paragraph after a heading */
+  .lead{font-size:19.5px;line-height:1.6;color:var(--ink-2);margin-bottom:24px;font-weight:400}
+
+  /* ordered steps */
+  ol.steps{list-style:none;counter-reset:step;margin:4px 0 24px;padding:0;display:flex;flex-direction:column;gap:18px}
+  ol.steps li{position:relative;padding-left:48px;font-size:17.5px;line-height:1.62;color:var(--body)}
+  ol.steps li::before{counter-increment:step;content:counter(step);position:absolute;left:0;top:-1px;width:30px;height:30px;border-radius:9px;background:#fff;border:1px solid var(--paper-line);color:var(--primary);font-family:"JetBrains Mono",monospace;font-size:14px;font-weight:500;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(26,20,36,0.04)}
+  ol.steps li strong{color:var(--ink-2);font-weight:600}
+
+  /* callout */
+  .note{display:flex;gap:14px;margin:0 0 24px;padding:18px 20px;border-radius:14px;background:#fff;border:1px solid var(--line);box-shadow:0 1px 2px rgba(26,20,36,0.03)}
+  .note .n-ico{flex:none;width:26px;height:26px;border-radius:8px;background:var(--primary-soft);color:var(--primary);display:flex;align-items:center;justify-content:center}
+  .note .n-ico svg{width:15px;height:15px}
+  .note .n-body{font-size:15.5px;line-height:1.6;color:var(--body)}
+  .note .n-body b{color:var(--ink-2);font-weight:600}
+
+  /* placeholder link tag */
+  .ph-link{display:inline-flex;align-items:center;gap:6px;font-family:"JetBrains Mono",monospace;font-size:13px;font-weight:500;letter-spacing:0.01em;color:var(--primary-ink);background:var(--primary-soft);border:1px solid var(--primary-soft-2);border-radius:7px;padding:2px 9px;text-transform:none}
+
+  /* ===== SCREENSHOT SLOT ===== */
+  figure.shot{margin:32px 0 4px}
+  figure.shot .frame{position:relative;border-radius:18px;background:#fff;border:1px solid var(--paper-line);padding:12px;box-shadow:0 24px 60px -28px rgba(26,20,36,0.28),0 2px 6px rgba(26,20,36,0.04)}
+  figure.shot image-slot{display:block;width:100%;height:380px}
+  figure.shot figcaption{display:flex;align-items:center;gap:9px;margin-top:14px;font-family:"JetBrains Mono",monospace;font-size:12.5px;letter-spacing:0.04em;color:var(--muted)}
+  figure.shot figcaption .fc-ico{width:14px;height:14px;color:var(--primary);flex:none}
+  figure.shot figcaption b{color:var(--ink-2);font-weight:500;text-transform:none;letter-spacing:0}
+
+  /* ===== RIGHT RAIL TOC ===== */
+  aside.rail{position:sticky;top:96px}
+  .toc-label{font-family:"JetBrains Mono",monospace;font-size:11.5px;font-weight:500;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);padding:0 0 16px 14px}
+  .toc{position:relative;display:flex;flex-direction:column}
+  .toc::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:2px;border-radius:2px;background:var(--line)}
+  .toc a{position:relative;display:flex;align-items:center;gap:12px;padding:11px 12px 11px 16px;border-radius:10px;font-size:14.5px;font-weight:500;color:var(--muted);transition:color .18s,background .18s}
+  .toc a .t-ico{flex:none;width:18px;height:18px;color:var(--muted);transition:color .18s}
+  .toc a .t-ico svg{width:18px;height:18px;display:block}
+  .toc a .t-num{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--paper-line);margin-left:auto;transition:color .18s}
+  .toc a:hover{color:var(--ink-2)}
+  .toc a:hover .t-ico{color:var(--ink-2)}
+  .toc a::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:2px;border-radius:2px;background:transparent;transition:background .18s}
+  .toc a.active{color:var(--primary);background:var(--primary-soft)}
+  .toc a.active .t-ico{color:var(--primary)}
+  .toc a.active .t-num{color:var(--primary)}
+  .toc a.active::before{background:var(--primary)}
+
+  .rail-foot{margin-top:22px;padding:18px 16px;border-radius:14px;background:#fff;border:1px solid var(--line)}
+  .rail-foot p{margin:0;font-size:13.5px;line-height:1.55;color:var(--body)}
+  .rail-foot a{display:inline-flex;align-items:center;gap:6px;margin-top:12px;font-size:13.5px;font-weight:600;color:var(--primary)}
+  .rail-foot a .arr{transition:transform .15s}
+  .rail-foot a:hover .arr{transform:translateX(2px)}
+
+  /* ===== MOBILE JUMP ROW ===== */
+  .jump{display:none}
+
+  @media (max-width:980px){
+    .doc-grid{grid-template-columns:1fr;gap:0}
+    aside.rail{display:none}
+    .jump{display:block;position:sticky;top:68px;z-index:50;margin:0 -40px 8px;padding:12px 0;background:rgba(250,247,242,0.92);backdrop-filter:saturate(180%) blur(12px);border-bottom:1px solid var(--line)}
+    .jump-scroll{display:flex;gap:8px;overflow-x:auto;padding:0 40px;scrollbar-width:none}
+    .jump-scroll::-webkit-scrollbar{display:none}
+    .jump a{flex:none;display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 14px;border-radius:99px;background:#fff;border:1px solid var(--paper-line);font-size:13.5px;font-weight:500;color:var(--body);white-space:nowrap}
+    .jump a .j-ico{width:15px;height:15px;color:var(--muted)}
+    .jump a.active{background:var(--primary);border-color:var(--primary);color:#fff}
+    .jump a.active .j-ico{color:#fff}
+    .col-main{max-width:none}
+    figure.shot image-slot{height:300px}
+  }
+  @media (max-width:620px){
+    .wrap{padding:0 22px}
+    .jump{margin:0 -22px 8px}
+    .jump-scroll{padding:0 22px}
+    .crumb{display:none}
+    .hero{padding:48px 0 4px}
+    .sec-head{gap:14px}
+    .sec-ico{width:44px;height:44px}
+  }
+</style>
+</head>
+<body style="background-color: rgb(255, 255, 255)">
+
+<!-- ICON SYMBOLS (thin-line, consistent 1.6 weight) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="annote-mark" viewBox="0 0 312 397">
+      <path d="M311.282 82.57C296.832 82.24 261.052 79.48 225.742 54.83C205.537 40.6482 189.006 21.8514 177.522 0L108.172 0V66.88C107.27 68.2735 106.117 69.4874 104.772 70.46C104.423 70.3883 104.068 70.3514 103.712 70.35H0.00195312V179.35H109.002V86.51C111.602 84.3742 114.782 83.0647 118.132 82.75C142.132 116.11 167.402 134.01 184.132 143.67C239.072 175.38 311.042 181.15 311.282 180.18C311.152 179.14 311.132 150.84 311.282 82.57Z" fill="currentColor"/>
+      <path d="M0.001244 313.708C14.4513 314.038 50.2312 316.798 85.5412 341.448C105.746 355.63 122.277 374.427 133.761 396.278L203.111 396.278L203.111 329.398C204.013 328.005 205.166 326.791 206.511 325.818C206.86 325.89 207.215 325.927 207.571 325.928L311.281 325.928L311.281 216.928L202.281 216.928L202.281 309.768C199.681 311.904 196.501 313.214 193.151 313.528C169.151 280.168 143.881 262.268 127.151 252.608C72.2112 220.898 0.241226 215.128 0.00123547 216.098C0.13124 217.138 0.151232 245.438 0.001244 313.708Z" fill="currentColor"/>
+    </symbol>
+
+    <!-- 1 · cursor-click + sparkle -->
+    <symbol id="ic-cursor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 3.5 L9.4 19 L11.6 12.6 L18 10.4 Z"/>
+      <path d="M16.4 16.4 L20 20"/>
+      <path d="M17.5 4 V7 M16 5.5 H19"/>
+    </symbol>
+
+    <!-- 2 · puzzle / extension -->
+    <symbol id="ic-puzzle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9.5 4.5a1.6 1.6 0 0 1 3.2 0c0 .6-.3 1-.3 1.5h3.1v3.1c.5 0 .9-.3 1.5-.3a1.6 1.6 0 0 1 0 3.2c-.6 0-1-.3-1.5-.3v3.6c0 .55-.45 1-1 1h-3.1c0-.5.3-.9.3-1.5a1.6 1.6 0 0 0-3.2 0c0 .6.3 1 .3 1.5H5.5c-.55 0-1-.45-1-1v-3.1c-.5 0-.9.3-1.5.3a1.6 1.6 0 0 1 0-3.2c.6 0 1 .3 1.5.3V5.5c0-.55.45-1 1-1h3.1c0 .5-.3.9-.3 1.5"/>
+    </symbol>
+
+    <!-- 3 · shield-check / connect -->
+    <symbol id="ic-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3 L19 5.6 V11 c0 4.5-3 7.6-7 9.4 C8 18.6 5 15.5 5 11 V5.6 Z"/>
+      <path d="M9 11.6 L11.2 13.8 L15.2 9.4"/>
+    </symbol>
+
+    <!-- 4 · target / capture -->
+    <symbol id="ic-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="7.5"/>
+      <circle cx="12" cy="12" r="3.2"/>
+      <path d="M12 1.8 V5 M12 19 V22.2 M1.8 12 H5 M19 12 H22.2"/>
+    </symbol>
+
+    <!-- small camera (caption) -->
+    <symbol id="ic-cam" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 8.5h3l1.4-2h7.2L16 8.5h3a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5H3A1.5 1.5 0 0 1 1.5 18v-8A1.5 1.5 0 0 1 3 8.5Z"/>
+      <circle cx="11" cy="13.5" r="3"/>
+    </symbol>
+    <symbol id="ic-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 7.6v.2"/>
+    </symbol>
+    <symbol id="ic-arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 12h13M13 6l6 6-6 6"/>
+    </symbol>
+  </defs>
+</svg>
+
+<!-- ===== NAV ===== -->
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top">
+      <svg class="mark" viewBox="0 0 312 397"><use href="#annote-mark"/></svg>
+      Annote
+    </a>
+    <div class="crumb">
+      <span>Docs</span><span class="sep">/</span><b>Getting Started</b>
+    </div>
+    <div class="nav-cta">
+      <a class="btn btn-ghost" href="#">Sign in</a>
+      <a class="btn btn-primary" href="#">Get Annote free <svg class="arr" width="15" height="15"><use href="#ic-arr"/></svg></a>
+    </div>
+  </div>
+</header>
+
+<!-- ===== HERO ===== -->
+<div id="top" class="hero">
+  <div class="wrap">
+    <span class="hero-eyebrow"><span class="pip"></span>Documentation</span>
+    <h1>Getting Started</h1>
+    <p class="hero-sub">Install Annote, connect your account, and file your first bug in under five minutes.</p>
+    <div class="hero-meta">
+      <span class="mono">4 SECTIONS</span>
+      <span class="dot"></span>
+      <span class="mono">~5 MIN READ</span>
+      <span class="dot"></span>
+      <span class="mono">CHROME EXTENSION</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DOC ===== -->
+<main class="doc">
+  <div class="wrap doc-grid">
+
+    <!-- MAIN COLUMN -->
+    <div class="col-main">
+
+      <!-- mobile jump row -->
+      <nav class="jump" aria-label="Jump to section">
+        <div class="jump-scroll">
+          <a href="#what" data-jump="what"><svg class="j-ico"><use href="#ic-cursor"/></svg>What is Annote</a>
+          <a href="#install" data-jump="install"><svg class="j-ico"><use href="#ic-puzzle"/></svg>Install</a>
+          <a href="#connect" data-jump="connect"><svg class="j-ico"><use href="#ic-shield"/></svg>Sign in &amp; connect</a>
+          <a href="#capture" data-jump="capture"><svg class="j-ico"><use href="#ic-target"/></svg>First bug</a>
+        </div>
+      </nav>
+
+      <!-- 1 -->
+      <section class="sec" id="what">
+        <div class="sec-head">
+          <div class="sec-ico"><svg><use href="#ic-cursor"/></svg></div>
+          <div class="sec-headtext">
+            <span class="sec-num"><b>01</b> &nbsp;·&nbsp; Overview</span>
+            <h2>What is Annote</h2>
+          </div>
+        </div>
+        <div class="prose">
+          <p class="lead">Annote turns a vague bug report into something a developer can act on. Instead of typing "the save button is broken" into Slack, you click the thing that's broken, say or type what's wrong, and Annote writes a structured ticket for you — automatically attaching a screenshot plus the technical evidence behind the bug: the console errors, the network requests, and the actions you took leading up to it.</p>
+          <p>The flow is always the same three beats: <strong>click an element → speak or type what's wrong → Annote's AI writes the ticket</strong> and diagnoses the likely cause. Your team picks it up in the Annote dashboard, already triaged.</p>
+          <div class="note">
+            <div class="n-ico"><svg><use href="#ic-info"/></svg></div>
+            <div class="n-body"><b>One thing worth knowing up front:</b> Annote captures nothing until you start a session. It sits quietly until you open it and hit record — so it's not watching your browsing in the background.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2 -->
+      <section class="sec" id="install">
+        <div class="sec-head">
+          <div class="sec-ico"><svg><use href="#ic-puzzle"/></svg></div>
+          <div class="sec-headtext">
+            <span class="sec-num"><b>02</b> &nbsp;·&nbsp; Setup</span>
+            <h2>Install the extension</h2>
+          </div>
+        </div>
+        <div class="prose">
+          <p class="lead">Annote lives in your browser as a Chrome extension.</p>
+          <ol class="steps">
+            <li>Open the Annote extension in the Chrome Web Store: <a class="link" href="#">Install Annote</a> <span class="ph-link">INSTALL LINK — swap in real store URL</span></li>
+            <li>Click <strong>"Add to Chrome,"</strong> then <strong>"Add extension"</strong> in the confirmation dialog.</li>
+            <li>Once installed, the Annote icon appears in your browser toolbar. Click the puzzle-piece icon and <strong>pin Annote</strong> so it's always visible.</li>
+          </ol>
+          <p>That's the whole install. There's no setup wizard and no settings to configure — the next step is connecting your account.</p>
+          <figure class="shot">
+            <div class="frame">
+              <image-slot id="gs-install" placeholder="Annote icon pinned in the Chrome toolbar"></image-slot>
+            </div>
+            <figcaption><svg class="fc-ico"><use href="#ic-cam"/></svg><b>Annote icon pinned in the Chrome toolbar</b></figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <!-- 3 -->
+      <section class="sec" id="connect">
+        <div class="sec-head">
+          <div class="sec-ico"><svg><use href="#ic-shield"/></svg></div>
+          <div class="sec-headtext">
+            <span class="sec-num"><b>03</b> &nbsp;·&nbsp; Account</span>
+            <h2>Sign in &amp; connect</h2>
+          </div>
+        </div>
+        <div class="prose">
+          <p class="lead">Here's the part that surprises people: there's no login inside the extension. You don't enter a password into Annote in your browser toolbar.</p>
+          <p>Instead, Annote connects automatically as long as you're signed in to the Annote website in the same browser. The first time you click the Annote toolbar icon while signed out, it opens the Annote login page in a new tab. Sign in there normally — with <strong>Google</strong> or your <strong>email and password</strong> — and the extension connects itself. No copying tokens, no separate "connect" step.</p>
+          <p>You'll stay connected as long as you're logged into the Annote website in that browser. You'll only be asked to sign in again if you log out of the website or your session expires.</p>
+          <div class="note">
+            <div class="n-ico"><svg><use href="#ic-info"/></svg></div>
+            <div class="n-body"><b>Don't have an account yet?</b> Create one at the Annote website first, verify your email, and finish the short onboarding (it sets up your workspace). You need a workspace before you can capture anything.</div>
+          </div>
+          <figure class="shot">
+            <div class="frame">
+              <image-slot id="gs-connect" placeholder="The website login page that opens from the extension"></image-slot>
+            </div>
+            <figcaption><svg class="fc-ico"><use href="#ic-cam"/></svg><b>The website login page that opens from the extension</b></figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <!-- 4 -->
+      <section class="sec" id="capture">
+        <div class="sec-head">
+          <div class="sec-ico"><svg><use href="#ic-target"/></svg></div>
+          <div class="sec-headtext">
+            <span class="sec-num"><b>04</b> &nbsp;·&nbsp; First capture</span>
+            <h2>Capture your first bug</h2>
+          </div>
+        </div>
+        <div class="prose">
+          <p class="lead">With the extension installed and your account connected, here's the full path from broken thing to finished ticket.</p>
+          <ol class="steps">
+            <li>Click the Annote icon in your toolbar. The Annote tray opens on the page.</li>
+            <li>Click <strong>"Start Session,"</strong> then choose how you want to give feedback — <strong>Voice</strong> (speak naturally) or <strong>Write</strong> (type it). Voice will ask for microphone permission the first time.</li>
+            <li>Click the element that's wrong. Your cursor becomes a marker and elements highlight as you hover. Clicking takes a screenshot of that element and opens a small capture box right next to it.</li>
+            <li>Say or type what's wrong, then hit <strong>Send</strong> (or Enter). A pin drops on the element and the box closes — so you can immediately click the next thing if you want.</li>
+            <li>Annote's AI structures your feedback into a ticket in the background — with the screenshot, console logs, network activity, and your actions all attached and correlated. The pin updates to the real ticket title when it's done.</li>
+          </ol>
+          <p>Your session follows you across tabs and pages automatically, so you can reproduce a bug across a flow and keep capturing. When you're done, click <strong>End</strong> — or the session ends on its own after 30 minutes of inactivity.</p>
+          <p>Then open the Annote dashboard: your session and its tickets are there, each one already AI-diagnosed with a likely cause and a suggested fix, ready for your team to resolve, assign, and comment on.</p>
+          <figure class="shot">
+            <div class="frame">
+              <image-slot id="gs-capture" placeholder="A captured ticket in the dashboard with the AI diagnosis panel"></image-slot>
+            </div>
+            <figcaption><svg class="fc-ico"><use href="#ic-cam"/></svg><b>A captured ticket in the dashboard with the AI diagnosis panel</b></figcaption>
+          </figure>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- RIGHT RAIL TOC -->
+    <aside class="rail">
+      <div class="toc-label">On this page</div>
+      <nav class="toc" aria-label="On this page">
+        <a href="#what" data-toc="what"><svg class="t-ico"><use href="#ic-cursor"/></svg>What is Annote<span class="t-num">01</span></a>
+        <a href="#install" data-toc="install"><svg class="t-ico"><use href="#ic-puzzle"/></svg>Install the extension<span class="t-num">02</span></a>
+        <a href="#connect" data-toc="connect"><svg class="t-ico"><use href="#ic-shield"/></svg>Sign in &amp; connect<span class="t-num">03</span></a>
+        <a href="#capture" data-toc="capture"><svg class="t-ico"><use href="#ic-target"/></svg>Capture your first bug<span class="t-num">04</span></a>
+      </nav>
+      <div class="rail-foot">
+        <p>Stuck on a step or something looks off? We're quick to respond.</p>
+        <a href="#">Contact support <svg class="arr" width="14" height="14"><use href="#ic-arr"/></svg></a>
+      </div>
+    </aside>
+
+  </div>
+</main>
+
+<script src="image-slot.js"></script>
+<script>
+(function(){
+  var ids = ['what','install','connect','capture'];
+  var tocLinks = {}, jumpLinks = {};
+  ids.forEach(function(id){
+    tocLinks[id]  = document.querySelector('.toc a[data-toc="'+id+'"]');
+    jumpLinks[id] = document.querySelector('.jump a[data-jump="'+id+'"]');
+  });
+
+  function setActive(id){
+    ids.forEach(function(k){
+      var on = k === id;
+      if(tocLinks[k])  tocLinks[k].classList.toggle('active', on);
+      if(jumpLinks[k]) jumpLinks[k].classList.toggle('active', on);
+    });
+  }
+
+  // Scroll-spy: track which section is highest in view above a top line.
+  var sections = ids.map(function(id){ return document.getElementById(id); });
+  function onScroll(){
+    var line = 140; // px below the sticky nav
+    var current = ids[0];
+    for(var i=0;i<sections.length;i++){
+      var rect = sections[i].getBoundingClientRect();
+      if(rect.top - line <= 0) current = ids[i];
+    }
+    // near page bottom → force last
+    if(window.innerHeight + window.scrollY >= document.body.scrollHeight - 4){
+      current = ids[ids.length-1];
+    }
+    setActive(current);
+  }
+  window.addEventListener('scroll', onScroll, {passive:true});
+  window.addEventListener('resize', onScroll, {passive:true});
+  onScroll();
+
+  // keep active mobile chip scrolled into the visible jump row
+  ids.forEach(function(id){
+    [tocLinks[id], jumpLinks[id]].forEach(function(a){
+      if(!a) return;
+      a.addEventListener('click', function(){ setTimeout(function(){ setActive(id); }, 60); });
+    });
+  });
+})();
+</script>
+</body>
+</html>

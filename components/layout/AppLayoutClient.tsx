@@ -40,9 +40,6 @@ export default function AppLayoutClient({
         open={commandOpen}
         onOpenChange={setCommandOpen}
       />
-      <div className="fixed bottom-4 right-6 text-[12px] text-meta pointer-events-none">
-        All changes saved • Secure session
-      </div>
     </div>
   );
 }

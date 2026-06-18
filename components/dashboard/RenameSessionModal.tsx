@@ -68,7 +68,7 @@ export function RenameSessionModal({
   return (
     <Modal open={open} onClose={onClose} ariaLabelledBy="rename-session-title">
       <div
-        className="card-depth bg-[var(--layer-1-bg)] rounded-none sm:rounded-[var(--radius-card)] shadow-[var(--shadow-level-5)] w-full sm:max-w-md h-full sm:h-auto p-5 sm:p-6 cursor-default"
+        className="card-depth bg-[var(--layer-1-bg)] rounded-none sm:rounded-[var(--radius-card)] shadow-[var(--shadow-level-5)] w-full sm:max-w-xl h-full sm:h-auto p-5 sm:p-6 cursor-default"
       >
         <h2
           id="rename-session-title"

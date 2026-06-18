@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Privacy &amp; data protection — Annote</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="docs.css" />
+<style>
+  /* leaves / stays cards */
+  .flow{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:30px 0 4px}
+  .flow .fcard{border-radius:16px;border:1px solid var(--line);background:#fff;padding:22px 22px 24px;box-shadow:0 1px 2px rgba(26,20,36,0.03)}
+  .flow .fcard.leaves{border-color:var(--primary-soft-2);background:linear-gradient(180deg,#fff,var(--primary-soft) 240%)}
+  .flow .fhead{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+  .flow .fhead .fh-ico{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:none}
+  .flow .fcard.leaves .fh-ico{background:var(--primary-soft);color:var(--primary);border:1px solid var(--primary-soft-2)}
+  .flow .fcard.stays .fh-ico{background:var(--green-soft);color:var(--green);border:1px solid var(--green-soft-2)}
+  .flow .fhead .fh-ico svg{width:16px;height:16px}
+  .flow .fhead h3{margin:0;font-size:17px;font-weight:600;letter-spacing:-0.01em;color:var(--ink)}
+  .flow ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:13px}
+  .flow li{position:relative;padding-left:24px;font-size:15px;line-height:1.55;color:var(--body)}
+  .flow li strong{color:var(--ink-2);font-weight:600}
+  .flow .fcard.leaves li::before{content:"";position:absolute;left:4px;top:8px;width:8px;height:8px;border-radius:99px;background:var(--primary)}
+  .flow .fcard.stays li::before{content:"";position:absolute;left:2px;top:3px;width:13px;height:13px;color:var(--green);background:none}
+  .flow .fcard.stays li{padding-left:26px}
+  .flow .fcard.stays li svg{position:absolute;left:1px;top:3px;width:14px;height:14px;color:var(--green)}
+  @media (max-width:620px){.flow{grid-template-columns:1fr}}
+</style>
+</head>
+<body style="background-color: rgb(255, 255, 255)">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="annote-mark" viewBox="0 0 312 397">
+      <path d="M311.282 82.57C296.832 82.24 261.052 79.48 225.742 54.83C205.537 40.6482 189.006 21.8514 177.522 0L108.172 0V66.88C107.27 68.2735 106.117 69.4874 104.772 70.46C104.423 70.3883 104.068 70.3514 103.712 70.35H0.00195312V179.35H109.002V86.51C111.602 84.3742 114.782 83.0647 118.132 82.75C142.132 116.11 167.402 134.01 184.132 143.67C239.072 175.38 311.042 181.15 311.282 180.18C311.152 179.14 311.132 150.84 311.282 82.57Z" fill="currentColor"/>
+      <path d="M0.001244 313.708C14.4513 314.038 50.2312 316.798 85.5412 341.448C105.746 355.63 122.277 374.427 133.761 396.278L203.111 396.278L203.111 329.398C204.013 328.005 205.166 326.791 206.511 325.818C206.86 325.89 207.215 325.927 207.571 325.928L311.281 325.928L311.281 216.928L202.281 216.928L202.281 309.768C199.681 311.904 196.501 313.214 193.151 313.528C169.151 280.168 143.881 262.268 127.151 252.608C72.2112 220.898 0.241226 215.128 0.00123547 216.098C0.13124 217.138 0.151232 245.438 0.001244 313.708Z" fill="currentColor"/>
+    </symbol>
+    <!-- power / toggle -->
+    <symbol id="ic-power" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3.5 V11"/>
+      <path d="M7.4 6.6 a7.2 7.2 0 1 0 9.2 0"/>
+    </symbol>
+    <!-- shield-check -->
+    <symbol id="ic-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3 L19 5.6 V11 c0 4.5-3 7.6-7 9.4 C8 18.6 5 15.5 5 11 V5.6 Z"/>
+      <path d="M9 11.6 L11.2 13.8 L15.2 9.4"/>
+    </symbol>
+    <!-- tag -->
+    <symbol id="ic-tag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 12.6 V5.2 a1.2 1.2 0 0 1 1.2-1.2 H12.6 L20 11.4 a1.5 1.5 0 0 1 0 2.1 L13.5 20 a1.5 1.5 0 0 1-2.1 0 Z"/>
+      <circle cx="8.3" cy="8.3" r="1.25"/>
+    </symbol>
+    <!-- alert-circle -->
+    <symbol id="ic-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="8.5"/>
+      <path d="M12 7.4 V13"/>
+      <path d="M12 16.3 v.05"/>
+    </symbol>
+    <!-- arrow-up-right -->
+    <symbol id="ic-arrow-ur" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M7 17 L17 7"/>
+      <path d="M8.5 7 H17 V15.5"/>
+    </symbol>
+    <!-- lock (stays) -->
+    <symbol id="ic-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="5.5" y="10.5" width="13" height="9.5" rx="2"/>
+      <path d="M8 10.5 V8 a4 4 0 0 1 8 0 v2.5"/>
+    </symbol>
+    <symbol id="ic-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 12.5 L10 17.5 L19 7"/>
+    </symbol>
+    <symbol id="ic-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 7.6v.2"/>
+    </symbol>
+    <symbol id="ic-arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 12h13M13 6l6 6-6 6"/>
+    </symbol>
+  </defs>
+</svg>
+
+<!-- ===== NAV ===== -->
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="getting-started.html">
+      <svg class="mark" viewBox="0 0 312 397"><use href="#annote-mark"/></svg>
+      Annote
+    </a>
+    <div class="crumb">
+      <a href="getting-started.html">Docs</a><span class="sep">/</span><b>Privacy &amp; data protection</b>
+    </div>
+    <div class="nav-cta">
+      <a class="btn btn-ghost" href="#">Sign in</a>
+      <a class="btn btn-primary" href="#">Get Annote free <svg class="arr" width="15" height="15"><use href="#ic-arr"/></svg></a>
+    </div>
+  </div>
+</header>
+
+<!-- ===== HERO ===== -->
+<div id="top" class="hero">
+  <div class="wrap">
+    <span class="hero-eyebrow"><span class="pip"></span>Documentation</span>
+    <h1>Privacy &amp; data protection</h1>
+    <p class="hero-sub">What Annote captures, what it redacts before anything leaves your browser, and exactly what you can control yourself.</p>
+    <div class="hero-meta">
+      <span class="mono">5 SECTIONS</span>
+      <span class="dot"></span>
+      <span class="mono">IN-BROWSER REDACTION</span>
+      <span class="dot"></span>
+      <span class="mono">PRIVACY-FIRST</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DOC ===== -->
+<main class="doc">
+  <div class="wrap doc-grid">
+
+    <div class="col-main">
+
+      <!-- mobile jump row -->
+      <nav class="jump" aria-label="Jump to section">
+        <div class="jump-scroll">
+          <a href="#capture-off" data-jump="capture-off"><svg class="j-ico"><use href="#ic-power"/></svg>Capture is off</a>
+          <a href="#redaction" data-jump="redaction"><svg class="j-ico"><use href="#ic-shield"/></svg>In-browser redaction</a>
+          <a href="#markers" data-jump="markers"><svg class="j-ico"><use href="#ic-tag"/></svg>Privacy markers</a>
+          <a href="#limits" data-jump="limits"><svg class="j-ico"><use href="#ic-alert"/></svg>Two honest limits</a>
+          <a href="#leaves" data-jump="leaves"><svg class="j-ico"><use href="#ic-arrow-ur"/></svg>What leaves</a>
+        </div>
+      </nav>
+
+      <!-- 1 -->
+      <section class="sec" id="capture-off">
+        <div class="sec-head">
+          <div class="sec-ico"><svg><use href="#ic-power"/></svg></div>
+          <div class="sec-headtext">
+            <span class="sec-num"><b>01</b> &nbsp;·&nbsp; By default</span>
+            <h2>Capture is off until you start</h2>
+          </div>
+        </div>
+        <div class="prose">
+          <p class="lead">Annote captures nothing until you start a session.</p>
+          <p>The extension loads on the pages you visit, but it sits inactive — in transparent passthrough — until you open the tray and begin a session. It is not recording your browsing in the background, and there is no always-on capture.</p>
+          <p>When you end a session (or close the tray), capture stops and the buffer is cleared.</p>
+        </div>
+      </section>
+
+      <!-- 2 -->
+      <section class="sec" id="redaction">
+        <div class="sec-head">
+          <div class="sec-ico"><svg><use href="#ic-shield"/></svg></div>
+          <div class="sec-headtext">
+            <span class="sec-num"><b>02</b> &nbsp;·&nbsp; On your machine</span>
+            <h2>Redaction happens in your browser, before anything is sent</h2>
+          </div>
+        </div>
+        <div class="prose">
+          <p class="lead">This is the part most tools don't do: Annote redacts sensitive data on your own machine, before any of it leaves your browser.</p>
+          <p>As your console, network, and action data are captured, Annote automatically replaces sensitive patterns — JSON Web Tokens, email addresses, card-like numbers, phone numbers, API keys (such as Stripe, GitHub, and Slack keys), Authorization headers, and Cookie headers — with safe placeholders like <code>&lt;jwt&gt;</code>, <code>&lt;email&gt;</code>, <code>&lt;card&gt;</code>, or <code>&lt;redacted&gt;</code>.</p>
+          <p>Network request headers go further: authorization, cookie, and common API-token and secret headers are stripped out entirely. Sensitive form-field values — passwords, hidden fields, credit-card fields — are never captured at all.</p>
+          <div class="note last">
+            <div class="n-ico"><svg><use href="#ic-shield"/></svg></div>
+            <div class="n-body"><b>All of this happens at capture time, in your browser,</b> so the raw values are gone before the data is ever attached to a ticket.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3 -->
+      <section class="sec" id="markers">
+        <div class="sec-head">
+          <div class="sec-ico"><svg><use href="#ic-tag"/></svg></div>
+          <div class="sec-headtext">
+            <span class="sec-num"><b>03</b> &nbsp;·&nbsp; Your control</span>
+            <h2>What you can control yourself: privacy markers</h2>
+          </div>
+        </div>
+        <div class="prose">
+          <p class="lead">If there are parts of your own pages you want to keep out of capture, you can mark them in your HTML.</p>
+          <p>Annote honors the standard session-replay markers, so if you already use a tool like FullStory you may have these in place already.</p>
+          <ul class="facts">
+            <li><code>[data-private]</code>, <code>.fs-exclude</code>, <code>.fs-block</code>, <code>[data-annote-mask]</code> — <strong>fully withhold</strong> the element. Annote records that an interaction happened, but keeps the element's text and attributes out.</li>
+            <li><code>.fs-mask</code>, <code>[data-rr-is-password]</code> — <strong>keep the element's structure</strong> but drop its text and labels.</li>
+            <li><code>.fs-unmask</code>, <code>[data-annote-blur='false']</code> — <strong>override</strong> a surrounding masked region for one specific element (the closest marker wins).</li>
+          </ul>
+          <p>These markers apply to user-action capture and to console capture (when you log a DOM element).</p>
+          <figure class="code">
+            <div class="frame">
+              <div class="bar"><span class="d"></span><span class="d"></span><span class="d"></span><span class="fname">checkout.html</span></div>
+<pre><span class="c">&lt;!-- fully withheld from capture --&gt;</span>
+<span class="t">&lt;div</span> <span class="a">data-private</span><span class="t">&gt;</span>
+  <span class="t">&lt;span&gt;</span>Card ending <span class="s">4242</span><span class="t">&lt;/span&gt;</span>
+<span class="t">&lt;/div&gt;</span>
+
+<span class="c">&lt;!-- masked region, one field unmasked --&gt;</span>
+<span class="t">&lt;form</span> <span class="a">class</span>=<span class="s">"fs-mask"</span><span class="t">&gt;</span>
+  <span class="t">&lt;input</span> <span class="a">name</span>=<span class="s">"coupon"</span> <span class="a">class</span>=<span class="s">"fs-unmask"</span><span class="t">&gt;</span>
+<span class="t">&lt;/form&gt;</span></pre>
+            </div>
+            <figcaption><svg class="fc-ico"><use href="#ic-tag"/></svg>Markers placed directly on your own page elements</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <!-- 4 -->
+      <section class="sec" id="limits">
+        <div class="sec-head">
+          <div class="sec-ico"><svg><use href="#ic-alert"/></svg></div>
+          <div class="sec-headtext">
+            <span class="sec-num"><b>04</b> &nbsp;·&nbsp; Plainly stated</span>
+            <h2>The two honest limits</h2>
+          </div>
+        </div>
+        <div class="prose">
+          <p class="lead">Two things these markers do <strong>not</strong> do, stated plainly so there are no surprises.</p>
+          <div class="note amber">
+            <div class="n-ico"><svg><use href="#ic-alert"/></svg></div>
+            <div class="n-body"><b>Markers do not redact network requests, headers, or bodies.</b> Network data is protected by the automatic pattern redaction described above — not by markers. Adding <code>data-private</code> to an element does not hide an API response.</div>
+          </div>
+          <div class="note amber last">
+            <div class="n-ico"><svg><use href="#ic-alert"/></svg></div>
+            <div class="n-body"><b>Markers do not edit the screenshot.</b> The screenshot is a picture of the visible part of the tab at the moment you capture. Markers hide text from the captured data, not from the image. If something sensitive is visible on screen when you capture, it will be in the screenshot.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5 -->
+      <section class="sec" id="leaves">
+        <div class="sec-head">
+          <div class="sec-ico"><svg><use href="#ic-arrow-ur"/></svg></div>
+          <div class="sec-headtext">
+            <span class="sec-num"><b>05</b> &nbsp;·&nbsp; The boundary</span>
+            <h2>What leaves your browser, and what stays</h2>
+          </div>
+        </div>
+        <div class="prose">
+          <p class="lead">A clear line between the two — after the in-browser redaction above has already run.</p>
+          <div class="flow">
+            <div class="fcard leaves">
+              <div class="fhead">
+                <span class="fh-ico"><svg><use href="#ic-arrow-ur"/></svg></span>
+                <h3>Leaves your browser</h3>
+              </div>
+              <ul>
+                <li>The <strong>redacted</strong> console, network, and action data attached to a ticket you file</li>
+                <li>The <strong>screenshot</strong> of the visible tab</li>
+                <li>If you use Voice, your <strong>microphone audio</strong> — sent to a transcription service to turn your speech into text</li>
+              </ul>
+            </div>
+            <div class="fcard stays">
+              <div class="fhead">
+                <span class="fh-ico"><svg><use href="#ic-lock"/></svg></span>
+                <h3>Stays on your machine</h3>
+              </div>
+              <ul>
+                <li><svg><use href="#ic-check"/></svg>Anything captured while <strong>no session is active</strong></li>
+                <li><svg><use href="#ic-check"/></svg>The buffer, if you start but <strong>never file</strong></li>
+                <li><svg><use href="#ic-check"/></svg>Anything matched by redaction (<strong>replaced before sending</strong>)</li>
+                <li><svg><use href="#ic-check"/></svg>The <strong>text you type</strong> into your own page's fields — the action timeline never records what you type</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- RIGHT RAIL TOC -->
+    <aside class="rail">
+      <div class="toc-label">On this page</div>
+      <nav class="toc" aria-label="On this page">
+        <a href="#capture-off" data-toc="capture-off"><svg class="t-ico"><use href="#ic-power"/></svg>Capture is off<span class="t-num">01</span></a>
+        <a href="#redaction" data-toc="redaction"><svg class="t-ico"><use href="#ic-shield"/></svg>In-browser redaction<span class="t-num">02</span></a>
+        <a href="#markers" data-toc="markers"><svg class="t-ico"><use href="#ic-tag"/></svg>Privacy markers<span class="t-num">03</span></a>
+        <a href="#limits" data-toc="limits"><svg class="t-ico"><use href="#ic-alert"/></svg>Two honest limits<span class="t-num">04</span></a>
+        <a href="#leaves" data-toc="leaves"><svg class="t-ico"><use href="#ic-arrow-ur"/></svg>What leaves &amp; stays<span class="t-num">05</span></a>
+      </nav>
+      <div class="rail-foot">
+        <p>Need the full marker list? See the dedicated reference.</p>
+        <a href="privacy-markers.html">Privacy markers reference <svg class="arr" width="14" height="14"><use href="#ic-arr"/></svg></a>
+      </div>
+    </aside>
+
+  </div>
+</main>
+
+<script src="docs-spy.js" data-ids="capture-off,redaction,markers,limits,leaves"></script>
+</body>
+</html>

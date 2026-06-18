@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>FAQ — Annote</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="docs.css" />
+<style>
+  .faq{display:flex;flex-direction:column;margin:8px 0 0;border-top:1px solid var(--line)}
+  .faq-item{border-bottom:1px solid var(--line)}
+  .faq-q{display:flex;align-items:flex-start;gap:18px;width:100%;text-align:left;padding:24px 4px;cursor:pointer}
+  .faq-q .qn{flex:none;font-family:"JetBrains Mono",monospace;font-size:12.5px;font-weight:500;color:var(--primary);padding-top:5px;width:30px}
+  .faq-q .qt{flex:1;font-size:19px;line-height:1.4;letter-spacing:-0.015em;font-weight:500;color:var(--ink)}
+  .faq-q .qx{flex:none;width:26px;height:26px;border-radius:8px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--muted);transition:transform .25s ease,color .2s,border-color .2s,background .2s;margin-top:2px}
+  .faq-q .qx svg{width:14px;height:14px}
+  .faq-item.open .faq-q .qx{transform:rotate(45deg);color:var(--primary);border-color:var(--primary-soft-2);background:var(--primary-soft)}
+  .faq-item.open .faq-q .qt{color:var(--primary-ink)}
+  .faq-a{display:grid;grid-template-rows:0fr;transition:grid-template-rows .3s ease}
+  .faq-item.open .faq-a{grid-template-rows:1fr}
+  .faq-a .inner{overflow:hidden}
+  .faq-a .inner p{margin:0 0 22px 48px;font-size:16.5px;line-height:1.66;color:var(--body)}
+  .faq-a .inner p b{color:var(--ink-2);font-weight:600}
+  .faq-a .inner a.link{color:var(--primary);font-weight:500;border-bottom:1px solid var(--primary-soft-2);transition:border-color .15s}
+  .faq-a .inner a.link:hover{border-bottom-color:var(--primary)}
+  @media (max-width:620px){
+    .faq-q{gap:12px;padding:20px 2px}
+    .faq-q .qn{display:none}
+    .faq-a .inner p{margin-left:0}
+  }
+</style>
+</head>
+<body style="background-color: rgb(255, 255, 255)">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="annote-mark" viewBox="0 0 312 397">
+      <path d="M311.282 82.57C296.832 82.24 261.052 79.48 225.742 54.83C205.537 40.6482 189.006 21.8514 177.522 0L108.172 0V66.88C107.27 68.2735 106.117 69.4874 104.772 70.46C104.423 70.3883 104.068 70.3514 103.712 70.35H0.00195312V179.35H109.002V86.51C111.602 84.3742 114.782 83.0647 118.132 82.75C142.132 116.11 167.402 134.01 184.132 143.67C239.072 175.38 311.042 181.15 311.282 180.18C311.152 179.14 311.132 150.84 311.282 82.57Z" fill="currentColor"/>
+      <path d="M0.001244 313.708C14.4513 314.038 50.2312 316.798 85.5412 341.448C105.746 355.63 122.277 374.427 133.761 396.278L203.111 396.278L203.111 329.398C204.013 328.005 205.166 326.791 206.511 325.818C206.86 325.89 207.215 325.927 207.571 325.928L311.281 325.928L311.281 216.928L202.281 216.928L202.281 309.768C199.681 311.904 196.501 313.214 193.151 313.528C169.151 280.168 143.881 262.268 127.151 252.608C72.2112 220.898 0.241226 215.128 0.00123547 216.098C0.13124 217.138 0.151232 245.438 0.001244 313.708Z" fill="currentColor"/>
+    </symbol>
+    <symbol id="ic-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M12 5 V19 M5 12 H19"/>
+    </symbol>
+    <symbol id="ic-arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 12h13M13 6l6 6-6 6"/>
+    </symbol>
+  </defs>
+</svg>
+
+<!-- ===== NAV ===== -->
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="getting-started.html">
+      <svg class="mark" viewBox="0 0 312 397"><use href="#annote-mark"/></svg>
+      Annote
+    </a>
+    <div class="crumb">
+      <a href="getting-started.html">Docs</a><span class="sep">/</span><b>FAQ</b>
+    </div>
+    <div class="nav-cta">
+      <a class="btn btn-ghost" href="#">Sign in</a>
+      <a class="btn btn-primary" href="#">Get Annote free <svg class="arr" width="15" height="15"><use href="#ic-arr"/></svg></a>
+    </div>
+  </div>
+</header>
+
+<!-- ===== HERO ===== -->
+<div id="top" class="hero">
+  <div class="wrap">
+    <span class="hero-eyebrow"><span class="pip"></span>Documentation</span>
+    <h1>Frequently asked questions</h1>
+    <p class="hero-sub">Short, straight answers to the things people ask most before they get started.</p>
+    <div class="hero-meta">
+      <span class="mono">7 QUESTIONS</span>
+      <span class="dot"></span>
+      <span class="mono">PRIVACY · CAPTURE · ACCOUNT</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DOC ===== -->
+<main class="doc">
+  <div class="wrap doc-grid solo">
+    <div class="col-main" style="max-width:none">
+
+      <div class="faq">
+
+        <div class="faq-item open">
+          <button class="faq-q" aria-expanded="true">
+            <span class="qn">01</span>
+            <span class="qt">Does Annote record my browsing in the background?</span>
+            <span class="qx"><svg><use href="#ic-plus"/></svg></span>
+          </button>
+          <div class="faq-a"><div class="inner">
+            <p><b>No.</b> Annote captures nothing until you start a session, and stops the moment you end it.</p>
+          </div></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q" aria-expanded="false">
+            <span class="qn">02</span>
+            <span class="qt">Is my data redacted before it's sent anywhere?</span>
+            <span class="qx"><svg><use href="#ic-plus"/></svg></span>
+          </button>
+          <div class="faq-a"><div class="inner">
+            <p><b>Yes.</b> Sensitive patterns — tokens, emails, card numbers, API keys, auth and cookie headers — are replaced in your browser before any data leaves it. Passwords and card fields are never captured. See <a class="link" href="privacy.html">Privacy &amp; data protection</a> for details.</p>
+          </div></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q" aria-expanded="false">
+            <span class="qn">03</span>
+            <span class="qt">Does Annote integrate with Jira, Linear, or Slack?</span>
+            <span class="qx"><svg><use href="#ic-plus"/></svg></span>
+          </button>
+          <div class="faq-a"><div class="inner">
+            <p><b>Not yet.</b> Integrations are on the roadmap. Today, feedback lives in the Annote dashboard where your team triages, assigns, and resolves it.</p>
+          </div></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q" aria-expanded="false">
+            <span class="qn">04</span>
+            <span class="qt">Do I log in through the extension?</span>
+            <span class="qx"><svg><use href="#ic-plus"/></svg></span>
+          </button>
+          <div class="faq-a"><div class="inner">
+            <p><b>No</b> — you sign in on the Annote website, and the extension connects automatically as long as you're logged in there in the same browser. See <a class="link" href="getting-started.html#connect">Sign in &amp; connect</a>.</p>
+          </div></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q" aria-expanded="false">
+            <span class="qn">05</span>
+            <span class="qt">What does the screenshot include?</span>
+            <span class="qx"><svg><use href="#ic-plus"/></svg></span>
+          </button>
+          <div class="faq-a"><div class="inner">
+            <p>Only the <b>visible part of the current browser tab</b> at the moment you capture — not the full page, not other tabs, and not your desktop.</p>
+          </div></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q" aria-expanded="false">
+            <span class="qn">06</span>
+            <span class="qt">How long can a voice note be?</span>
+            <span class="qx"><svg><use href="#ic-plus"/></svg></span>
+          </button>
+          <div class="faq-a"><div class="inner">
+            <p>Up to <b>three minutes</b>, with a warning as you approach the limit.</p>
+          </div></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q" aria-expanded="false">
+            <span class="qn">07</span>
+            <span class="qt">Can I control what gets captured on my own pages?</span>
+            <span class="qx"><svg><use href="#ic-plus"/></svg></span>
+          </button>
+          <div class="faq-a"><div class="inner">
+            <p><b>Yes</b> — add privacy markers to your HTML to mask or exclude specific elements. See the <a class="link" href="privacy-markers.html">Privacy markers reference</a>.</p>
+          </div></div>
+        </div>
+
+      </div>
+
+      <div class="rail-foot" style="margin-top:40px">
+        <p>Didn't find your answer here? We're quick to respond.</p>
+        <a href="#">Contact support <svg class="arr" width="14" height="14"><use href="#ic-arr"/></svg></a>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<script>
+(function(){
+  document.querySelectorAll('.faq-item').forEach(function(item){
+    var btn = item.querySelector('.faq-q');
+    btn.addEventListener('click', function(){
+      var open = item.classList.toggle('open');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+  });
+})();
+</script>
+</body>
+</html>

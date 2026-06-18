@@ -7,7 +7,6 @@ import { useIsMobile } from "@/lib/hooks/useIsMobile";
 import {
   ArrowRight,
   Bug,
-  Command,
   CreditCard,
   ExternalLink,
   Globe,
@@ -593,11 +592,6 @@ export function ProfileCommandPanel({
                 onClose();
               }}
             />
-            <MenuItem
-              icon={Command}
-              label="Keyboard shortcuts"
-              onClick={onClose}
-            />
           </div>
 
           <div style={dividerStyle} />
@@ -609,14 +603,20 @@ export function ProfileCommandPanel({
               icon={HelpCircle}
               label="Help & Support"
               onClick={() => {
-                window.open("mailto:ishaq@annote.ai", "_self");
+                window.open("mailto:help@annote.ai", "_self");
                 onClose();
               }}
             />
             <MenuItem
               icon={Bug}
               label="Report a Bug"
-              onClick={() => { onClose(); }}
+              onClick={() => {
+                window.open(
+                  "mailto:help@annote.ai?subject=Bug%20report",
+                  "_self",
+                );
+                onClose();
+              }}
             />
           </div>
 

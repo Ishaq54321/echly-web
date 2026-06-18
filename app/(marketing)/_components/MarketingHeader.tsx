@@ -6,6 +6,7 @@ const NAV_LINKS: ReadonlyArray<{ label: string; href: string; caret?: boolean }>
   { label: "Agencies", href: "#agencies" },
   { label: "Teams", href: "#teams" },
   { label: "Pricing", href: "#pricing" },
+  { label: "Docs", href: "/docs" },
 ];
 
 export function MarketingHeader() {

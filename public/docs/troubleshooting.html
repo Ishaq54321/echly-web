@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Troubleshooting — Annote</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="docs.css" />
+<style>
+  .msgs{display:flex;flex-direction:column;gap:4px;margin:4px 0 8px}
+  .msg{display:grid;grid-template-columns:auto 1fr;gap:18px;padding:18px 0;border-bottom:1px solid var(--line-2)}
+  .msg:last-child{border-bottom:0}
+  .msg-q{display:flex;flex-direction:column;gap:7px;max-width:230px}
+  .msg-q .q{display:inline-flex;align-items:flex-start;gap:7px;font-family:"JetBrains Mono",monospace;font-size:12.5px;line-height:1.45;font-weight:500;color:var(--ink-2);background:var(--paper-2);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+  .msg-q .q .qm{color:var(--primary);flex:none;font-size:14px;line-height:1.1;margin-top:-1px}
+  .msg-a{font-size:16px;line-height:1.6;color:var(--body);padding-top:2px}
+  .msg-a b{color:var(--ink-2);font-weight:600}
+  .msg-a .ui{font-weight:600;color:var(--ink-2)}
+  @media (max-width:680px){
+    .msg{grid-template-columns:1fr;gap:11px}
+    .msg-q{max-width:none}
+  }
+</style>
+</head>
+<body style="background-color: rgb(255, 255, 255)">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="annote-mark" viewBox="0 0 312 397">
+      <path d="M311.282 82.57C296.832 82.24 261.052 79.48 225.742 54.83C205.537 40.6482 189.006 21.8514 177.522 0L108.172 0V66.88C107.27 68.2735 106.117 69.4874 104.772 70.46C104.423 70.3883 104.068 70.3514 103.712 70.35H0.00195312V179.35H109.002V86.51C111.602 84.3742 114.782 83.0647 118.132 82.75C142.132 116.11 167.402 134.01 184.132 143.67C239.072 175.38 311.042 181.15 311.282 180.18C311.152 179.14 311.132 150.84 311.282 82.57Z" fill="currentColor"/>
+      <path d="M0.001244 313.708C14.4513 314.038 50.2312 316.798 85.5412 341.448C105.746 355.63 122.277 374.427 133.761 396.278L203.111 396.278L203.111 329.398C204.013 328.005 205.166 326.791 206.511 325.818C206.86 325.89 207.215 325.927 207.571 325.928L311.281 325.928L311.281 216.928L202.281 216.928L202.281 309.768C199.681 311.904 196.501 313.214 193.151 313.528C169.151 280.168 143.881 262.268 127.151 252.608C72.2112 220.898 0.241226 215.128 0.00123547 216.098C0.13124 217.138 0.151232 245.438 0.001244 313.708Z" fill="currentColor"/>
+    </symbol>
+    <!-- mic -->
+    <symbol id="ic-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="9" y="3" width="6" height="11" rx="3"/>
+      <path d="M5.5 11 a6.5 6.5 0 0 0 13 0"/>
+      <path d="M12 17.5 V21 M8.5 21 H15.5"/>
+    </symbol>
+    <!-- sparkles -->
+    <symbol id="ic-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M11 4 l1.5 4.1 L16.6 9.6 l-4.1 1.5 L11 15.2 l-1.5-4.1 L5.4 9.6 l4.1-1.5 Z"/>
+      <path d="M17.6 14.4 l.7 1.9 1.9 .7 -1.9 .7 -.7 1.9 -.7-1.9 -1.9-.7 1.9-.7 Z"/>
+    </symbol>
+    <!-- refresh -->
+    <symbol id="ic-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19.5 12 a7.5 7.5 0 1 1-2.1-5.2"/>
+      <path d="M19.7 4.2 V8.4 H15.5"/>
+    </symbol>
+    <!-- gauge -->
+    <symbol id="ic-gauge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 16 a8 8 0 0 1 16 0"/>
+      <path d="M12 16 L15.8 10.8"/>
+      <circle cx="12" cy="16" r="1.1" fill="currentColor" stroke="none"/>
+    </symbol>
+    <symbol id="ic-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 7.6v.2"/>
+    </symbol>
+    <symbol id="ic-arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 12h13M13 6l6 6-6 6"/>
+    </symbol>
+  </defs>
+</svg>
+
+<!-- ===== NAV ===== -->
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="getting-started.html">
+      <svg class="mark" viewBox="0 0 312 397"><use href="#annote-mark"/></svg>
+      Annote
+    </a>
+    <div class="crumb">
+      <a href="getting-started.html">Docs</a><span class="sep">/</span><b>Troubleshooting</b>
+    </div>
+    <div class="nav-cta">
+      <a class="btn btn-ghost" href="#">Sign in</a>
+      <a class="btn btn-primary" href="#">Get Annote free <svg class="arr" width="15" height="15"><use href="#ic-arr"/></svg></a>
+    </div>
+  </div>
+</header>
+
+<!-- ===== HERO ===== -->
+<div id="top" class="hero">
+  <div class="wrap">
+    <span class="hero-eyebrow"><span class="pip"></span>Documentation</span>
+    <h1>Troubleshooting</h1>
+    <p class="hero-sub">The messages you might run into — what each one means, and the quickest way past it.</p>
+    <div class="hero-meta">
+      <span class="mono">4 SECTIONS</span>
+      <span class="dot"></span>
+      <span class="mono">COMMON MESSAGES</span>
+      <span class="dot"></span>
+      <span class="mono">QUICK FIXES</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DOC ===== -->
+<main class="doc">
+  <div class="wrap doc-grid">
+
+    <div class="col-main">
+
+      <nav class="jump" aria-label="Jump to section">
+        <div class="jump-scroll">
+          <a href="#mic" data-jump="mic"><svg class="j-ico"><use href="#ic-mic"/></svg>Microphone</a>
+          <a href="#ai" data-jump="ai"><svg class="j-ico"><use href="#ic-sparkles"/></svg>AI diagnosis</a>
+          <a href="#sync" data-jump="sync"><svg class="j-ico"><use href="#ic-refresh"/></svg>Sync &amp; session</a>
+          <a href="#limits" data-jump="limits"><svg class="j-ico"><use href="#ic-gauge"/></svg>Plan limits</a>
+        </div>
+      </nav>
+
+      <!-- 1 -->
+      <section class="sec" id="mic">
+        <div class="sec-head">
+          <div class="sec-ico"><svg><use href="#ic-mic"/></svg></div>
+          <div class="sec-headtext">
+            <span class="sec-num"><b>01</b> &nbsp;·&nbsp; Voice</span>
+            <h2>Microphone issues</h2>
+          </div>
+        </div>
+        <div class="msgs">
+          <div class="msg">
+            <div class="msg-q"><span class="q"><span class="qm">"</span>Annote needs your microphone</span></div>
+            <div class="msg-a">Annote doesn't have mic access yet. Click <span class="ui">"Try again"</span> and allow access in the browser prompt, or switch to <span class="ui">Write</span> to type instead.</div>
+          </div>
+          <div class="msg">
+            <div class="msg-q"><span class="q"><span class="qm">"</span>Microphone is blocked</span></div>
+            <div class="msg-a">Access was denied for this site. Follow the three on-screen steps to re-enable it in your browser; Annote detects when it's back on.</div>
+          </div>
+          <div class="msg">
+            <div class="msg-q"><span class="q"><span class="qm">"</span>This site doesn't allow voice recording</span></div>
+            <div class="msg-a">The website itself blocks microphone use through its security policy. This isn't something Annote can change — switch to <span class="ui">Write</span> for this site.</div>
+          </div>
+          <div class="msg">
+            <div class="msg-q"><span class="q"><span class="qm">"</span>No audio detected</span></div>
+            <div class="msg-a">Your mic was on but Annote didn't hear anything. Check that the right microphone is selected and try again.</div>
+          </div>
+          <div class="msg">
+            <div class="msg-q"><span class="q"><span class="qm">"</span>Couldn't process audio</span></div>
+            <div class="msg-a">The transcription didn't go through. Retry; if it persists, switch to <span class="ui">Write</span>.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2 -->
+      <section class="sec" id="ai">
+        <div class="sec-head">
+          <div class="sec-ico"><svg><use href="#ic-sparkles"/></svg></div>
+          <div class="sec-headtext">
+            <span class="sec-num"><b>02</b> &nbsp;·&nbsp; Diagnosis</span>
+            <h2>When the AI diagnosis doesn't appear</h2>
+          </div>
+        </div>
+        <div class="msgs">
+          <div class="msg">
+            <div class="msg-q"><span class="q"><span class="qm">"</span>AI processing failed</span></div>
+            <div class="msg-a">The ticket was saved, but the automatic write-up didn't complete. The capture (screenshot, console, network, actions) is still attached; you can edit the ticket manually.</div>
+          </div>
+          <div class="msg">
+            <div class="msg-q"><span class="q"><span class="qm">"</span>Analyzing… taking longer than expected</span></div>
+            <div class="msg-a">Diagnosis is still running. Use <span class="ui">"Retry analysis"</span> if it stalls.</div>
+          </div>
+          <div class="msg">
+            <div class="msg-q"><span class="q"><span class="qm">"</span>AI analysis unavailable</span></div>
+            <div class="msg-a">The analysis request failed. Retry from the ticket's <span class="ui">Dev Tools</span> panel.</div>
+          </div>
+        </div>
+        <div class="note" style="margin-top:24px;margin-bottom:0">
+          <div class="n-ico"><svg><use href="#ic-info"/></svg></div>
+          <div class="n-body"><b>Worth knowing:</b> a <b>"No related capture"</b> verdict does not mean there's no bug. It means the captured evidence didn't contain anything bearing on what you reported — the issue still stands.</div>
+        </div>
+      </section>
+
+      <!-- 3 -->
+      <section class="sec" id="sync">
+        <div class="sec-head">
+          <div class="sec-ico"><svg><use href="#ic-refresh"/></svg></div>
+          <div class="sec-headtext">
+            <span class="sec-num"><b>03</b> &nbsp;·&nbsp; Connection</span>
+            <h2>Sync and session issues</h2>
+          </div>
+        </div>
+        <div class="msgs">
+          <div class="msg">
+            <div class="msg-q">
+              <span class="q"><span class="qm">"</span>Retrying feedback sync…</span>
+              <span class="q"><span class="qm">"</span>Temporary sync issue. We'll retry on your next scroll or refresh</span>
+            </div>
+            <div class="msg-a">Your ticket is saved locally and Annote is reattempting the upload. Scrolling or refreshing nudges it; nothing is lost.</div>
+          </div>
+          <div class="msg">
+            <div class="msg-q"><span class="q"><span class="qm">"</span>Could not start session. Try again.</span></div>
+            <div class="msg-a">The session didn't start. Confirm you're signed in to the Annote website in this browser, then retry.</div>
+          </div>
+          <div class="msg">
+            <div class="msg-q"><span class="q" style="background:var(--primary-soft);border-color:var(--primary-soft-2);color:var(--primary-ink)">Your session ended on its own</span></div>
+            <div class="msg-a">Sessions end automatically after <b>30 minutes of inactivity</b>. Start a new one to keep capturing.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4 -->
+      <section class="sec" id="limits">
+        <div class="sec-head">
+          <div class="sec-ico"><svg><use href="#ic-gauge"/></svg></div>
+          <div class="sec-headtext">
+            <span class="sec-num"><b>04</b> &nbsp;·&nbsp; Plan</span>
+            <h2>Reaching a plan limit</h2>
+          </div>
+        </div>
+        <div class="msgs">
+          <div class="msg">
+            <div class="msg-q">
+              <span class="q"><span class="qm">"</span>You've reached your session limit</span>
+              <span class="q"><span class="qm">"</span>You've reached your monthly limit</span>
+            </div>
+            <div class="msg-a">Your workspace hit its plan's cap for the month. The owner can upgrade from the dashboard to lift it. On the free <span class="ui">Starter</span> plan the caps are <b>50 tickets</b> and <b>5 members</b>.</div>
+          </div>
+          <div class="msg">
+            <div class="msg-q"><span class="q"><span class="qm">"</span>Monthly AI limit reached</span></div>
+            <div class="msg-a">You've used this month's AI write-ups. It resets on the date shown; capture still works, just without the automatic diagnosis until then.</div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- RIGHT RAIL TOC -->
+    <aside class="rail">
+      <div class="toc-label">On this page</div>
+      <nav class="toc" aria-label="On this page">
+        <a href="#mic" data-toc="mic"><svg class="t-ico"><use href="#ic-mic"/></svg>Microphone issues<span class="t-num">01</span></a>
+        <a href="#ai" data-toc="ai"><svg class="t-ico"><use href="#ic-sparkles"/></svg>AI diagnosis<span class="t-num">02</span></a>
+        <a href="#sync" data-toc="sync"><svg class="t-ico"><use href="#ic-refresh"/></svg>Sync &amp; session<span class="t-num">03</span></a>
+        <a href="#limits" data-toc="limits"><svg class="t-ico"><use href="#ic-gauge"/></svg>Plan limits<span class="t-num">04</span></a>
+      </nav>
+      <div class="rail-foot">
+        <p>Still stuck after trying these? We're quick to respond.</p>
+        <a href="#">Contact support <svg class="arr" width="14" height="14"><use href="#ic-arr"/></svg></a>
+      </div>
+    </aside>
+
+  </div>
+</main>
+
+<script src="docs-spy.js" data-ids="mic,ai,sync,limits"></script>
+</body>
+</html>
