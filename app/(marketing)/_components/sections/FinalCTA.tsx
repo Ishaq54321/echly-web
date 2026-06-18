@@ -127,6 +127,24 @@ export function FinalCTA() {
     return () => io.disconnect();
   }, []);
 
+  // Pause the infinite decorative animations (drifting code columns + the four
+  // soft-light clouds) whenever this closing band is scrolled out of view —
+  // pure perf, no visible change. Reused inline here (rather than the shared
+  // useAnimationPause hook) because the section already owns `sectionRef`.
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const e = entries[0];
+        if (e) el.classList.toggle("mk-anim-paused", !e.isIntersecting);
+      },
+      { rootMargin: "200px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   return (
     <section className="cta" ref={sectionRef}>
       <div className="cta-wash" />

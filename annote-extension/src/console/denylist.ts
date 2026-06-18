@@ -57,11 +57,18 @@ export const CONSOLE_DENYLIST: readonly RegExp[] = Object.freeze([
   /Blocked a frame with origin/i,
   /SecurityError: Blocked a frame/i,
 
-  // Chrome extension content-script noise (ours and other extensions') — matches
-  // when the message TEXT contains the scheme. See EXTENSION_ORIGIN_PATTERN below
-  // for the SOURCE/STACK signal that catches the more common case where the
-  // scheme is only in an error's origin, not its message.
-  /chrome-extension:\/\//,
+  // NOTE (scoping fix): there is intentionally NO `chrome-extension://` MESSAGE
+  // pattern here anymore. It used to live in this list and matched the scheme
+  // ANYWHERE in a message string — which silently dropped legitimate PAGE logs and
+  // errors that merely MENTION a chrome-extension:// URL (the common real case:
+  // a browser-emitted CSP violation report naming a blocked extension resource, or
+  // a page that logs "failed to talk to extension X at chrome-extension://…").
+  // Those are real page evidence, not extension noise. The honest signal for
+  // "this came FROM an extension" is the SOURCE/STACK origin, not the message text
+  // — that is handled by EXTENSION_ORIGIN_PATTERN / isExtensionOrigin below, which
+  // recordError + the unhandledrejection path consult against an entry's `source`
+  // and `stack`. So extension-thrown errors are still filtered; page logs that
+  // happen to name the scheme are no longer collateral.
 
   // Our OWN extension's stray logs, should any reach the page realm (Fix C-lite,
   // belt-and-suspenders). Anchored to the start so only our prefixes match, not

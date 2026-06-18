@@ -29,7 +29,7 @@ import { ConsoleBuffer } from "./buffer";
 import { isDenylisted, isExtensionOrigin } from "./denylist";
 import { redact } from "./redact";
 import { serializeNode } from "./serializeElement";
-import { installCaptureGate, isCaptureEnabled } from "../shared/captureGate";
+import { installCaptureGate, isCaptureEnabled, onCaptureEnabledOnce } from "../shared/captureGate";
 import type {
   ConsoleLogEntry,
   ConsoleLogLevel,
@@ -54,17 +54,95 @@ declare global {
   if (window.__ECHLY_CONSOLE_WRAPPED__) return;
   window.__ECHLY_CONSOLE_WRAPPED__ = true;
 
-  // Capture-enabled gate. When OFF (the default — see captureGate.ts) each
-  // console wrapper calls through to previousWrap and returns with no capture,
-  // the exception/rejection listeners record nothing (but window.onerror still
-  // chains to the page's own handler), and the integrity/breaker intervals do
-  // nothing. The gate flips ON only while this tab is part of an active
-  // engagement.
-  installCaptureGate();
-
   const LEVELS: readonly ConsoleLogLevel[] = ["log", "info", "warn", "error", "debug"];
   const INTEGRITY_CHECK_INTERVAL_MS = 2000;
   const buffer = new ConsoleBuffer();
+
+  // ─── LAYER 3: document_start console PRE-BUFFER ─────────────────────────────
+  //
+  // Since Layer 1 this bundle installs at document_start — BEFORE the page's own
+  // scripts. But while the gate is OFF (the dormant default) the normal capture
+  // pipeline records nothing, so a console.log / console.error / uncaught error
+  // that fires on page load — before the user opens the tray — would still be
+  // lost the moment the buffer-fed pipeline is skipped. The pre-buffer closes
+  // that last gap: it records the EARLIEST console output + uncaught errors into
+  // a tiny, bounded, raw holding array EVEN WHILE THE GATE IS OFF, doing the
+  // absolute minimum work (push a reference + a level + a timestamp — NO
+  // stringify, NO redaction, NO serialization, NO denylist on the hot path).
+  //
+  // When the gate flips ON (engagement) we DRAIN the pre-buffer through the exact
+  // normal redaction/serialization/denylist path into the real ConsoleBuffer, so
+  // pre-engagement output is recovered with the same privacy + filtering as live
+  // capture. If the page is never engaged, the pre-buffer is simply never drained
+  // and is discarded with the realm — no persistence, no page interference.
+  //
+  // BOUNDED: hard caps on count (so a chatty dormant page can't grow it without
+  // limit) and a coarse arg-count clamp per entry. This is memory-only and never
+  // touches the page, so the dormancy guarantee (no PAGE interference) holds — the
+  // page's console calls still pass through to the real console identically; we
+  // only hold a bounded shadow copy of what was logged.
+  const PREBUFFER_MAX_LOGS = 100;
+  const PREBUFFER_MAX_EXCEPTIONS = 50;
+  const PREBUFFER_MAX_ARGS_PER_ENTRY = 12;
+  type PreLog = { level: ConsoleLogLevel; args: unknown[]; timestamp: number };
+  type PreException = {
+    message: string;
+    stack: string | null;
+    source: string | null;
+    line: number | null;
+    column: number | null;
+    type: ExceptionType;
+    timestamp: number;
+  };
+  let preLogs: PreLog[] | null = [];
+  let preExceptions: PreException[] | null = [];
+  let preBufferDrained = false;
+
+  /** Push a raw console call into the pre-buffer (gate OFF, pre-engagement). Minimal work. */
+  function preBufferLog(level: ConsoleLogLevel, args: unknown[]): void {
+    const pb = preLogs;
+    if (!pb || pb.length >= PREBUFFER_MAX_LOGS) return;
+    // Hold at most N arg references; slicing bounds the retained graph breadth.
+    // We do NOT stringify here — that's deferred to drain time so the dormant
+    // hot path stays trivially cheap.
+    const held = args.length > PREBUFFER_MAX_ARGS_PER_ENTRY ? args.slice(0, PREBUFFER_MAX_ARGS_PER_ENTRY) : args;
+    try {
+      pb.push({ level, args: held, timestamp: Date.now() });
+    } catch {
+      // swallow — never throw from a console wrapper
+    }
+  }
+
+  /** Push an early uncaught error/rejection into the pre-buffer (gate OFF). Minimal work. */
+  function preBufferException(e: PreException): void {
+    const pb = preExceptions;
+    if (!pb || pb.length >= PREBUFFER_MAX_EXCEPTIONS) return;
+    try {
+      pb.push(e);
+    } catch {
+      // swallow
+    }
+  }
+
+  // Capture-enabled gate. When OFF (the default — see captureGate.ts) each
+  // console wrapper calls through to previousWrap and returns with no live
+  // capture (it only feeds the bounded pre-buffer above), the exception/rejection
+  // listeners feed the pre-buffer too (but window.onerror still chains to the
+  // page's own handler), and the integrity/breaker intervals do nothing. The gate
+  // flips ON only while this tab is part of an active engagement.
+  installCaptureGate();
+
+  // Drain the pre-buffer through the live pipeline the first time the gate turns
+  // ON. Registered before the wrappers install so an enable that races install
+  // (the SW broadcast vs. document_start) still drains. drainPreBuffer is defined
+  // below (hoisted) and is a one-shot via onCaptureEnabledOnce + preBufferDrained.
+  onCaptureEnabledOnce(() => {
+    try {
+      drainPreBuffer();
+    } catch {
+      // swallow — recovery of pre-engagement evidence must never break capture.
+    }
+  });
 
   // Wrapper functions we install. Keyed by level so the integrity check can
   // compare window.console[level] against the one we put there. If something
@@ -385,17 +463,21 @@ declare global {
           }
           return undefined;
         }
-        // GATE OFF → no capture. Skip captureLevel entirely (no stringify, no
-        // redact, no queued microtask, no buffer write) and fall straight
-        // through to the previousWrap callthrough below — which is the exact
-        // native-equivalent behavior that delivers the log to the real console.
-        // The page sees an ordinary console call.
+        // GATE ON → live capture. GATE OFF → feed the Layer 3 pre-buffer with the
+        // minimum possible work (hold arg refs + level + ts, no stringify/redact/
+        // microtask/buffer write), then fall straight through to previousWrap —
+        // the exact native-equivalent behavior that delivers the log to the real
+        // console. Either way the page sees an ordinary console call; the OFF path
+        // adds only a bounded array push (no-op once the cap is hit, and a no-op
+        // after the pre-buffer is drained-and-freed on engagement).
         if (isCaptureEnabled()) {
           try {
             captureLevel(level, args);
           } catch {
             // never throw from the wrapper
           }
+        } else if (preLogs) {
+          preBufferLog(level, args);
         }
         const prev = previousWrap[level];
         if (typeof prev !== "function") return undefined;
@@ -505,6 +587,7 @@ declare global {
     source: string | null,
     line: number | null,
     column: number | null,
+    timestamp?: number,
   ): void {
     try {
       // Drop extension-originated exceptions before they reach the buffer. The
@@ -521,7 +604,7 @@ declare global {
       const key = `${message}|${source ?? ""}|${line ?? ""}|${column ?? ""}`;
       if (isDuplicateError(key)) return;
       const entry: ExceptionEntry = {
-        timestamp: Date.now(),
+        timestamp: typeof timestamp === "number" ? timestamp : Date.now(),
         message,
         stack,
         source,
@@ -535,19 +618,129 @@ declare global {
     }
   }
 
+  // ─── LAYER 3 drain ──────────────────────────────────────────────────────────
+  // Runs once, on the first OFF→ON gate transition (via onCaptureEnabledOnce). Pulls
+  // every raw entry collected before engagement through the SAME stringify →
+  // denylist → redact pipeline as live capture, then frees the pre-buffer arrays so
+  // the wrappers' OFF path (which now can't run again — gate is ON) and memory both
+  // drop the holding references. Ordering by timestamp interleaves logs +
+  // exceptions in the order they actually happened on the page.
+  function drainPreBuffer(): void {
+    if (preBufferDrained) return;
+    preBufferDrained = true;
+    const logs = preLogs;
+    const exceptions = preExceptions;
+    // Null them out FIRST so any (defensive) re-entrancy can't double-drain, and so
+    // the retained arg-graph references are released as soon as we finish.
+    preLogs = null;
+    preExceptions = null;
+
+    if (exceptions) {
+      for (const e of exceptions) {
+        try {
+          if (e.type === "unhandledrejection") {
+            // Rejection: apply the same extension-origin filter + redaction as the
+            // live unhandledrejection path, preserving type:"unhandledrejection".
+            // (recordError forces type:"error", so we DON'T route rejections through
+            // it — that would mislabel severity.)
+            const msg = redact(e.message || "");
+            const stack = e.stack ? redact(e.stack) : null;
+            if (isExtensionOrigin(stack) || isExtensionOrigin(msg)) continue;
+            buffer.addException({
+              timestamp: e.timestamp,
+              message: msg,
+              stack,
+              source: null,
+              line: null,
+              column: null,
+              type: "unhandledrejection",
+            });
+          } else {
+            // Uncaught error: same extension-origin filter + redaction + dedup as the
+            // live error/onerror path. recordError stamps type:"error". Preserve the
+            // original fire time (not drain time) so the timeline stays accurate.
+            recordError(
+              redact(e.message || ""),
+              e.stack ? redact(e.stack) : null,
+              e.source ? redact(e.source) : null,
+              e.line,
+              e.column,
+              e.timestamp,
+            );
+          }
+        } catch {
+          // swallow — one bad pre-buffered exception must not abort the drain.
+        }
+      }
+    }
+
+    if (logs) {
+      for (const pre of logs) {
+        try {
+          // Resource-load-failure marker: re-emit with the same shape + kind the
+          // live capture-phase listener uses, redacting the URL now.
+          const first = pre.args[0] as { __echlyResourceFailure?: boolean; tagName?: string; url?: string } | undefined;
+          if (first && first.__echlyResourceFailure === true && typeof first.url === "string") {
+            buffer.addLog({
+              timestamp: pre.timestamp,
+              level: "error",
+              message: `Failed to load resource: <${first.tagName || "resource"}> ${redact(first.url)}`,
+              source: safeLocationHref(),
+              kind: "resource-load-failure",
+            });
+            continue;
+          }
+          // Ordinary console call: stringify → denylist → redact, mirroring captureLevel.
+          let stringifiedArgs: string[];
+          try {
+            stringifiedArgs = pre.args.map(stringifyArg);
+          } catch {
+            continue;
+          }
+          const joined = stringifiedArgs.join(" ");
+          if (isDenylisted(joined)) continue;
+          let redactedMessage: string;
+          let redactedArgs: string[];
+          try {
+            redactedMessage = redact(joined);
+            redactedArgs = stringifiedArgs.map(redact);
+          } catch {
+            continue;
+          }
+          buffer.addLog({
+            timestamp: pre.timestamp,
+            level: pre.level,
+            message: redactedMessage,
+            args: redactedArgs,
+            source: safeLocationHref(),
+          });
+        } catch {
+          // swallow — one bad pre-buffered entry must not abort the drain.
+        }
+      }
+    }
+  }
+
   window.addEventListener("error", (event) => {
-    // GATE OFF → observe nothing. This is a passive listener (it never calls
-    // preventDefault), so the page's error handling is unaffected either way; we
-    // simply skip recording when disabled.
-    if (!isCaptureEnabled()) return;
+    // Passive listener (never calls preventDefault), so the page's error handling
+    // is unaffected regardless of gate state.
+    //   GATE ON  → record live via recordError (redacted, deduped).
+    //   GATE OFF → push RAW into the Layer 3 pre-buffer (no redaction yet) so a
+    //              page-load-time uncaught error is recovered when the user later
+    //              engages. Drain redacts it through the same recordError path.
+    // event.target === window distinguishes a JS uncaught error from an element
+    // resource-load failure (handled by the capture-phase listener below).
     try {
-      const message = redact(event.message || "");
-      const stack =
-        event.error && typeof event.error.stack === "string" ? redact(event.error.stack) : null;
-      const source = event.filename ? redact(event.filename) : null;
+      const message = event.message || "";
+      const stack = event.error && typeof event.error.stack === "string" ? event.error.stack : null;
+      const source = event.filename || null;
       const line = typeof event.lineno === "number" ? event.lineno : null;
       const column = typeof event.colno === "number" ? event.colno : null;
-      recordError(message, stack, source, line, column);
+      if (isCaptureEnabled()) {
+        recordError(redact(message), stack ? redact(stack) : null, source ? redact(source) : null, line, column);
+      } else if (preExceptions) {
+        preBufferException({ message, stack, source, line, column, type: "error", timestamp: Date.now() });
+      }
     } catch {
       // swallow
     }
@@ -576,9 +769,11 @@ declare global {
   window.addEventListener(
     "error",
     (event) => {
-      // GATE OFF → observe nothing. Passive capture-phase listener; the page is
-      // unaffected either way.
-      if (!isCaptureEnabled()) return;
+      // Passive capture-phase listener; the page is unaffected by gate state.
+      //   GATE ON  → write the synthetic "Failed to load resource" log live.
+      //   GATE OFF → pre-buffer it (Layer 3) so a broken <img>/<script> on page
+      //              load is recovered at engagement. The drain re-emits it via
+      //              the same buffer.addLog path with full redaction.
       try {
         const target = event.target as unknown;
         // Uncaught JS errors arrive with target === window and are handled by
@@ -595,7 +790,8 @@ declare global {
               : "";
         if (!rawUrl) return;
         // Reuse the noise gates: never record our own extension's resources;
-        // respect the console denylist.
+        // respect the console denylist. (Dedup-by-URL state is shared across the
+        // OFF/ON paths so a resource that fails pre- and post-engagement records once.)
         if (isExtensionOrigin(rawUrl)) return;
         if (isDenylisted(rawUrl)) return;
         if (
@@ -605,12 +801,26 @@ declare global {
           return;
         }
         seenResourceFailureUrls.add(rawUrl);
-        buffer.addLog({
-          timestamp: Date.now(),
-          level: "error",
-          message: `Failed to load resource: <${tagName.toLowerCase()}> ${redact(rawUrl)}`,
-          source: safeLocationHref(),
-        });
+        if (isCaptureEnabled()) {
+          buffer.addLog({
+            timestamp: Date.now(),
+            level: "error",
+            message: `Failed to load resource: <${tagName.toLowerCase()}> ${redact(rawUrl)}`,
+            source: safeLocationHref(),
+            kind: "resource-load-failure",
+          });
+        } else if (preLogs && preLogs.length < PREBUFFER_MAX_LOGS) {
+          // Stash a pre-formed resource-failure marker. Drain redacts the URL and
+          // re-emits with the same message shape + kind. Using a private wrapper
+          // object lets drain recognize it without re-classifying. Bounded by both
+          // the seenResourceFailureUrls cap (≤50 distinct URLs) AND the pre-buffer
+          // cap, so a dormant page can never grow it without limit.
+          preLogs.push({
+            level: "error",
+            args: [{ __echlyResourceFailure: true, tagName: tagName.toLowerCase(), url: rawUrl }],
+            timestamp: Date.now(),
+          });
+        }
       } catch {
         // swallow — never let resource-error capture break the page
       }
@@ -636,24 +846,26 @@ declare global {
       colno?: number,
       error?: Error,
     ): boolean {
-      // GATE OFF → record nothing, but ALWAYS still chain to the page's own
-      // previous handler below. The page assigned window.onerror expecting its
-      // handler to run; skipping the chain would change observable behavior. So
-      // we gate only OUR recording, never the passthrough.
-      if (isCaptureEnabled()) {
-        try {
-          const msgStr = typeof message === "string" ? message : "";
-          const redMessage = redact(msgStr || "");
-          const stack = error && typeof error.stack === "string" ? redact(error.stack) : null;
-          const redSource = source ? redact(source) : null;
-          const line = typeof lineno === "number" ? lineno : null;
-          const column = typeof colno === "number" ? colno : null;
+      // ALWAYS chain to the page's own previous handler below regardless of gate
+      // state — the page assigned window.onerror expecting its handler to run.
+      //   GATE ON  → record live (deduped against the addEventListener path).
+      //   GATE OFF → pre-buffer the earliest uncaught errors (Layer 3) so an error
+      //              thrown on page load is recovered at engagement. We pre-buffer
+      //              RAW; drain redacts + dedups through the same recordError path.
+      try {
+        const msgStr = typeof message === "string" ? message : "";
+        const stack = error && typeof error.stack === "string" ? error.stack : null;
+        const line = typeof lineno === "number" ? lineno : null;
+        const column = typeof colno === "number" ? colno : null;
+        if (isCaptureEnabled()) {
           // Deduped against the addEventListener("error") path — for a normal
           // uncaught error that fires both, only the first records.
-          recordError(redMessage, stack, redSource, line, column);
-        } catch {
-          // swallow — never break the page's error handling.
+          recordError(redact(msgStr || ""), stack ? redact(stack) : null, source ? redact(source) : null, line, column);
+        } else if (preExceptions) {
+          preBufferException({ message: msgStr, stack, source: source || null, line, column, type: "error", timestamp: Date.now() });
         }
+      } catch {
+        // swallow — never break the page's error handling.
       }
       if (previousOnError) {
         try {
@@ -680,8 +892,11 @@ declare global {
   }
 
   window.addEventListener("unhandledrejection", (event) => {
-    // GATE OFF → observe nothing. Passive listener; the page is unaffected.
-    if (!isCaptureEnabled()) return;
+    // Passive listener; the page is unaffected by gate state.
+    //   GATE ON  → record live.
+    //   GATE OFF → pre-buffer (Layer 3) so a rejection on page load is recovered
+    //              at engagement. Pre-buffer RAW; drain applies the same extension-
+    //              origin filter + redaction.
     try {
       const reason = event.reason as unknown;
       let message = "";
@@ -698,22 +913,26 @@ declare global {
           message = String(reason);
         }
       }
-      // Drop extension-originated rejections (e.g. our widget's own
-      // chrome-extension:// "Failed to fetch") before buffering — the stack
-      // frames carry the chrome-extension:// origin even when the message does
-      // not. Mirrors recordError's guard for the error/onerror paths. SCHEME
-      // only — never filters a same-origin page rejection on annote.ai.
-      if (isExtensionOrigin(stack) || isExtensionOrigin(message)) return;
-      const entry: ExceptionEntry = {
-        timestamp: Date.now(),
-        message: redact(message || ""),
-        stack: stack ? redact(stack) : null,
-        source: null,
-        line: null,
-        column: null,
-        type: "unhandledrejection",
-      };
-      buffer.addException(entry);
+      if (isCaptureEnabled()) {
+        // Drop extension-originated rejections (e.g. our widget's own
+        // chrome-extension:// "Failed to fetch") before buffering — the stack
+        // frames carry the chrome-extension:// origin even when the message does
+        // not. Mirrors recordError's guard for the error/onerror paths. SCHEME
+        // only — never filters a same-origin page rejection on annote.ai.
+        if (isExtensionOrigin(stack) || isExtensionOrigin(message)) return;
+        const entry: ExceptionEntry = {
+          timestamp: Date.now(),
+          message: redact(message || ""),
+          stack: stack ? redact(stack) : null,
+          source: null,
+          line: null,
+          column: null,
+          type: "unhandledrejection",
+        };
+        buffer.addException(entry);
+      } else if (preExceptions) {
+        preBufferException({ message, stack, source: null, line: null, column: null, type: "unhandledrejection", timestamp: Date.now() });
+      }
     } catch {
       // swallow
     }

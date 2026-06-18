@@ -51,10 +51,34 @@ describe("isDenylisted() — our own widget log prefixes", () => {
   });
 });
 
-describe("isDenylisted() — chrome-extension:// in message text", () => {
-  it("matches when the scheme appears anywhere in the message", () => {
+describe("isDenylisted() — chrome-extension:// in message text (scoping fix)", () => {
+  // SCOPING FIX: a chrome-extension:// scheme appearing in the MESSAGE text must
+  // NOT cause the entry to be dropped — that silently lost legitimate page logs/
+  // errors that merely mention an extension URL (e.g. a browser CSP violation
+  // report, or a page that logs about talking to an extension). The honest
+  // extension signal is the SOURCE/STACK origin (isExtensionOrigin), not the
+  // message text. So these are now NOT denylisted by message.
+  it("does NOT drop a page log that mentions a chrome-extension:// URL", () => {
     assert.equal(
       isDenylisted("Failed to load chrome-extension://abc/widget.js"),
+      false,
+    );
+  });
+
+  it("does NOT drop a CSP violation report naming a chrome-extension:// resource", () => {
+    assert.equal(
+      isDenylisted(
+        "Refused to load the script 'chrome-extension://abc/inject.js' because it violates the Content Security Policy directive",
+      ),
+      false,
+    );
+  });
+
+  it("still drops our own [Annote]-prefixed lines regardless of an extension URL in them", () => {
+    // The first-party prefix anchor is the mechanism that filters OUR logs, and it
+    // still applies even when the line also contains a chrome-extension:// URL.
+    assert.equal(
+      isDenylisted("[Annote] something about chrome-extension://abc/x.js"),
       true,
     );
   });

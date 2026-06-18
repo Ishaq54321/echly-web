@@ -88,12 +88,15 @@ const MESSAGE_CHAR_BUDGET = 800;
  */
 const TIMELINE_CHAR_BUDGET = 11_000;
 /**
- * Cap on how many anchors we build windows around. Dedup collapses cascades
- * BEFORE this cap applies, so the slots go to DISTINCT faults ranked by
- * diagnostic priority (exceptions > network faults > console errors > slow
- * requests), newest-first within a tier.
+ * Cap on how many WEAK (slow-but-successful, non-fault) anchors we build windows
+ * around. There is deliberately NO cap on FAULT anchors (exceptions, network
+ * faults, console errors): a confirmed fault is never de-selected to make room
+ * for anything. Dedup collapses cascades BEFORE selection, so the surviving
+ * faults are DISTINCT — keeping them all is the point. Slow requests are weak
+ * performance evidence (the noise tier of the anchor set), so they keep a cap,
+ * newest-first; they never displace a fault.
  */
-const MAX_ANCHORS = 8;
+const MAX_SLOW_ANCHORS = 4;
 /** Description is capped separately so a huge body can't crowd out the report. */
 const DESCRIPTION_CHAR_BUDGET = 2_000;
 /**
@@ -124,6 +127,16 @@ const PRIORITY_EXCEPTION = 4;
 const PRIORITY_NETWORK_FAULT = 3;
 const PRIORITY_CONSOLE_ERROR = 2;
 const PRIORITY_SLOW_REQUEST = 1;
+
+/**
+ * A fault anchor is a CONFIRMED fault — exception, network fault, or console
+ * error (priority ≥ console-error). A slow-but-successful request (priority
+ * below that) is a weak, non-fault anchor. The fault invariant protects the
+ * former from being de-selected or budget-trimmed in favour of any non-fault.
+ */
+function isFaultAnchor(entry: TimelineEntry): boolean {
+  return entry.isAnchor && entry.anchorPriority >= PRIORITY_CONSOLE_ERROR;
+}
 
 interface TimelineEntry {
   source: TimelineSource;
@@ -474,8 +487,13 @@ function renderSlowRequestSummary(feedback: AnalyzableFeedback): string | null {
 /**
  * Honest statement of the capture window's bounds. When the prior-ticket
  * watermark cut applies (captureWindowStartAt stamped at file time), the model
- * must know the window BEGINS there — "no signals" on such a ticket means "none
- * since the prior ticket", not "none at all".
+ * must know the USER-ACTIONS list BEGINS there — "no actions" on such a ticket
+ * means "none since the prior ticket", not "none at all".
+ *
+ * The stamp is scoped to user actions ONLY: actions are an event stream that is
+ * partitioned per ticket, so earlier actions were filed with the prior ticket.
+ * Console / exceptions / network are ambient snapshots of the live buffer at file
+ * time and are NOT truncated to this window — so the note must not claim they are.
  */
 function captureWindowNote(feedback: AnalyzableFeedback): string | null {
   if (typeof feedback.captureWindowStartAt !== "number") return null;
@@ -485,8 +503,9 @@ function captureWindowNote(feedback: AnalyzableFeedback): string | null {
       ? ` (~${Math.round((filedAt - feedback.captureWindowStartAt) / 1000)}s before this ticket was filed)`
       : "";
   return (
-    `NOTE: the captured window BEGINS after a prior ticket was filed from the same browsing session${span}. ` +
-    `Anything that happened before that prior ticket is not in view here — it was filed with that ticket, not lost.`
+    `NOTE: the USER-ACTIONS list begins after a prior ticket was filed from the same browsing session${span}. ` +
+    `Actions before that prior ticket were filed with that ticket, not lost. ` +
+    `This bound applies to user actions only — the console, exceptions, and network shown here are a snapshot of the live buffer at file time and may overlap with prior tickets.`
   );
 }
 
@@ -619,30 +638,28 @@ function inWindow(ts: number, anchorTs: number): boolean {
 }
 
 /**
- * Select the MAX_ANCHORS most diagnostic anchors, then keep entries within the
+ * Select the anchors to build windows around, then keep entries within the
  * asymmetric −LOOKBACK/+LOOKAHEAD band of one of THOSE anchors; preserve
  * chronological order.
  *
- * Cascades are already collapsed by dedupeAnchorCascades, so the slots here go
- * to DISTINCT signals: ranked by priority (exception > network fault > console
- * error > slow request), then newest within a tier.
+ * Fault invariant: EVERY fault anchor (exception, network fault, console error)
+ * is selected — confirmed faults are never dropped at selection. Only the weak,
+ * non-fault slow-request anchors are capped (MAX_SLOW_ANCHORS, newest-first),
+ * and they never displace a fault. Cascades are already collapsed by
+ * dedupeAnchorCascades, so the surviving fault anchors are DISTINCT.
  */
 function windowAroundAnchors(timeline: TimelineEntry[]): TimelineEntry[] {
   const anchors = timeline.filter((e) => e.isAnchor);
   if (anchors.length === 0) return [];
 
-  const selected =
-    anchors.length <= MAX_ANCHORS
-      ? anchors
-      : [...anchors]
-          .sort((a, b) => {
-            if (a.anchorPriority !== b.anchorPriority) {
-              return b.anchorPriority - a.anchorPriority; // higher priority first
-            }
-            return b.ts - a.ts; // newest first within a tier
-          })
-          .slice(0, MAX_ANCHORS);
+  const faultAnchors = anchors.filter(isFaultAnchor);
+  const slowAnchors = anchors.filter((e) => !isFaultAnchor(e));
+  const selectedSlow =
+    slowAnchors.length <= MAX_SLOW_ANCHORS
+      ? slowAnchors
+      : [...slowAnchors].sort((a, b) => b.ts - a.ts).slice(0, MAX_SLOW_ANCHORS);
 
+  const selected = [...faultAnchors, ...selectedSlow];
   const selectedSet = new Set(selected);
   const anchorTs = selected.map((e) => e.ts);
   return timeline.filter(
@@ -664,6 +681,12 @@ interface RenderedBlock {
   tier: number;
   /** Tie-break weight WITHIN a tier — stronger signal admitted first. */
   weight: number;
+  /**
+   * Confirmed-fault block (exception / network fault / console error). Admitted
+   * unconditionally — a fault is never dropped for budget while any non-fault
+   * block competes, and faults jump the budget if they alone exceed it.
+   */
+  protected: boolean;
 }
 
 /**
@@ -672,22 +695,33 @@ interface RenderedBlock {
  * The trap this avoids: when proximity-to-an-anchor marks a whole dense early
  * region as "context", a chronological fill can spend the entire budget there and
  * truncate a later-but-stronger anchor (e.g. the uncaught exception) right out.
- * So we admit in tiers — every anchor ENTRY first (strongest signal first), then
- * the neighbouring trigger context, then the remainder — and only drop from the
- * low-signal tail. The kept set is re-sorted into chronological order before
- * joining, so the model still reads a coherent timeline. Whole entries only —
- * never cut a block mid-way (which would feed the model a garbled line).
+ * So we admit in two stages. First the CONFIRMED FAULTS, unconditionally — a
+ * fault is never dropped for budget while any non-fault competes, and if faults
+ * alone exceed the budget they still all go in (the prompt grows to hold them;
+ * the fault count is bounded upstream by the capture/write caps). Then the
+ * remainder — slow anchors, neighbouring trigger context, low-signal tail — by
+ * tier/weight within whatever budget is left. The kept set is re-sorted into
+ * chronological order before joining, so the model still reads a coherent
+ * timeline. Whole entries only — never cut a block mid-way.
  */
 function fitBlocksToBudget(blocks: RenderedBlock[], maxChars: number): string {
   const kept = new Set<number>();
   let used = 0;
-  // Admit tier 0 (anchors) → tier 1 (neighbours) → tier 2 (rest); within a tier,
-  // higher weight first so the strongest signal wins the last few chars of budget.
-  const byPriority = [...blocks].sort((a, b) =>
-    a.tier !== b.tier ? a.tier - b.tier : b.weight - a.weight
-  );
-  for (const b of byPriority) {
-    const cost = b.text.length + 1; // +1 for the joining newline
+  // Stage 1: every protected (fault) block, regardless of budget.
+  for (const b of blocks) {
+    if (!b.protected) continue;
+    kept.add(b.order);
+    used += b.text.length + 1; // +1 for the joining newline
+  }
+  // Stage 2: the rest by tier 0 (slow anchors) → 1 (neighbours) → 2 (tail);
+  // within a tier, higher weight first so the strongest signal wins the last
+  // few chars. Once the budget is spent (possibly already by faults), the
+  // low-signal tail is what's dropped — never a fault.
+  const rest = blocks
+    .filter((b) => !b.protected)
+    .sort((a, b) => (a.tier !== b.tier ? a.tier - b.tier : b.weight - a.weight));
+  for (const b of rest) {
+    const cost = b.text.length + 1;
     if (used + cost > maxChars) continue; // skip this one, keep trying smaller later ones
     kept.add(b.order);
     used += cost;
@@ -726,7 +760,10 @@ function renderTimeline(kept: TimelineEntry[]): string {
     // console error > slow request); neighbours/others rank by recency (the
     // trigger sits just before the fault).
     const weight = e.isAnchor ? e.anchorPriority : e.ts;
-    return { order, text: `t+${rel}ms ${e.render()}`, tier, weight };
+    // Confirmed faults are protected: admitted ahead of (and never evicted for)
+    // any non-fault. Slow-but-successful anchors are NOT protected — they're the
+    // weak/noise tier and yield to the budget like neighbours.
+    return { order, text: `t+${rel}ms ${e.render()}`, tier, weight, protected: isFaultAnchor(e) };
   });
   return fitBlocksToBudget(blocks, TIMELINE_CHAR_BUDGET);
 }

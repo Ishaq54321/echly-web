@@ -79,6 +79,55 @@ let captureEnabled = false;
 let gateInstalled = false;
 
 /**
+ * One-shot OFF→ON transition subscribers. Registered by a bundle (console pre-
+ * buffer drain — Layer 3; resource-timing replay — Layer 2) that needs to run
+ * work exactly when this tab first becomes engaged. Each fires AT MOST ONCE: the
+ * pre-engagement evidence drain/replay is a one-time recovery, not a per-toggle
+ * action (a pause→resume mid-engagement must NOT re-drain a now-empty pre-buffer
+ * or re-replay the same resource-timing entries). Fired synchronously the first
+ * time the gate goes from OFF to ON. Never throws out to the gate's message
+ * handler — a subscriber that throws is swallowed so it can't break the gate.
+ */
+const onEnabledOnceSubs: Array<() => void> = [];
+let firedEnabledOnce = false;
+
+/**
+ * Register a callback to run exactly once, the first time capture transitions
+ * OFF→ON in this realm. If the gate is ALREADY on when you subscribe (a late
+ * subscriber after the enable broadcast already landed), the callback runs
+ * synchronously right now. Safe to call from bundle init. Never throws.
+ */
+export function onCaptureEnabledOnce(cb: () => void): void {
+  if (typeof cb !== "function") return;
+  if (firedEnabledOnce && captureEnabled === true) {
+    // Already engaged — run immediately so a late subscriber still recovers the
+    // pre-engagement evidence.
+    try {
+      cb();
+    } catch {
+      // swallow — a faulty subscriber must never break capture.
+    }
+    return;
+  }
+  onEnabledOnceSubs.push(cb);
+}
+
+/** Fire the one-shot OFF→ON subscribers. Idempotent; drains the list. */
+function fireEnabledOnce(): void {
+  if (firedEnabledOnce) return;
+  firedEnabledOnce = true;
+  // Copy + clear first so a subscriber that (re-)subscribes can't loop.
+  const subs = onEnabledOnceSubs.splice(0, onEnabledOnceSubs.length);
+  for (const cb of subs) {
+    try {
+      cb();
+    } catch {
+      // swallow — one bad subscriber must not starve the others or break the gate.
+    }
+  }
+}
+
+/**
  * Read the current capture-enabled state. Called by every MAIN-world wrapper on
  * EVERY invocation — must be a trivial, synchronous, allocation-free read so the
  * disabled passthrough adds no measurable latency over the native call.
@@ -103,10 +152,21 @@ export function installCaptureGate(): void {
 
   try {
     window.addEventListener("message", (event) => {
-      // Same hardening as the existing snapshot bridges: same-window +
-      // same-origin only, so a foreign frame cannot forge a control message
-      // that toggles capture on. Empty origin is allowed for transitional
-      // same-window documents (matches the bridge listeners).
+      // ── DORMANT-PAGE HOT PATH (load-bearing) ──────────────────────────────
+      // Since Layer 1 (declarative MAIN install at document_start) this listener
+      // now runs on EVERY page — including never-engaged ones — for EVERY
+      // postMessage the host fires. On postMessage-saturated SPAs (LinkedIn fires
+      // thousands during load) this is squarely the listener that the LinkedIn
+      // load-blocking fix was about. So it MUST early-exit on the very first,
+      // cheapest comparison before touching `event.data` (reading it can force a
+      // structured-clone deserialization of a large foreign payload):
+      //   1. `event.source !== window` — an identity compare, no deserialization,
+      //      rejects every cross-frame/iframe/embed message (the bulk of LinkedIn's
+      //      traffic) immediately.
+      //   2. origin compare — still no `event.data` read.
+      // Only AFTER both pass do we touch `event.data`. Same discipline as the
+      // sessionRelay / console-network-actions snapshot bridges. Do not reorder
+      // these or hoist a `const data = event.data` above the source check.
       if (event.source !== window) return;
       if (event.origin !== "" && event.origin !== window.origin) return;
       const data = event.data;
@@ -116,7 +176,13 @@ export function installCaptureGate(): void {
       if (typed.type !== CAPTURE_GATE_SET) return;
       // Strict boolean coercion: only an explicit `true` enables capture; every
       // other value (undefined, "true", 1, null) resolves to false. Fail-safe.
-      captureEnabled = typed.enabled === true;
+      const next = typed.enabled === true;
+      const wasOff = captureEnabled !== true;
+      captureEnabled = next;
+      // First OFF→ON transition: fire the one-shot subscribers (Layer 3 console
+      // pre-buffer drain, Layer 2 resource-timing replay). Guarded by fireEnabledOnce's
+      // own idempotency, so a later pause→resume can't re-fire them.
+      if (next && wasOff) fireEnabledOnce();
     });
   } catch {
     // Page blocked addEventListener — leave captureEnabled at its OFF default.

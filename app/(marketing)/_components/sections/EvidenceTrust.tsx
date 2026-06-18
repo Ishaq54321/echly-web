@@ -473,7 +473,6 @@ export function EvidenceTrust() {
   return (
     <section className="pv">
       <div className="pv-grid" />
-      <div className="pv-glow" />
       <div className="pv-wrap">
         <div className="pv-split">
           {/* LEFT : copy */}
@@ -917,6 +916,24 @@ export function AiDiagnosisCard() {
       io.disconnect();
       cleanup();
     };
+  }, []);
+
+  // Pause the infinite drifting flag-code columns (and the card's idle shimmer
+  // loops) whenever this flagship band is scrolled out of view — pure perf, no
+  // visible change. Separate from the one-shot "light + run diagnosis" observer
+  // above (which disconnects after firing); this one lives for the page.
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const e = entries[0];
+        if (e) el.classList.toggle("mk-anim-paused", !e.isIntersecting);
+      },
+      { rootMargin: "200px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
   }, []);
 
   // Tabbed evidence panel — AI · Console · Network · Actions. A port of the

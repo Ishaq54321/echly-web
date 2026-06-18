@@ -386,6 +386,16 @@ function ContentApp({ widgetRoot }: ContentAppProps) {
   const [isProcessingFeedback, setIsProcessingFeedback] = React.useState(false);
   /** Job queue for concurrent feedback captures; each job shows its own Processing/failed card in the tray. */
   const [feedbackJobs, setFeedbackJobs] = React.useState<FeedbackJob[]>([]);
+  /** Pending 20s auto-dismiss timers for failed jobs, keyed by jobId. Cleared on unmount so a
+   *  closed tray never fires a stale setFeedbackJobs (avoids a leak / warning). */
+  const failedJobDismissTimersRef = React.useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  React.useEffect(() => {
+    const timers = failedJobDismissTimersRef.current;
+    return () => {
+      for (const t of timers.values()) clearTimeout(t);
+      timers.clear();
+    };
+  }, []);
   /** When POST /api/feedback returns 403 PLAN_LIMIT_REACHED (ticket limit), show upgrade screens. */
   const [feedbackLimitReached, setFeedbackLimitReached] = React.useState<{
     message: string;
@@ -1058,6 +1068,7 @@ function ContentApp({ widgetRoot }: ContentAppProps) {
             upgradePlan: (err as Error & { upgradePlan?: string }).upgradePlan ?? "business",
           });
         } else if (jobId) {
+          const failedJobId = jobId;
           const failMsg =
             err instanceof Error
               ? err.message.startsWith("API_ERROR_")
@@ -1065,8 +1076,19 @@ function ContentApp({ widgetRoot }: ContentAppProps) {
                 : err.message
               : "AI processing failed.";
           setFeedbackJobs((prev) =>
-            prev.map((j) => (j.id === jobId ? { ...j, status: "failed" as const, errorMessage: failMsg } : j))
+            prev.map((j) => (j.id === failedJobId ? { ...j, status: "failed" as const, errorMessage: failMsg } : j))
           );
+          // Auto-dismiss this failed card after 20s. The local entry wins the merge over the
+          // self-cleaning background copy (see mergedFeedbackJobs), so without this the error
+          // would render forever. Keyed by failedJobId — successful tickets are removed on
+          // success above and never enter this path. Timer tracked for unmount cleanup.
+          const existing = failedJobDismissTimersRef.current.get(failedJobId);
+          if (existing) clearTimeout(existing);
+          const timer = setTimeout(() => {
+            failedJobDismissTimersRef.current.delete(failedJobId);
+            setFeedbackJobs((prev) => prev.filter((j) => j.id !== failedJobId));
+          }, 20000);
+          failedJobDismissTimersRef.current.set(failedJobId, timer);
         }
         callbacks?.onError?.();
         throw err;

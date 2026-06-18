@@ -383,7 +383,17 @@ export function NetworkTabContent({
     const q = search.trim().toLowerCase();
     return indexedAll.filter(({ entry: e }) => {
       if (filters.errorsOnly && !isErrorish(e)) return false;
-      if (filters.sources.size > 0 && !filters.sources.has(e.source)) return false;
+      // The source filter only exposes "fetch"/"xhr" chips. Entries from the
+      // pre-instrumentation recovery layers ("resource-timing", "beacon") have no
+      // chip, so they must NOT be excluded by an active fetch/xhr filter — only
+      // apply the membership test to the two filterable sources.
+      if (
+        filters.sources.size > 0 &&
+        (e.source === "fetch" || e.source === "xhr") &&
+        !filters.sources.has(e.source)
+      ) {
+        return false;
+      }
       if (filters.doc && !isDocLike(e)) return false;
       if (q && !e.url.toLowerCase().includes(q)) return false;
       return true;

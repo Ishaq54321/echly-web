@@ -403,6 +403,70 @@ test("no-anchor wrong-data ticket: the action-correlated 2xx body reaches the co
   assert.doesNotMatch(contextText, /uncorrelated-body/);
 });
 
+// ── Fault invariant: no fault de-selected or budget-trimmed for noise ─────────
+
+test("more than 8 DISTINCT faults all reach the timeline (no anchor cap drops faults)", () => {
+  // 12 distinct console errors — formerly only 8 anchors survived selection.
+  const faults = Array.from({ length: 12 }, (_, i) =>
+    makeConsoleError({ timestamp: T0 + i * 400, message: `Distinct error number ${i}` })
+  );
+  const { contextText, hasAnchors } = assembleAnalysisContext(baseTicket({ consoleLogs: faults }));
+  assert.equal(hasAnchors, true);
+  for (let i = 0; i < 12; i++) {
+    assert.match(contextText, new RegExp(`Distinct error number ${i}\\b`), `fault ${i} missing`);
+  }
+});
+
+test("a fault is never dropped for budget while non-fault noise is present", () => {
+  // One real fault, plus a flood of in-window successful (noise) requests that
+  // would blow any shared budget. The fault must survive; noise is what's cut.
+  const noise = Array.from({ length: 60 }, (_, i) =>
+    makeRequest({
+      timestamp: T0 + 100 + i * 20,
+      status: 200,
+      url: `https://app.example.com/api/noise-${i}`,
+      responseBody: `{"pad":"${"y".repeat(400)}"}`,
+    })
+  );
+  const ticket = baseTicket({
+    consoleLogs: [makeConsoleError({ timestamp: T0, message: "THE REAL FAULT here" })],
+    userActions: [makeAction({ timestamp: T0 - 200 })],
+    networkRequests: noise,
+  });
+  const { contextText } = assembleAnalysisContext(ticket);
+  assert.match(contextText, /THE REAL FAULT here/);
+  // The omission marker proves noise was trimmed for budget — but the fault stayed.
+  assert.match(contextText, /lower-signal entries omitted for length/);
+});
+
+test("slow (non-fault) anchors are capped and never displace faults", () => {
+  // 10 slow successful requests (weak anchors) + 1 real fault. The fault is
+  // always present; the slow anchors are bounded.
+  const slow = Array.from({ length: 10 }, (_, i) =>
+    makeRequest({
+      timestamp: T0 + i * 300,
+      durationMs: 6_000,
+      url: `https://app.example.com/api/slow-${i}`,
+    })
+  );
+  const ticket = baseTicket({
+    exceptions: [
+      {
+        timestamp: T0 + 5_000,
+        type: "error",
+        message: "Uncaught TypeError: the real defect",
+        stack: null,
+        source: null,
+        line: null,
+        column: null,
+      },
+    ],
+    networkRequests: slow,
+  });
+  const { contextText } = assembleAnalysisContext(ticket);
+  assert.match(contextText, /Uncaught TypeError: the real defect/);
+});
+
 // ── Backward compatibility ──────────────────────────────────────────────────
 
 test("legacy ticket shape (no new metadata fields) still assembles", () => {

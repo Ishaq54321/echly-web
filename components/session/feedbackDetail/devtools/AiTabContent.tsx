@@ -48,9 +48,11 @@ export interface AiTabContentProps {
   aiConfidence?: number | null;
   aiAnalysisStatus?: AiAnalysisStatus;
   /**
-   * Capture-window honesty stamp (epoch ms) — present when this ticket's capture
-   * streams were cut at a prior ticket's watermark. Rendered as a small framing
-   * note so "no related capture" reads as "none since the prior ticket".
+   * Capture-window honesty stamp (epoch ms) — present when this ticket's USER
+   * ACTIONS were cut at a prior ticket's watermark. Scoped to actions only:
+   * console/exceptions/network are full live-buffer snapshots, not windowed.
+   * Rendered as a small framing note so "no related actions" reads as "none
+   * since the prior ticket".
    */
   captureWindowStartAt?: number | null;
   /**
@@ -764,8 +766,9 @@ function CompleteState({
   const presentation =
     RELATION_PRESENTATION[relation] ?? RELATION_PRESENTATION.related;
 
-  // Window-start framing: when this ticket's capture was cut at a prior ticket's
-  // watermark, absence-of-evidence verdicts need the context to read honestly.
+  // Window-start framing: when this ticket's USER ACTIONS were cut at a prior
+  // ticket's watermark, absence-of-evidence verdicts need the context to read
+  // honestly. Scoped to actions — console/network are full live snapshots.
   // Most load-bearing for no_signal/unrelated, harmless elsewhere.
   const showWindowNote = typeof captureWindowStartAt === "number";
 
@@ -777,8 +780,9 @@ function CompleteState({
       </div>
       {showWindowNote ? (
         <div className="aitab-relation-note">
-          Capture window began after an earlier ticket from this session — older
-          activity was filed with that ticket.
+          User actions begin after an earlier ticket from this session — older
+          actions were filed with that ticket. Console and network show the live
+          buffer at capture time.
         </div>
       ) : null}
       <div className="aitab-section">

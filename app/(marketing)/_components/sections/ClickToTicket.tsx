@@ -131,17 +131,25 @@ export function ClickToTicket() {
     const update = () => {
       frame = 0;
       const vh = window.innerHeight;
-      cards.forEach((card, i) => {
-        const rect = card.getBoundingClientRect();
+      // READ pass — measure every card up-front into one array. Doing all the
+      // getBoundingClientRect() reads BEFORE any class/style write below means
+      // no write can invalidate layout and force a synchronous reflow on the
+      // next read (the layout-thrash that made scrolling this deck stutter).
+      const rects = cards.map((card) => card.getBoundingClientRect());
+
+      // WRITE pass — reveal + recede, using only the cached rects (no reads).
+      for (let i = 0; i < cards.length; i++) {
+        const card = cards[i];
+        const rect = rects[i];
         // Reveal once the card is meaningfully on screen.
         if (rect.top < vh * 0.8 && rect.bottom > 0) {
           card.classList.add("ctt-in-view");
         }
 
-        const next = cards[i + 1];
-        if (!next) {
+        const nextRect = rects[i + 1];
+        if (!nextRect) {
           card.style.setProperty("--ctt-recede", "0");
-          return;
+          continue;
         }
         // This card pins at rect.top (≈ the sticky offset). The next card rises
         // up toward that same line. `gap` is how far the next card still has to
@@ -151,10 +159,10 @@ export function ClickToTicket() {
         // We spread the motion over one card-height so the recede tracks the
         // approach smoothly rather than snapping at the very end.
         const span = Math.max(rect.height, 1);
-        const gap = next.getBoundingClientRect().top - rect.top;
+        const gap = nextRect.top - rect.top;
         const progress = Math.min(Math.max(1 - gap / span, 0), 1);
         card.style.setProperty("--ctt-recede", progress.toFixed(4));
-      });
+      }
     };
 
     const onScroll = () => {

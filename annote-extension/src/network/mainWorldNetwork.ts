@@ -18,7 +18,8 @@
 import { NetworkBuffer } from "./buffer";
 import { isNetworkDenylisted } from "./denylist";
 import { redactBody, redactHeaders, redactUrl } from "./redactNetwork";
-import { installCaptureGate, isCaptureEnabled } from "../shared/captureGate";
+import { buildResourceTimingReplay, normalizeForDedup } from "./resourceTiming";
+import { installCaptureGate, isCaptureEnabled, onCaptureEnabledOnce } from "../shared/captureGate";
 import type {
   NetworkRequestEntry,
   NetworkSnapshotRequest,
@@ -51,6 +52,35 @@ declare global {
   installCaptureGate();
 
   const buffer = new NetworkBuffer();
+
+  // ─── LAYER 2: Resource Timing replay (one-shot at engagement) ───────────────
+  // The first time this tab is engaged, retroactively reconstruct network/resource
+  // evidence that COMPLETED before the wrappers were armed — the page-load window,
+  // including failed/4xx/5xx resources and broken-image/favicon loads that never go
+  // through fetch/XHR. Deduped against whatever the live wrappers have already
+  // buffered (a request caught both ways stays the live one), filtered through the
+  // same network denylist, and merged into the buffer so all caps/eviction apply
+  // uniformly. One-shot via onCaptureEnabledOnce so a pause→resume can't re-scan.
+  onCaptureEnabledOnce(() => {
+    try {
+      // Normalize the live URLs already in the buffer through the SAME function the
+      // replay uses, so both sides of the dedup compare identically. At first
+      // engagement the live set is usually empty (wrappers were OFF), but a request
+      // that started just before the enable broadcast may already be present.
+      const liveNormalized = new Set<string>();
+      for (const u of buffer.liveUrls()) liveNormalized.add(normalizeForDedup(u));
+      const replayed = buildResourceTimingReplay(liveNormalized);
+      for (const entry of replayed) {
+        try {
+          buffer.addRequest(entry);
+        } catch {
+          // swallow — one bad replayed entry must not abort the merge.
+        }
+      }
+    } catch {
+      // swallow — replay is best-effort recovery; never break live capture.
+    }
+  });
 
   // ─── Body & response config ────────────────────────────────────
   const MAX_BODY_BYTES = 50 * 1024; // 50 KB
@@ -1158,6 +1188,122 @@ declare global {
 
   installXhrWrappers();
 
+  // ─── navigator.sendBeacon wrapper (Fix B) ──────────────────────
+  // Beacons are a common analytics + error-report transport (the Beacon API is
+  // the canonical "fire telemetry on page unload" channel). They go through
+  // NEITHER fetch NOR XHR, so until now every beacon — including error reports a
+  // page sends on crash/unload — was invisible to capture. We wrap it under the
+  // SAME gate discipline as fetch/XHR.
+  //
+  // GATE OFF → TRUE PASSTHROUGH: call the native sendBeacon with the original
+  // (url, data) and return its boolean result untouched. We read NO body, touch
+  // NO rate counter, add NOTHING to the buffer — byte-for-byte as if unwrapped.
+  // This matters because sendBeacon is latency-sensitive on unload; a disabled
+  // wrapper must add zero work.
+  //
+  // GATE ON → record a thin entry (method POST — beacons are always POST), then
+  // call native. We serialize the data body with the existing helper + redaction
+  // and apply the network denylist (so GA/Segment beacons are filtered exactly
+  // like their fetch/XHR equivalents, including the GA4 proxied-beacon detector).
+  //
+  // EventSource / WebSocket assessment (deliberately NOT wrapped here):
+  //  - WebSocket: a long-lived bidirectional frame stream. Wrapping send()/onmessage
+  //    would mean buffering an unbounded message stream (the same unbounded-memory
+  //    hazard that the streaming-content-type guard exists to avoid for fetch), and
+  //    the per-frame payloads are rarely the "bug evidence" a ticket needs. Decided
+  //    out of scope — high interference risk, low signal. Revisit only with a strict
+  //    frame cap + sentinel, mirroring the streaming-response handling.
+  //  - EventSource (SSE): already covered on the READ side — an SSE response opened
+  //    via fetch hits the streaming-content-type sentinel ("<streaming response>")
+  //    and is not body-read. A native EventSource object isn't fetch/XHR, but it is
+  //    GET-only server→client; the connection URL is the only useful signal and it
+  //    typically also shows up in Resource Timing (Layer 2). Not worth a dedicated
+  //    wrapper's interference budget. Documented; not wrapped.
+  let previousSendBeacon: typeof navigator.sendBeacon | null = null;
+  let ourSendBeacon: typeof navigator.sendBeacon | null = null;
+  function serializeBeaconData(data: BodyInit | null | undefined): {
+    body: string | null;
+    originalSize: number | null;
+    truncated: boolean;
+  } {
+    // sendBeacon accepts the same BodyInit shapes as fetch (string, Blob,
+    // FormData, URLSearchParams, ArrayBuffer(View), ReadableStream is not valid
+    // for beacons). Reuse the fetch request-body serializer for identical handling.
+    return serializeRequestBody(data ?? null);
+  }
+  function installSendBeaconWrapper(): void {
+    try {
+      if (typeof navigator === "undefined" || typeof navigator.sendBeacon !== "function") return;
+      const current = navigator.sendBeacon;
+      // If the slot already holds our wrapper, don't re-wrap (idempotent; mirrors
+      // the fetch/XHR install guards). We don't run a leapfrog integrity loop for
+      // beacon — it's a single method, rarely re-wrapped by SDKs — but we DO avoid
+      // self-wrapping.
+      if (current === ourSendBeacon) return;
+      previousSendBeacon = current;
+      const wrapper = function (this: Navigator, url: string | URL, data?: BodyInit | null): boolean {
+        const prev = previousSendBeacon as typeof navigator.sendBeacon;
+        // GATE OFF → true passthrough. No body read, no buffer write, no counter.
+        if (!isCaptureEnabled()) {
+          return prev.apply(this, [url, data] as Parameters<typeof navigator.sendBeacon>);
+        }
+        // GATE ON → record, then send. Recording must NEVER change the send result
+        // or throw out to the caller, so it's wrapped and the native call is what
+        // we return.
+        try {
+          const urlStr = typeof url === "string" ? url : url instanceof URL ? url.toString() : String(url);
+          if (urlStr && !circuitBreakerActive && !isNetworkDenylisted(urlStr)) {
+            requestsThisSecond += 1;
+            let bodySerialized = serializeBeaconData(data);
+            try {
+              if (bodySerialized.body !== null) bodySerialized = { ...bodySerialized, body: redactBody(bodySerialized.body, null) };
+            } catch {
+              // keep best-effort
+            }
+            const entry: NetworkRequestEntry = {
+              id: newId(),
+              timestamp: Date.now(),
+              url: redactUrl(urlStr),
+              method: "POST", // sendBeacon is always POST
+              status: null,
+              statusText: null,
+              durationMs: null,
+              source: "beacon",
+              requestHeaders: {},
+              responseHeaders: {},
+              requestBody: bodySerialized.body,
+              requestBodyOriginalSize: bodySerialized.originalSize,
+              requestBodyTruncated: bodySerialized.truncated,
+              // Beacons are fire-and-forget: the page gets a boolean accept/reject,
+              // never a response. No response surface to capture.
+              responseBody: null,
+              responseBodyOriginalSize: null,
+              responseBodyTruncated: false,
+              responseContentType: null,
+              errored: false,
+              errorMessage: null,
+              initiatorPage: safeLocationHref(),
+            };
+            try {
+              buffer.addRequest(entry);
+            } catch {
+              // swallow
+            }
+          }
+        } catch {
+          // swallow — recording must never affect the beacon send.
+        }
+        return prev.apply(this, [url, data] as Parameters<typeof navigator.sendBeacon>);
+      } as typeof navigator.sendBeacon;
+      ourSendBeacon = wrapper;
+      navigator.sendBeacon = wrapper;
+    } catch {
+      // Some environments freeze navigator or have no sendBeacon. Non-fatal.
+    }
+  }
+
+  installSendBeaconWrapper();
+
   // ─── Wrapper integrity check ───────────────────────────────────
   // If anything replaces our wrappers entirely (not just wraps on top of us),
   // re-install. CRITICAL: do NOT re-wrap if the current top-of-stack is a
@@ -1203,6 +1349,16 @@ declare global {
         (currentSend !== ourSend && !isCurrentXhrSendOurs(currentSend))
       ) {
         installXhrWrappers();
+      }
+    } catch {
+      // swallow
+    }
+    // Beacon: if the slot is neither ours nor untouched, re-wrap on top of the
+    // current value (installSendBeaconWrapper captures previousSendBeacon = current
+    // and delegates to it, so we never break an SDK that wrapped sendBeacon).
+    try {
+      if (typeof navigator !== "undefined" && navigator.sendBeacon !== ourSendBeacon) {
+        installSendBeaconWrapper();
       }
     } catch {
       // swallow

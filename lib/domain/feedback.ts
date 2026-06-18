@@ -36,6 +36,9 @@ export interface StructuredFeedback {
   element?: FeedbackElement;
 }
 
+/** Severity/type discriminator on a console log entry — see annote-extension/src/console/types.ts ConsoleLogKind. `"resource-load-failure"` marks a synthetic broken-resource (img/script/link) entry, lower signal than a real exception. Additive + optional so old tickets validate. */
+export type ConsoleLogKind = "resource-load-failure";
+
 /** Single console-log entry captured by the extension's MAIN-world wrapper and persisted with a ticket. Domain copy — the extension keeps its own bundler-isolated copy in annote-extension/src/console/types.ts; field names must stay in lockstep. */
 export interface ConsoleLogEntry {
   timestamp: number;
@@ -43,6 +46,8 @@ export interface ConsoleLogEntry {
   message: string;
   args?: string[];
   source?: string;
+  /** Evidence-quality discriminator; absent for ordinary page logs. See ConsoleLogKind. */
+  kind?: ConsoleLogKind;
 }
 
 /** Uncaught error / unhandled rejection captured by the extension's MAIN-world wrapper. Domain copy — shape must match annote-extension/src/console/types.ts. */
@@ -120,6 +125,12 @@ export interface FeedbackElement {
   modalContext?: string;
 }
 
+/** How a network entry was captured. `"resource-timing"` and `"beacon"` were added with the pre-instrumentation recovery layers; `"resource-timing"` entries are reconstructed retroactively (no bodies/headers). Domain copy — must match annote-extension/src/network/types.ts. */
+export type NetworkSource = "fetch" | "xhr" | "resource-timing" | "beacon";
+
+/** Severity/type discriminator on a network entry — see annote-extension/src/network/types.ts NetworkKind. Additive + optional so old tickets validate. */
+export type NetworkKind = "resource-load-failure" | "http-4xx" | "http-5xx";
+
 /** Single network request captured by the extension's MAIN-world fetch/XHR wrapper and persisted with a ticket. Domain copy — the extension keeps its own bundler-isolated copy in annote-extension/src/network/types.ts; field names must stay in lockstep. Headers and bodies are redacted at the extension's capture site before they reach this type. */
 export interface NetworkRequestEntry {
   id: string;
@@ -129,7 +140,11 @@ export interface NetworkRequestEntry {
   status: number | null;
   statusText: string | null;
   durationMs: number | null;
-  source: "fetch" | "xhr";
+  source: NetworkSource;
+  /** Evidence-quality discriminator; absent for ordinary requests. See NetworkKind. */
+  kind?: NetworkKind;
+  /** True when reconstructed from Resource/Navigation Timing at engagement rather than observed live (no bodies/headers). */
+  replayed?: boolean;
   requestHeaders: Record<string, string>;
   responseHeaders: Record<string, string>;
   requestBody: string | null;

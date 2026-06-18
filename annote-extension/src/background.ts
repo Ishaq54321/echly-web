@@ -1284,24 +1284,58 @@ async function ensureContentScriptInjected(tabId: number): Promise<boolean> {
 }
 
 /**
- * Ensure the MAIN-world capture scripts (mainWorld.js + mainWorldNetwork.js
- * + mainWorldActions.js) are loaded in the given tab. Phase M1 of the
- * session-driven injection migration: capture is no longer declarative —
- * callers (session-start, tab activation during an active session, etc.)
- * trigger this explicitly. Restricted pages (chrome://, the Web Store)
- * silently fail and are not added to the cache so a later retry on a normal
- * URL can succeed. mainWorldActions.js (Phase A3) inherits the same
- * lifecycle for free — there is no separate gating needed.
+ * Arm MAIN-world capture for the given tab — i.e. flip the capture gate ON so
+ * the (already-present) wrappers/listeners stop being transparent passthroughs
+ * and start buffering. Idempotent.
+ *
+ * ── LAYER 1 (pre-instrumentation capture) ──────────────────────────────────
+ * The three MAIN-world bundles (mainWorld.js + mainWorldNetwork.js +
+ * mainWorldActions.js) are now DECLARATIVELY injected at document_start on every
+ * page (manifest content_scripts, world:"MAIN", run_at:"document_start"). They
+ * install in their fail-safe DEFAULT-OFF state (see captureGate.ts) — error
+ * listeners, console wrappers, fetch/XHR wrappers all present and listening into
+ * their ring buffers, but the gate keeps every page-affecting code path inert, so
+ * a never-engaged page sees a true native passthrough. Because they install
+ * BEFORE the page's own scripts run, an error / request / log that fires on page
+ * load is buffered immediately — and is therefore already present when the user
+ * later opens the tray. That closes the pre-instrumentation evidence gap that the
+ * old tray-open-time executeScript injection could never catch.
+ *
+ * So this function's PRIMARY job is no longer installation — it is to drive the
+ * gate ON for an engaged tab (setTabCaptureEnabled), which also drains Layer 3's
+ * document_start console pre-buffer and triggers Layer 2's Resource-Timing replay
+ * inside the MAIN bundles.
+ *
+ * The executeScript call is KEPT as an idempotent FALLBACK for the edge case where
+ * declarative injection didn't run for this document (extension freshly installed
+ * before the page loaded; a CSP/feature quirk; an about:blank that predates the
+ * content-script registration). Re-running the bundles is a no-op: each guards on
+ * its own window.__ECHLY_*_WRAPPED__ flag and returns immediately. Restricted
+ * pages (chrome://, the Web Store) silently fail and are not added to the cache so
+ * a later retry on a normal URL can succeed.
  */
 async function ensureCaptureInjected(tabId: number): Promise<boolean> {
   if (captureInjectedTabs.has(tabId)) {
-    // Already injected for this engagement — but the gate may have been turned
-    // OFF since (e.g. a prior non-engaged activation of this same tab id) or the
-    // MAIN gate may have missed the broadcast (late install race). Re-assert ON
-    // so an engaged tab is never left transparent. Cheap idempotent message.
+    // Already armed for this engagement — but the gate may have been turned OFF
+    // since (e.g. a prior non-engaged activation of this same tab id) or the MAIN
+    // gate may have missed the broadcast (late install race). Re-assert ON so an
+    // engaged tab is never left transparent. Cheap idempotent message.
     setTabCaptureEnabled(tabId, true);
     return true;
   }
+  // Fast path: the bundles are declaratively present on virtually every normal
+  // page already, so just flip the gate ON. This is what makes the
+  // already-buffered pre-engagement evidence (errors/requests/logs from page
+  // load) become live. Mark the tab armed and broadcast enable. The relay
+  // re-posts into MAIN; the gate's own STATE_REQUEST handles the race where this
+  // enable races the bundle's (declarative) install.
+  captureInjectedTabs.add(tabId);
+  setTabCaptureEnabled(tabId, true);
+  // Idempotent fallback: re-assert the bundles via executeScript in case the
+  // declarative document_start injection didn't run for this document. No-op when
+  // it did (the __ECHLY_*_WRAPPED__ IIFE guards short-circuit). Fire-and-forget —
+  // the gate is already being driven ON above, and the relay/STATE_REQUEST
+  // handshake converges regardless of which install path won.
   try {
     await chrome.scripting.executeScript({
       target: { tabId },
@@ -1309,16 +1343,14 @@ async function ensureCaptureInjected(tabId: number): Promise<boolean> {
       files: ["mainWorld.js", "mainWorldNetwork.js", "mainWorldActions.js"],
       injectImmediately: true,
     });
-    captureInjectedTabs.add(tabId);
-    // Capture scripts install with the gate DEFAULT-OFF (transparent). This tab
-    // is being armed as part of an active engagement, so flip the gate ON now.
-    // The relay re-posts into MAIN; the gate's own STATE_REQUEST handles the
-    // race where this message races the bundle's install.
-    setTabCaptureEnabled(tabId, true);
     return true;
   } catch (e) {
-    if (ECHLY_DEBUG) console.debug("[ECHLY] Failed to inject capture scripts", { tabId, error: e });
-    return false;
+    // Declarative injection has almost certainly already covered this tab; an
+    // executeScript failure here (restricted page, tab gone) is non-fatal. Leave
+    // the tab in captureInjectedTabs — on a restricted page there's nothing to
+    // capture anyway, and the gate broadcast already no-oped harmlessly.
+    if (ECHLY_DEBUG) console.debug("[ECHLY] capture fallback inject failed (declarative likely covered it)", { tabId, error: e });
+    return true;
   }
 }
 
@@ -1967,48 +1999,54 @@ function mergeEngagementIntoTicket(
   const allNetwork = dedupBy([...eng.network, ...liveNetwork], networkKey).sort(byTs);
   const allActions = dedupBy([...eng.actions, ...liveActions], actionKey).sort(byTs);
 
-  /* PER-STREAM WATERMARK FILTER (all four surfaces). After producing each merged,
-     deduped, time-ordered list, drop everything at-or-before the previous filed ticket's
-     cut for that stream: keep entries whose timestamp is AFTER the watermark, plus same-ms
-     entries that were NOT already included last time (includedKeys tiebreak). No watermark
-     for a stream → keep all of it. Each watermark only advances on a SUCCESSFUL file (see
+  /* PER-STREAM WATERMARK FILTER — ACTIONS ONLY.
+
+     User actions are an EVENT STREAM and stay partitioned per-ticket: drop everything
+     at-or-before the previous filed ticket's cut (keep entries strictly after the watermark,
+     plus same-ms entries not already included last time — includedKeys tiebreak). No
+     watermark yet → keep all. The cut advances only on a SUCCESSFUL file (see
      advanceWatermarks at the ECHLY_CREATE_FEEDBACK success site), so a failed/retried
-     submission re-includes the same entries. All four streams are filtered identically so
-     the dashboard Console/Network/Actions tabs and the AI analysis agree per-ticket. */
+     submission re-includes the same actions, and ticket 2 never carries ticket 1's actions.
+
+     CONSOLE / EXCEPTIONS / NETWORK are ambient STATE, not a stream: each ticket should
+     carry a SNAPSHOT of whatever is in the buffer at its recording time, even if a prior
+     ticket already carried the same still-present entries (a TypeError sitting in the
+     console when both tickets are filed belongs on BOTH). So these three are attached
+     UNFILTERED — the deduped union IS the current buffer state, already bounded by the
+     age/size caps (genuinely aged-out entries are gone) and the MAIN-world noise denylists
+     (extension/analytics noise never entered the buffer). Their watermarks are no longer
+     consulted here, and advanceWatermarks no longer advances them. */
   const wms =
     engagementId != null && typeof tabId === "number"
       ? engagementBuffers.get(bufferKey(engagementId, tabId))?.watermarks ?? null
       : null;
-  const logs = filterByWatermark(allLogs, wms?.logs ?? null, consoleLogKey);
-  const exceptions = filterByWatermark(allExceptions, wms?.exceptions ?? null, exceptionKey);
-  const network = filterByWatermark(allNetwork, wms?.network ?? null, networkKey);
+  const logs = allLogs;
+  const exceptions = allExceptions;
+  const network = allNetwork;
   const actions = filterByWatermark(allActions, wms?.actions ?? null, actionKey);
 
   const merged: Record<string, unknown> = { ...ticket };
 
-  /* CAPTURE-WINDOW HONESTY STAMP. When any stream carries a watermark, this
-     ticket's window BEGINS after a prior successful ticket in this engagement+tab
-     — entries at or before the cut were filed with THAT ticket, not lost. Stamp
-     the latest cut (epoch ms) onto the payload so the server, the AI analysis,
-     and the dashboard panel can say "the captured window begins after a prior
-     ticket" instead of the misleading "nothing was captured". Absent on the
-     engagement's first ticket and when no stream has filed before. */
-  const watermarkCuts = [wms?.logs, wms?.exceptions, wms?.network, wms?.actions]
-    .filter((w): w is StreamWatermark => w != null)
-    .map((w) => w.timestamp);
-  if (watermarkCuts.length > 0) {
-    merged.captureWindowStartAt = Math.max(...watermarkCuts);
+  /* CAPTURE-WINDOW HONESTY STAMP — ACTIONS ONLY. The stamp means "this ticket's
+     window begins after a prior successful ticket, so earlier entries were filed
+     with THAT ticket, not lost." That is true ONLY for actions now: console /
+     exceptions / network are full current-buffer snapshots, NOT truncated to a
+     window, so stamping their (now-stale) cuts would falsely tell the user those
+     surfaces were truncated. Derive the stamp solely from the actions watermark,
+     which is the only surface still partitioned per-ticket. Absent on the
+     engagement's first ticket and until the first successful actions file. */
+  if (wms?.actions != null) {
+    merged.captureWindowStartAt = wms.actions.timestamp;
   }
 
-  /* Assign the FILTERED (post-watermark) lists UNCONDITIONALLY for every surface, and
-     recompute the counts from them. This is the part of the cut that makes ticket 3 (no
-     new activity → empty filtered lists) actually empty instead of inheriting the live
-     snapshot: the cut is a filter, NOT a buffer-clear, so the live `ticket.*` arrays still
-     carry the full window — a conditional "only override when non-empty" passthrough would
-     leak the prior tickets' entries back in whenever the filter emptied a surface. The
-     filtered list already INCLUDES this page's live entries (they're in the union above),
-     so writing it back is lossless for the non-empty case and correct (empty) for the
-     watermarked-empty case. All four surfaces are handled identically. */
+  /* Assign the merged lists UNCONDITIONALLY for every surface and recompute counts.
+     Console / exceptions / network carry the FULL deduped union (the current buffer
+     snapshot); actions carry the post-watermark FILTERED list. Assigning unconditionally
+     (rather than "only override when non-empty") matters for the actions cut: when actions
+     filter to empty (ticket 3, no new actions), the ticket must be genuinely empty for
+     actions, not fall back to the live snapshot and re-leak ticket 1's actions. The cut is
+     a filter, NOT a buffer-clear, so the buffer still holds the full window for the next
+     ticket. The ambient surfaces, being unfiltered, are simply the bounded current state. */
   merged.consoleLogs = logs;
   merged.exceptions = exceptions;
   merged.consoleLogCount = logs.length;
@@ -2072,21 +2110,22 @@ function computeWatermark<T extends { timestamp: number }>(
 }
 
 /**
- * Advance every stream's watermark after a SUCCESSFUL ticket creation. The `filed` lists
- * are the exact (filtered) entries that were filed for each surface. For each stream the
- * new watermark is the max timestamp among the filed entries plus the same-ms-tiebreak
- * keys; a stream with zero filed entries leaves ITS watermark unmoved (so a ticket that
- * carried new console errors but no new network requests still advances the console cut
- * while keeping the network window open). Called only on the success path, so a
- * failed/retried submission keeps including the same entries for all streams.
+ * Advance the ACTIONS watermark after a SUCCESSFUL ticket creation. `filed.actions`
+ * are the exact (filtered) actions that were filed; the new cut is their max timestamp
+ * plus the same-ms-tiebreak keys. A ticket that filed zero actions leaves the cut
+ * unmoved. Called only on the success path, so a failed/retried submission keeps
+ * including the same actions.
+ *
+ * ONLY actions are partitioned per-ticket now. Console / exceptions / network are
+ * ambient snapshots (attached unfiltered in mergeEngagementIntoTicket), so their
+ * watermarks are intentionally never advanced — advancing them would re-introduce the
+ * per-ticket stripping this fix removes. Their StreamWatermark slots remain on the
+ * struct but stay null/dead.
  */
 function advanceWatermarks(
   engagementId: string | null,
   tabId: number | undefined,
   filed: {
-    logs: EngagementConsoleLog[];
-    exceptions: EngagementException[];
-    network: EngagementNetwork[];
     actions: EngagementAction[];
   }
 ): void {
@@ -2110,9 +2149,6 @@ function advanceWatermarks(
     buf.watermarks[stream] = next;
   };
 
-  advance("logs", filed.logs, consoleLogKey);
-  advance("exceptions", filed.exceptions, exceptionKey);
-  advance("network", filed.network, networkKey);
   advance("actions", filed.actions, actionKey);
 }
 
@@ -2324,18 +2360,20 @@ async function openRecorderUI(tabId?: number): Promise<boolean> {
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
   activeOwnerTabId = activeInfo.tabId;
   if (!cachedEchlyActive) {
-    // Not engaged: this tab must never be capturing. If it carries a lingering
-    // wrapper from a prior engagement (M3: can't uninstall), assert the gate OFF
-    // so it stays a transparent passthrough. No-op on tabs without bootstrap.
-    //
-    // But only bother if capture was EVER injected somewhere this SW lifetime:
-    // captureInjectedTabs is non-empty iff some tab got a MAIN-world wrapper, i.e.
-    // an engagement happened (or is winding down). On a provably-never-engaged
-    // browser no wrapper exists anywhere, so the per-tab-switch assert-off is a
-    // pointless cross-process message — skip it. The set still holds entries
-    // after a session ends (cleared lazily on tab close/navigation), so the
-    // load-bearing "turn wrappers off when switching tabs during/after a session"
-    // path keeps firing exactly as before.
+    // Not engaged: this tab must never be capturing. Since Layer 1 the MAIN-world
+    // wrappers are present on every page (declarative document_start install), but
+    // they DEFAULT OFF — a freshly-loaded never-armed tab is already a transparent
+    // passthrough with no enable ever sent. So this assert-OFF is only needed to
+    // flip DOWN a tab we previously armed ON (a prior engagement on this tab id, or
+    // a tab mid-wind-down). We gate it on captureInjectedTabs being non-empty:
+    // that set is non-empty iff some tab was armed ON this SW lifetime. On a
+    // provably-never-armed browser nothing is ON anywhere (declarative installs are
+    // all still at their OFF default), so the per-tab-switch assert-off is a
+    // pointless cross-process message — skip it. The set still holds entries after a
+    // session ends (cleared lazily on tab close/navigation), so the load-bearing
+    // "turn wrappers off when switching tabs during/after a session" path keeps
+    // firing exactly as before. (Default-OFF + this assert = dormant tabs never
+    // capture, the LinkedIn-class guarantee.)
     if (captureInjectedTabs.size > 0) {
       setTabCaptureEnabled(activeInfo.tabId, false);
     }
@@ -3362,6 +3400,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             globalUIState.feedbackLimitMessage = "Monthly ticket limit reached";
             globalUIState.feedbackUpgradePlan = globalUIState.feedbackUpgradePlan ?? "business";
             broadcastUIState();
+          } else if (usageData.canCreateFeedback === true && globalUIState.feedbackLimitReached) {
+            // Authoritative reset: the server says the workspace can create again (upgrade
+            // or new billing cycle), so clear any latched limit flag. This is the primary
+            // recovery path — the submit handlers hard-return while the flag is set, so a
+            // successful create can't be the only way out. Refetching usage must be able to
+            // unstick it.
+            globalUIState.feedbackLimitReached = false;
+            globalUIState.feedbackLimitMessage = null;
+            globalUIState.feedbackUpgradePlan = null;
+            broadcastUIState();
           }
         }
       }
@@ -3622,11 +3670,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         if (!feedbackRes.ok || data.success === false) {
           const upgradePlan = data?.data?.upgradePlan || data?.upgradePlan || data?.error?.data?.upgradePlan;
-          const isLimitError = feedbackRes.status === 403 && (
-            !!upgradePlan ||
-            (data?.error?.message || "").toLowerCase().includes("limit") ||
-            (data?.error?.code || "").includes("FORBIDDEN")
-          );
+          // A GENUINE quota cap is signalled by POST /api/feedback returning 403 with a
+          // top-level `data` object that carries an `upgradePlan` key (see
+          // planLimitReachedApiError → apiError, which sets data: { upgradePlan }, while
+          // other 403s — no access, workspace mismatch — leave data: null). We gate the
+          // sticky workspace-limit flag on THAT specific shape only. A non-quota 403, a
+          // transient/permission error, or any message that merely contains "limit" must
+          // fall through to the generic-failure branch so it never latches the flag and
+          // permanently blocks future submits.
+          const limitDataObj =
+            (data?.data && typeof data.data === "object" ? (data.data as Record<string, unknown>) : null) ??
+            (data?.error?.data && typeof data.error.data === "object"
+              ? (data.error.data as Record<string, unknown>)
+              : null);
+          const hasPlanLimitSignal =
+            limitDataObj != null && Object.prototype.hasOwnProperty.call(limitDataObj, "upgradePlan");
+          const isLimitError = feedbackRes.status === 403 && hasPlanLimitSignal;
           if (isLimitError) {
             globalUIState.feedbackLimitReached = true;
             globalUIState.feedbackLimitMessage = data?.error?.message || data?.message || "Monthly feedback ticket limit reached";
@@ -3642,7 +3701,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             setTimeout(() => {
               globalUIState.feedbackJobs = globalUIState.feedbackJobs.filter((j) => j.id !== feedbackId);
               broadcastUIState(true);
-            }, 60_000);
+            }, 20_000);
           }
           sendResponse({
             success: false,
@@ -3653,22 +3712,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
 
         await markFeedbackCompleted(feedbackId);
-        /* ADVANCE every stream watermark — SUCCESS ONLY. The ticket was created, so the
-           entries actually filed (the post-watermark filtered lists on mergedTicket:
-           consoleLogs / exceptions / networkRequests / userActions) become the new cut per
-           stream: ticket N+1 will include only entries after these. Reaching this point
-           means the POST succeeded; the failure/catch branches below never run this, so a
-           failed-then-retried submission re-includes the same entries for ALL streams. A
-           stream that filed zero entries leaves ITS watermark unmoved (handled inside). */
+        /* ADVANCE the ACTIONS watermark — SUCCESS ONLY. The actions actually filed (the
+           post-watermark filtered userActions on mergedTicket) become the new cut: ticket
+           N+1 carries only actions after these. Reaching this point means the POST
+           succeeded; the failure/catch branches below never run this, so a failed-then-
+           retried submission re-includes the same actions. Zero filed actions leaves the
+           cut unmoved (handled inside). Console / exceptions / network are ambient snapshots
+           now and intentionally have NO watermark to advance. */
         const asArr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
         advanceWatermarks(engagementIdForFile, senderTabId, {
-          logs: asArr<EngagementConsoleLog>(mergedTicket.consoleLogs),
-          exceptions: asArr<EngagementException>(mergedTicket.exceptions),
-          network: asArr<EngagementNetwork>(mergedTicket.networkRequests),
           actions: asArr<EngagementAction>(mergedTicket.userActions),
         });
         cachedBillingUsage = null;
         billingUsageCachedAt = 0;
+        // Defense-in-depth reset: a successful create proves the workspace is back under
+        // the cap (e.g. after an upgrade or a new billing cycle), so clear any latched
+        // limit flag. Without this, a once-set feedbackLimitReached would stay sticky and
+        // keep hard-returning every submit handler even once the user is genuinely allowed.
+        if (globalUIState.feedbackLimitReached) {
+          globalUIState.feedbackLimitReached = false;
+          globalUIState.feedbackLimitMessage = null;
+          globalUIState.feedbackUpgradePlan = null;
+        }
         globalUIState.feedbackJobs = globalUIState.feedbackJobs.filter((j) => j.id !== feedbackId);
         broadcastUIState(true);
         sendResponse({ success: true, data });
@@ -3681,7 +3746,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         setTimeout(() => {
           globalUIState.feedbackJobs = globalUIState.feedbackJobs.filter((j) => j.id !== feedbackId);
           broadcastUIState(true);
-        }, 60_000);
+        }, 20_000);
         sendResponse({ success: false });
       } finally {
         processingFeedbackIds.delete(feedbackId);

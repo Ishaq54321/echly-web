@@ -11,12 +11,30 @@
 
 export type ConsoleLogLevel = "log" | "info" | "warn" | "error" | "debug";
 
+/**
+ * Evidence-quality discriminator on a console log entry. The capture layers now
+ * surface MORE — including low-signal noise (favicon 404s, deprecation warnings) —
+ * so downstream analysis needs to weight entries by what they actually are rather
+ * than treating every `level:"error"` identically. `kind` carries that signal:
+ *
+ *  - undefined           → an ordinary page console.* call (weight by `level`).
+ *  - "resource-load-failure" → a synthetic entry for a failed <img>/<script>/<link>
+ *                          element load (the browser's "Failed to load resource").
+ *                          Lower signal than a real uncaught exception; an AI should
+ *                          rank a TypeError above a favicon 404.
+ *
+ * Kept optional + additive so existing stored tickets (no `kind`) still validate.
+ */
+export type ConsoleLogKind = "resource-load-failure";
+
 export interface ConsoleLogEntry {
   timestamp: number;
   level: ConsoleLogLevel;
   message: string;
   args?: string[];
   source?: string;
+  /** Severity/type discriminator — see ConsoleLogKind. Absent for ordinary logs. */
+  kind?: ConsoleLogKind;
 }
 
 export type ExceptionType = "error" | "unhandledrejection";

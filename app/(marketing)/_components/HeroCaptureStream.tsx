@@ -205,19 +205,6 @@ export function HeroCaptureStream() {
       "(prefers-reduced-motion: reduce)",
     ).matches;
 
-    const supportsFilter = (() => {
-      try {
-        return Boolean(
-          Object.getOwnPropertyDescriptor(
-            CanvasRenderingContext2D.prototype,
-            "filter",
-          ),
-        );
-      } catch {
-        return false;
-      }
-    })();
-
     let width = 0;
     let height = 0;
     let dpr = 1;
@@ -225,6 +212,27 @@ export function HeroCaptureStream() {
     let lines: Line[] = [];
     let maxLines = MAX_LINES;
     let stars: Star[] = [];
+
+    // ── Cached paint resources (perf) ────────────────────────────────────────
+    // The vignette gradient depends only on width/height, so it's rebuilt once
+    // per resize() instead of allocated every frame.
+    let vignette: CanvasGradient | null = null;
+    // A soft white bloom sprite, pre-rendered ONCE. Stars draw their glow by
+    // blitting this with globalAlpha (cheap drawImage) instead of allocating a
+    // fresh radial gradient per star per frame.
+    const bloomSprite = (() => {
+      const c = document.createElement("canvas");
+      c.width = c.height = 64;
+      const bx = c.getContext("2d");
+      if (bx) {
+        const g = bx.createRadialGradient(32, 32, 0, 32, 32, 32);
+        g.addColorStop(0, "rgba(255, 255, 255, 1)");
+        g.addColorStop(1, "rgba(255, 255, 255, 0)");
+        bx.fillStyle = g;
+        bx.fillRect(0, 0, 64, 64);
+      }
+      return c;
+    })();
 
     const mouse = { x: -1, y: -1, active: false };
 
@@ -322,6 +330,19 @@ export function HeroCaptureStream() {
       canvas!.style.height = `${height}px`;
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
 
+      // Rebuild the cached vignette gradient for the new dimensions (CSS-pixel
+      // space, matching the transform above).
+      vignette = ctx!.createRadialGradient(
+        width * 0.5,
+        height * 0.44,
+        Math.min(width, height) * 0.34,
+        width * 0.5,
+        height * 0.5,
+        Math.max(width, height) * 0.72,
+      );
+      vignette.addColorStop(0, "rgba(8, 7, 18, 0)");
+      vignette.addColorStop(1, "rgba(8, 7, 18, 0.42)");
+
       buildLines();
       buildStars();
     }
@@ -388,15 +409,14 @@ export function HeroCaptureStream() {
 
         const r = s.r * (1 + s.glow * 0.5);
         // Soft bloom on brighter / gathered stars (distant light w/ atmosphere).
+        // Blit the pre-rendered bloom sprite (perf) instead of allocating a
+        // radial gradient per star per frame; globalAlpha reproduces the old
+        // `a * 0.3` centre falloff, and `lighter` (already set) blends it.
         if (s.glow > 0.05 || s.alpha > 0.42) {
           const gR = r * 3.2;
-          const g = ctx!.createRadialGradient(s.x, s.y, 0, s.x, s.y, gR);
-          g.addColorStop(0, `rgba(255, 255, 255, ${a * 0.3})`);
-          g.addColorStop(1, "rgba(255, 255, 255, 0)");
-          ctx!.fillStyle = g;
-          ctx!.beginPath();
-          ctx!.arc(s.x, s.y, gR, 0, Math.PI * 2);
-          ctx!.fill();
+          ctx!.globalAlpha = a * 0.3;
+          ctx!.drawImage(bloomSprite, s.x - gR, s.y - gR, gR * 2, gR * 2);
+          ctx!.globalAlpha = 1;
         }
         ctx!.fillStyle = `rgba(255, 255, 255, ${a})`;
         ctx!.beginPath();
@@ -464,12 +484,13 @@ export function HeroCaptureStream() {
         );
         if (alpha < 0.008) continue;
 
-        // Blur: tier blur, sharpened to ~0 as the line comes into focus (so the
-        // cursor lens clearly resolves lines out of the soft-blurred baseline).
-        const blur = T.blur * (1 - focus);
-        if (supportsFilter) {
-          ctx!.filter = blur > 0.05 ? `blur(${blur.toFixed(2)}px)` : "none";
-        }
+        // NB: per-line canvas `ctx.filter = blur(...)` was removed — it was the
+        // single most expensive op in the loop (a full offscreen raster+blur
+        // pass per line per frame, CPU-bound on machines without accelerated
+        // canvas filters → the hero jank). Depth now reads purely from the
+        // tier's size + dimness (the blurred tiers are also the faintest/
+        // smallest, so the perceptual loss is minimal), and the cursor lens
+        // still resolves lines by lifting their opacity + glow below.
 
         ctx!.font = `${T.size}px ${MONO_FONT}`;
         const [r, g, b] = ln.rgb;
@@ -498,21 +519,12 @@ export function HeroCaptureStream() {
         ctx!.fillText(ln.text, ln.x, ln.y);
       }
 
-      if (supportsFilter) ctx!.filter = "none";
-
-      // Cinematic vignette — gentle edge darkening to frame the field.
-      const vig = ctx!.createRadialGradient(
-        width * 0.5,
-        height * 0.44,
-        Math.min(width, height) * 0.34,
-        width * 0.5,
-        height * 0.5,
-        Math.max(width, height) * 0.72,
-      );
-      vig.addColorStop(0, "rgba(8, 7, 18, 0)");
-      vig.addColorStop(1, "rgba(8, 7, 18, 0.42)");
-      ctx!.fillStyle = vig;
-      ctx!.fillRect(0, 0, width, height);
+      // Cinematic vignette — gentle edge darkening to frame the field. Uses the
+      // gradient cached in resize() rather than re-allocating it every frame.
+      if (vignette) {
+        ctx!.fillStyle = vignette;
+        ctx!.fillRect(0, 0, width, height);
+      }
     }
 
     function loop() {

@@ -21,7 +21,11 @@ import {
   getScreenshotByIdRepo,
 } from "@/lib/repositories/screenshotsRepository";
 import { corsHeaders } from "@/lib/server/cors";
-import { evictOldestUntilFits } from "@/lib/server/evictOldestUntilFits";
+import {
+  evictOldestUntilFits,
+  evictNoiseFirstUntilFits,
+  capPreferringFaults,
+} from "@/lib/server/evictOldestUntilFits";
 import "@/lib/server/firebaseAdmin";
 import { assert, ECHLY_STRICT_MODE } from "@/lib/guardrails";
 import { tryBuildRequestContext } from "@/lib/server/requestContext";
@@ -339,6 +343,7 @@ export async function POST(req: NextRequest) {
   const MAX_TOTAL_BYTES = 100 * 1024;
   const ALLOWED_LEVELS = new Set(["log", "info", "warn", "error", "debug"]);
   const ALLOWED_EXCEPTION_TYPES = new Set(["error", "unhandledrejection"]);
+  const ALLOWED_CONSOLE_KINDS = new Set(["resource-load-failure"]);
 
   function isPlainObject(v: unknown): v is Record<string, unknown> {
     return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -359,6 +364,11 @@ export async function POST(req: NextRequest) {
       if (args.length > 0) out.args = args;
     }
     if (typeof entry.source === "string") out.source = entry.source;
+    // Preserve the evidence-quality discriminator so downstream analysis can weight
+    // a resource-load-failure below a real exception. Whitelisted + optional.
+    if (typeof entry.kind === "string" && ALLOWED_CONSOLE_KINDS.has(entry.kind)) {
+      out.kind = entry.kind as ConsoleLogEntry["kind"];
+    }
     return out;
   }
 
@@ -383,37 +393,52 @@ export async function POST(req: NextRequest) {
     return out;
   }
 
+  // Hard ceiling on how many raw entries we VALIDATE (bounds CPU against a
+  // malicious/buggy client) — set well above MAX_LOG_ENTRIES so the fault-aware
+  // cap below still has every fault to choose from. The engagement merge that
+  // feeds this is itself capped at ~200/surface, so this is generous headroom.
+  const VALIDATE_CEILING_MULTIPLIER = 5;
+
   function validateLogArray<T>(
     field: "consoleLogs" | "exceptions",
     raw: unknown,
     validator: (entry: unknown) => T | null,
+    isFault: (entry: T) => boolean,
   ): T[] | undefined {
     if (raw === undefined || raw === null) return undefined;
     if (!Array.isArray(raw)) {
       console.warn(`[feedback] dropped ${field}: not an array`);
       return undefined;
     }
-    // Keep the NEWEST entries: the merged capture arrays arrive time-ascending,
-    // so slice from the END — the entries nearest the report are the evidence;
-    // the oldest tail is what a cap should sacrifice.
-    const capped = raw.slice(-MAX_LOG_ENTRIES);
+    // Validate from the END (newest) up to the ceiling, then cap to
+    // MAX_LOG_ENTRIES keeping ALL faults + the newest noise. A console.error
+    // older than a flood of console.log noise is retained; the cap stays the
+    // same size, so faults are preferentially kept, not granted more room.
+    const ceiling = MAX_LOG_ENTRIES * VALIDATE_CEILING_MULTIPLIER;
+    const bounded = raw.length > ceiling ? raw.slice(-ceiling) : raw;
     const validated: T[] = [];
-    for (const entry of capped) {
+    for (const entry of bounded) {
       const v = validator(entry);
       if (v !== null) validated.push(v);
     }
-    return validated.length > 0 ? validated : undefined;
+    if (validated.length === 0) return undefined;
+    return capPreferringFaults(validated, MAX_LOG_ENTRIES, isFault);
   }
 
   let validatedConsoleLogs = validateLogArray<ConsoleLogEntry>(
     "consoleLogs",
     body.consoleLogs,
     validateConsoleLog,
+    // Fault tier: error-level console entries (incl. synthetic resource-load
+    // failures, emitted at level "error"). Lower levels are noise.
+    (e) => e.level === "error",
   );
   let validatedExceptions = validateLogArray<ExceptionEntry>(
     "exceptions",
     body.exceptions,
     validateException,
+    // Every uncaught error / rejection is a fault.
+    () => true,
   );
 
   // Combined byte cap over logs ∪ exceptions: evict the OLDEST entries (by
@@ -434,8 +459,15 @@ export async function POST(req: NextRequest) {
         (entry): TaggedEntry => ({ stream: "exc", ts: entry.timestamp, entry })
       ),
     ].sort((a, b) => a.ts - b.ts);
-    const { kept, evicted } = evictOldestUntilFits(merged, MAX_TOTAL_BYTES, (t) =>
-      JSON.stringify(t.entry).length
+    // Fault-preferring byte eviction: an exception is always a fault; a console
+    // entry is a fault when error-level. Oldest noise across both streams is
+    // evicted first so the cap never drops a console.error/exception to make
+    // room for lower-severity logs.
+    const { kept, evicted } = evictNoiseFirstUntilFits(
+      merged,
+      MAX_TOTAL_BYTES,
+      (t) => t.stream === "exc" || t.entry.level === "error",
+      (t) => JSON.stringify(t.entry).length,
     );
     if (evicted > 0) {
       console.warn(
@@ -479,7 +511,11 @@ export async function POST(req: NextRequest) {
   // over request/response bodies logs warnings; never rejects.
   const MAX_NETWORK_ENTRIES = 200;
   const MAX_NETWORK_TOTAL_BYTES = 200 * 1024;
-  const ALLOWED_NETWORK_SOURCES = new Set(["fetch", "xhr"]);
+  // "resource-timing" (Layer 2 retroactive replay) and "beacon" (sendBeacon)
+  // were added with the pre-instrumentation recovery work; they must be accepted
+  // or those recovered entries would be silently dropped at validation.
+  const ALLOWED_NETWORK_SOURCES = new Set(["fetch", "xhr", "resource-timing", "beacon"]);
+  const ALLOWED_NETWORK_KINDS = new Set(["resource-load-failure", "http-4xx", "http-5xx"]);
 
   function isStringRecord(v: unknown): v is Record<string, string> {
     if (!isPlainObject(v)) return false;
@@ -527,7 +563,27 @@ export async function POST(req: NextRequest) {
       initiatorPage:
         typeof entry.initiatorPage === "string" ? entry.initiatorPage : null,
     };
+    // Evidence-quality discriminator + replay flag — whitelisted + optional so old
+    // tickets validate and the AI can weight a 5xx/load-failure above a 200.
+    if (typeof entry.kind === "string" && ALLOWED_NETWORK_KINDS.has(entry.kind)) {
+      out.kind = entry.kind as NetworkRequestEntry["kind"];
+    }
+    if (entry.replayed === true) out.replayed = true;
     return out;
+  }
+
+  // Fault tier for a network request: transport error, HTTP >= 400, or a 0/null
+  // status carrying a failure kind (resource-load-failure / http-4xx / http-5xx
+  // from Resource-Timing replay). Mirrors the in-page ring buffer's predicate so
+  // the same requests are protected end to end.
+  function isNetworkFaultEntry(r: NetworkRequestEntry): boolean {
+    if (r.errored === true) return true;
+    if (typeof r.status === "number" && r.status >= 400) return true;
+    return (
+      r.kind === "resource-load-failure" ||
+      r.kind === "http-4xx" ||
+      r.kind === "http-5xx"
+    );
   }
 
   function validateNetworkRequestArray(raw: unknown): NetworkRequestEntry[] | undefined {
@@ -536,18 +592,28 @@ export async function POST(req: NextRequest) {
       console.warn("[feedback] dropped networkRequests: not an array");
       return undefined;
     }
-    // Keep the NEWEST entries (see validateLogArray) — input is time-ascending.
-    const capped = raw.slice(-MAX_NETWORK_ENTRIES);
+    // Validate from the END up to a ceiling, then cap to MAX_NETWORK_ENTRIES
+    // keeping ALL faults + newest noise (see validateLogArray). A real 500
+    // older than a burst of analytics 2xx noise is retained.
+    const ceiling = MAX_NETWORK_ENTRIES * VALIDATE_CEILING_MULTIPLIER;
+    const bounded = raw.length > ceiling ? raw.slice(-ceiling) : raw;
     const validated: NetworkRequestEntry[] = [];
-    for (const entry of capped) {
+    for (const entry of bounded) {
       const v = validateNetworkRequest(entry);
       if (v !== null) validated.push(v);
     }
     if (validated.length === 0) return undefined;
-    const { kept, evicted } = evictOldestUntilFits(validated, MAX_NETWORK_TOTAL_BYTES);
+    const counted = capPreferringFaults(validated, MAX_NETWORK_ENTRIES, isNetworkFaultEntry);
+    // Fault-preferring byte eviction: oldest noise (2xx/pending) first; a fault
+    // is dropped only once no noise remains under the byte cap.
+    const { kept, evicted } = evictNoiseFirstUntilFits(
+      counted,
+      MAX_NETWORK_TOTAL_BYTES,
+      isNetworkFaultEntry,
+    );
     if (evicted > 0) {
       console.warn(
-        `[feedback] networkRequests over ${MAX_NETWORK_TOTAL_BYTES} byte cap: evicted ${evicted} oldest entries, kept ${kept.length}`,
+        `[feedback] networkRequests over ${MAX_NETWORK_TOTAL_BYTES} byte cap: evicted ${evicted} oldest non-fault entries first, kept ${kept.length}`,
       );
     }
     return kept.length > 0 ? kept : undefined;

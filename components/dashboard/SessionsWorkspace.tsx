@@ -356,9 +356,16 @@ export const SessionWorkspaceRow = memo(function SessionWorkspaceRow({
                 {visibleViewers.map((viewer, i) => (
                   <UserAvatar
                     key={viewer.id}
-                    // Live avatar overrides the stale recentViewers snapshot.
+                    // Live avatar (avatarUrl) is the source of truth and overrides
+                    // the stale recentViewers snapshot the moment it resolves. The
+                    // snapshot URL is passed as `image` purely as a first-paint SEED:
+                    // resolveImageSrc prefers avatarUrl over image, so on a fresh
+                    // dashboard mount (when the live map is still empty) the seed
+                    // paints immediately instead of the initials fallback, then the
+                    // live value silently takes over — no flash, no loss of liveness.
                     // The stack is guaranteed non-anonymous here.
                     avatarUrl={liveViewerAvatars.get(viewer.id) ?? null}
+                    image={viewer.avatarUrl}
                     name={viewer.displayName}
                     size={28}
                     colorSeed={viewer.id}

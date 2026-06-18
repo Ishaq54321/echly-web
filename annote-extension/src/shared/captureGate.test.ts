@@ -141,6 +141,50 @@ describe("captureGate message hardening", () => {
   });
 });
 
+describe("captureGate onCaptureEnabledOnce (Layer 2/3 recovery trigger)", () => {
+  // The one-shot is a per-realm singleton that, by design, fires AT MOST ONCE for
+  // the realm's lifetime and never resets (the pre-engagement drain/replay is a
+  // one-time recovery). Earlier describe blocks here already drove the gate ON, so
+  // in this shared-singleton test file the first OFF→ON has already happened. We
+  // therefore assert the two invariants that hold regardless of prior firing.
+
+  it("runs a subscriber IMMEDIATELY when capture is already ON (late subscriber)", () => {
+    set(true);
+    assert.equal(gate.isCaptureEnabled(), true);
+    let ran = 0;
+    gate.onCaptureEnabledOnce(() => {
+      ran += 1;
+    });
+    assert.equal(ran, 1, "a subscriber registered while already-ON must run synchronously");
+  });
+
+  it("does NOT re-run a subscriber on a later pause→resume (OFF→ON→OFF→ON)", () => {
+    set(true); // ensure ON + one-shot already fired for the realm
+    let ran = 0;
+    gate.onCaptureEnabledOnce(() => {
+      ran += 1;
+    });
+    assert.equal(ran, 1); // fired immediately (already ON)
+    set(false);
+    set(true); // resume — must NOT fire the one-shot again
+    assert.equal(ran, 1, "a resume must not re-fire the one-shot recovery");
+  });
+
+  it("swallows a throwing subscriber without breaking the gate", () => {
+    set(true);
+    assert.doesNotThrow(() => {
+      gate.onCaptureEnabledOnce(() => {
+        throw new Error("subscriber boom");
+      });
+    });
+    // Gate still toggles normally afterward.
+    set(false);
+    assert.equal(gate.isCaptureEnabled(), false);
+    set(true);
+    assert.equal(gate.isCaptureEnabled(), true);
+  });
+});
+
 describe("captureGate late-injection pull", () => {
   it("posted exactly one STATE_REQUEST at install so a late gate can learn the value", () => {
     // Snapshotted in the `before` hook before beforeEach clears the post log.

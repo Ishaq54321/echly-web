@@ -145,3 +145,73 @@ describe("NetworkBuffer — byte-cap eviction", () => {
     assert.ok(ids.includes("d"), "newest entry 'd' should survive");
   });
 });
+
+describe("NetworkBuffer — fault invariant (severity-tiered eviction)", () => {
+  it("count cap: an older 500 survives a flood of newer 200s", () => {
+    const buf = new NetworkBuffer({ maxEntries: 3 });
+    const t = Date.now();
+    // The real fault arrives FIRST, then noise floods past the count cap.
+    buf.addRequest(makeEntry({ id: "fault", timestamp: t + 1, status: 500 }));
+    buf.addRequest(makeEntry({ id: "n1", timestamp: t + 2, status: 200 }));
+    buf.addRequest(makeEntry({ id: "n2", timestamp: t + 3, status: 200 }));
+    buf.addRequest(makeEntry({ id: "n3", timestamp: t + 4, status: 200 }));
+    buf.addRequest(makeEntry({ id: "n4", timestamp: t + 5, status: 200 }));
+    const ids = buf.snapshot().requests.map((r) => r.id);
+    assert.ok(ids.includes("fault"), "the 500 must survive the noise flood");
+    assert.equal(ids.length, 3, "count cap still bounds the buffer to 3");
+    // Oldest NOISE evicted first — the earliest 200s go, not the fault.
+    assert.ok(!ids.includes("n1"));
+    assert.ok(!ids.includes("n2"));
+  });
+
+  it("byte cap: an older errored request survives a byte flood of 200s", () => {
+    const fatBody = "x".repeat(2_000);
+    const buf = new NetworkBuffer({ maxTotalBytes: 5_000, maxEntries: 1_000 });
+    const t = Date.now();
+    buf.addRequest(
+      makeEntry({ id: "fault", timestamp: t + 1, status: null, errored: true, responseBody: fatBody })
+    );
+    buf.addRequest(makeEntry({ id: "n1", timestamp: t + 2, responseBody: fatBody }));
+    buf.addRequest(makeEntry({ id: "n2", timestamp: t + 3, responseBody: fatBody }));
+    buf.addRequest(makeEntry({ id: "n3", timestamp: t + 4, responseBody: fatBody }));
+    const ids = buf.snapshot().requests.map((r) => r.id);
+    assert.ok(ids.includes("fault"), "the errored request must survive the byte flood");
+  });
+
+  it("a request that BECOMES a fault on update is then protected from eviction", () => {
+    const buf = new NetworkBuffer({ maxEntries: 3 });
+    const t = Date.now();
+    buf.addRequest(makeEntry({ id: "pending", timestamp: t + 1, status: null, durationMs: null }));
+    // Promote to a 500 — now a fault.
+    buf.updateRequest("pending", { status: 500, durationMs: 30 });
+    buf.addRequest(makeEntry({ id: "n1", timestamp: t + 2 }));
+    buf.addRequest(makeEntry({ id: "n2", timestamp: t + 3 }));
+    buf.addRequest(makeEntry({ id: "n3", timestamp: t + 4 }));
+    const ids = buf.snapshot().requests.map((r) => r.id);
+    assert.ok(ids.includes("pending"), "the promoted 500 must survive once it's a fault");
+  });
+
+  it("a kind-only failure (status null, http-5xx) is treated as a fault", () => {
+    const buf = new NetworkBuffer({ maxEntries: 2 });
+    const t = Date.now();
+    buf.addRequest(
+      makeEntry({ id: "replay-5xx", timestamp: t + 1, status: null, kind: "http-5xx", source: "resource-timing", replayed: true })
+    );
+    buf.addRequest(makeEntry({ id: "n1", timestamp: t + 2 }));
+    buf.addRequest(makeEntry({ id: "n2", timestamp: t + 3 }));
+    const ids = buf.snapshot().requests.map((r) => r.id);
+    assert.ok(ids.includes("replay-5xx"), "a replayed 5xx with null status must be protected");
+  });
+
+  it("all-fault buffer still bounds by count (fault-vs-fault eviction permitted)", () => {
+    const buf = new NetworkBuffer({ maxEntries: 2 });
+    const t = Date.now();
+    buf.addRequest(makeEntry({ id: "f1", timestamp: t + 1, status: 500 }));
+    buf.addRequest(makeEntry({ id: "f2", timestamp: t + 2, status: 503 }));
+    buf.addRequest(makeEntry({ id: "f3", timestamp: t + 3, status: 404 }));
+    const ids = buf.snapshot().requests.map((r) => r.id);
+    assert.equal(ids.length, 2, "count cap holds even when every entry is a fault");
+    assert.ok(!ids.includes("f1"), "oldest fault evicted when no noise remains");
+    assert.ok(ids.includes("f3"), "newest fault retained");
+  });
+});

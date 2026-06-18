@@ -1,6 +1,7 @@
 "use client";
 
 import { EvidenceBlock } from "./EvidenceTrust";
+import { useAnimationPause } from "../useAnimationPause";
 
 /**
  * <BuiltForAgenciesDark />
@@ -485,13 +486,16 @@ function CardShip() {
 }
 
 export function BuiltForAgenciesDark() {
+  // Pause this panel's infinite CSS animations (the 55-bar QA waveform, team
+  // presence pulses, review rings, evidence-card loops) while it's off-screen.
+  const ref = useAnimationPause<HTMLElement>();
   return (
     <>
       {/* White gutter behind the inset dark panel — the panel is inset from the
          page edges, so this band replaces the grey page background that would
          otherwise show as left/right margins around it. */}
       <div className="ag-gutter">
-      <section id="personas" className="ag-root">
+      <section id="personas" className="ag-root" ref={ref}>
         <div className="ag-bg-grain"></div>
 
         <header className="ag-head">
