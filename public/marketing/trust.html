@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Annote — Security &amp; Trust Overview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css" />
+<style>
+  /* ---- Trust page ---- */
+  .trust-hero{padding:84px 0 8px}
+  .trust-hero .wrap{position:relative;z-index:1}
+  .trust-hero h1{font-size:clamp(40px,5.2vw,68px);line-height:1.04;letter-spacing:-0.034em;max-width:880px;margin:18px auto 0;font-weight:500}
+  .trust-hero h1 .accent{color:var(--primary)}
+  .trust-hero .sub{font-size:19px;line-height:1.6;color:var(--body);max-width:660px;margin:22px auto 0;font-weight:400}
+  .trust-hero .sub b{color:var(--ink);font-weight:500}
+
+  /* feature rows (points 1 & 2) */
+  .feat{padding:104px 0 0}
+  .feat-row{display:grid;grid-template-columns:1fr 1.05fr;gap:64px;align-items:center}
+  .feat-row.flip{grid-template-columns:1.05fr 1fr}
+  .feat-row.flip .copy{order:2}
+  .feat-row .copy .eyebrow{margin-bottom:14px}
+  .feat-row .copy h2{font-size:clamp(28px,3.2vw,40px);line-height:1.08;margin:0 0 18px;max-width:440px}
+  .feat-row .copy p{margin:0;font-size:16.5px;line-height:1.66;color:var(--body)}
+  .feat-row .copy p b{color:var(--ink);font-weight:500}
+  .feat-row .copy .failclosed{display:inline-flex;align-items:center;gap:9px;margin-top:22px;padding:9px 14px;border-radius:10px;background:var(--primary-soft);color:var(--primary-ink);font-size:13.5px;font-weight:500}
+  .feat-row .copy .failclosed .mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-weight:600;color:var(--primary)}
+
+  .feat-vis{background:linear-gradient(160deg,#FBFAF6 0%,#F2EEE6 100%);border:1px solid var(--line);border-radius:22px;padding:40px;position:relative;overflow:hidden;min-height:340px;display:flex;align-items:center;justify-content:center}
+  .feat-vis::before{content:"";position:absolute;inset:0;background-image:radial-gradient(circle,rgba(90,73,191,0.09) 1px,transparent 1px);background-size:22px 22px;opacity:0.45;pointer-events:none}
+
+  /* capture-state visual */
+  .vis-state{position:relative;z-index:1;width:100%;max-width:380px;display:flex;flex-direction:column;gap:14px}
+  .state-pill{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:15px 18px;box-shadow:0 18px 36px -22px rgba(26,20,36,0.22)}
+  .state-pill .dot{width:11px;height:11px;border-radius:99px;flex-shrink:0}
+  .state-pill .tx{flex:1;min-width:0}
+  .state-pill .tx .t{font-size:14px;font-weight:600;color:var(--ink);letter-spacing:-0.005em}
+  .state-pill .tx .m{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;color:var(--muted);margin-top:3px}
+  .state-pill .badge{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:10.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;padding:4px 9px;border-radius:99px}
+  .state-pill.idle .dot{background:#C9C1B4}
+  .state-pill.idle .badge{background:var(--paper-2);color:var(--muted)}
+  .state-pill.active{border-color:var(--primary-soft-2)}
+  .state-pill.active .dot{background:var(--red);box-shadow:0 0 0 4px rgba(224,78,62,0.16);animation:recordpulse 1.8s infinite}
+  .state-pill.active .badge{background:var(--maroon-soft);color:var(--red)}
+  .vis-state .arrow{display:flex;align-items:center;justify-content:center;gap:8px;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;color:var(--muted);letter-spacing:0.04em}
+  .vis-state .arrow .ln{height:1px;width:36px;background:var(--paper-line)}
+
+  /* redaction visual */
+  .vis-redact{position:relative;z-index:1;width:100%;max-width:400px;background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 24px 50px -26px rgba(26,20,36,0.22)}
+  .vis-redact .rhead{display:flex;align-items:center;gap:9px;padding:12px 16px;border-bottom:1px solid var(--line);background:#FBF9F4;font-size:12px;font-weight:600;color:var(--ink);letter-spacing:-0.005em}
+  .vis-redact .rhead .loc{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:10px;font-weight:600;color:var(--primary);letter-spacing:0.04em;text-transform:uppercase}
+  .vis-redact .rhead .loc i{width:6px;height:6px;border-radius:99px;background:var(--primary)}
+  .vis-redact .rbody{padding:16px;display:flex;flex-direction:column;gap:11px;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11.5px;line-height:1.5}
+  .vis-redact .line{display:flex;flex-direction:column;gap:4px}
+  .vis-redact .k{color:var(--muted)}
+  .vis-redact .before{color:#B8AFA0;text-decoration:line-through;text-decoration-thickness:1px}
+  .vis-redact .after{color:var(--ink);display:inline-flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .vis-redact .tok{background:var(--primary-soft);color:var(--primary);padding:1px 7px;border-radius:5px;font-weight:600}
+  .vis-redact .never{color:var(--muted)}
+  .vis-redact .never .tok{background:var(--paper-2);color:var(--muted)}
+
+  /* small principle cards (points 3-5) */
+  .princ{padding:104px 0 0}
+  .princ .pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  .pcard{background:#fff;border:1px solid var(--line);border-radius:20px;padding:30px 28px;display:flex;flex-direction:column;gap:14px}
+  .pcard .ic{width:42px;height:42px;border-radius:11px;background:var(--primary-soft);color:var(--primary);display:flex;align-items:center;justify-content:center}
+  .pcard h3{font-size:18px;font-weight:600;letter-spacing:-0.012em;color:var(--ink);margin:0;line-height:1.2}
+  .pcard p{margin:0;font-size:14.5px;line-height:1.58;color:var(--body)}
+  .pcard p b{color:var(--ink);font-weight:500}
+
+  /* honest limits */
+  .limits{padding:104px 0 0}
+  .limits .lwrap{max-width:1080px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:24px;padding:48px;box-shadow:0 30px 70px -44px rgba(26,20,36,0.16)}
+  .limits .lhead{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+  .limits .lhead h2{font-size:clamp(26px,3vw,36px);line-height:1.08;margin:0}
+  .limits .lhead .tag{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#9A6B2F;background:#F6EEDF;border:1px solid #ECDFC6;padding:5px 11px;border-radius:99px}
+  .limits .lsub{font-size:16px;color:var(--body);line-height:1.6;margin:0 0 32px;max-width:620px}
+  .limits .lgrid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .lcard{border:1px solid var(--line);border-radius:16px;padding:26px;background:linear-gradient(180deg,#FFFDFA,#FBF8F2)}
+  .lcard .n{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;font-weight:600;color:#9A6B2F;letter-spacing:0.04em;margin-bottom:12px}
+  .lcard h4{font-size:16.5px;font-weight:600;color:var(--ink);letter-spacing:-0.008em;margin:0 0 10px;line-height:1.25}
+  .lcard p{margin:0;font-size:14.5px;line-height:1.6;color:var(--body)}
+  .lcard p b{color:var(--ink);font-weight:500}
+
+  /* sub-processors */
+  .subs{padding:104px 0 0}
+  .subs .head{text-align:center;margin-bottom:44px}
+  .vgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;max-width:1080px;margin:0 auto}
+  .vcard{background:#fff;border:1px solid var(--line);border-radius:18px;padding:24px 22px;display:flex;flex-direction:column;gap:9px;transition:transform .25s,box-shadow .25s,border-color .25s}
+  .vcard:hover{transform:translateY(-3px);box-shadow:0 24px 50px -28px rgba(26,20,36,0.18);border-color:var(--primary-soft-2)}
+  .vcard .lg{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;font-weight:700;letter-spacing:-0.02em}
+  .vcard .nm{font-size:14px;font-weight:600;color:var(--ink);letter-spacing:-0.005em;margin-top:2px}
+  .vcard .role{font-size:12px;color:var(--muted);line-height:1.45}
+
+  @media (max-width:900px){
+    .feat-row,.feat-row.flip{grid-template-columns:1fr;gap:32px}
+    .feat-row.flip .copy{order:0}
+    .princ .pgrid{grid-template-columns:1fr}
+    .limits .lgrid{grid-template-columns:1fr}
+    .limits .lwrap{padding:32px}
+    .vgrid{grid-template-columns:repeat(2,1fr)}
+  }
+</style>
+</head>
+<body data-page="security" style="background-color: rgb(255, 255, 255)">
+
+<!-- HERO -->
+<header class="page-hero trust-hero">
+  <div class="wrap">
+    <span class="eyebrow">Security &amp; Trust Overview</span>
+    <h1>Built so sensitive data never leaves your browser <span class="accent">unprotected.</span></h1>
+    <p class="sub">Annote captures the technical evidence behind a bug — console, network, and what the user did. <b>That's exactly the kind of data that can contain secrets, so we built the product to protect it at the source.</b></p>
+  </div>
+</header>
+
+<!-- POINT 1 — Capture is off until you start -->
+<section class="feat">
+  <div class="wrap">
+    <div class="feat-row">
+      <div class="copy">
+        <span class="eyebrow">Off by default</span>
+        <h2>Capture is off until you start.</h2>
+        <p>The extension stays inactive on the pages you visit. It captures only during a session you start, and stops the moment you end it. <b>There is no always-on background recording.</b></p>
+      </div>
+      <div class="feat-vis">
+        <div class="vis-state">
+          <div class="state-pill idle">
+            <span class="dot"></span>
+            <div class="tx"><div class="t">Annote</div><div class="m">Inactive · not capturing</div></div>
+            <span class="badge">Idle</span>
+          </div>
+          <div class="arrow"><span class="ln"></span> you start a session <span class="ln"></span></div>
+          <div class="state-pill active">
+            <span class="dot"></span>
+            <div class="tx"><div class="t">Capture session</div><div class="m">Recording · 00:12</div></div>
+            <span class="badge">● Rec</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- POINT 2 — Redaction in your browser -->
+<section class="feat">
+  <div class="wrap">
+    <div class="feat-row flip">
+      <div class="copy">
+        <span class="eyebrow">Redaction at the source</span>
+        <h2>Redaction happens in your browser, before anything is sent.</h2>
+        <p>As data is captured, Annote replaces sensitive patterns — auth tokens, emails, card-like numbers, phone numbers, API keys, Authorization and Cookie headers — with placeholders, and strips sensitive headers, on your machine, before transmission. <b>Password, hidden, and payment fields are never captured.</b></p>
+        <span class="failclosed">We call this <span class="mono">fail-closed</span> — if in doubt, it's redacted.</span>
+      </div>
+      <div class="feat-vis">
+        <div class="vis-redact">
+          <div class="rhead">
+            Outgoing capture
+            <span class="loc"><i></i> redacted on-device</span>
+          </div>
+          <div class="rbody">
+            <div class="line">
+              <span class="k">Authorization:</span>
+              <span class="before">Bearer sk-live-9f3a2b1c8e…</span>
+              <span class="after">Bearer <span class="tok">[redacted]</span></span>
+            </div>
+            <div class="line">
+              <span class="k">email:</span>
+              <span class="before">jane.doe@acme.com</span>
+              <span class="after"><span class="tok">[redacted]</span></span>
+            </div>
+            <div class="line">
+              <span class="k">card:</span>
+              <span class="before">4242 4242 4242 4242</span>
+              <span class="after"><span class="tok">[redacted]</span></span>
+            </div>
+            <div class="line">
+              <span class="k">password field:</span>
+              <span class="after never">never captured <span class="tok">✓</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- POINTS 3-5 -->
+<section class="princ">
+  <div class="wrap">
+    <div class="pgrid">
+      <div class="pcard">
+        <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7a11 11 0 0 1-5-1.2"/><circle cx="12" cy="12" r="3"/><path d="m3 3 18 18"/></svg></span>
+        <h3>We never read what users type.</h3>
+        <p>Annote records <b>which field</b> was interacted with — never the characters entered into your page's fields.</p>
+      </div>
+      <div class="pcard">
+        <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6z"/></svg></span>
+        <h3>Four browser permissions. Nothing more.</h3>
+        <p>Annote requests only what it needs to show the capture tray and capture during a session. It does <b>not</b> request access to your browsing history or cookies, and does not use a webRequest interception permission.</p>
+      </div>
+      <div class="pcard">
+        <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16 9"/></svg></span>
+        <h3>No third-party tracking.</h3>
+        <p>The product contains <b>no advertising or product-analytics SDKs.</b></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TWO HONEST LIMITS -->
+<section class="limits">
+  <div class="wrap">
+    <div class="lwrap">
+      <div class="lhead">
+        <h2>Two honest limits.</h2>
+        <span class="tag">Said plainly</span>
+      </div>
+      <p class="lsub">We'd rather tell you than have you discover them.</p>
+      <div class="lgrid">
+        <div class="lcard">
+          <div class="n">Limit 01</div>
+          <h4>The screenshot is a picture of your visible tab.</h4>
+          <p>Anything on screen at capture time is in the image — <b>redaction protects the captured data, not the picture.</b></p>
+        </div>
+        <div class="lcard">
+          <div class="n">Limit 02</div>
+          <h4>Privacy markers control action and console capture, not network data.</h4>
+          <p>Network data is <b>protected by automatic redaction</b> instead.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SUB-PROCESSORS -->
+<section class="subs">
+  <div class="wrap">
+    <div class="head">
+      <span class="eyebrow">Sub-processors</span>
+      <h2>A small set of <span class="accent">trusted providers.</span></h2>
+    </div>
+    <div class="vgrid">
+      <div class="vcard"><span class="lg" style="background:#10A37F">O</span><div class="nm">OpenAI</div><div class="role">AI structuring, diagnosis &amp; voice transcription</div></div>
+      <div class="vcard"><span class="lg" style="background:#FFA000">F</span><div class="nm">Google Firebase</div><div class="role">Auth and storage</div></div>
+      <div class="vcard"><span class="lg" style="background:#635BFF">S</span><div class="nm">Stripe</div><div class="role">Billing</div></div>
+      <div class="vcard"><span class="lg" style="background:#1A1424">R</span><div class="nm">Resend</div><div class="role">Email</div></div>
+      <div class="vcard"><span class="lg" style="background:#111111">V</span><div class="nm">Vercel</div><div class="role">Hosting</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CLOSING CTA -->
+<section class="final">
+  <div class="final-card">
+    <div class="inner">
+      <span class="eyebrow">Read more</span>
+      <h2>Want the <span class="accent">full detail?</span></h2>
+      <p class="lead">For full detail on data handling, see our Privacy Policy. For enterprise security questions, reach out any time.</p>
+      <div class="cta-row">
+        <a href="privacy.html" class="btn btn-primary btn-lg">Read the Privacy Policy <span class="arr">→</span></a>
+      </div>
+      <p class="lead" style="margin:22px auto 0;font-size:15px">For enterprise security questions, contact <span class="ph">[SECURITY/SALES EMAIL]</span>.</p>
+    </div>
+  </div>
+</section>
+
+<script src="partials.js"></script>
+
+</body>
+</html>

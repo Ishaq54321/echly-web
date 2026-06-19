@@ -2,7 +2,16 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   async redirects() {
-    return [{ source: "/app", destination: "/dashboard", permanent: false }];
+    return [
+      { source: "/app", destination: "/dashboard", permanent: false },
+      // Docs now live as Next.js routes under app/(marketing)/docs/. Old links
+      // and bookmarks still carrying the legacy ".html" extension (from when the
+      // docs were static files in public/docs/) redirect to the clean route
+      // URLs. Only the screenshots remain under public/docs/assets/ — that is
+      // also where the docs-screenshot harness (scripts/docsCapture/) writes.
+      { source: "/docs/index.html", destination: "/docs", permanent: false },
+      { source: "/docs/:slug.html", destination: "/docs/:slug", permanent: false },
+    ];
   },
   images: {
     // remotePatterns status (Fix 6 — image-system audit):

@@ -86,6 +86,7 @@
     "esbuild": "^0.24.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "playwright": "^1.61.0",
     "postcss-cli": "^11.0.1",
     "server-only": "^0.0.1",
     "tailwindcss": "^4",

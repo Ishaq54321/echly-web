@@ -153,13 +153,27 @@ export function emailShellV2({
   <meta name="color-scheme" content="light">
   <meta name="supported-color-schemes" content="light">
   <title>Annote</title>
+  <!--
+    Responsive overrides. Email has no inline equivalent for media queries, so
+    this single <style> block is the one exception to the "inline CSS only"
+    rule. Clients that honour <style>+media (Apple Mail, iOS Mail, Gmail apps)
+    tighten the card/outer padding on phones; clients that ignore it (Outlook)
+    keep the inline 32px desktop padding, so the layout degrades gracefully.
+    !important is required to win over the inline padding on the same elements.
+  -->
+  <style>
+    @media only screen and (max-width:480px) {
+      .em-outer { padding-left:${EMAIL_SIZES.outerPaddingHorizontal - 4}px !important; padding-right:${EMAIL_SIZES.outerPaddingHorizontal - 4}px !important; }
+      .em-card { padding:${EMAIL_SIZES.cardPaddingMobile}px !important; }
+    }
+  </style>
 </head>
 <body style="margin:0;padding:0;background-color:${EMAIL_COLORS.pageBackground};font-family:${EMAIL_FONTS.body};-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
   ${pre ? `<div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${pre}</div>` : ""}
 
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${EMAIL_COLORS.pageBackground};">
     <tr>
-      <td align="center" style="padding:${EMAIL_SIZES.outerPaddingVertical}px ${EMAIL_SIZES.outerPaddingHorizontal}px;">
+      <td align="center" class="em-outer" style="padding:${EMAIL_SIZES.outerPaddingVertical}px ${EMAIL_SIZES.outerPaddingHorizontal}px;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="${EMAIL_SIZES.containerMaxWidth}" style="width:100%;max-width:${EMAIL_SIZES.containerMaxWidth}px;">
 
           <!-- Header: brand strip (logomark + "Annote"), 32px gap below -->
@@ -210,7 +224,7 @@ interface CardV2Options {
  */
 export function emailCardV2({ content }: CardV2Options): string {
   return `<tr>
-  <td style="background-color:${EMAIL_COLORS.cardBackground};border-radius:${EMAIL_SIZES.cardBorderRadius}px;padding:${EMAIL_SIZES.cardPaddingDesktop}px;">
+  <td class="em-card" style="background-color:${EMAIL_COLORS.cardBackground};border-radius:${EMAIL_SIZES.cardBorderRadius}px;padding:${EMAIL_SIZES.cardPaddingDesktop}px;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
       ${content}
     </table>

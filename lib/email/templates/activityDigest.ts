@@ -55,17 +55,23 @@ export interface ActivityDigestProps {
 function renderItemLinks(
   links: Array<{ title: string; url: string | null }>
 ): string {
+  // Titles must be allowed to wrap: ticket titles are free-form and often long,
+  // and `white-space:nowrap` (the old treatment) forced a single long title to
+  // overflow the card on narrow viewports, which zoomed/scrolled the whole
+  // digest sideways on phones. `overflow-wrap:break-word` on the cell lets long
+  // titles (and unbroken tokens like URLs) wrap cleanly. The "·" separators are
+  // kept non-breaking so they never orphan onto a line by themselves.
   const rendered = links
     .map((l) => {
       const safeTitle = escapeEmailHtml(l.title);
       if (l.url) {
-        return `<span style="white-space:nowrap;"><a href="${l.url}" style="color:${EMAIL_COLORS.linkColor};text-decoration:none;">${safeTitle}</a></span>`;
+        return `<a href="${l.url}" style="color:${EMAIL_COLORS.linkColor};text-decoration:none;">${safeTitle}</a>`;
       }
-      return `<span style="white-space:nowrap;">${safeTitle}</span>`;
+      return safeTitle;
     })
-    .join('<span style="color:' + EMAIL_COLORS.hairline + ';">&nbsp;·&nbsp;</span>');
+    .join('<span style="color:' + EMAIL_COLORS.hairline + ';white-space:nowrap;">&nbsp;·&nbsp;</span>');
   if (!rendered) return "";
-  return `<tr><td style="padding:2px 0 0 0;font-size:13px;color:${EMAIL_COLORS.textSecondary};line-height:1.5;">${rendered}</td></tr>`;
+  return `<tr><td style="padding:2px 0 0 0;font-size:13px;color:${EMAIL_COLORS.textSecondary};line-height:1.5;word-break:break-word;overflow-wrap:break-word;">${rendered}</td></tr>`;
 }
 
 /** A single session card: title (linked) + bullet-ish summary lines. */

@@ -142,9 +142,9 @@ export function PlansAndPricingView({
           priceUnit=""
           priceSub="Free forever"
           features={[
-            `Up to ${fmtNum(starter?.maxMembers, 5)} members`,
+            "Limited team members",
             `${fmtNum(starter?.maxFeedbackPerMonth, 50)} tickets/mo`,
-            `${fmtNum(starter?.aiImprovementsPerMonth, 300)} AI improvements/mo`,
+            "Limited AI improvements/mo",
             "Basic insights",
           ]}
           cta={
@@ -171,7 +171,7 @@ export function PlansAndPricingView({
           priceSub={businessPrice.sub}
           features={[
             "Unlimited members",
-            `${fmtNum(business?.aiImprovementsPerMonth, 1500)} AI improvements/mo`,
+            "Unlimited AI improvements/mo",
             "Unlimited tickets",
             "Priority support",
             "Custom branding",
@@ -558,14 +558,14 @@ function ComparisonTable({
     },
     {
       label: "Team members",
-      starter: limit(starter?.maxMembers),
+      starter: "Limited",
       business: limit(business?.maxMembers),
       enterprise: limit(enterprise?.maxMembers),
     },
     {
       label: "AI improvements/mo",
-      starter: limit(starter?.aiImprovementsPerMonth),
-      business: limit(business?.aiImprovementsPerMonth),
+      starter: "Limited",
+      business: "Unlimited",
       enterprise: limit(enterprise?.aiImprovementsPerMonth),
     },
     {

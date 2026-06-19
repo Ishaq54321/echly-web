@@ -67,8 +67,8 @@ export function UpgradeModal({
     seatCountProp != null
       ? Math.max(seatCountProp, memberFloor)
       : memberFloor;
-  const pricePerSeat = businessPlan?.pricePerSeat ?? 19;
-  const annualPricePerSeat = businessPlan?.annualPricePerSeat ?? 15.2;
+  const pricePerSeat = businessPlan?.pricePerSeat ?? 24;
+  const annualPricePerSeat = businessPlan?.annualPricePerSeat ?? 19;
 
   const monthlyTotal = (seatCount * pricePerSeat).toFixed(2);
   const annualTotal = (seatCount * annualPricePerSeat * 12).toFixed(2);

@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Annote — Privacy Policy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css" />
+</head>
+<body data-page="privacy">
+
+<!-- HEAD -->
+<header class="legal-head">
+  <div class="legal-shell">
+    <p class="kicker">Legal</p>
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated: <span class="ph">[DATE]</span></p>
+    <p class="preamble"><span class="ph">[LEGAL ENTITY NAME]</span> ("Annote," "we," "us") operates the Annote browser extension and web application at annote.ai (the "Service"). This policy explains what we collect, how we use it, and the choices you have. <span class="ph">[LEGAL REVIEW REQUIRED before publishing.]</span></p>
+  </div>
+</header>
+
+<div class="legal-layout">
+
+  <!-- TABLE OF CONTENTS -->
+  <nav class="legal-toc" aria-label="Sections">
+    <p class="toc-label">On this page</p>
+    <ol>
+      <li><a href="#s1"><span class="n">01</span><span>The short version</span></a></li>
+      <li><a href="#s2"><span class="n">02</span><span>Information we collect</span></a></li>
+      <li><a href="#s3"><span class="n">03</span><span>What we do not collect</span></a></li>
+      <li><a href="#s4"><span class="n">04</span><span>Redaction before transmission</span></a></li>
+      <li><a href="#s5"><span class="n">05</span><span>How we use information</span></a></li>
+      <li><a href="#s6"><span class="n">06</span><span>Service providers</span></a></li>
+      <li><a href="#s7"><span class="n">07</span><span>AI processing</span></a></li>
+      <li><a href="#s8"><span class="n">08</span><span>Data retention</span></a></li>
+      <li><a href="#s9"><span class="n">09</span><span>Your rights</span></a></li>
+      <li><a href="#s10"><span class="n">10</span><span>Transfers, children, security</span></a></li>
+      <li><a href="#s11"><span class="n">11</span><span>Changes &amp; contact</span></a></li>
+    </ol>
+  </nav>
+
+  <!-- BODY -->
+  <main class="legal-body">
+
+    <section class="legal-section" id="s1">
+      <h2><span class="num">1.</span> The short version.</h2>
+      <p>Annote is a tool for capturing website feedback. It captures nothing until you start a session. When you do, sensitive data is redacted inside your browser before anything is sent to us. We don't sell your data, we don't use third-party advertising or analytics trackers in the product, and we use a small number of trusted service providers to run the Service.</p>
+    </section>
+
+    <section class="legal-section" id="s2">
+      <h2><span class="num">2.</span> Information we collect.</h2>
+      <p><span class="lead-term">Account information:</span> when you create an account, we collect your name, email address, and (if you sign in with Google) basic Google profile information. Authentication and account data are handled through Google Firebase.</p>
+      <p><span class="lead-term">Workspace and content you create:</span> workspaces, sessions, tickets, comments, tags, and any text you write in the Service.</p>
+      <p><span class="lead-term">Captured feedback data:</span> when you run a capture session, Annote records, for the page you're reviewing: console logs, network request metadata and bodies, a record of your interactions (clicks, navigation, field edits — never the text you type into your own page's fields), a screenshot of the visible browser tab, and, if you use voice, an audio recording of your microphone. This data is redacted in your browser before transmission — see Section 4.</p>
+      <p><span class="lead-term">Billing information:</span> if you purchase a paid plan, payment is processed by Stripe. We do not store full card numbers; Stripe handles payment data under its own terms.</p>
+      <p><span class="lead-term">Basic operational data:</span> we keep limited logs needed to operate and secure the Service.</p>
+    </section>
+
+    <section class="legal-section" id="s3">
+      <h2><span class="num">3.</span> What we do NOT collect.</h2>
+      <p>Annote runs on four browser permissions and does not request access to your browsing history, your cookies, or a webRequest interception permission. Outside of an active capture session, the extension does not collect page data. Annote does not record the text users type into form fields. We do not embed third-party advertising or product-analytics tracking SDKs in the Service.</p>
+    </section>
+
+    <section class="legal-section" id="s4">
+      <h2><span class="num">4.</span> Redaction before transmission.</h2>
+      <p>As feedback is captured, Annote automatically replaces sensitive patterns — including authentication tokens, email addresses, card-like numbers, phone numbers, API keys, and Authorization and Cookie headers — with placeholders, and strips sensitive request headers, before the data leaves your browser. Password, hidden, and payment field values are never captured. You can additionally mark elements on your own pages to exclude or mask them. <b>Important limits, stated plainly:</b> redaction does not alter the screenshot image, and privacy markers do not redact network data. See our <a class="inline" href="trust.html">Security overview</a> for full detail.</p>
+    </section>
+
+    <section class="legal-section" id="s5">
+      <h2><span class="num">5.</span> How we use information.</h2>
+      <p>To provide and operate the Service; to generate AI ticket structuring and diagnosis; to transcribe voice notes; to process payments; to send transactional and (with your consent where required) product-update emails; to secure the Service and prevent abuse; and to comply with law.</p>
+    </section>
+
+    <section class="legal-section" id="s6">
+      <h2><span class="num">6.</span> Service providers (sub-processors).</h2>
+      <p>We share data only with providers that help us run the Service: OpenAI (AI ticket structuring/diagnosis and voice transcription), Google Firebase (authentication and data storage), Stripe (billing), Resend (transactional email), and Vercel (hosting). Captured text and voice audio are sent to OpenAI to produce tickets and transcriptions. <span class="ph">[CONFIRM each provider and add any others; link a sub-processor list.]</span></p>
+    </section>
+
+    <section class="legal-section" id="s7">
+      <h2><span class="num">7.</span> AI processing.</h2>
+      <p>Captured feedback text and voice recordings are processed by OpenAI to structure tickets and produce diagnoses. AI output may be inaccurate and is labeled "review before acting"; you are responsible for verifying it. <span class="ph">[CONFIRM data-retention/training terms with your OpenAI account tier and state them here.]</span></p>
+    </section>
+
+    <section class="legal-section" id="s8">
+      <h2><span class="num">8.</span> Data retention.</h2>
+      <p>We retain account and content data for as long as your account is active and as needed to provide the Service. <span class="ph">[SPECIFY retention periods for captured data and voice audio, and deletion timelines.]</span> You can delete tickets, sessions, your workspace, and your account from within the Service.</p>
+    </section>
+
+    <section class="legal-section" id="s9">
+      <h2><span class="num">9.</span> Your rights.</h2>
+      <p>Depending on where you live, you may have rights to access, correct, delete, or export your data, and to object to or restrict certain processing. <span class="ph">[ADD GDPR/UK-GDPR and CCPA/CPRA specifics and how to exercise them.]</span> To make a request, contact <span class="ph">[PRIVACY EMAIL]</span>.</p>
+    </section>
+
+    <section class="legal-section" id="s10">
+      <h2><span class="num">10.</span> International transfers, children, security.</h2>
+      <p><span class="ph">[ADD international-transfer mechanism if you serve the EU/UK.]</span> The Service is not directed to children under <span class="ph">[16/13]</span>. We use reasonable technical and organizational measures to protect data; no method is perfectly secure.</p>
+    </section>
+
+    <section class="legal-section" id="s11">
+      <h2><span class="num">11.</span> Changes &amp; contact.</h2>
+      <p>We'll update this policy as the Service evolves and revise the date above. Questions: <span class="ph">[PRIVACY EMAIL]</span>, <span class="ph">[LEGAL ENTITY + ADDRESS]</span>.</p>
+    </section>
+
+  </main>
+</div>
+
+<script src="partials.js"></script>
+<script>
+  // TOC scroll-spy
+  (function(){
+    const links = [...document.querySelectorAll('.legal-toc a')];
+    const map = new Map(links.map(a => [a.getAttribute('href').slice(1), a]));
+    const sections = [...document.querySelectorAll('.legal-section')];
+    const io = new IntersectionObserver((entries)=>{
+      entries.forEach(e=>{
+        if(e.isIntersecting){
+          links.forEach(l=>l.classList.remove('active'));
+          const a = map.get(e.target.id);
+          if(a) a.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-96px 0px -65% 0px', threshold: 0 });
+    sections.forEach(s=>io.observe(s));
+  })();
+</script>
+
+</body>
+</html>

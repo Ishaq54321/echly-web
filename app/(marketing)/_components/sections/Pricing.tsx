@@ -46,12 +46,12 @@ const PRICING_TIERS: Record<"starter" | "business" | "enterprise", TierData> = {
     name: "Business",
     whoItsFor: "For agencies and product teams shipping client work",
     pricing: {
-      monthly: { price: 19, period: "user / month", billed: null },
+      monthly: { price: 24, period: "user / month", billed: null },
       yearly: {
-        price: 15,
+        price: 19,
         period: "user / month",
-        billed: "$180 / user / year",
-        original: "$228 / user / year",
+        billed: "$228 / user / year",
+        original: "$288 / user / year",
       },
     },
     cta: { label: "Get started", href: "/signup?plan=business", variant: "primary" },

@@ -29,11 +29,9 @@ const COLUMNS: ReadonlyArray<FooterColumn> = [
   {
     heading: "Legal",
     links: [
-      { label: "Terms", href: "#" },
-      { label: "Privacy policy", href: "#" },
-      { label: "Trust", href: "#" },
-      { label: "DPA", href: "#" },
-      { label: "Your privacy choices", href: "#" },
+      { label: "Terms", href: "/marketing/terms.html" },
+      { label: "Privacy policy", href: "/marketing/privacy.html" },
+      { label: "Trust", href: "/marketing/trust.html" },
     ],
   },
   {
