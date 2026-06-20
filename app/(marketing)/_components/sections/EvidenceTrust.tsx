@@ -542,10 +542,6 @@ export function EvidenceTrust() {
                 </div>
               </div>
             </div>
-
-            <a className="pv-link" href="#">
-              Security overview <span className="arr">→</span>
-            </a>
           </div>
 
           {/* RIGHT : redaction mockup */}
