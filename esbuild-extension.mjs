@@ -83,6 +83,28 @@ if (isParallelBuild && !fs.existsSync(outDir)) {
   fs.mkdirSync(outDir, { recursive: true });
 }
 
+// Clean prior build artifacts before emitting new ones. esbuild's code-
+// splitting writes freshly-hashed chunks but never deletes superseded ones,
+// so without this a build accumulates orphan chunks (e.g. dead localhost-
+// pointing code) that would silently ship if the directory is zipped as-is
+// (see B4 audit). Clean-then-build guarantees only current chunks survive.
+//
+// We never delete source: when outDir === extDir the generated outputs sit
+// beside source files, so we remove the generated set explicitly rather than
+// wiping the directory. popup.css is intentionally excluded — it is produced
+// by the separate `build:extension:css` step that runs before this one.
+const generatedOutputs = [
+  "widget", // code-split output dir: widget.js + chunks/* (all generated)
+  "bootstrap.js",
+  "background.js",
+  "mainWorld.js",
+  "mainWorldNetwork.js",
+  "mainWorldActions.js",
+];
+for (const name of generatedOutputs) {
+  fs.rmSync(path.join(outDir, name), { recursive: true, force: true });
+}
+
 const define = {
   "process.env.NODE_ENV": JSON.stringify(nodeEnv),
   "process.env.ECHLY_WEB_APP_URL": JSON.stringify(webAppUrl),
@@ -227,7 +249,12 @@ await esbuild.build({
 // concatenates. For the localhost build we swap manifest.local.json into
 // place as manifest.json so the dev sees a distinct name in chrome://extensions.
 if (isParallelBuild) {
-  const manifestSrc = fs.existsSync(path.join(extDir, "manifest.local.json"))
+  // Only dev builds get the "Annote (Local Dev)" manifest. A prod build must
+  // always ship the real manifest.json — never the local one, even if it
+  // happens to exist in extDir (see B4 audit).
+  const useLocalManifest =
+    !isProd && fs.existsSync(path.join(extDir, "manifest.local.json"));
+  const manifestSrc = useLocalManifest
     ? path.join(extDir, "manifest.local.json")
     : path.join(extDir, "manifest.json");
   fs.copyFileSync(manifestSrc, path.join(outDir, "manifest.json"));

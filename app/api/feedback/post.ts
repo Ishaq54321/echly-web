@@ -98,7 +98,6 @@ export async function POST(req: NextRequest) {
 
   try {
     body = await req.json();
-    console.log("[FEEDBACK_DEBUG] received body:", JSON.stringify(body, null, 2));
   } catch (err) {
     console.error("[feedback] invalid JSON body:", err);
     return apiError({

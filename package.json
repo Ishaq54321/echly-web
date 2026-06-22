@@ -17,6 +17,7 @@
     "build:extension:css": "npx postcss app/globals.css -o annote-extension/popup.css && node -e \"const fs=require('fs'); const f=fs.readFileSync('annote-extension/extension-fonts.css','utf8'); const m=fs.readFileSync('annote-extension/popup.css','utf8'); fs.writeFileSync('annote-extension/popup.css', f+m);\"",
     "build:extension:js": "node esbuild-extension.mjs",
     "build:extension:prod": "cross-env NODE_ENV=production ECHLY_WEB_APP_URL=https://annote.ai npm run build:extension",
+    "build:extension:dist": "cross-env NODE_ENV=production ECHLY_WEB_APP_URL=https://annote.ai ECHLY_EXT_OUT_DIR=annote-extension-dist npm run build:extension",
     "build:extension:local": "cross-env NODE_ENV=development ECHLY_WEB_APP_URL=http://localhost:3000 ECHLY_EXT_OUT_DIR=annote-extension-local npm run build:extension",
     "test:shared": "node --import tsx --test annote-extension/src/shared/privacy.test.ts annote-extension/src/shared/captureGate.test.ts",
     "test:console": "node --import tsx --test annote-extension/src/console/redact.test.ts annote-extension/src/console/stringify.test.ts annote-extension/src/console/denylist.test.ts annote-extension/src/console/buffer.test.ts",

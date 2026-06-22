@@ -230,7 +230,10 @@ export default function PrivacyPage() {
             <b>Markers do not edit the screenshot.</b> The screenshot is a picture of the
             visible part of the tab at the moment you capture. Markers hide text from the
             captured data, not from the image. If something sensitive is visible on screen
-            when you capture, it will be in the screenshot.
+            when you capture, it will be in the screenshot. Screenshots are stored at a
+            unique, unguessable link — but anyone who has that link can open the image, so
+            treat a capture link as sensitive and share it only with people who should see
+            it.
           </Note>
         </DocSection>
 

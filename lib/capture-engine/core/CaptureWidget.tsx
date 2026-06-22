@@ -500,11 +500,14 @@ export default function CaptureWidget({
     if (!sessionId) return;
     setCopyState("copying");
 
-    const envBase = (typeof process !== "undefined" ? process.env.ECHLY_WEB_APP_URL : "") || "";
+    const envBase = process.env.ECHLY_WEB_APP_URL || "";
     const fallbackOrigin = extensionMode
       ? ""
       : (typeof window !== "undefined" ? window.location.origin : "");
-    const appOrigin = envBase || fallbackOrigin || "http://localhost:3000";
+    const appOrigin =
+      envBase ||
+      fallbackOrigin ||
+      (process.env.NODE_ENV !== "production" ? "http://localhost:3000" : "");
 
     const finalize = async (url: string) => {
       await navigator.clipboard.writeText(url);

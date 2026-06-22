@@ -27,16 +27,17 @@
 </svg>`;
 
   const navLinks = [
-    { href: 'how-it-works.html', label: 'Product', match: ['how-it-works'] },
-    { href: 'pricing.html', label: 'Pricing', match: ['pricing'] },
-    { href: 'security.html', label: 'Security', match: ['security'] },
-    { href: 'how-it-works.html', label: 'How it works', match: ['how-it-works'] }
+    { href: '/use-cases/qa-testing', label: 'Use cases', match: ['use-cases'] },
+    { href: '/use-cases/agencies', label: 'Agencies', match: ['agencies'] },
+    { href: '/use-cases/teams', label: 'Teams', match: ['teams'] },
+    { href: '/#pricing', label: 'Pricing', match: ['pricing'] },
+    { href: '/docs', label: 'Docs', match: ['docs'] }
   ];
 
   const navHTML = `
 <nav class="nav">
   <div class="wrap nav-inner">
-    <a href="../Annote Landing v3.html" class="brand">
+    <a href="/" class="brand">
       <span class="mark"><svg viewBox="0 0 44 55" width="100%" height="100%"><use href="#annote-mark"/></svg></span>
       Annote
     </a>
@@ -44,8 +45,9 @@
       ${navLinks.map((l,i)=>`<a href="${l.href}" class="${l.match.includes(page)?'active':''}" data-key="${i}">${l.label}</a>`).join('')}
     </div>
     <div class="nav-cta">
-      <a href="#" class="btn btn-ghost">Sign in</a>
-      <a href="#" class="btn btn-primary">Get started <span class="arr">→</span></a>
+      <a href="/#contact" class="btn btn-ghost">Contact sales</a>
+      <a href="/login" class="btn btn-ghost">Sign in</a>
+      <a href="/signup" class="btn btn-primary">Get Annote <span class="arr">→</span></a>
     </div>
   </div>
 </nav>`;
@@ -62,49 +64,33 @@
         <p>Feedback at the speed of seeing it. Made for people who care about the details.</p>
       </div>
       <div class="f-col">
-        <h5>Product</h5>
-        <ul>
-          <li><a href="../Annote Landing v3.html">Home</a></li>
-          <li><a href="pricing.html">Pricing</a></li>
-          <li><a href="security.html">Security</a></li>
-          <li><a href="#">Changelog</a></li>
-          <li><a href="#">What's new</a></li>
-        </ul>
-      </div>
-      <div class="f-col">
         <h5>Use cases</h5>
         <ul>
-          <li><a href="for-designers.html">Designers</a></li>
-          <li><a href="for-developers.html">Developers</a></li>
-          <li><a href="#">Marketers</a></li>
-          <li><a href="#">Product</a></li>
-          <li><a href="#">QA</a></li>
+          <li><a href="/use-cases/qa-testing">QA testing</a></li>
+          <li><a href="/use-cases/design-review">Design review</a></li>
+          <li><a href="/use-cases/client-feedback">Client feedback</a></li>
         </ul>
       </div>
       <div class="f-col">
-        <h5>Company</h5>
+        <h5>Solutions</h5>
         <ul>
-          <li><a href="about.html">About</a></li>
-          <li><a href="#">Careers</a></li>
-          <li><a href="contact.html">Contact</a></li>
-        </ul>
-      </div>
-      <div class="f-col">
-        <h5>Resources</h5>
-        <ul>
-          <li><a href="how-it-works.html">How it works</a></li>
-          <li><a href="#">Docs</a></li>
-          <li><a href="#">API</a></li>
-          <li><a href="#">Help</a></li>
-          <li><a href="#">Status</a></li>
+          <li><a href="/use-cases/agencies">Agencies</a></li>
+          <li><a href="/use-cases/teams">Teams</a></li>
+          <li><a href="/docs">Help center</a></li>
         </ul>
       </div>
       <div class="f-col">
         <h5>Legal</h5>
         <ul>
-          <li><a href="privacy.html">Privacy</a></li>
           <li><a href="terms.html">Terms</a></li>
+          <li><a href="privacy.html">Privacy policy</a></li>
           <li><a href="trust.html">Trust</a></li>
+        </ul>
+      </div>
+      <div class="f-col">
+        <h5>Connect</h5>
+        <ul>
+          <li><a href="https://www.linkedin.com/company/annoteai">LinkedIn</a></li>
         </ul>
       </div>
     </div>
@@ -114,8 +100,7 @@
       </div>
       <div class="right">
         <span class="stat"><span class="pip"></span>All systems normal</span>
-        <a href="#">Twitter</a>
-        <a href="#">LinkedIn</a>
+        <a href="https://www.linkedin.com/company/annoteai">LinkedIn</a>
       </div>
     </div>
   </div>

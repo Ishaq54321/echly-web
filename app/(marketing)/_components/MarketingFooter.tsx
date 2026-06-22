@@ -7,23 +7,19 @@ type FooterColumn = {
 
 const COLUMNS: ReadonlyArray<FooterColumn> = [
   {
-    heading: "Product",
+    heading: "Use cases",
     links: [
-      { label: "Annote Capture", href: "#" },
-      { label: "Annote Voice", href: "#" },
-      { label: "Sessions", href: "#" },
-      { label: "Integrations", href: "#" },
-      { label: "Changelog", href: "#" },
+      { label: "QA testing", href: "/use-cases/qa-testing" },
+      { label: "Design review", href: "/use-cases/design-review" },
+      { label: "Client feedback", href: "/use-cases/client-feedback" },
     ],
   },
   {
-    heading: "Company",
+    heading: "Solutions",
     links: [
-      { label: "Contact us", href: "#" },
-      { label: "About", href: "#" },
-      { label: "Careers", href: "#" },
-      { label: "Help center", href: "#" },
-      { label: "Partners", href: "#" },
+      { label: "Agencies", href: "/use-cases/agencies" },
+      { label: "Teams", href: "/use-cases/teams" },
+      { label: "Help center", href: "/docs" },
     ],
   },
   {
@@ -37,11 +33,7 @@ const COLUMNS: ReadonlyArray<FooterColumn> = [
   {
     heading: "Connect",
     links: [
-      { label: "LinkedIn", href: "#" },
-      { label: "X", href: "#" },
-      { label: "Instagram", href: "#" },
-      { label: "YouTube", href: "#" },
-      { label: "Threads", href: "#" },
+      { label: "LinkedIn", href: "https://www.linkedin.com/company/annoteai" },
     ],
   },
 ];

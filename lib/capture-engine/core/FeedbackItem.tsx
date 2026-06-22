@@ -357,7 +357,7 @@ export function TicketEditorOverlay({
                   onClick={async (e) => {
                     e.stopPropagation();
                     await onPauseForEditor?.();
-                    const base = (typeof process !== "undefined" ? process.env.ECHLY_WEB_APP_URL : "") || "http://localhost:3000";
+                    const base = process.env.ECHLY_WEB_APP_URL || "";
                     window.open(`${base}/session/${sessionId}?ticket=${ticket.id}&edit=true`, "_blank");
                   }}
                 >
