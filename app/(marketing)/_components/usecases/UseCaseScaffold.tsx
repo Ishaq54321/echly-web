@@ -41,7 +41,7 @@ export function UseCaseHero({
           <Link className="btn-primary lg" href="/signup">
             Get Annote for free <span className="arr">→</span>
           </Link>
-          <a className="uc-btn-ghost" href="/signup">
+          <a className="uc-btn-ghost" href="https://chromewebstore.google.com/detail/annote/bbgkibjfpdpiooneibjmafgiaiilpfhn" target="_blank" rel="noopener noreferrer">
             Install Chrome Extension
           </a>
         </div>

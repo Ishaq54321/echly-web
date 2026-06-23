@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useExtensionDetection } from "@/components/dashboard/hooks/useExtensionDetection";
 
-const CHROME_EXTENSION_URL = "https://chromewebstore.google.com/detail/echly/PLACEHOLDER";
+const CHROME_EXTENSION_URL = "https://chromewebstore.google.com/detail/annote/bbgkibjfpdpiooneibjmafgiaiilpfhn";
 
 type UseSessionEntryCtaResult = {
   isInstalled: boolean;

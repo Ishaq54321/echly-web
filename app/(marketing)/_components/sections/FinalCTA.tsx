@@ -195,7 +195,7 @@ export function FinalCTA() {
             </Link>
             <a
               className="cta-btn cta-btn--light"
-              href="https://chrome.google.com/webstore/detail/annote"
+              href="https://chromewebstore.google.com/detail/annote/bbgkibjfpdpiooneibjmafgiaiilpfhn"
               target="_blank"
               rel="noopener noreferrer"
             >

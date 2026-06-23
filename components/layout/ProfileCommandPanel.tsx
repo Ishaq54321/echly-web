@@ -585,7 +585,7 @@ export function ProfileCommandPanel({
               badge="Free"
               onClick={() => {
                 window.open(
-                  "https://chrome.google.com/webstore",
+                  "https://chromewebstore.google.com/detail/annote/bbgkibjfpdpiooneibjmafgiaiilpfhn",
                   "_blank",
                   "noopener,noreferrer",
                 );

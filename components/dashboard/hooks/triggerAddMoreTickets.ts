@@ -1,6 +1,6 @@
 "use client";
 
-const CHROME_EXTENSION_URL = "https://chromewebstore.google.com/detail/echly/PLACEHOLDER";
+const CHROME_EXTENSION_URL = "https://chromewebstore.google.com/detail/annote/bbgkibjfpdpiooneibjmafgiaiilpfhn";
 
 export function triggerAddMoreTickets(sessionId: string): void {
   if (typeof window === "undefined") return;

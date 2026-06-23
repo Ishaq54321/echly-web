@@ -96,8 +96,7 @@ export default function GettingStartedPage() {
           <ol className="steps">
             <li>
               Open the Annote extension in the Chrome Web Store:{" "}
-              <a className="link" href="#">Install Annote</a>{" "}
-              <span className="ph-link">INSTALL LINK — swap in real store URL</span>
+              <a className="link" href="https://chromewebstore.google.com/detail/annote/bbgkibjfpdpiooneibjmafgiaiilpfhn" target="_blank" rel="noopener noreferrer">Install Annote</a>
             </li>
             <li>
               Click <strong>&ldquo;Add to Chrome,&rdquo;</strong> then{" "}

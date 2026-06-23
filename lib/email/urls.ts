@@ -28,13 +28,11 @@ export function ticketUrl(sessionId: string, feedbackId: string): string {
 }
 
 /**
- * Chrome Web Store listing for the extension. Uses the same PLACEHOLDER id
- * the rest of the app uses (ExtensionStep / useSessionEntryCta / /docs); all
- * get the real id at once when the listing is published.
+ * Chrome Web Store listing for the extension. Shared with the rest of the app
+ * (ExtensionStep / useSessionEntryCta / /docs).
  */
-// TODO: replace with real Chrome Web Store extension ID once published.
 export const EXTENSION_INSTALL_URL =
-  "https://chromewebstore.google.com/detail/echly/PLACEHOLDER";
+  "https://chromewebstore.google.com/detail/annote/bbgkibjfpdpiooneibjmafgiaiilpfhn";
 
 /** The stubbed /docs page (Phase 3). */
 export function docsUrl(): string {

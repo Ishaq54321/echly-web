@@ -4,7 +4,7 @@ import { useExtensionDetection } from "@/components/dashboard/hooks/useExtension
 import { ObIcon } from "./icons";
 import { StepShell, StepFooter } from "./StepShell";
 
-const CHROME_WEB_STORE_URL = "https://chromewebstore.google.com/detail/echly/PLACEHOLDER";
+const CHROME_WEB_STORE_URL = "https://chromewebstore.google.com/detail/annote/bbgkibjfpdpiooneibjmafgiaiilpfhn";
 
 type Props = {
   onContinue: () => void;
