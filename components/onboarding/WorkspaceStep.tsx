@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { authFetch } from "@/lib/authFetch";
-import { useToast } from "@/components/dashboard/context/ToastContext";
 import { ObIcon } from "./icons";
 import { StepShell, StepFooter } from "./StepShell";
-import { generateSlug, isValidSlug, SLUG_MIN_LEN, SLUG_MAX_LEN } from "@/lib/utils/slugify";
+import { generateSlug, isValidSlug } from "@/lib/utils/slugify";
 
 type Props = {
   initialName: string;
@@ -20,20 +18,8 @@ type Props = {
   onBack: () => void;
 };
 
-type SlugCheck =
-  | { status: "idle" }
-  | { status: "checking" }
-  | { status: "available" }
-  | { status: "taken"; suggestion: string }
-  | { status: "invalid"; suggestion: string };
-
 export function WorkspaceStep({ initialName, initialLogoUrl, initialLogoFile, onContinue, onBack }: Props) {
-  const { showToast } = useToast();
   const [name, setName] = useState(initialName || "");
-  const [slug, setSlug] = useState<string>(generateSlug(initialName || ""));
-  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
-  const [slugEditing, setSlugEditing] = useState(false);
-  const [slugCheck, setSlugCheck] = useState<SlugCheck>({ status: "idle" });
   const [logoFile, setLogoFile] = useState<File | null>(initialLogoFile);
   const [logoUrl, setLogoUrl] = useState<string | null>(initialLogoUrl);
   const [submitting, setSubmitting] = useState(false);
@@ -51,67 +37,7 @@ export function WorkspaceStep({ initialName, initialLogoUrl, initialLogoFile, on
 
   const initial = (name || "?").trim()[0]?.toUpperCase() || "?";
 
-  // Auto-generate slug from name unless user has manually edited it.
-  useEffect(() => {
-    if (slugManuallyEdited) return;
-    setSlug(generateSlug(name));
-  }, [name, slugManuallyEdited]);
-
-  // Debounced uniqueness check.
-  useEffect(() => {
-    const trimmed = slug.trim().toLowerCase();
-    if (!trimmed) {
-      setSlugCheck({ status: "idle" });
-      return;
-    }
-    if (!isValidSlug(trimmed)) {
-      setSlugCheck({ status: "invalid", suggestion: "" });
-      return;
-    }
-    setSlugCheck({ status: "checking" });
-    const handle = setTimeout(async () => {
-      try {
-        const res = await authFetch(
-          `/api/workspaces/check-slug?slug=${encodeURIComponent(trimmed)}`
-        );
-        if (!res || !res.ok) {
-          setSlugCheck({ status: "idle" });
-          return;
-        }
-        const body = (await res.json()) as {
-          success?: boolean;
-          data?: { available?: boolean; valid?: boolean; suggestion?: string };
-        };
-        if (!body?.success || !body.data) {
-          setSlugCheck({ status: "idle" });
-          return;
-        }
-        if (body.data.valid === false) {
-          setSlugCheck({
-            status: "invalid",
-            suggestion: body.data.suggestion ?? "",
-          });
-          return;
-        }
-        if (body.data.available) {
-          setSlugCheck({ status: "available" });
-        } else {
-          setSlugCheck({
-            status: "taken",
-            suggestion: body.data.suggestion ?? "",
-          });
-        }
-      } catch {
-        setSlugCheck({ status: "idle" });
-      }
-    }, 300);
-    return () => clearTimeout(handle);
-  }, [slug]);
-
-  const canContinue =
-    !!name.trim() &&
-    !submitting &&
-    (slugCheck.status === "available" || slugCheck.status === "idle");
+  const canContinue = !!name.trim() && !submitting;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -135,40 +61,18 @@ export function WorkspaceStep({ initialName, initialLogoUrl, initialLogoFile, on
     setSubmitting(true);
     setError(null);
     const trimmed = name.trim().slice(0, 80);
-    const trimmedSlug = slug.trim().toLowerCase();
-    const slugOut = trimmedSlug && isValidSlug(trimmedSlug) ? trimmedSlug : "";
+    // The slug is derived silently from the name purely for addressing. It is no
+    // longer shown as a URL preview or checked for uniqueness here: workspaces
+    // are resolved by id, not slug, so duplicate/derived slugs are harmless and
+    // the onboarding API reserves the slug non-fatally.
+    const derived = generateSlug(trimmed);
+    const slugOut = derived && isValidSlug(derived) ? derived : "";
     onContinue({
       workspaceName: trimmed,
       workspaceSlug: slugOut,
       logoFile,
       logoPreviewUrl: logoUrl,
     });
-  };
-
-  const handleSlugInput = (value: string) => {
-    setSlugManuallyEdited(true);
-    // Sanitize as user types — only allow chars that can appear in a slug.
-    const cleaned = value.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, SLUG_MAX_LEN);
-    setSlug(cleaned);
-  };
-
-  const adoptSuggestion = (suggestion: string) => {
-    if (!suggestion) return;
-    setSlug(suggestion);
-    setSlugManuallyEdited(true);
-  };
-
-  const slugStatusIndicator = () => {
-    if (slugCheck.status === "checking") {
-      return <span className="ob-spinner" style={{ width: 12, height: 12 }} />;
-    }
-    if (slugCheck.status === "available") {
-      return <span style={{ color: "#1F9D55" }}>✓</span>;
-    }
-    if (slugCheck.status === "taken" || slugCheck.status === "invalid") {
-      return <span style={{ color: "#C53030" }}>✕</span>;
-    }
-    return null;
   };
 
   return (
@@ -194,7 +98,7 @@ export function WorkspaceStep({ initialName, initialLogoUrl, initialLogoFile, on
               </span>
               <div>
                 <div className="ob-ws-card-name">{name || "Your workspace"}</div>
-                <div className="ob-ws-card-meta">annote.ai/{slug || "workspace"} · 1 member</div>
+                <div className="ob-ws-card-meta">1 member</div>
               </div>
               <div
                 style={{
@@ -214,7 +118,7 @@ export function WorkspaceStep({ initialName, initialLogoUrl, initialLogoFile, on
               <div className="ob-ws-feat"><span className="tick"><ObIcon.Check size={9} /></span><span><span className="num">Unlimited</span> sessions</span></div>
               <div className="ob-ws-feat"><span className="tick"><ObIcon.Check size={9} /></span><span>Capture, annotate &amp; comment</span></div>
               <div className="ob-ws-feat"><span className="tick"><ObIcon.Check size={9} /></span><span>Slack &amp; Linear integrations</span></div>
-              <div className="ob-ws-feat"><span className="tick"><ObIcon.Check size={9} /></span><span>Free for the first <span className="num">14</span> days</span></div>
+              <div className="ob-ws-feat"><span className="tick"><ObIcon.Check size={9} /></span><span>Free Starter plan — <span className="num">50</span> tickets/mo</span></div>
             </div>
           </div>
           <div className="ob-preview-meta">Live preview · updates as you type</div>
@@ -238,60 +142,6 @@ export function WorkspaceStep({ initialName, initialLogoUrl, initialLogoFile, on
             required
             autoFocus
           />
-          <div className="ob-helper" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            <span>URL:</span>
-            {slugEditing ? (
-              <>
-                <span>annote.ai/</span>
-                <input
-                  className="ob-input"
-                  style={{ height: 28, padding: "0 8px", fontSize: 12, width: 200 }}
-                  value={slug}
-                  maxLength={SLUG_MAX_LEN}
-                  onChange={(e) => handleSlugInput(e.target.value)}
-                  onBlur={() => setSlugEditing(false)}
-                  autoFocus
-                />
-                {slugStatusIndicator()}
-              </>
-            ) : (
-              <>
-                <b
-                  style={{ cursor: "pointer", textDecoration: "underline dotted" }}
-                  onClick={() => setSlugEditing(true)}
-                  title="Click to customize"
-                >
-                  annote.ai/{slug || "workspace"}
-                </b>
-                {slugStatusIndicator()}
-              </>
-            )}
-          </div>
-          {slugCheck.status === "taken" && slugCheck.suggestion && (
-            <div className="ob-helper" style={{ color: "#C53030" }}>
-              Taken — try{" "}
-              <button
-                type="button"
-                onClick={() => adoptSuggestion(slugCheck.suggestion)}
-                style={{
-                  background: "none",
-                  border: 0,
-                  color: "var(--ob-brand)",
-                  padding: 0,
-                  cursor: "pointer",
-                  textDecoration: "underline",
-                  fontWeight: 500,
-                }}
-              >
-                {slugCheck.suggestion}
-              </button>
-            </div>
-          )}
-          {slugCheck.status === "invalid" && (
-            <div className="ob-helper" style={{ color: "#C53030" }}>
-              Slug must be {SLUG_MIN_LEN}-{SLUG_MAX_LEN} chars, lowercase a–z, 0–9, hyphens.
-            </div>
-          )}
         </div>
 
         <div className="ob-field">

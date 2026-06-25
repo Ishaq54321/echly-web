@@ -3,6 +3,7 @@ import { DM_Sans } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import { ToastProvider } from "@/components/dashboard/context/ToastContext";
 
 // RootProviders intentionally NOT mounted at the root.
@@ -56,6 +57,8 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+const gaId = process.env.NEXT_PUBLIC_GA_ID;
+
 export default function RootLayout({
   children,
 }: {
@@ -89,6 +92,9 @@ export default function RootLayout({
             INP, TTFB, CLS) once deployed. No-ops outside Vercel. */}
         <SpeedInsights />
       </body>
+      {/* GA4 — loads site-wide only when NEXT_PUBLIC_GA_ID is set (no-op in
+          local dev / preview where the env var is absent). */}
+      {gaId ? <GoogleAnalytics gaId={gaId} /> : null}
     </html>
   );
 }

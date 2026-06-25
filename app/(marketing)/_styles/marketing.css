@@ -7592,6 +7592,14 @@
   width: 100%;
   max-width: 100%;
   max-height: 620px;
+  /* Render the hero tray 15% shorter. Height is content-driven (no fixed
+     dimension), so a uniform scale is the only single-value way to cut height
+     by an exact 15% without distorting the contents. bottom-right origin
+     matches the tray's pinned corner so it shrinks toward the anchor instead
+     of drifting. The idle-breath animation is opacity-only, so it doesn't
+     override this transform. */
+  transform: scale(0.85);
+  transform-origin: bottom right;
 }
 /* Glass refinement Fix 2: multi-layer elevation. Ambient close shadow â†’ mid
    falloff â†’ far cast (floating feel), plus an inner-top white highlight that

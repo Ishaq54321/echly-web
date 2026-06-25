@@ -407,7 +407,7 @@ export async function POST(
                 prorationCurrency: seatProrationPreview?.currency ?? null,
                 nextBillingDate:
                   seatProrationPreview?.nextBillingDate ?? fallbackNextBilling,
-                billingUrl: `${APP_URL}/settings/billing`,
+                billingUrl: `${APP_URL}/settings?tab=billing`,
               });
               if (!seatResult.sent) {
                 console.error(

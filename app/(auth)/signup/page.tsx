@@ -136,7 +136,7 @@ function SignupPageContent() {
               Start finding bugs <span className="accent">faster.</span>
             </h1>
             <p className="auth-sub">
-              Join the teams using Annote to turn web feedback into shipped fixes. Free for 14 days, no card required.
+              Join the teams using Annote to turn web feedback into shipped fixes. Free to start — 50 tickets a month, no card required.
             </p>
 
             <button

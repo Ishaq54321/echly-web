@@ -193,7 +193,7 @@ export function DashboardUpgradeBanner() {
         {/* CTA */}
         <button
           type="button"
-          onClick={() => router.push("/settings/billing")}
+          onClick={() => router.push("/settings?tab=billing")}
           className="relative z-10 inline-flex flex-shrink-0 cursor-pointer items-center justify-center gap-2 rounded-[12px] border-none text-[14px] font-semibold text-white transition-[transform,box-shadow] duration-[120ms] hover:-translate-y-px active:translate-y-0"
           style={{
             height: "42px",

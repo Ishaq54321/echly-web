@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Annote",
-  "version": "1.0",
+  "version": "1.0.1",
   "description": "Click the element, say what's wrong, and Annote writes a polished bug ticket - with an AI that's already diagnosed the likely cause.",
   "icons": {
     "16": "assets/icon16.png",

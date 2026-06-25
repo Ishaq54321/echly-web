@@ -1035,23 +1035,34 @@ button[aria-disabled="true"],
   align-items: center;
   gap: 28px;
   border-bottom: 0.5px solid rgba(0, 0, 0, 0.08);
+  /* No wrap: tabs on the left, scope dropdowns pinned to the right edge
+     on the SAME line. If truly cramped, the tabs scroll horizontally inside
+     `.activity-filter-tabs` rather than stack the dropdowns onto their own line.
+
+     overflow MUST stay visible (default) here: the scope dropdowns open
+     downward (absolute, top-full) and would be clipped by any
+     overflow:auto/hidden on this bar — overflow-x:auto forces overflow-y to
+     auto too, trapping them behind the feed below regardless of z-index. The
+     horizontal scroll for the cramped-tab edge case is delegated to the inner
+     `.activity-filter-tabs` strip, which contains no downward-opening menus. */
+  flex-wrap: nowrap;
+}
+/* Inner tab strip — owns the horizontal scroll so the bar can stay
+   overflow:visible and never clip the scope dropdowns. min-width:0 lets it
+   shrink below its content width so the scroll actually engages when cramped. */
+.activity-filter-tabs {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
   scroll-snap-type: x proximity;
   scroll-padding-left: 16px;
-  /* No wrap: tabs on the left, scope dropdowns pinned to the right edge
-     on the SAME line. If truly cramped, scroll horizontally rather than
-     stack the dropdowns onto their own line.
-
-     overflow MUST stay visible here: the scope dropdowns open downward
-     (absolute, top-full) and would be clipped by any overflow:auto/hidden
-     on this bar — overflow-x:auto forces overflow-y to auto too, trapping
-     them behind the feed below regardless of z-index. Horizontal scroll
-     for the cramped-tab edge case is delegated to the inner tab strip. */
   flex-wrap: nowrap;
 }
-.activity-filter-bar::-webkit-scrollbar { display: none; }
+.activity-filter-tabs::-webkit-scrollbar { display: none; }
 /* Scope dropdowns (All sessions · Members) ride the right edge of the
    same tab bar. margin-left:auto pushes them past the tabs; the bar's
    own align-items:center keeps the 34px pills centered against the
@@ -6556,43 +6567,19 @@ h6 [data-ai-touched="true"] {
 
 /* ── Pill shared chrome ─────────────────────────────────── */
 .echly-v2 .pill {
-  /* Warm translucent glass. Previously var(--surface) (#FFFFFF) which
-     masked the ::before blur entirely — now the blur reads through. */
-  background: var(--glass-surface);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
+  /* Fully opaque warm surface — glassmorphism (translucency + backdrop
+     blur + edge highlight) intentionally removed. */
+  background: #FCFBF9;
   border-radius: var(--r-xl);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow-stack);
   position: relative;
-  /* New stacking context so the ::before highlight sits between the
-     translucent surface and the content, not behind the pill. */
   isolation: isolate;
   font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
   color: var(--body);
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-}
-.echly-v2 .pill::before {
-  /* Blur now lives on the parent (above) — avoid double-blurring this
-     nested layer. Repurpose ::before as a subtle top-edge highlight that
-     hugs the rounded top corners and stays inset from the border so it
-     never reads as a hard straight line across the top of the surface. */
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 1px;
-  right: 1px;
-  height: 50%;
-  border-radius: var(--r-xl) var(--r-xl) 0 0;
-  background: linear-gradient(
-    to bottom,
-    var(--glass-edge-highlight),
-    transparent
-  );
-  z-index: -1;
-  pointer-events: none;
 }
 
 .echly-v2 .pill-default { width: 100%; }

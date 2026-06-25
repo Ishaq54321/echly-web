@@ -871,25 +871,31 @@ function ActivityFeed() {
           <div className="mt-5">
             {/* Type filter tabs + scope dropdowns — one line, dropdowns right-aligned */}
             <div className="activity-filter-bar" role="group" aria-label="Activity filters">
-              <FilterTab
-                active={selectedCategory == null || selectedCategory === "member"}
-                onClick={() => setSelectedCategory(null)}
-              >
-                All
-              </FilterTab>
-              {ACTIVITY_FILTER_CATEGORY_IDS.map((id) => {
-                const TabIcon = ACTIVITY_TYPE_PILL_ICONS[id];
-                return (
-                  <FilterTab
-                    key={id}
-                    active={selectedCategory === id}
-                    onClick={() => selectCategory(id)}
-                    icon={<TabIcon size={16} strokeWidth={1.75} aria-hidden />}
-                  >
-                    {ACTIVITY_FILTER_CATEGORY_LABELS[id]}
-                  </FilterTab>
-                );
-              })}
+              {/* Tabs live in their own overflow-x scroller so the cramped-tab
+                  edge case scrolls HERE, while the bar itself stays
+                  overflow:visible — otherwise overflow-x:auto on the bar would
+                  force overflow-y:auto and clip the scope dropdowns below it. */}
+              <div className="activity-filter-tabs">
+                <FilterTab
+                  active={selectedCategory == null || selectedCategory === "member"}
+                  onClick={() => setSelectedCategory(null)}
+                >
+                  All
+                </FilterTab>
+                {ACTIVITY_FILTER_CATEGORY_IDS.map((id) => {
+                  const TabIcon = ACTIVITY_TYPE_PILL_ICONS[id];
+                  return (
+                    <FilterTab
+                      key={id}
+                      active={selectedCategory === id}
+                      onClick={() => selectCategory(id)}
+                      icon={<TabIcon size={16} strokeWidth={1.75} aria-hidden />}
+                    >
+                      {ACTIVITY_FILTER_CATEGORY_LABELS[id]}
+                    </FilterTab>
+                  );
+                })}
+              </div>
 
               <div
                 className="activity-scope-filters"

@@ -348,7 +348,7 @@ const TEMPLATES: Record<string, () => Variant> = {
         month: "long",
         day: "numeric",
       }),
-      billingUrl: "https://annote.ai/settings/billing",
+      billingUrl: "https://annote.ai/settings?tab=billing",
     };
     return { html: seatAddedEmailHtml(p), text: seatAddedEmailText(p) };
   },
@@ -553,7 +553,7 @@ const TEMPLATES: Record<string, () => Variant> = {
         month: "long",
         day: "numeric",
       }),
-      billingUrl: "https://annote.ai/settings/billing",
+      billingUrl: "https://annote.ai/settings?tab=billing",
     };
     return { html: seatAddedEmailHtml(p), text: seatAddedEmailText(p) };
   },

@@ -228,16 +228,6 @@ export function InviteStep({
     }
   };
 
-  const handleCopyLink = async () => {
-    try {
-      const url = `${window.location.origin}/invite/${encodeURIComponent(workspaceName || "join")}`;
-      await navigator.clipboard.writeText(url);
-      showToast("Invite link copied");
-    } catch {
-      showToast("Couldn't copy link");
-    }
-  };
-
   // Invites are not sent here. They're queued in page state and dispatched
   // after POST /api/onboarding creates the workspace (see ReadyStep). The
   // "Continue" button just advances and lifts the collected emails up.
@@ -378,14 +368,6 @@ export function InviteStep({
           >
             <ObIcon.Mail size={13} />
             {gmailLoading ? "Connecting…" : "Import from Gmail"}
-          </button>
-          <button
-            type="button"
-            className="ob-btn ob-btn-secondary"
-            style={{ height: 36, padding: "0 12px", fontSize: 12.5, fontWeight: 500 }}
-            onClick={handleCopyLink}
-          >
-            <ObIcon.External size={11} /> Copy invite link
           </button>
         </div>
         <div className="ob-helper" style={{ marginTop: 6 }}>

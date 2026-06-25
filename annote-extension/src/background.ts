@@ -3112,7 +3112,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "ECHLY_OPEN_BILLING") {
-    chrome.tabs.create({ url: `${WEB_APP_URL}/settings/billing` });
+    chrome.tabs.create({ url: `${WEB_APP_URL}/settings?tab=billing` });
     sendResponse({ success: true });
     return true;
   }

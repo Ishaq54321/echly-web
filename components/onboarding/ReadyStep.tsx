@@ -32,7 +32,7 @@ export function ReadyStep({
   const { showToast } = useToast();
   const [submitting, setSubmitting] = useState(false);
 
-  const complete = async () => {
+  const complete = async (destination: string = "/dashboard") => {
     if (submitting) return;
     setSubmitting(true);
     try {
@@ -105,7 +105,7 @@ export function ReadyStep({
         }
       }
 
-      window.location.href = "/dashboard";
+      window.location.href = destination;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to finish";
       showToast(msg);
@@ -200,7 +200,7 @@ export function ReadyStep({
             type="button"
             className="ob-btn ob-btn-ghost"
             style={{ padding: "0 12px" }}
-            onClick={complete}
+            onClick={() => complete("/docs")}
             disabled={submitting}
           >
             Take a tour first
@@ -210,11 +210,11 @@ export function ReadyStep({
           <button
             type="button"
             className="ob-btn ob-btn-primary"
-            onClick={complete}
+            onClick={() => complete("/dashboard")}
             disabled={submitting}
           >
             <ObIcon.Sparkle size={13} />
-            {submitting ? "Finishing…" : "Start your first session"}
+            {submitting ? "Finishing…" : "Go to Dashboard"}
           </button>
         }
       />
