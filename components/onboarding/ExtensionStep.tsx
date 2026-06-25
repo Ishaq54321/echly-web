@@ -20,7 +20,7 @@ export function ExtensionStep({ onContinue, onBack }: Props) {
 
   return (
     <StepShell
-      step={4}
+      step={3}
       stage={
         <>
           <div className="ob-browser">

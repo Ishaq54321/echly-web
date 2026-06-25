@@ -6,11 +6,10 @@ import { useWorkspace } from "@/lib/client/workspaceContext";
 import { authFetch } from "@/lib/authFetch";
 import { ProfileStep } from "@/components/onboarding/ProfileStep";
 import { WorkspaceStep } from "@/components/onboarding/WorkspaceStep";
-import { InviteStep } from "@/components/onboarding/InviteStep";
 import { ExtensionStep } from "@/components/onboarding/ExtensionStep";
 import { ReadyStep } from "@/components/onboarding/ReadyStep";
 
-type StepId = "profile" | "workspace" | "invite" | "extension" | "ready";
+type StepId = "profile" | "workspace" | "extension" | "ready";
 
 /** Fire-and-forget writeback of progress; never blocks UI. */
 function persistProgress(stepNumber: number) {
@@ -26,7 +25,6 @@ export default function OnboardingPage() {
   const {
     authUid,
     authReady,
-    authEmail,
     isIdentityReady,
     isLoadingWorkspaces,
     allWorkspaces,
@@ -50,10 +48,6 @@ export default function OnboardingPage() {
   const [workspaceLogoPreviewUrl, setWorkspaceLogoPreviewUrl] = useState<string | null>(
     ctxWorkspaceLogoUrl ?? null
   );
-  // Invites are deferred like the logo: the workspace doesn't exist until
-  // POST /api/onboarding succeeds, so we collect emails here and dispatch
-  // them from ReadyStep after the workspace is created.
-  const [pendingInvites, setPendingInvites] = useState<string[]>([]);
 
   useEffect(() => { if (ctxFirstName) setFirstName(ctxFirstName); }, [ctxFirstName]);
   useEffect(() => { if (ctxLastName) setLastName(ctxLastName); }, [ctxLastName]);
@@ -76,7 +70,7 @@ export default function OnboardingPage() {
   );
 
   const steps: StepId[] = useMemo(
-    () => (isInviteUser ? ["profile", "extension", "ready"] : ["profile", "workspace", "invite", "extension", "ready"]),
+    () => (isInviteUser ? ["profile", "extension", "ready"] : ["profile", "workspace", "extension", "ready"]),
     [isInviteUser]
   );
 
@@ -191,18 +185,6 @@ export default function OnboardingPage() {
           onBack={goBack}
         />
       );
-    case "invite":
-      return (
-        <InviteStep
-          ownerName={[firstName, lastName].filter(Boolean).join(" ")}
-          ownerEmail={authEmail ?? ""}
-          workspaceName={workspaceName}
-          pendingInvites={pendingInvites}
-          onPendingInvitesChange={setPendingInvites}
-          onContinue={advance}
-          onBack={goBack}
-        />
-      );
     case "extension":
       return <ExtensionStep onContinue={advance} onBack={goBack} />;
     case "ready":
@@ -212,7 +194,6 @@ export default function OnboardingPage() {
           workspaceName={workspaceName}
           workspaceSlug={workspaceSlug}
           workspaceLogoFile={workspaceLogoFile}
-          pendingInvites={pendingInvites}
           onBack={goBack}
         />
       );

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   authFetch,
   getFirebaseBearerToken,
@@ -28,11 +27,10 @@ export function ReadyStep({
   pendingInvites,
   onBack,
 }: Props) {
-  const router = useRouter();
   const { showToast } = useToast();
   const [submitting, setSubmitting] = useState(false);
 
-  const complete = async (destination: string = "/dashboard") => {
+  const complete = async () => {
     if (submitting) return;
     setSubmitting(true);
     try {
@@ -105,7 +103,7 @@ export function ReadyStep({
         }
       }
 
-      window.location.href = destination;
+      window.location.href = "/dashboard";
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to finish";
       showToast(msg);
@@ -115,7 +113,7 @@ export function ReadyStep({
 
   return (
     <StepShell
-      step={5}
+      step={4}
       stage={
         <>
           <div className="ob-loop-wrap">
@@ -200,7 +198,13 @@ export function ReadyStep({
             type="button"
             className="ob-btn ob-btn-ghost"
             style={{ padding: "0 12px" }}
-            onClick={() => complete("/docs")}
+            onClick={() => {
+              // Open the docs in a NEW TAB synchronously (within the click
+              // gesture, so it isn't blocked as a popup), then finalize
+              // onboarding and send this tab to the dashboard.
+              window.open("/docs", "_blank", "noopener,noreferrer");
+              complete();
+            }}
             disabled={submitting}
           >
             Take a tour first
@@ -210,7 +214,7 @@ export function ReadyStep({
           <button
             type="button"
             className="ob-btn ob-btn-primary"
-            onClick={() => complete("/dashboard")}
+            onClick={() => complete()}
             disabled={submitting}
           >
             <ObIcon.Sparkle size={13} />

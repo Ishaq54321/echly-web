@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
 
-export function StepHeader({ step, total = 5 }: { step: number; total?: number }) {
+export function StepHeader({ step, total = 4 }: { step: number; total?: number }) {
   return (
     <header className="ob-head">
       <span className="ob-brand">
