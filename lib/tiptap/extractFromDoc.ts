@@ -28,6 +28,9 @@ export function extractFromDoc(doc: {
             if (id) mentionedUserIds.push(id);
             return `@[${label}](${id})`;
           }
+          // Shift+Enter inserts a hardBreak node (no text) inside a paragraph.
+          // Serialize it to a newline so soft line breaks survive the round-trip.
+          if (node.type === "hardBreak") return "\n";
           return node.text ?? "";
         })
         .join("")

@@ -5948,6 +5948,18 @@ html.dark .echly-voice-mic-dropdown::-webkit-scrollbar-thumb {
   white-space: nowrap;
 }
 
+/* Links inside posted comments / replies */
+.comment-link {
+  color: var(--brand);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-word;
+}
+.comment-link:hover {
+  color: var(--brand-hover);
+}
+
 /* Mention dropdown — portalled to body */
 .mention-dropdown {
   background: var(--surface-card, #fff);

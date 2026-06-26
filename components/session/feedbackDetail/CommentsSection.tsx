@@ -485,7 +485,7 @@ function ThreadBlock({
         size="default"
       />
       {replies.length > 0 && (
-        <div className="ml-[19px] mt-1 pl-[21px] border-l border-[var(--text-tertiary)]/20 space-y-0.5">
+        <div className="ml-[19px] mt-3 pl-[21px] border-l border-[var(--text-tertiary)]/20 space-y-1.5">
           {replies.map((r) => (
             <div key={r.id} className="py-2">
               <CommentItem

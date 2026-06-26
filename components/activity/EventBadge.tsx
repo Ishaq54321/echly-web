@@ -169,15 +169,19 @@ export function MentionBadge({ size = 32, className }: BadgeProps) {
     >
       <circle cx="16" cy="16" r="16" fill="#D4537E" opacity="0.14" />
       <circle cx="16" cy="16" r="11" fill="#D4537E" />
-      <circle cx="16" cy="16" r="2.7" fill="none" stroke="#FFFFFF" strokeWidth="1.7" />
-      <path
-        d="M19 17.5 V14.5 A4 4 0 1 0 17 19.5 M19 17.5 A1.5 1.5 0 0 0 21 16 V15 A6 6 0 1 0 18 20.5"
-        stroke="#FFFFFF"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
+      {/* Simple, crisp "@" glyph — replaces the old hand-drawn arc path */}
+      <text
+        x="16"
+        y="16"
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill="#FFFFFF"
+        fontSize="15"
+        fontWeight="600"
+        fontFamily="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif"
+      >
+        @
+      </text>
     </svg>
   );
 }

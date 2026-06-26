@@ -71,6 +71,44 @@ function restitchMentionsAfterEdit(text: string, idByLabel: Map<string, string>)
   return out;
 }
 
+const URL_TOKEN_RE = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
+
+// Split a plain-text run into nodes, rendering any URLs as styled links.
+function renderTextWithLinks(text: string, keyPrefix: string): React.ReactNode[] {
+  const nodes: React.ReactNode[] = [];
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+  URL_TOKEN_RE.lastIndex = 0;
+  while ((match = URL_TOKEN_RE.exec(text)) !== null) {
+    if (match.index > cursor) nodes.push(text.slice(cursor, match.index));
+    let url = match[0];
+    // Trailing punctuation usually isn't part of the URL (e.g. "see https://x.com.").
+    let trailing = "";
+    while (/[.,!?;:)\]]$/.test(url)) {
+      trailing = url.slice(-1) + trailing;
+      url = url.slice(0, -1);
+    }
+    const href = url.startsWith("www.") ? `https://${url}` : url;
+    nodes.push(
+      <a
+        key={`${keyPrefix}-l-${key++}`}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="comment-link"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {url}
+      </a>
+    );
+    if (trailing) nodes.push(trailing);
+    cursor = match.index + match[0].length;
+  }
+  if (cursor < text.length) nodes.push(text.slice(cursor));
+  return nodes;
+}
+
 function renderMessageWithMentions(message: string) {
   if (!message) return null;
   const out: React.ReactNode[] = [];
@@ -80,7 +118,7 @@ function renderMessageWithMentions(message: string) {
   MENTION_TOKEN_RE.lastIndex = 0;
   while ((match = MENTION_TOKEN_RE.exec(message)) !== null) {
     if (match.index > cursor) {
-      out.push(message.slice(cursor, match.index));
+      out.push(...renderTextWithLinks(message.slice(cursor, match.index), `t-${key}`));
     }
     const label = match[1] ?? match[0].slice(1);
     out.push(
@@ -91,7 +129,7 @@ function renderMessageWithMentions(message: string) {
     cursor = match.index + match[0].length;
   }
   if (cursor < message.length) {
-    out.push(message.slice(cursor));
+    out.push(...renderTextWithLinks(message.slice(cursor), `t-${key}`));
   }
   return out;
 }
@@ -137,13 +175,20 @@ function CommentItemBase({
     setEditDraft(editFlattened.text);
   }, [editFlattened]);
 
+  const autosizeEdit = useCallback((el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 320)}px`;
+  }, []);
+
   useEffect(() => {
     if (editing && editRef.current) {
       const el = editRef.current;
       el.focus();
       el.setSelectionRange(el.value.length, el.value.length);
+      autosizeEdit(el);
     }
-  }, [editing]);
+  }, [editing, autosizeEdit]);
 
   useEffect(() => {
     if (!reactionPickerOpen) return;
@@ -304,13 +349,14 @@ function CommentItemBase({
               <textarea
                 ref={editRef}
                 value={editDraft}
-                onChange={(e) => setEditDraft(e.target.value)}
+                rows={1}
+                onChange={(e) => { setEditDraft(e.target.value); autosizeEdit(e.currentTarget); }}
                 onKeyDown={(e) => {
                   e.stopPropagation();
                   if (e.key === "Escape") { setEditing(false); setEditDraft(editFlattened.text); }
                   if (e.key === "Enter" && !e.shiftKey && editDraft.trim()) { e.preventDefault(); handleSaveEdit(); }
                 }}
-                className="block w-full min-h-[60px] px-3 pt-2.5 pb-10 text-[14px] leading-relaxed text-[var(--text-body)] placeholder:text-[var(--text-tertiary)] bg-transparent border-none outline-none resize-none"
+                className="block w-full min-h-[38px] max-h-[320px] overflow-y-auto px-3 pt-2.5 pb-10 text-[14px] leading-relaxed text-[var(--text-body)] placeholder:text-[var(--text-tertiary)] bg-transparent border-none outline-none resize-none"
               />
               <div className="absolute bottom-2 right-2 flex items-center gap-2">
                 <button
@@ -340,7 +386,7 @@ function CommentItemBase({
         ) : (
           <>
             <p
-              className={`mt-1.5 leading-relaxed text-discussion-body font-normal ${textSize}`}
+              className={`mt-1.5 leading-relaxed text-discussion-body font-normal whitespace-pre-wrap break-words ${textSize}`}
             >
               {renderMessageWithMentions(comment.message)}
             </p>
