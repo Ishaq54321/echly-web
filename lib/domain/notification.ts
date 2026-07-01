@@ -19,6 +19,7 @@ export const DIGEST_EPOCH = 1748822400000;
 
 export type NotificationType =
   | "comment.added"
+  | "comment.reply"
   | "comment.mention"
   | "description.mention"
   | "feedback.created"

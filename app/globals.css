@@ -7304,11 +7304,9 @@ h6 [data-ai-touched="true"] {
   align-items: center;
   gap: 0;
   padding: 16px 16px 14px;
-  /* Text-dense permission panel — elevated (more opaque) glass for
-     legibility, plus blur + hairline + premium depth. */
-  background: var(--glass-surface-elevated);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
+  /* Text-dense permission panel — solid surface (glass removed), plus
+     hairline + premium depth. */
+  background: #FEFDFB;
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow-stack);
   border-radius: 14px;
@@ -9108,9 +9106,8 @@ h6 [data-ai-touched="true"] {
 /* Dark glass pill ─────────────────────────────────────────── */
 .echly-sc-root .sc-bar {
   pointer-events: auto;
-  background: rgba(20,22,28,0.82);
-  backdrop-filter: blur(24px) saturate(140%);
-  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  /* Solid dark surface — glass (translucency + blur) removed. */
+  background: #14161C;
   border-radius: 999px;
   padding: 8px 8px 8px 24px;
   display: inline-flex;
@@ -10830,9 +10827,8 @@ h6 [data-ai-touched="true"] {
 }
 
 .echly-pill-hint--dark {
-  background: rgba(21, 16, 31, 0.92);
-  backdrop-filter: blur(20px) saturate(1.4);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  /* Solid dark surface — glass (translucency + blur) removed. */
+  background: #15101F;
   color: rgba(255, 255, 255, 0.96);
   border: 0.5px solid rgba(255, 255, 255, 0.08);
   /* Same design-system shadow family as .echly-pill-content for a cohesive
@@ -10890,10 +10886,9 @@ h6 [data-ai-touched="true"] {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  /* Warm translucent glass (was opaque var(--pill-surface) = #FFFFFF). */
-  background: var(--glass-surface);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
+  /* Fully opaque warm surface — glassmorphism (translucency + backdrop
+     blur) intentionally removed, matching the solid ticket tray/pill. */
+  background: #FCFBF9;
   border-radius: 999px;
   padding: 8px 8px 8px 12px;
   gap: 12px;
@@ -11169,15 +11164,14 @@ h6 [data-ai-touched="true"] {
   color: #FFFFFF;
 }
 
-/* ── Hint strip rendered BELOW the error pill (frosted glass, mirrors hint above) ── */
+/* ── Hint strip rendered BELOW the error pill (solid, mirrors hint above) ── */
 .echly-pill-error-hint-below {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(20px) saturate(1.4);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  /* Solid surface — glass (translucency + blur) removed. */
+  background: #FFFFFF;
   border-radius: 999px;
   border: 0.5px solid var(--pill-hair);
   font-size: 12px;
@@ -11382,11 +11376,8 @@ h6 [data-ai-touched="true"] {
   isolation: isolate;
   padding: 6px;
   border-radius: 14px;
-  /* Elevated glass — more opaque variant for dropdown legibility.
-     Was opaque #FFFFFF with a hand-rolled shadow stack. */
-  background: var(--glass-surface-elevated);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
+  /* Solid surface (glass removed) — opaque for dropdown legibility. */
+  background: #FEFDFB;
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow-stack);
   display: flex;

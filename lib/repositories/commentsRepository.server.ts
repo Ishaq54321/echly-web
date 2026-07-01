@@ -253,6 +253,66 @@ export async function addCommentRepo(
       });
     }
 
+    // Thread replies: notify everyone who already participated in this thread
+    // (the root-comment author + prior repliers) so a reply reaches the people
+    // being replied to — not only the ticket creator/assignee. Threads are flat
+    // (a reply stores threadId = root comment id; there is no per-reply parent
+    // pointer), so "the comment being replied to" maps to all prior thread
+    // participants. We exclude anyone already covered above — the actor, the
+    // creator/assignee (comment.added), and mentioned users (comment.mention) —
+    // so nobody gets two notifications for one reply.
+    const threadRootId =
+      typeof data.threadId === "string" ? data.threadId.trim() : "";
+    if (threadRootId) {
+      const participantIds = new Set<string>();
+      try {
+        const [rootSnap, repliesSnap] = await Promise.all([
+          adminDb.doc(`comments/${threadRootId}`).get(),
+          adminDb
+            .collection("comments")
+            .where("threadId", "==", threadRootId)
+            .get(),
+        ]);
+        const rootAuthor = rootSnap.exists ? rootSnap.data()?.userId : null;
+        if (typeof rootAuthor === "string" && rootAuthor.trim() !== "") {
+          participantIds.add(rootAuthor);
+        }
+        for (const replyDoc of repliesSnap.docs) {
+          if (replyDoc.id === commentRef.id) continue; // skip the reply just written
+          const uid = replyDoc.data()?.userId;
+          if (typeof uid === "string" && uid.trim() !== "") {
+            participantIds.add(uid);
+          }
+        }
+      } catch (err) {
+        console.error(
+          "[addCommentRepo] thread participant lookup failed",
+          err
+        );
+      }
+
+      participantIds.delete(resolvedUserId);
+      for (const mid of mentionedIds) participantIds.delete(mid);
+      for (const rid of commentRecipients) participantIds.delete(rid);
+
+      const replyRecipients = Array.from(participantIds);
+      if (replyRecipients.length > 0) {
+        await dispatchNotifications({
+          recipientIds: replyRecipients,
+          workspaceId,
+          sessionId,
+          sessionTitle: sessionTitle || null,
+          feedbackId,
+          commentId: commentRef.id,
+          type: "comment.reply",
+          actor: notifActor,
+          title: `${actor.actorName} replied on "${titleLabel}"`,
+          entityTitle: titleLabel || null,
+          body: previewBody,
+        });
+      }
+    }
+
     // DIGEST CUTOVER: instant comment/mention emails were removed here. The
     // in-app notifications above (comment.added / comment.mention) are the
     // source of truth; the daily activity-digest cron sweeps un-digested

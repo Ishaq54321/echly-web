@@ -2674,8 +2674,10 @@
   }
   .marketing-root .ctt-cap-browser {
     position: relative;
-    right: 0;
+    left: auto;
+    right: auto;
     top: 0;
+    transform: none;
     width: 100%;
     max-width: 420px;
     margin: -30px auto 0;
@@ -2689,6 +2691,7 @@
     position: relative;
     left: 0;
     top: 0;
+    transform: none;
     width: 100%;
     max-width: 380px;
     margin: -30px auto 0;
@@ -5145,6 +5148,13 @@
 /* ============ RESPONSIVE ============ */
 @media (max-width: 1100px) {
   .marketing-root .mk-nav-links { display: none; }
+  /* Inset the floating nav island from the screen edges so it doesn't run
+     edge-to-edge on phones/tablets. */
+  .marketing-root .mk-nav { padding-left: 18px; padding-right: 18px; }
+  /* "Contact sales" is desktop-only; drop it on mobile so the remaining
+     actions (Sign in · Get Annote) have room and don't get clipped. */
+  .marketing-root .mk-nav-contact { display: none; }
+  .marketing-root .mk-nav-cta { gap: 16px; }
   /* From-click-to-ticket: card body collapses to single column, copy first,
      visual second. (Detailed card rules live in the 1099px block below.) */
   .marketing-root .editorial {
@@ -5222,10 +5232,21 @@
   }
   .marketing-root .ctt-card-copy {
     padding: 32px 28px;
+    /* Let the single-column grid track shrink below the mockups' wide
+       min-content so the card never stretches past the viewport (which was
+       clipping the copy text on the right edge). */
+    min-width: 0;
   }
   .marketing-root .ctt-card-visual {
     padding: 32px;
     min-height: 360px;
+    min-width: 0;
+    overflow: hidden;
+  }
+  /* Copy text wraps to the card width instead of overflowing it. */
+  .marketing-root .ctt-card-title,
+  .marketing-root .ctt-card-sub {
+    max-width: 100%;
   }
   .marketing-root .ctt-card-header {
     padding: 16px 24px;
@@ -12619,6 +12640,25 @@
     min-width: 0;
     flex: 1;
     overflow: hidden;
+  }
+}
+
+/* ---- QA memo ("Walk the build. Speak the issues."): the 55 fixed-width
+   waveform bars overflow the narrow memo card on phones, spilling past its
+   right edge. Give the memo a touch more width and thin the bars so the whole
+   voice envelope fits inside the card. ---- */
+@media (max-width: 640px) {
+  .marketing-root .qa-memo {
+    width: 92%;
+    padding: 14px 12px 12px;
+  }
+  .marketing-root .qa-wave {
+    gap: 1px;
+    overflow: hidden;
+  }
+  .marketing-root .qa-wave i {
+    width: 2px;
+    flex-basis: 2px;
   }
 }
 

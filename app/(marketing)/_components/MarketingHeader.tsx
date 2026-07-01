@@ -111,7 +111,7 @@ export function MarketingHeader({
         </nav>
 
         <div className="mk-nav-cta">
-          <Link className="mk-nav-link-quiet" href="/#contact">
+          <Link className="mk-nav-link-quiet mk-nav-contact" href="/#contact">
             Contact sales
           </Link>
           <Link className="mk-nav-link-quiet" href="/login">

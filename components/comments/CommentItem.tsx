@@ -109,6 +109,36 @@ function renderTextWithLinks(text: string, keyPrefix: string): React.ReactNode[]
   return nodes;
 }
 
+// Position the emoji reaction picker so it always stays within the viewport:
+// flip above the trigger when there's no room below, and clamp horizontally.
+const REACTION_PICKER_W = 300;
+const REACTION_PICKER_H = 380;
+function getReactionPickerStyle(anchor: DOMRect | null): React.CSSProperties {
+  const GAP = 4;
+  const MARGIN = 8;
+  if (!anchor || typeof window === "undefined") {
+    return { top: (anchor?.bottom ?? 0) + GAP, left: anchor?.left ?? 0 };
+  }
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  // Horizontal: prefer aligning to the trigger's left, then keep inside.
+  const left = Math.max(MARGIN, Math.min(anchor.left, vw - REACTION_PICKER_W - MARGIN));
+
+  // Vertical: open below if it fits, otherwise above, otherwise clamp on-screen.
+  const fitsBelow = anchor.bottom + GAP + REACTION_PICKER_H <= vh - MARGIN;
+  const fitsAbove = anchor.top - GAP - REACTION_PICKER_H >= MARGIN;
+  let top: number;
+  if (fitsBelow) {
+    top = anchor.bottom + GAP;
+  } else if (fitsAbove) {
+    top = anchor.top - GAP - REACTION_PICKER_H;
+  } else {
+    top = Math.max(MARGIN, vh - REACTION_PICKER_H - MARGIN);
+  }
+  return { top, left };
+}
+
 function renderMessageWithMentions(message: string) {
   if (!message) return null;
   const out: React.ReactNode[] = [];
@@ -510,10 +540,7 @@ function CommentItemBase({
         <div
           ref={reactionPickerRef}
           className="fixed z-[2147480001]"
-          style={{
-            top: (reactionAnchorRect?.bottom ?? 0) + 4,
-            left: Math.min(reactionAnchorRect?.left ?? 0, window.innerWidth - 320),
-          }}
+          style={getReactionPickerStyle(reactionAnchorRect)}
         >
           <EmojiPicker
             onEmojiClick={async (emojiData: { emoji: string }) => {

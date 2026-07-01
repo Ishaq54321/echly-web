@@ -45,6 +45,7 @@ const BUCKET_ORDER: DigestBucket[] = [
 function bucketForType(type: NotificationType | string): DigestBucket {
   switch (type) {
     case "comment.added":
+    case "comment.reply":
       return "comments";
     case "comment.mention":
     case "description.mention":

@@ -30,6 +30,7 @@ import { useUserAvatars } from "@/lib/hooks/useUserAvatars";
 function getBadgeClass(type: NotificationType | string): string {
   switch (type) {
     case "comment.added":
+    case "comment.reply":
       return "badge-comment";
     case "comment.mention":
     case "description.mention":
@@ -63,6 +64,7 @@ function getTypeIcon(type: NotificationType | string) {
   const props = { size: 11, strokeWidth: 2.5 };
   switch (type) {
     case "comment.added":
+    case "comment.reply":
       return <MessageSquare {...props} />;
     case "comment.mention":
     case "description.mention":
@@ -177,6 +179,13 @@ function renderNotificationText(n: NotificationRow): React.ReactNode {
       return (
         <>
           <strong>{actorName}</strong> commented on{entityPart}
+          {inSession}
+        </>
+      );
+    case "comment.reply":
+      return (
+        <>
+          <strong>{actorName}</strong> replied on{entityPart}
           {inSession}
         </>
       );
@@ -307,6 +316,7 @@ function ticketGroupKey(n: NotificationRow): string | null {
   if (!n.feedbackId) return null;
   if (
     n.type !== "comment.added" &&
+    n.type !== "comment.reply" &&
     n.type !== "comment.mention" &&
     n.type !== "description.mention" &&
     n.type !== "feedback.created" &&
@@ -367,7 +377,10 @@ function groupByDayThenTicket(items: NotificationRow[]): NotificationDayGroup[] 
 
 function summarizeTicketGroup(items: NotificationRow[]): string {
   const commentCount = items.filter(
-    (n) => n.type === "comment.added" || n.type === "comment.mention"
+    (n) =>
+      n.type === "comment.added" ||
+      n.type === "comment.reply" ||
+      n.type === "comment.mention"
   ).length;
   const wasResolved = items.some((n) => n.type === "feedback.resolved");
   const wasReopened = items.some((n) => n.type === "feedback.reopened");
