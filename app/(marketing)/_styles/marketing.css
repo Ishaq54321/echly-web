@@ -542,6 +542,289 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.10);
 }
 
+/* ============ MOBILE NAV (hamburger + full-screen menu) ============
+   The button lives in the nav grid as the last child; it's display:none on
+   desktop (so the desktop nav is untouched) and switched on at ≤1100px in the
+   RESPONSIVE block, where .mk-nav-cta is hidden. */
+.marketing-root .mk-nav-burger {
+  display: none;              /* desktop: hidden — desktop nav unaffected */
+  justify-self: end;         /* pin to the right edge of the bar on mobile */
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  margin: -4px -6px -4px 0;   /* enlarge tap target without growing the bar */
+  border-radius: 12px;
+  color: #F5F6FA;            /* light, to read on the dark nav island */
+  background: transparent;
+  transition: background 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.marketing-root .mk-nav-burger:hover,
+.marketing-root .mk-nav-burger:focus-visible {
+  background: rgba(199, 205, 230, 0.12);
+  outline: none;
+}
+.marketing-root .mk-nav-burger-lines {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  width: 20px;
+}
+.marketing-root .mk-nav-burger-lines i {
+  display: block;
+  height: 2px;
+  width: 20px;
+  border-radius: 2px;
+  background: currentColor;
+}
+.marketing-root .mk-nav-burger-lines i:last-child {
+  width: 14px;               /* shorter second bar — a small premium detail */
+}
+
+/* ── Full-screen menu overlay ─────────────────────────────────────────────
+   Fixed, edge-to-edge, on-brand deep indigo (the hero/nav-island family). Sits
+   above everything (nav island included). Closed = faded out + non-interactive
+   via [hidden]; open = fades/rises in. */
+.marketing-root .mk-mobile-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 22px calc(24px + env(safe-area-inset-bottom, 0px));
+  color: #F5F6FA;
+  /* Deep indigo → near-black, matching the homepage hero field. A soft violet
+     glow up top ties it to the brand accent. */
+  background:
+    radial-gradient(120% 60% at 50% -10%, rgba(90, 73, 191, 0.35) 0%, rgba(90, 73, 191, 0) 60%),
+    linear-gradient(180deg, #191338 0%, #120D2A 55%, #0C0820 100%);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* Closed: faded, non-interactive, and out of the tab order (visibility:hidden
+     removes descendant links from focus). Open flips all three. Kept in the DOM
+     so open/close animate. */
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-8px);
+  transition:
+    opacity 0.24s ease,
+    transform 0.32s cubic-bezier(0.2, 0.7, 0.2, 1),
+    visibility 0s linear 0.32s;
+}
+.marketing-root .mk-mobile-menu.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+  transition:
+    opacity 0.24s ease,
+    transform 0.32s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* Top row: large wordmark + close. */
+.marketing-root .mk-mobile-menu-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+}
+.marketing-root .mk-mobile-menu-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+}
+.marketing-root .mk-mobile-menu-mark {
+  display: inline-flex;
+}
+.marketing-root .mk-mobile-menu-word {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.022em;
+  color: #F5F6FA;
+}
+.marketing-root .mk-mobile-menu-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  margin-right: -6px;
+  border-radius: 12px;
+  color: #C7CBDA;
+  background: rgba(199, 205, 230, 0.08);
+  border: 1px solid rgba(199, 205, 230, 0.10);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.marketing-root .mk-mobile-menu-close:hover,
+.marketing-root .mk-mobile-menu-close:focus-visible {
+  background: rgba(199, 205, 230, 0.16);
+  color: #F5F6FA;
+  outline: none;
+}
+
+/* Body: grouped destinations. */
+.marketing-root .mk-mobile-menu-body {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  padding: 26px 2px 8px;
+}
+.marketing-root .mk-mobile-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.marketing-root .mk-mobile-group-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #7E85A6;
+  padding-left: 2px;
+  margin-bottom: 6px;
+}
+.marketing-root .mk-mobile-usecases,
+.marketing-root .mk-mobile-links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Use-case rows — icon tile + label + description, generous tap height. */
+.marketing-root .mk-mobile-usecase {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 13px 8px;
+  border-radius: 14px;
+  transition: background 0.15s ease;
+}
+.marketing-root .mk-mobile-usecase:active,
+.marketing-root .mk-mobile-usecase:hover {
+  background: rgba(199, 205, 230, 0.07);
+}
+.marketing-root .mk-mobile-usecase-ico {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(90, 73, 191, 0.22);
+  border: 1px solid rgba(165, 149, 240, 0.22);
+  color: #B8ABF5;
+}
+.marketing-root .mk-mobile-usecase-ico svg {
+  width: 20px;
+  height: 20px;
+}
+.marketing-root .mk-mobile-usecase-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.marketing-root .mk-mobile-usecase-label {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #F5F6FA;
+}
+.marketing-root .mk-mobile-usecase-desc {
+  font-size: 13px;
+  line-height: 1.4;
+  color: #9AA0BE;
+}
+
+/* Top-level links — large tappable rows with a hairline divider rhythm. */
+.marketing-root .mk-mobile-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 8px;
+  font-size: 21px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: #EDEEF6;
+  border-bottom: 1px solid rgba(199, 205, 230, 0.08);
+  transition: color 0.15s ease;
+}
+.marketing-root .mk-mobile-links li:first-child .mk-mobile-link {
+  border-top: 1px solid rgba(199, 205, 230, 0.08);
+}
+.marketing-root .mk-mobile-link:hover,
+.marketing-root .mk-mobile-link:active {
+  color: #FFFFFF;
+}
+.marketing-root .mk-mobile-link-arrow {
+  font-size: 15px;
+  color: #6E7599;
+}
+
+/* Footer: primary CTA, secondary links, brand tagline. */
+.marketing-root .mk-mobile-menu-foot {
+  margin-top: auto;
+  padding-top: 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+/* `a.` bumps specificity over `.marketing-root .btn-primary` (which this link
+   also carries) so the dark-surface light-pill treatment wins — matching the
+   hero nav's primary CTA convention. */
+.marketing-root a.mk-mobile-cta {
+  width: 100%;
+  height: 52px;
+  justify-content: center;
+  font-size: 16px;
+  /* Light pill on the dark surface — the hero's primary CTA treatment. */
+  background: #F5F6FA;
+  color: #15101F;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 10px 24px -8px rgba(90, 73, 191, 0.45);
+}
+.marketing-root a.mk-mobile-cta:hover {
+  background: #FFFFFF;
+  color: #15101F;
+}
+.marketing-root .mk-mobile-foot-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14.5px;
+}
+.marketing-root .mk-mobile-foot-link {
+  color: #B7BCCC;
+  transition: color 0.15s ease;
+}
+.marketing-root .mk-mobile-foot-link:hover {
+  color: #F5F6FA;
+}
+.marketing-root .mk-mobile-foot-sep {
+  color: #5A6084;
+}
+.marketing-root .mk-mobile-foot-tag {
+  font-size: 12.5px;
+  letter-spacing: 0.01em;
+  color: #6A7096;
+}
+
+/* Reduced-motion: no slide, just a plain fade. */
+@media (prefers-reduced-motion: reduce) {
+  .marketing-root .mk-mobile-menu {
+    transform: none;
+    transition: opacity 0.2s ease;
+  }
+}
+
 /* ============ BUTTONS ============ */
 .marketing-root .btn-primary {
   display: inline-flex;
@@ -5151,10 +5434,11 @@
   /* Inset the floating nav island from the screen edges so it doesn't run
      edge-to-edge on phones/tablets. */
   .marketing-root .mk-nav { padding-left: 18px; padding-right: 18px; }
-  /* "Contact sales" is desktop-only; drop it on mobile so the remaining
-     actions (Sign in · Get Annote) have room and don't get clipped. */
-  .marketing-root .mk-nav-contact { display: none; }
-  .marketing-root .mk-nav-cta { gap: 16px; }
+  /* Mobile bar shows ONLY the logo + hamburger: the desktop actions (Contact
+     sales · Sign in · Get Annote) move into the full-screen menu, and the
+     hamburger button (hidden on desktop) takes the right edge. */
+  .marketing-root .mk-nav-cta { display: none; }
+  .marketing-root .mk-nav-burger { display: inline-flex; }
   /* From-click-to-ticket: card body collapses to single column, copy first,
      visual second. (Detailed card rules live in the 1099px block below.) */
   .marketing-root .editorial {
@@ -12679,4 +12963,113 @@
   .marketing-root .dt-curl {
     padding: 9px 10px;
   }
+}
+
+/* ============================================================
+   FROM-CLICK-TO-TICKET — phone card fit (≤767px)
+   ------------------------------------------------------------
+   Root cause of the old overflow: the inner mockups keep their
+   desktop-proportioned, FIXED-WIDTH surfaces (the 520px browser,
+   the 430–480px voice/session cards) and the long mono URL string.
+   In the single-column phone card those surfaces don't shrink
+   below their intrinsic / min-content width, so they overrun the
+   ~300px card and get sliced by .ctt-card-visual's overflow:hidden
+   — clipping the browser + CTA on the right and the stacked lower
+   card off the bottom.
+
+   Fix (mobile only — every rule is inside this ≤767 block, so the
+   desktop composition is untouched): stack each mockup as a clean,
+   centered flex column and force every inner surface to shrink to
+   the card width (width:100% + max-width:100% + min-width:0). With
+   the surfaces contained, the column sizes to its own content, the
+   visual grows to fit it, and nothing reaches the clip edge. ---- */
+@media (max-width: 767px) {
+  /* De-stack the deck on phones. Each card is taller than a phone viewport,
+     so the desktop sticky-stack (card pins at the top while the next rises
+     over it) leaves the lower half of the pinned card — the AI draft / session
+     card — permanently below the fold and then covered by the next card. That
+     was the real "content clipped at the bottom." Fall back to the same plain
+     vertical list the reduced-motion path already uses: no pinning, no recede
+     transforms, every card fully scrolls into view in order. (Desktop >767px
+     keeps the full sticky-stacking composition untouched.) */
+  .marketing-root .ctt-deck {
+    gap: 28px;
+    padding-bottom: 0;
+  }
+  .marketing-root .ctt-card {
+    position: relative;
+    top: auto;
+    z-index: auto;
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+
+  /* Roomier, phone-appropriate inner padding + a sensible floor so the
+     graphic never crams edge-to-edge. */
+  .marketing-root .ctt-card-visual {
+    padding: 22px 16px;
+    min-height: 0;
+  }
+
+  /* Mockup stage → vertical flow, sized to content (no tall fixed height,
+     no min-content width leaking out). */
+  .marketing-root .ctt-cap,
+  .marketing-root .ctt-voice,
+  .marketing-root .ctt-sess {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 14px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    height: auto;
+    min-height: 0;
+  }
+
+  /* Every inner surface shrinks to the card instead of overrunning it.
+     min-width:0 defeats the flex/blocked min-content width that was the
+     actual source of the right-edge slicing. */
+  .marketing-root .ctt-cap-browser,
+  .marketing-root .ctt-voice-note,
+  .marketing-root .ctt-voice-draft,
+  .marketing-root .ctt-diag,
+  .marketing-root .ctt-sess-url {
+    position: relative;
+    left: auto;
+    right: auto;
+    top: auto;
+    bottom: auto;
+    width: 100%;
+    max-width: 340px;
+    min-width: 0;
+    margin: 0;
+    transform: none;
+  }
+
+  /* The URL bar is a mono one-liner; let it truncate within the frame
+     rather than force the whole browser wider than the card. */
+  .marketing-root .ctt-cap-url {
+    min-width: 0;
+    overflow: hidden;
+  }
+  .marketing-root .ctt-cap-url b,
+  .marketing-root .ctt-cap-url-dim {
+    white-space: nowrap;
+  }
+
+  /* Voice: the AI-transcribing bridge sits between the two cards, centered. */
+  .marketing-root .ctt-voice-bridge {
+    position: relative;
+    left: auto;
+    top: auto;
+    transform: none;
+    margin: 0;
+  }
+
+  /* Waveform is a fixed-count bar row — let it flex down inside the card. */
+  .marketing-root .ctt-voice-note-row { min-width: 0; }
+  .marketing-root .ctt-voice-wave { min-width: 0; flex: 1; overflow: hidden; }
 }
