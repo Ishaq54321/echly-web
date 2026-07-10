@@ -3,17 +3,20 @@
 // init or workspace fetches. The smart root in app/page.tsx redirects
 // logged-in users to /dashboard before they reach any marketing surface.
 //
-// Phase 2A: the home page (rendered from app/page.tsx) composes its own
-// chrome (AnnouncementBar + MarketingHeader + MarketingFooter) inside the
-// .marketing-root wrapper. Future routes under (marketing)/ should also
-// compose their own chrome — this layout is a deliberate pass-through so
-// each page owns its top-level styling decisions.
+// This layout is a deliberate pass-through: each marketing page composes its
+// own chrome (MarketingHeader + MarketingFooter) inside the .marketing-root
+// wrapper. What the layout DOES own is typography:
 //
-// Editorial fonts (Caveat / Fraunces / JetBrains Mono) are loaded here and
-// exposed as CSS vars on the wrapper so any marketing section can reach for
-// them without re-importing.
+//   • Google Sans Flex — the display/body variable font of the redesigned
+//     marketing surface (same face antigravity.google uses). Served from
+//     fonts.googleapis.com; React 19 hoists the <link precedence> tags into
+//     <head>. next/font can't load it (not in its manifest), hence the links.
+//   • Google Sans Code — the mono "annotation" face for eyebrows/special text.
+//   • Caveat / Fraunces / JetBrains Mono — legacy editorial fonts still used
+//     by interior pages (docs, use-cases); kept as CSS vars.
 
 import { Caveat, Fraunces, JetBrains_Mono } from "next/font/google";
+import { MarketingFonts } from "./_components/MarketingFonts";
 
 const caveat = Caveat({
   subsets: ["latin"],
@@ -46,6 +49,7 @@ export default function MarketingLayout({
     <div
       className={`${caveat.variable} ${fraunces.variable} ${jetbrainsMono.variable}`}
     >
+      <MarketingFonts />
       {children}
     </div>
   );

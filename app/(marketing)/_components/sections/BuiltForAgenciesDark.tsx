@@ -76,7 +76,7 @@ function Avatar({ initials, hue = 280, size = 26, ring = false, src }: AvatarPro
   );
 }
 
-function CardQA() {
+export function CardQA() {
   return (
     <article className="ag-card ag-card--qa">
       <div className="ag-card-head">
@@ -168,7 +168,7 @@ function CardQA() {
   );
 }
 
-function CardTeam() {
+export function CardTeam() {
   const people = [
     { name: "Maya", role: "session host", hue: 310, initials: "M", status: "Listening", src: PHOTO.maya },
     { name: "Daniel", role: "QA review", hue: 200, initials: "D", status: "3 notes", src: PHOTO.daniel },
@@ -272,7 +272,7 @@ function CardTeam() {
   );
 }
 
-function CardReview() {
+export function CardReview() {
   return (
     <article className="ag-card ag-card--review">
       <div className="ag-card-head">
@@ -388,7 +388,7 @@ function CardReview() {
   );
 }
 
-function CardShip() {
+export function CardShip() {
   return (
     <article className="ag-card ag-card--ship">
       <div className="ag-card-head">

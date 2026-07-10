@@ -1,17 +1,18 @@
-import "../../_styles/marketing.css";
-import "../../_styles/use-cases.css";
+import "../../_styles";
 
 import Link from "next/link";
 import { MarketingHeader } from "../MarketingHeader";
 import { MarketingFooter } from "../MarketingFooter";
 
-/* Shared chrome for every use-case page: the dark in-flow Annote navbar
-   (variant="solid"), the page footer, and the .marketing-root token scope.
-   The page body is wrapped in `.uc`, which is where use-cases.css hangs its
-   retinted tokens. The dark flagship band is added per-page via <AiDiagnosisCard/>. */
+/* Shared chrome for every use-case page: the fixed nova header, the page
+   footer, and the .marketing-root token scope. The page body is wrapped in
+   `.uc`, which is where use-cases.css hangs its retinted tokens. `nv-root`
+   puts the page on the nova base (white canvas, Google Sans Flex, cool greys)
+   so use-case pages read as one system with the homepage; it also gives the
+   per-page <AiDiagnosisCard/> dark band its nova chrome (.nv-root .dxflag). */
 export function UseCaseScaffold({ children }: { children: React.ReactNode }) {
   return (
-    <div className="marketing-root">
+    <div className="marketing-root nv-root">
       <MarketingHeader variant="solid" />
       <main className="uc">{children}</main>
       <MarketingFooter />

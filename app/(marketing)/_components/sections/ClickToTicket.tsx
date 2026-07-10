@@ -271,7 +271,7 @@ export function ClickToTicket() {
    target CTA, capture pill, and a floating "Captured" toast.
    ============================================================ */
 
-function CaptureMockup() {
+export function CaptureMockup() {
   return (
     <div className="ctt-cap">
       {/* Pointer cursor — pointing-hand silhouette (provided SVG). Slides
@@ -394,7 +394,7 @@ function CaptureMockup() {
    voice-note card with animated waveform + AI-drafted ticket.
    ============================================================ */
 
-function VoiceMockup() {
+export function VoiceMockup() {
   return (
     <div className="ctt-voice">
       <div className="ctt-voice-note">
@@ -480,7 +480,7 @@ function VoiceMockup() {
    shareable session URL card with presence + a floating comment.
    ============================================================ */
 
-function SessionsMockup() {
+export function SessionsMockup() {
   return (
     <div className="ctt-sess">
       {/* AI diagnosis card — the "already diagnosed" moment, top-left. */}

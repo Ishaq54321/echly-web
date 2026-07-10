@@ -1,71 +1,167 @@
+"use client";
+
+/**
+ * MarketingFooter — rebuilt in the reference style (antigravity.google):
+ * slogan + hairline link columns up top, a giant full-bleed wordmark whose
+ * letters rise in one-by-one as the footer scrolls into view (the reference
+ * animates its ANTIGRAVITY letterforms the same way), and a quiet utility
+ * bar with the legal links.
+ *
+ * Styles live in nova.css, loaded via the _styles barrel (one canonical
+ * stylesheet order on every route — see _styles/index.ts).
+ */
+
+import "../_styles";
+
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { AnnoteLogo } from "./AnnoteLogo";
 
 type FooterColumn = {
   heading: string;
-  links: ReadonlyArray<{ label: string; href: string }>;
+  links: ReadonlyArray<{ label: string; href: string; external?: boolean }>;
 };
 
 const COLUMNS: ReadonlyArray<FooterColumn> = [
+  {
+    heading: "Product",
+    links: [
+      { label: "Capture extension", href: "/docs/capturing" },
+      { label: "Voice tickets", href: "/docs/tickets" },
+      { label: "Sessions", href: "/docs/sharing" },
+      { label: "Pricing", href: "/#pricing" },
+    ],
+  },
   {
     heading: "Use cases",
     links: [
       { label: "QA testing", href: "/use-cases/qa-testing" },
       { label: "Design review", href: "/use-cases/design-review" },
       { label: "Client feedback", href: "/use-cases/client-feedback" },
-    ],
-  },
-  {
-    heading: "Solutions",
-    links: [
       { label: "Agencies", href: "/use-cases/agencies" },
       { label: "Teams", href: "/use-cases/teams" },
-      { label: "Help center", href: "/docs" },
     ],
   },
   {
-    heading: "Legal",
+    heading: "Resources",
     links: [
-      { label: "Terms", href: "/marketing/terms.html" },
-      { label: "Privacy policy", href: "/marketing/privacy.html" },
-      { label: "Trust", href: "/marketing/trust.html" },
-    ],
-  },
-  {
-    heading: "Connect",
-    links: [
-      { label: "LinkedIn", href: "https://www.linkedin.com/company/annoteai" },
+      { label: "Documentation", href: "/docs" },
+      { label: "Blog", href: "/blog" },
+      { label: "FAQ", href: "/docs/faq" },
+      {
+        label: "LinkedIn",
+        href: "https://www.linkedin.com/company/annoteai",
+        external: true,
+      },
     ],
   },
 ];
 
+const LEGAL = [
+  { label: "Terms", href: "/marketing/terms.html" },
+  { label: "Privacy", href: "/marketing/privacy.html" },
+  { label: "Trust", href: "/marketing/trust.html" },
+] as const;
+
+const WORDMARK = "ANNOTE".split("");
+
 export function MarketingFooter() {
+  const markRef = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
+
+  useEffect(() => {
+    const node = markRef.current;
+    if (!node) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setInView(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setInView(true);
+            observer.unobserve(entry.target);
+          }
+        }
+      },
+      { threshold: 0.3 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <footer className="mk-footer">
-      <div className="foot-inner">
-        <div className="foot-brand">
-          <div className="foot-brand-row">
-            <span className="mk-logo-mark">
-              <AnnoteLogo width={22} height={28} variant="white" />
-            </span>
-            <span className="mk-logo-word">Annote</span>
+    <footer className="nv-footer">
+      <div className="nv-container">
+        <div className="nv-footer-main">
+          <div>
+            <p className="nv-h5 nv-footer-slogan">
+              Feedback at the speed of seeing it.
+            </p>
           </div>
-          <p className="foot-tag">Feedback at the speed of seeing it.</p>
+          {COLUMNS.map((col) => (
+            <nav className="nv-footer-col" key={col.heading} aria-label={col.heading}>
+              <p className="nv-footer-col-head">{col.heading}</p>
+              {col.links.map((link) =>
+                link.external || link.href.endsWith(".html") ? (
+                  <a
+                    key={link.label}
+                    href={link.href}
+                    target={link.external ? "_blank" : undefined}
+                    rel={link.external ? "noopener noreferrer" : undefined}
+                  >
+                    {link.label}
+                  </a>
+                ) : (
+                  <Link key={link.label} href={link.href}>
+                    {link.label}
+                  </Link>
+                ),
+              )}
+            </nav>
+          ))}
         </div>
-        {COLUMNS.map((col) => (
-          <div className="foot-col" key={col.heading}>
-            <h6>{col.heading}</h6>
-            <ul>
-              {col.links.map((link) => (
-                <li key={link.label}>
-                  <a href={link.href}>{link.label}</a>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
       </div>
-      <div className="foot-wordmark" aria-hidden="true">
-        ANNOTE
+
+      <div className="nv-container">
+        <div
+          ref={markRef}
+          className={`nv-footer-wordmark${inView ? " is-in" : ""}`}
+          aria-hidden="true"
+        >
+          {WORDMARK.map((letter, i) => (
+            <span
+              key={i}
+              className="nv-footer-letter"
+              style={{ "--nv-i": i } as React.CSSProperties}
+            >
+              {letter}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="nv-footer-utility">
+        <div className="nv-container">
+          <div className="nv-footer-utility-inner">
+            <span
+              style={{ display: "inline-flex", alignItems: "center", gap: 10 }}
+            >
+              <AnnoteLogo width={16} height={20} />
+              <span className="nv-footer-copy">
+                © {new Date().getFullYear()} Annote
+              </span>
+            </span>
+            <nav className="nv-footer-utility-nav" aria-label="Legal">
+              {LEGAL.map((link) => (
+                <a key={link.label} href={link.href}>
+                  {link.label}
+                </a>
+              ))}
+            </nav>
+          </div>
+        </div>
       </div>
     </footer>
   );

@@ -3,53 +3,54 @@
    Shared layout + framed product-mock vocabulary for the use-case pages
    (/use-cases/agencies, /teams, /client-feedback, /qa-testing, /design-review).
 
-   Ported from the standalone marketing prototype, re-scoped under
-   `.marketing-root .uc` and re-tinted onto the echly marketing tokens
-   (--violet / --ink-* / --line-* / --bg-*) so the pages read as one system
-   with the homepage. The dark "dev-ready" flagship band is NOT here — those
-   pages drop in the shared <AiDiagnosisCard/> component (.dxflag) instead.
+   Re-tinted onto the NOVA design system (nova.css): white canvas, Google Sans
+   Flex at 400–500 weights, cool greys, hairline outlines, flat tinted
+   containers instead of drop shadows — with the Annote brand purple #5A49BF
+   kept as the single accent (same treatment as the blog). The scaffold root
+   carries `nv-root`, so the base font/background arrive from nova.css. The
+   dark "dev-ready" flagship band is NOT here — those pages drop in the shared
+   <AiDiagnosisCard/> component, whose nova chrome lives in nova.css
+   (.nv-root .dxflag).
    ============================================================================ */
 
 .marketing-root .uc {
-  /* map the prototype's palette onto echly tokens — one place to retint */
-  --uc-primary: var(--violet);
-  --uc-primary-dim: var(--violet-dim);
-  --uc-accent: var(--violet-2);
-  --uc-accent-2: var(--violet-3);
-  --uc-primary-soft: var(--violet-soft);
-  --uc-primary-soft-2: #E3E0F4;
-  --uc-primary-ink: var(--violet-dim);
+  /* map the prototype's palette onto nova tokens — one place to retint */
+  --uc-primary: #5a49bf;
+  --uc-primary-dim: #4a3ba6;
+  --uc-accent: #6557cc;
+  --uc-accent-2: #a595f0;
+  --uc-primary-soft: rgba(90, 73, 191, 0.08);
+  --uc-primary-soft-2: rgba(90, 73, 191, 0.26);
+  --uc-primary-ink: #4a3ba6;
 
-  --uc-ink: var(--ink-1);
-  --uc-body: var(--ink-2);
-  --uc-muted: var(--ink-3);
-  --uc-faint: var(--ink-4);
+  --uc-ink: var(--nv-ink);
+  --uc-body: var(--nv-ink-2);
+  --uc-muted: var(--nv-ink-3);
+  --uc-faint: var(--nv-ink-3);
 
-  --uc-line: var(--line-1);
-  --uc-line-2: #EEECE3;
-  --uc-line-strong: var(--line-2);
+  --uc-line: var(--nv-outline);
+  --uc-line-2: var(--nv-outline-var);
+  --uc-line-strong: var(--nv-outline);
 
-  --uc-surface: #FFFFFF;
-  --uc-bg-2: var(--bg-0);
-  --uc-bg-3: var(--bg-1);
+  --uc-surface: #ffffff;
+  --uc-bg-2: var(--nv-container);
+  --uc-bg-3: var(--nv-container-high);
 
-  --uc-green: #1F8A5B;
-  --uc-green-ink: #15724A;
-  --uc-green-soft: #E9F8F0;
-  --uc-green-line: #CDEEDB;
-  --uc-amber: #B26A00;
-  --uc-amber-soft: #FBF0DE;
-  --uc-amber-line: #F2E2B8;
-  --uc-rose: #D14343;
-  --uc-rose-soft: #FCE8EC;
+  --uc-green: #1f8a5b;
+  --uc-green-ink: #15724a;
+  --uc-green-soft: rgba(31, 138, 91, 0.09);
+  --uc-green-line: rgba(31, 138, 91, 0.28);
+  --uc-amber: #9a6b12;
+  --uc-amber-soft: rgba(154, 107, 18, 0.1);
+  --uc-amber-line: rgba(154, 107, 18, 0.3);
+  --uc-rose: #d14343;
+  --uc-rose-soft: rgba(209, 67, 67, 0.09);
 
-  --uc-sh-sm: var(--mk-sh-sm);
-  --uc-sh: var(--mk-sh-md);
-  --uc-sh-lg: var(--mk-sh-xl);
-  --uc-mono: var(--mk-font-mono);
+  --uc-mono: var(--nv-font-mono);
   --uc-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 
   color: var(--uc-ink);
+  font-optical-sizing: auto;
 }
 
 .marketing-root .uc-wrap {
@@ -58,13 +59,14 @@
   padding: 0 40px;
 }
 
-/* ── eyebrow / section marker ───────────────────────────────────────────── */
+/* ── eyebrow / section marker — nova mono voice, purple accent ──────────── */
 .marketing-root .uc-eyebrow {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  font-family: var(--uc-mono);
   font-size: 12.5px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--uc-primary);
@@ -72,6 +74,7 @@
 }
 
 /* ============================ BUTTONS ============================ */
+/* tonal nova pill — flat container tint, hairline, no shadow or lift */
 .marketing-root .uc-btn-ghost {
   display: inline-flex;
   align-items: center;
@@ -80,21 +83,17 @@
   height: 46px;
   padding: 0 22px;
   border-radius: 999px;
-  border: 1px solid var(--uc-line-strong);
-  background: var(--uc-surface);
+  border: 1px solid var(--nv-outline-var);
+  background: var(--uc-bg-2);
   color: var(--uc-ink);
   font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-weight: 450;
+  letter-spacing: 0.1px;
   white-space: nowrap;
-  box-shadow: var(--uc-sh-sm);
-  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.2s ease, transform 0.16s var(--uc-ease);
+  transition: border-color 0.18s ease, background 0.18s ease;
 }
 .marketing-root .uc-btn-ghost:hover {
-  border-color: var(--uc-line-3, #C9C2B0);
-  background: #fff;
-  box-shadow: var(--uc-sh);
-  transform: translateY(-1px);
+  background: var(--uc-bg-3);
 }
 .marketing-root .uc .arr {
   transition: transform 0.18s var(--uc-ease);
@@ -118,16 +117,16 @@
   max-width: 880px;
   font-size: clamp(38px, 6.2vw, 72px);
   line-height: 1.02;
-  letter-spacing: -0.038em;
-  font-weight: 720;
+  letter-spacing: -0.02em;
+  font-weight: 450;
+  font-variation-settings: "wdth" 100, "opsz" 72;
   color: var(--uc-ink);
   text-wrap: balance;
 }
+/* flat brand purple — the nova system is typography-led with one accent, so
+   the old purple→lilac gradient text reads as noise next to the homepage */
 .marketing-root .uc-hero-h1 .grad {
-  background: linear-gradient(100deg, var(--uc-primary) 10%, var(--uc-accent-2) 60%, var(--uc-primary) 95%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--uc-primary);
 }
 .marketing-root .uc-hero-sub {
   margin: 24px auto 0;
@@ -135,7 +134,7 @@
   font-size: clamp(16px, 1.7vw, 19px);
   line-height: 1.58;
   color: var(--uc-body);
-  letter-spacing: -0.008em;
+  letter-spacing: 0.1px;
   text-wrap: pretty;
 }
 .marketing-root .uc-hero-cta {
@@ -150,7 +149,7 @@
   margin-top: 18px;
   font-size: 13px;
   color: var(--uc-muted);
-  letter-spacing: -0.005em;
+  letter-spacing: 0.1px;
 }
 
 /* ============================ FEATURE ROWS ============================ */
@@ -181,8 +180,9 @@
   align-items: center;
   gap: 10px;
   margin-bottom: 18px;
+  font-family: var(--uc-mono);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--uc-primary);
@@ -190,9 +190,9 @@
 .marketing-root .uc-feat-eyebrow .num {
   font-family: var(--uc-mono);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.06em;
-  color: var(--uc-accent);
+  color: var(--uc-primary-ink);
   background: var(--uc-primary-soft);
   border: 1px solid var(--uc-primary-soft-2);
   padding: 3px 8px;
@@ -201,8 +201,9 @@
 .marketing-root .uc-feat-h {
   font-size: clamp(27px, 3vw, 40px);
   line-height: 1.07;
-  letter-spacing: -0.03em;
-  font-weight: 700;
+  letter-spacing: -0.018em;
+  font-weight: 450;
+  font-variation-settings: "wdth" 100, "opsz" 40;
   color: var(--uc-ink);
   text-wrap: balance;
 }
@@ -211,13 +212,13 @@
   font-size: 17px;
   line-height: 1.6;
   color: var(--uc-body);
-  letter-spacing: -0.006em;
+  letter-spacing: 0.1px;
   max-width: 480px;
   text-wrap: pretty;
 }
 .marketing-root .uc-feat-p b {
   color: var(--uc-ink);
-  font-weight: 600;
+  font-weight: 500;
 }
 .marketing-root .uc-feat-p + .uc-feat-p {
   margin-top: 14px;
@@ -232,22 +233,21 @@
   z-index: 1;
 }
 
-/* browser frame */
+/* browser frame — flat hairline frame on a tinted body, no drop shadow */
 .marketing-root .uc-mock {
   position: relative;
   background: var(--uc-surface);
   border: 1px solid var(--uc-line);
-  border-radius: 18px;
+  border-radius: var(--nv-r-lg);
   overflow: hidden;
-  box-shadow: var(--uc-sh-lg);
 }
 .marketing-root .uc-mock-bar {
   display: flex;
   align-items: center;
   gap: 13px;
   padding: 12px 16px;
-  background: #FBFBFD;
-  border-bottom: 1px solid var(--uc-line);
+  background: var(--uc-bg-2);
+  border-bottom: 1px solid var(--uc-line-2);
 }
 .marketing-root .uc-dots {
   display: flex;
@@ -259,9 +259,9 @@
   border-radius: 99px;
   display: block;
 }
-.marketing-root .uc-dots i:nth-child(1) { background: #FF6058; }
-.marketing-root .uc-dots i:nth-child(2) { background: #FFBD2E; }
-.marketing-root .uc-dots i:nth-child(3) { background: #28C941; }
+.marketing-root .uc-dots i:nth-child(1) { background: #ff6058; }
+.marketing-root .uc-dots i:nth-child(2) { background: #ffbd2e; }
+.marketing-root .uc-dots i:nth-child(3) { background: #28c941; }
 .marketing-root .uc-mock-url {
   flex: 1;
   max-width: 420px;
@@ -270,7 +270,7 @@
   align-items: center;
   gap: 9px;
   background: #fff;
-  border: 1px solid var(--uc-line);
+  border: 1px solid var(--uc-line-2);
   border-radius: 8px;
   padding: 7px 13px;
   font-size: 12px;
@@ -281,7 +281,7 @@
   display: inline-flex;
 }
 .marketing-root .uc-mock-url .lock svg { width: 12px; height: 12px; }
-.marketing-root .uc-mock-url b { color: var(--uc-ink); font-weight: 600; }
+.marketing-root .uc-mock-url b { color: var(--uc-ink); font-weight: 500; }
 .marketing-root .uc-mock-url .tag {
   margin-left: auto;
   font-family: var(--uc-mono);
@@ -291,7 +291,7 @@
 .marketing-root .uc-mock-body {
   position: relative;
   padding: 20px;
-  background: #FAFAFC;
+  background: var(--uc-bg-2);
   min-height: 280px;
 }
 
@@ -314,7 +314,7 @@
   gap: 14px;
   align-items: center;
   padding: 14px;
-  border: 1px solid var(--uc-line);
+  border: 1px solid var(--uc-line-2);
   border-radius: 12px;
   background: #fff;
 }
@@ -332,28 +332,29 @@
   gap: 8px;
 }
 
-/* highlighted target element */
+/* highlighted target element — the purple ring is the capture-selection
+   indicator (functional, kept); the decorative drop shadow is gone */
 .marketing-root .uc-target {
   position: relative;
   border: 2px solid var(--uc-primary);
   border-radius: 12px;
   background: #fff;
-  box-shadow: 0 0 0 6px rgba(90, 73, 191, 0.12), var(--uc-sh);
+  box-shadow: 0 0 0 6px rgba(90, 73, 191, 0.1);
   padding: 15px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
-.marketing-root .uc-target .lab { font-size: 13px; font-weight: 600; color: var(--uc-ink); }
-.marketing-root .uc-target .val { font-size: 18px; font-weight: 700; color: var(--uc-ink); letter-spacing: -0.02em; }
+.marketing-root .uc-target .lab { font-size: 13px; font-weight: 500; color: var(--uc-ink); }
+.marketing-root .uc-target .val { font-size: 18px; font-weight: 500; color: var(--uc-ink); letter-spacing: -0.02em; }
 .marketing-root .uc-target .sel {
   position: absolute;
   top: -12px;
   left: 12px;
   font-family: var(--uc-mono);
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 500;
   color: #fff;
   background: var(--uc-primary);
   padding: 2px 8px;
@@ -361,17 +362,16 @@
   letter-spacing: -0.01em;
 }
 
-/* voice capture pill */
+/* voice capture pill — nova near-black, no glow */
 .marketing-root .uc-cap {
   position: absolute;
   display: inline-flex;
   align-items: center;
   gap: 11px;
-  background: #171221;
+  background: var(--nv-inverse-surface);
   color: #fff;
   border-radius: 14px;
   padding: 11px 15px;
-  box-shadow: 0 18px 40px -14px rgba(8, 6, 24, 0.55);
   max-width: 300px;
 }
 .marketing-root .uc-cap.float {
@@ -384,15 +384,15 @@
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  background: rgba(129, 140, 248, 0.22);
+  background: rgba(165, 149, 240, 0.22);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #C7D2FE;
+  color: #cdc3f7;
 }
 .marketing-root .uc-cap .mic svg { width: 15px; height: 15px; }
 .marketing-root .uc-cap .wave { display: inline-flex; align-items: flex-end; gap: 2.5px; height: 18px; }
-.marketing-root .uc-cap .wave i { width: 2.5px; border-radius: 99px; background: #A5B4FC; animation: ucCapw 1s ease-in-out infinite; }
+.marketing-root .uc-cap .wave i { width: 2.5px; border-radius: 99px; background: #a595f0; animation: ucCapw 1s ease-in-out infinite; }
 .marketing-root .uc-cap .wave i:nth-child(1) { height: 6px; animation-delay: 0s; }
 .marketing-root .uc-cap .wave i:nth-child(2) { height: 13px; animation-delay: 0.1s; }
 .marketing-root .uc-cap .wave i:nth-child(3) { height: 18px; animation-delay: 0.2s; }
@@ -400,39 +400,38 @@
 .marketing-root .uc-cap .wave i:nth-child(5) { height: 15px; animation-delay: 0.15s; }
 .marketing-root .uc-cap .wave i:nth-child(6) { height: 7px; animation-delay: 0.25s; }
 @keyframes ucCapw { 0%, 100% { transform: scaleY(0.55); } 50% { transform: scaleY(1); } }
-.marketing-root .uc-cap .vt { font-size: 13px; font-weight: 500; color: #EEF0FE; letter-spacing: -0.005em; line-height: 1.35; }
+.marketing-root .uc-cap .vt { font-size: 13px; font-weight: 400; color: var(--nv-inverse-ink); letter-spacing: 0.1px; line-height: 1.35; }
 .marketing-root .uc-cap .rec {
   flex: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-size: 10.5px;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #FCA5A5;
+  color: #fca5a5;
 }
-.marketing-root .uc-cap .rec i { width: 7px; height: 7px; border-radius: 99px; background: #F87171; animation: ucPulse 1.3s infinite; }
+.marketing-root .uc-cap .rec i { width: 7px; height: 7px; border-radius: 99px; background: #f87171; animation: ucPulse 1.3s infinite; }
 @keyframes ucPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
 /* ============================ TICKET CARD ============================ */
 .marketing-root .uc-tk {
   background: #fff;
-  border: 1px solid var(--uc-line);
+  border: 1px solid var(--uc-line-2);
   border-radius: 14px;
   padding: 16px 17px;
-  box-shadow: var(--uc-sh-sm);
 }
 .marketing-root .uc-tk + .uc-tk { margin-top: 10px; }
 .marketing-root .uc-tk-h { display: flex; align-items: center; gap: 9px; margin-bottom: 9px; }
-.marketing-root .uc-tk-id { font-family: var(--uc-mono); font-size: 11px; font-weight: 600; color: var(--uc-muted); letter-spacing: 0.02em; }
+.marketing-root .uc-tk-id { font-family: var(--uc-mono); font-size: 11px; font-weight: 500; color: var(--uc-muted); letter-spacing: 0.02em; }
 .marketing-root .uc-tk-status {
   margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-size: 10.5px;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   padding: 4px 9px;
@@ -441,7 +440,7 @@
 .marketing-root .uc-tk-status.open { color: var(--uc-primary-ink); background: var(--uc-primary-soft); border: 1px solid var(--uc-primary-soft-2); }
 .marketing-root .uc-tk-status.prog { color: var(--uc-amber); background: var(--uc-amber-soft); border: 1px solid var(--uc-amber-line); }
 .marketing-root .uc-tk-status.done { color: var(--uc-green); background: var(--uc-green-soft); border: 1px solid var(--uc-green-line); }
-.marketing-root .uc-tk-t { font-size: 15px; font-weight: 600; color: var(--uc-ink); letter-spacing: -0.012em; line-height: 1.3; }
+.marketing-root .uc-tk-t { font-size: 15px; font-weight: 500; color: var(--uc-ink); letter-spacing: -0.012em; line-height: 1.3; }
 .marketing-root .uc-tk-meta { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 11px; }
 .marketing-root .uc-chip {
   display: inline-flex;
@@ -449,10 +448,10 @@
   gap: 5px;
   font-family: var(--uc-mono);
   font-size: 10.5px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--uc-body);
   background: var(--uc-bg-2);
-  border: 1px solid var(--uc-line);
+  border: 1px solid var(--uc-line-2);
   padding: 4px 8px;
   border-radius: 7px;
   letter-spacing: -0.01em;
@@ -476,7 +475,7 @@
   align-items: center;
   gap: 5px;
   font-size: 10.5px;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   padding: 3px 8px;
@@ -495,19 +494,19 @@
   border-radius: 99px;
   color: #fff;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: -0.01em;
   border: 1.5px solid #fff;
-  box-shadow: 0 0 0 1px var(--uc-line);
+  box-shadow: 0 0 0 1px var(--uc-line-2);
 }
 .marketing-root .uc-av.s { width: 24px; height: 24px; font-size: 10px; }
 .marketing-root .uc-av.m { width: 30px; height: 30px; }
 .marketing-root .uc-av.lg { width: 38px; height: 38px; font-size: 13px; }
-.marketing-root .uc-av.b1 { background: linear-gradient(140deg, #6366F1, #4F46E5); }
-.marketing-root .uc-av.b2 { background: linear-gradient(140deg, #E0598B, #B5407A); }
-.marketing-root .uc-av.b3 { background: linear-gradient(140deg, #2E9E83, #1F7A66); }
-.marketing-root .uc-av.b4 { background: linear-gradient(140deg, #D98A3D, #B36A28); }
-.marketing-root .uc-av.b5 { background: linear-gradient(140deg, #7C6BD6, #5B4FC0); }
+.marketing-root .uc-av.b1 { background: linear-gradient(140deg, #6366f1, #4f46e5); }
+.marketing-root .uc-av.b2 { background: linear-gradient(140deg, #e0598b, #b5407a); }
+.marketing-root .uc-av.b3 { background: linear-gradient(140deg, #2e9e83, #1f7a66); }
+.marketing-root .uc-av.b4 { background: linear-gradient(140deg, #d98a3d, #b36a28); }
+.marketing-root .uc-av.b5 { background: linear-gradient(140deg, #7c6bd6, #5b4fc0); }
 .marketing-root .uc-av-stack { display: inline-flex; align-items: center; }
 .marketing-root .uc-av-stack .uc-av { margin-left: -8px; }
 .marketing-root .uc-av-stack .uc-av:first-child { margin-left: 0; }
@@ -518,12 +517,12 @@
   border-radius: 99px;
   background: var(--uc-bg-3);
   border: 1.5px solid #fff;
-  box-shadow: 0 0 0 1px var(--uc-line);
+  box-shadow: 0 0 0 1px var(--uc-line-2);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 9.5px;
-  font-weight: 700;
+  font-weight: 500;
   color: var(--uc-body);
 }
 
@@ -533,10 +532,10 @@
   align-items: center;
   gap: 13px;
   padding: 15px 18px;
-  border-bottom: 1px solid var(--uc-line);
+  border-bottom: 1px solid var(--uc-line-2);
   background: #fff;
 }
-.marketing-root .uc-sess-brand { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; letter-spacing: -0.01em; color: var(--uc-ink); }
+.marketing-root .uc-sess-brand { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; letter-spacing: -0.01em; color: var(--uc-ink); }
 .marketing-root .uc-sess-brand .mk {
   width: 22px;
   height: 22px;
@@ -548,19 +547,19 @@
   color: #fff;
   font-size: 12px;
 }
-.marketing-root .uc-sess-brand .mk.client { background: linear-gradient(150deg, #E0598B, #B5407A); }
-.marketing-root .uc-sess-brand .mk.studio { background: linear-gradient(150deg, #2E9E83, #1F7A66); }
+.marketing-root .uc-sess-brand .mk.client { background: linear-gradient(150deg, #e0598b, #b5407a); }
+.marketing-root .uc-sess-brand .mk.studio { background: linear-gradient(150deg, #2e9e83, #1f7a66); }
 .marketing-root .uc-sess-meta { margin-left: auto; display: flex; align-items: center; gap: 12px; }
-.marketing-root .uc-sess-live { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--uc-green); }
+.marketing-root .uc-sess-live { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; color: var(--uc-green); }
 .marketing-root .uc-sess-live i { width: 7px; height: 7px; border-radius: 99px; background: var(--uc-green); box-shadow: 0 0 0 3px rgba(31, 138, 91, 0.16); animation: ucPulse 1.4s infinite; }
-.marketing-root .uc-sess-share { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #fff; background: var(--uc-primary); padding: 6px 12px; border-radius: 8px; }
+.marketing-root .uc-sess-share { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: #fff; background: var(--uc-primary); padding: 6px 12px; border-radius: 8px; }
 .marketing-root .uc-sess-share svg { width: 13px; height: 13px; }
 .marketing-root .uc-sess-title { padding: 16px 18px 6px; }
-.marketing-root .uc-sess-title h4 { font-size: 16px; font-weight: 700; color: var(--uc-ink); letter-spacing: -0.015em; }
+.marketing-root .uc-sess-title h4 { font-size: 16px; font-weight: 500; color: var(--uc-ink); letter-spacing: -0.015em; }
 .marketing-root .uc-sess-title p { margin-top: 5px; font-size: 13px; color: var(--uc-body); line-height: 1.5; }
 
 .marketing-root .uc-rail { padding: 6px 12px 14px; display: flex; flex-direction: column; gap: 2px; }
-.marketing-root .uc-rail-group { font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--uc-muted); padding: 10px 8px 6px; display: flex; align-items: center; gap: 7px; }
+.marketing-root .uc-rail-group { font-size: 10.5px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--uc-muted); padding: 10px 8px 6px; display: flex; align-items: center; gap: 7px; }
 .marketing-root .uc-rail-group .ct { margin-left: auto; font-family: var(--uc-mono); font-size: 10px; color: var(--uc-faint); }
 .marketing-root .uc-rail-row { display: flex; align-items: center; gap: 11px; padding: 9px 10px; border-radius: 9px; transition: background 0.15s; }
 .marketing-root .uc-rail-row:hover { background: var(--uc-bg-2); }
@@ -576,29 +575,29 @@
   color: var(--uc-ink);
   font-family: var(--uc-mono);
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 500;
 }
 .marketing-root .uc-rail-row.sel .ric { background: var(--uc-primary-soft); color: var(--uc-primary); }
 .marketing-root .uc-rail-row .rt { flex: 1; min-width: 0; font-size: 13px; color: var(--uc-ink); letter-spacing: -0.008em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .marketing-root .uc-rail-row .rs { flex: none; width: 7px; height: 7px; border-radius: 99px; background: var(--uc-primary-soft-2); }
 .marketing-root .uc-rail-row.done .rs { background: var(--uc-green); }
 
-.marketing-root .uc-presence { display: flex; align-items: center; gap: 12px; padding: 13px 18px; border-top: 1px solid var(--uc-line); background: #FBFBFD; }
+.marketing-root .uc-presence { display: flex; align-items: center; gap: 12px; padding: 13px 18px; border-top: 1px solid var(--uc-line-2); background: var(--uc-bg-2); }
 .marketing-root .uc-presence .lbl { font-size: 12px; color: var(--uc-body); }
-.marketing-root .uc-presence .lbl b { color: var(--uc-ink); font-weight: 600; }
+.marketing-root .uc-presence .lbl b { color: var(--uc-ink); font-weight: 500; }
 
 /* ============================ COMMENT THREAD ============================ */
 .marketing-root .uc-cmt { display: flex; flex-direction: column; gap: 14px; padding: 18px; }
 .marketing-root .uc-cmt-row { display: flex; gap: 11px; align-items: flex-start; }
 .marketing-root .uc-cmt-bub { flex: 1; min-width: 0; }
 .marketing-root .uc-cmt-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
-.marketing-root .uc-cmt-name { font-size: 13px; font-weight: 700; color: var(--uc-ink); letter-spacing: -0.01em; }
+.marketing-root .uc-cmt-name { font-size: 13px; font-weight: 500; color: var(--uc-ink); letter-spacing: -0.01em; }
 .marketing-root .uc-cmt-time { font-size: 11px; color: var(--uc-muted); }
-.marketing-root .uc-cmt-body { font-size: 13.5px; line-height: 1.5; color: var(--uc-body); background: var(--uc-bg-2); border: 1px solid var(--uc-line); border-radius: 11px; border-top-left-radius: 3px; padding: 10px 13px; }
+.marketing-root .uc-cmt-body { font-size: 13.5px; line-height: 1.5; color: var(--uc-body); background: var(--uc-bg-2); border: 1px solid var(--uc-line-2); border-radius: 11px; border-top-left-radius: 3px; padding: 10px 13px; }
 .marketing-root .uc-cmt-body.client { background: var(--uc-primary-soft); border-color: var(--uc-primary-soft-2); color: var(--uc-ink); }
-.marketing-root .uc-cmt-body b { color: var(--uc-ink); font-weight: 600; }
-.marketing-root .uc-cmt-react { display: inline-flex; align-items: center; gap: 5px; margin-top: 7px; font-size: 11px; color: var(--uc-muted); background: #fff; border: 1px solid var(--uc-line); border-radius: 99px; padding: 3px 9px; }
-.marketing-root .uc-cmt-input { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-top: 1px solid var(--uc-line); background: #fff; }
+.marketing-root .uc-cmt-body b { color: var(--uc-ink); font-weight: 500; }
+.marketing-root .uc-cmt-react { display: inline-flex; align-items: center; gap: 5px; margin-top: 7px; font-size: 11px; color: var(--uc-muted); background: #fff; border: 1px solid var(--uc-line-2); border-radius: 99px; padding: 3px 9px; }
+.marketing-root .uc-cmt-input { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-top: 1px solid var(--uc-line-2); background: #fff; }
 .marketing-root .uc-cmt-input .field { flex: 1; font-size: 13px; color: var(--uc-muted); }
 .marketing-root .uc-cmt-input .send { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 8px; background: var(--uc-primary); color: #fff; }
 .marketing-root .uc-cmt-input .send svg { width: 14px; height: 14px; }
@@ -609,10 +608,10 @@
   align-items: center;
   gap: 14px;
   padding: 18px 22px;
-  background: linear-gradient(120deg, #1F1A2E, #171221);
+  background: var(--nv-inverse-surface);
   color: #fff;
 }
-.marketing-root .uc-brand-logo { display: inline-flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+.marketing-root .uc-brand-logo { display: inline-flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 500; letter-spacing: -0.01em; }
 .marketing-root .uc-brand-logo .gl {
   width: 30px;
   height: 30px;
@@ -620,16 +619,16 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(140deg, #F4B860, #E0598B);
+  background: linear-gradient(140deg, #f4b860, #e0598b);
   color: #1a1424;
-  font-weight: 800;
+  font-weight: 500;
   font-size: 15px;
 }
-.marketing-root .uc-brand-bar .by { margin-left: auto; display: inline-flex; align-items: center; gap: 7px; font-size: 11px; color: rgba(226, 231, 255, 0.6); }
-.marketing-root .uc-brand-bar .by .pw { font-size: 12px; font-weight: 700; letter-spacing: -0.01em; color: rgba(238, 240, 254, 0.92); display: inline-flex; align-items: center; gap: 5px; }
-.marketing-root .uc-brand-bar .by .pw .mk { font-size: 11px; color: #A5B4FC; }
-.marketing-root .uc-brand-sub { display: flex; align-items: center; gap: 12px; padding: 14px 22px; background: #fff; border-bottom: 1px solid var(--uc-line); }
-.marketing-root .uc-brand-sub h4 { font-size: 15px; font-weight: 700; color: var(--uc-ink); letter-spacing: -0.012em; }
+.marketing-root .uc-brand-bar .by { margin-left: auto; display: inline-flex; align-items: center; gap: 7px; font-size: 11px; color: var(--nv-inverse-ink-2); }
+.marketing-root .uc-brand-bar .by .pw { font-size: 12px; font-weight: 500; letter-spacing: -0.01em; color: var(--nv-inverse-ink); display: inline-flex; align-items: center; gap: 5px; }
+.marketing-root .uc-brand-bar .by .pw .mk { font-size: 11px; color: #a595f0; }
+.marketing-root .uc-brand-sub { display: flex; align-items: center; gap: 12px; padding: 14px 22px; background: #fff; border-bottom: 1px solid var(--uc-line-2); }
+.marketing-root .uc-brand-sub h4 { font-size: 15px; font-weight: 500; color: var(--uc-ink); letter-spacing: -0.012em; }
 .marketing-root .uc-brand-sub .ct { font-size: 12px; color: var(--uc-body); }
 
 /* ============================ CLOSING CTA ============================ */
@@ -642,8 +641,9 @@
 .marketing-root .uc-closer h2 {
   font-size: clamp(30px, 4vw, 50px);
   line-height: 1.04;
-  letter-spacing: -0.032em;
-  font-weight: 720;
+  letter-spacing: -0.02em;
+  font-weight: 450;
+  font-variation-settings: "wdth" 100, "opsz" 50;
   color: var(--uc-ink);
   text-wrap: balance;
 }

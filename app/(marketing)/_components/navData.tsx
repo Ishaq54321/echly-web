@@ -1,64 +1,162 @@
 import React from "react";
+import {
+  MousePointerClick,
+  Mic,
+  FolderOpen,
+  ShieldCheck,
+  ClipboardCheck,
+  PenTool,
+  MessagesSquare,
+  Briefcase,
+  Users,
+  BookOpen,
+  Rocket,
+  CircleHelp,
+  Wrench,
+  Lock,
+} from "lucide-react";
 
 /**
- * Shared marketing nav destinations — the single source of truth for both the
- * desktop header (MarketingHeader) and the mobile full-screen menu
- * (MarketingMobileNav), so the two can never drift out of sync.
+ * Shared marketing nav model — the single source of truth for the desktop
+ * header, its full-width dropdown panels, and the mobile menu (all rendered by
+ * MarketingHeader), so they can never drift out of sync.
+ *
+ * Shape mirrors the reference architecture (antigravity.google): top-level
+ * items are either a plain link or a dropdown; each dropdown carries a big
+ * statement `title` shown on the left of the panel, an optional overview
+ * link, and a column of sublinks on the right.
  *
  * Plain data module (no "use client", no server-only): safe to import from
  * both server and client components.
  */
 
-export type UseCase = {
+export type NavSublink = {
   label: string;
   href: string;
-  desc: string;
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
 };
 
-// "Use cases" group — the three reviewer-facing pages. Agencies and Teams stay
-// as their own top-level items (see NAV_LINKS).
-export const USE_CASES: ReadonlyArray<UseCase> = [
-  {
-    label: "QA testing",
-    href: "/use-cases/qa-testing",
-    desc: "Bug reports with the console, network, and steps attached.",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M8 2v3M16 2v3M9 9h6M9 13h6M9 17h3" />
-        <rect x="4" y="5" width="16" height="17" rx="2" />
-      </svg>
-    ),
-  },
-  {
-    label: "Design review",
-    href: "/use-cases/design-review",
-    desc: "Feedback pinned to the exact element on the live page.",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M12 19l7-7 3 3-7 7-3-3z" />
-        <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
-        <path d="M2 2l7.586 7.586" />
-        <circle cx="11" cy="11" r="2" />
-      </svg>
-    ),
-  },
-  {
-    label: "Client feedback",
-    href: "/use-cases/client-feedback",
-    desc: "One link your client opens — no account, no install.",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" />
-        <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" />
-      </svg>
-    ),
-  },
-];
+export type NavDropdown = {
+  id: string;
+  /** Big statement headline on the left of the open panel. */
+  title: string;
+  /** Optional "See overview" destination under the headline. */
+  overviewHref?: string;
+  overviewLabel?: string;
+  sublinks: ReadonlyArray<NavSublink>;
+};
 
-export const NAV_LINKS: ReadonlyArray<{ label: string; href: string }> = [
-  { label: "Agencies", href: "/use-cases/agencies" },
-  { label: "Teams", href: "/use-cases/teams" },
+export type NavItem = {
+  label: string;
+  /** Direct destination for plain items; ignored when `dropdown` is set. */
+  href?: string;
+  dropdown?: NavDropdown;
+};
+
+const ICON_SIZE = 20;
+
+export const NAV_ITEMS: ReadonlyArray<NavItem> = [
+  {
+    label: "Product",
+    dropdown: {
+      id: "product",
+      title: "Everything between spotting a bug and shipping the fix",
+      overviewHref: "/docs",
+      overviewLabel: "See overview",
+      sublinks: [
+        {
+          label: "Capture extension",
+          href: "/docs/capturing",
+          icon: <MousePointerClick size={ICON_SIZE} strokeWidth={1.75} />,
+        },
+        {
+          label: "Voice tickets & AI diagnosis",
+          href: "/docs/tickets",
+          icon: <Mic size={ICON_SIZE} strokeWidth={1.75} />,
+        },
+        {
+          label: "Sessions & sharing",
+          href: "/docs/sharing",
+          icon: <FolderOpen size={ICON_SIZE} strokeWidth={1.75} />,
+        },
+        {
+          label: "Privacy controls",
+          href: "/docs/privacy",
+          icon: <ShieldCheck size={ICON_SIZE} strokeWidth={1.75} />,
+        },
+      ],
+    },
+  },
+  {
+    label: "Use cases",
+    dropdown: {
+      id: "use-cases",
+      title: "Built for every team that ships on the web",
+      sublinks: [
+        {
+          label: "QA testing",
+          href: "/use-cases/qa-testing",
+          icon: <ClipboardCheck size={ICON_SIZE} strokeWidth={1.75} />,
+        },
+        {
+          label: "Design review",
+          href: "/use-cases/design-review",
+          icon: <PenTool size={ICON_SIZE} strokeWidth={1.75} />,
+        },
+        {
+          label: "Client feedback",
+          href: "/use-cases/client-feedback",
+          icon: <MessagesSquare size={ICON_SIZE} strokeWidth={1.75} />,
+        },
+        {
+          label: "Agencies",
+          href: "/use-cases/agencies",
+          icon: <Briefcase size={ICON_SIZE} strokeWidth={1.75} />,
+        },
+        {
+          label: "Teams",
+          href: "/use-cases/teams",
+          icon: <Users size={ICON_SIZE} strokeWidth={1.75} />,
+        },
+      ],
+    },
+  },
   { label: "Pricing", href: "/#pricing" },
-  { label: "Docs", href: "/docs" },
+  { label: "Blog", href: "/blog" },
+  {
+    label: "Resources",
+    dropdown: {
+      id: "resources",
+      title: "Everything you need to get set up and get help",
+      overviewHref: "/docs",
+      overviewLabel: "Browse the docs",
+      sublinks: [
+        {
+          label: "Documentation",
+          href: "/docs",
+          icon: <BookOpen size={ICON_SIZE} strokeWidth={1.75} />,
+        },
+        {
+          label: "Getting started",
+          href: "/docs/getting-started",
+          icon: <Rocket size={ICON_SIZE} strokeWidth={1.75} />,
+        },
+        {
+          label: "FAQ",
+          href: "/docs/faq",
+          icon: <CircleHelp size={ICON_SIZE} strokeWidth={1.75} />,
+        },
+        {
+          label: "Troubleshooting",
+          href: "/docs/troubleshooting",
+          icon: <Wrench size={ICON_SIZE} strokeWidth={1.75} />,
+        },
+        {
+          label: "Trust & security",
+          href: "/marketing/trust.html",
+          icon: <Lock size={ICON_SIZE} strokeWidth={1.75} />,
+        },
+      ],
+    },
+  },
 ];

@@ -1,5 +1,4 @@
-import "../../_styles/marketing.css";
-import "../../_styles/docs.css";
+import "../../_styles";
 
 import { Fragment } from "react";
 import Link from "next/link";
@@ -8,12 +7,14 @@ import { MarketingFooter } from "../MarketingFooter";
 import { DocScrollSpy } from "./DocScrollSpy";
 
 /* ── Shared chrome ──────────────────────────────────────────────────────────
-   Every docs route mounts the dark in-flow marketing navbar (variant="solid")
-   and the marketing footer, and scopes its body under `.marketing-root .docs`
-   where docs.css hangs its retinted tokens + prose vocabulary. */
+   Every docs route mounts the fixed nova header and the marketing footer, and
+   scopes its body under `.marketing-root .docs` where docs.css hangs its
+   retinted tokens + prose vocabulary. `nv-root` puts the page on the nova
+   base (white canvas, Google Sans Flex, cool greys) so docs read as one
+   system with the homepage and blog. */
 export function DocsScaffold({ children }: { children: React.ReactNode }) {
   return (
-    <div className="marketing-root">
+    <div className="marketing-root nv-root">
       <MarketingHeader variant="solid" />
       <main className="docs">{children}</main>
       <MarketingFooter />

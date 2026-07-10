@@ -1,0 +1,1958 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   NOVA — the redesigned Annote marketing surface.
+
+   Design system transposed from antigravity.google (studied 2026-07):
+   • Near-monochrome cool greys: ink #121317 on #FFFFFF / #F8F9FC surfaces,
+     secondary text #45474D, hairline outlines at 6–12% alpha, ONE blue accent.
+   • Typography-led: Google Sans Flex at weight 450 with tight negative
+     letter-spacing and per-size optical sizing; Google Sans Code for the mono
+     "annotation" voice; typed headlines with a blinking block caret.
+   • 52–64px fixed translucent header that hides on scroll-down, full-width
+     dropdown panels, pill buttons (near-black primary), 36–48px media radii,
+     expo-eased fade-up entrances, generous 120–180px section rhythm.
+
+   Loaded AFTER marketing.css (import order in MarketingHome), so .nv-* rules
+   and the .marketing-root.nv-root overrides win. The forklifted product demos
+   (extension tray, session stage) keep their rules in marketing.css.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Tokens ──────────────────────────────────────────────────────────────
+   Scoped to .marketing-root (not .nv-root) so the redesigned header/footer,
+   which also mount on interior pages (docs, use-cases, blog scaffolds), always
+   see the tokens. The --nv- namespace can't collide with legacy vars. */
+
+.marketing-root,
+.nv-root {
+  /* palette */
+  --nv-surface: #ffffff;
+  --nv-container: #f8f9fc;
+  --nv-container-high: #eff2f7;
+  --nv-container-higher: #e6eaf0;
+  --nv-container-highest: #e1e6ec;
+  --nv-ink: #121317;
+  --nv-ink-2: #45474d;
+  --nv-ink-3: #6a6a71;
+  --nv-inverse-surface: #121317;
+  --nv-inverse-ink: #f8f9fc;
+  --nv-inverse-ink-2: #b2bbc5;
+  --nv-outline: rgba(33, 34, 38, 0.12);
+  --nv-outline-var: rgba(33, 34, 38, 0.06);
+  --nv-inverse-outline: rgba(230, 234, 240, 0.12);
+  --nv-blue: #1a73e8;
+  --nv-blue-bright: #3279f9;
+  --nv-nav-pill: rgba(183, 191, 217, 0.12);
+  --nv-nav-pill-hover: rgba(183, 191, 217, 0.24);
+
+  /* type */
+  --nv-font-display: "Google Sans Flex", "Google Sans", "DM Sans", system-ui,
+    sans-serif;
+  --nv-font-mono: "Google Sans Code", var(--font-jetbrains-mono, monospace),
+    monospace;
+
+  --nv-landing-size: 107px;
+  --nv-landing-lh: 107px;
+  --nv-landing-ls: -2.14px;
+  --nv-h1-size: 98px;
+  --nv-h1-lh: 92px;
+  --nv-h1-ls: -1.8px;
+  --nv-h2-size: 72px;
+  --nv-h2-lh: 72px;
+  --nv-h2-ls: -1.44px;
+  --nv-h3-size: 54px;
+  --nv-h3-lh: 56px;
+  --nv-h3-ls: -0.95px;
+  --nv-h4-size: 42px;
+  --nv-h4-lh: 44px;
+  --nv-h4-ls: -0.73px;
+  --nv-h5-size: 32px;
+  --nv-h5-lh: 34px;
+  --nv-h5-ls: -0.15px;
+  --nv-h6-size: 28px;
+  --nv-h6-lh: 30px;
+  --nv-h6-ls: -0.1px;
+  --nv-h7-size: 24px;
+  --nv-h7-lh: 26px;
+  --nv-h7-ls: -0.07px;
+  --nv-h9-size: 20px;
+  --nv-h9-lh: 26px;
+  --nv-h9-ls: -0.05px;
+  --nv-body-size: 17.5px;
+  --nv-body-lh: 25.4px;
+  --nv-body-ls: 0.18px;
+  --nv-caption-size: 14.5px;
+  --nv-caption-lh: 21px;
+  --nv-caption-ls: 0.16px;
+  --nv-cta-size: 17.5px;
+  --nv-cta-sm-size: 14.5px;
+
+  /* layout */
+  --nv-page-margin: 72px;
+  --nv-max: 1728px;
+  --nv-nav-h: 60px;
+  --nv-gutter: 64px;
+
+  /* shape */
+  --nv-r-xs: 4px;
+  --nv-r-sm: 8px;
+  --nv-r-md: 16px;
+  --nv-r-lg: 24px;
+  --nv-r-xl: 36px;
+  --nv-r-2xl: 48px;
+  --nv-r-full: 9999px;
+
+  /* space */
+  --nv-s-xs: 4px;
+  --nv-s-sm: 8px;
+  --nv-s-md: 16px;
+  --nv-s-lg: 24px;
+  --nv-s-xl: 36px;
+  --nv-s-2xl: 48px;
+  --nv-s-3xl: 60px;
+  --nv-s-4xl: 80px;
+  --nv-s-5xl: 88px;
+  --nv-s-6xl: 120px;
+  --nv-s-7xl: 180px;
+
+  /* motion */
+  --nv-ease-out-quad: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --nv-ease-out-cubic: cubic-bezier(0.215, 0.61, 0.355, 1);
+  --nv-ease-out-quart: cubic-bezier(0.165, 0.84, 0.44, 1);
+  --nv-ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
+  --nv-ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+  --nv-ease-out-back: cubic-bezier(0.34, 1.85, 0.64, 1);
+  --nv-ease-in-out-quart: cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+@media (max-width: 1600px) {
+  .marketing-root,
+  .nv-root {
+    --nv-landing-size: 72px;
+    --nv-landing-lh: 72px;
+    --nv-landing-ls: -1.44px;
+    --nv-gutter: 48px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .marketing-root,
+  .nv-root {
+    --nv-landing-size: 56px;
+    --nv-landing-lh: 56px;
+    --nv-landing-ls: -1.12px;
+    --nv-h1-size: 38px;
+    --nv-h1-lh: 40px;
+    --nv-h1-ls: -0.76px;
+    --nv-h2-size: 34px;
+    --nv-h2-lh: 36px;
+    --nv-h2-ls: -0.68px;
+    --nv-h3-size: 34px;
+    --nv-h3-lh: 36px;
+    --nv-h3-ls: -0.68px;
+    --nv-h4-size: 28px;
+    --nv-h4-lh: 29.6px;
+    --nv-h4-ls: -0.28px;
+    --nv-h5-size: 28px;
+    --nv-h5-lh: 29.6px;
+    --nv-h5-ls: -0.28px;
+    --nv-h7-size: 24px;
+    --nv-h7-lh: 26px;
+    --nv-body-size: 15px;
+    --nv-body-lh: 22px;
+    --nv-body-ls: 0.16px;
+    --nv-cta-size: 15px;
+    --nv-page-margin: 40px;
+    --nv-gutter: 40px;
+  }
+}
+
+@media (max-width: 767px) {
+  .marketing-root,
+  .nv-root {
+    --nv-landing-size: 42px;
+    --nv-landing-lh: 46px;
+    --nv-landing-ls: -0.8px;
+    --nv-page-margin: 16px;
+    --nv-gutter: 16px;
+  }
+}
+
+/* ── 2. Root overrides (beats .marketing-root defaults from marketing.css) ── */
+
+.marketing-root.nv-root {
+  background: #ffffff;
+  color: var(--nv-ink);
+  font-family: var(--nv-font-display);
+  font-weight: 400;
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Lift the whole marketing surface above the app shell's fixed
+     .env-canvas::before noise overlay (globals.css) — without this the page
+     picks up a warm grain wash from the dashboard environment. */
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+  /* The app shell (.env-canvas, h-full flex-col) squashes this flex child to
+     viewport height, so its white background only painted the first 1100px —
+     everything below showed the shell's warm body background + fixed noise.
+     flex:none lets the root grow to its content, so the white canvas spans
+     the whole page. */
+  flex: none;
+  height: auto;
+  min-height: 100vh;
+}
+
+.marketing-root.nv-root ::selection {
+  background: var(--nv-ink);
+  color: var(--nv-surface);
+}
+
+/* ── 3. Type utilities ──────────────────────────────────────────────────── */
+
+.nv-display,
+.nv-h1,
+.nv-h2,
+.nv-h3,
+.nv-h4,
+.nv-h5,
+.nv-h6,
+.nv-h7,
+.nv-h9 {
+  font-family: var(--nv-font-display);
+  font-weight: 450;
+  font-optical-sizing: auto;
+  margin: 0;
+  color: var(--nv-ink);
+  text-wrap: balance;
+}
+
+.nv-display {
+  font-size: var(--nv-landing-size);
+  line-height: var(--nv-landing-lh);
+  letter-spacing: var(--nv-landing-ls);
+  font-variation-settings: "wdth" 100, "opsz" 144;
+}
+.nv-h1 {
+  font-size: var(--nv-h1-size);
+  line-height: var(--nv-h1-lh);
+  letter-spacing: var(--nv-h1-ls);
+  font-variation-settings: "wdth" 100, "opsz" 98;
+}
+.nv-h2 {
+  font-size: var(--nv-h2-size);
+  line-height: var(--nv-h2-lh);
+  letter-spacing: var(--nv-h2-ls);
+  font-variation-settings: "wdth" 100, "opsz" 72;
+}
+.nv-h3 {
+  font-size: var(--nv-h3-size);
+  line-height: var(--nv-h3-lh);
+  letter-spacing: var(--nv-h3-ls);
+  font-variation-settings: "wdth" 100, "opsz" 54;
+}
+.nv-h4 {
+  font-size: var(--nv-h4-size);
+  line-height: var(--nv-h4-lh);
+  letter-spacing: var(--nv-h4-ls);
+  font-variation-settings: "wdth" 100, "opsz" 42;
+}
+.nv-h5 {
+  font-size: var(--nv-h5-size);
+  line-height: var(--nv-h5-lh);
+  letter-spacing: var(--nv-h5-ls);
+  font-variation-settings: "wdth" 100, "opsz" 32;
+}
+.nv-h6 {
+  font-size: var(--nv-h6-size);
+  line-height: var(--nv-h6-lh);
+  letter-spacing: var(--nv-h6-ls);
+  font-variation-settings: "wdth" 100, "opsz" 28;
+}
+.nv-h7 {
+  font-size: var(--nv-h7-size);
+  line-height: var(--nv-h7-lh);
+  letter-spacing: var(--nv-h7-ls);
+  font-variation-settings: "wdth" 100, "opsz" 24;
+}
+.nv-h9 {
+  font-size: var(--nv-h9-size);
+  line-height: var(--nv-h9-lh);
+  letter-spacing: var(--nv-h9-ls);
+  font-variation-settings: "wdth" 100, "opsz" 20;
+}
+
+.nv-body {
+  font-family: var(--nv-font-display);
+  font-size: var(--nv-body-size);
+  line-height: var(--nv-body-lh);
+  letter-spacing: var(--nv-body-ls);
+  font-weight: 400;
+  font-variation-settings: "wdth" 100, "opsz" 17.5;
+  color: var(--nv-ink-2);
+  margin: 0;
+}
+
+.nv-caption {
+  font-family: var(--nv-font-display);
+  font-size: var(--nv-caption-size);
+  line-height: var(--nv-caption-lh);
+  letter-spacing: var(--nv-caption-ls);
+  font-weight: 400;
+  color: var(--nv-ink-2);
+  margin: 0;
+}
+
+/* mono "annotation" voice — the reference's .special-text */
+.nv-mono {
+  font-family: var(--nv-font-mono);
+  font-size: 20px;
+  line-height: 28px;
+  letter-spacing: -0.08px;
+  font-weight: 400;
+  color: var(--nv-ink);
+  margin: 0;
+}
+
+@media (max-width: 1024px) {
+  .nv-mono {
+    font-size: 16px;
+    line-height: 24px;
+  }
+}
+
+/* section eyebrow — small mono, uppercase, quiet */
+.nv-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nv-s-sm);
+  font-family: var(--nv-font-mono);
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--nv-ink-2);
+  margin: 0 0 var(--nv-s-lg);
+}
+.nv-eyebrow::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--nv-ink);
+  opacity: 0.85;
+}
+
+/* dimmed second line inside big headlines */
+.nv-dim {
+  color: var(--nv-ink-3);
+}
+
+/* ── 4. Layout ──────────────────────────────────────────────────────────── */
+
+.nv-container {
+  width: 100%;
+  max-width: calc(var(--nv-max) + var(--nv-page-margin) * 2);
+  margin: 0 auto;
+  padding-left: var(--nv-page-margin);
+  padding-right: var(--nv-page-margin);
+}
+
+.nv-section {
+  padding-block: var(--nv-s-6xl);
+}
+
+/* ── 5. Buttons ─────────────────────────────────────────────────────────── */
+
+.nv-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nv-s-sm);
+  border: 1px solid transparent;
+  border-radius: var(--nv-r-full);
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  font-family: var(--nv-font-display);
+  font-size: var(--nv-cta-size);
+  line-height: 1.45;
+  letter-spacing: 0.18px;
+  font-weight: 450;
+  font-variation-settings: "wdth" 100, "opsz" 17.5;
+  padding: 12px 24px;
+  transition: background-color 0.2s var(--nv-ease-out-cubic),
+    color 0.2s var(--nv-ease-out-cubic),
+    border-color 0.2s var(--nv-ease-out-cubic),
+    transform 0.25s var(--nv-ease-out-cubic);
+}
+.nv-btn:active {
+  transform: scale(0.98);
+}
+.nv-btn:focus-visible {
+  outline: 2px solid var(--nv-blue-bright);
+  outline-offset: 2px;
+}
+.nv-btn svg {
+  flex: none;
+}
+
+/* NOTE: color declarations carry a `.marketing-root` prefix too — marketing.css
+   has `.marketing-root a { color: inherit }` (0,1,1) which would otherwise beat
+   a single-class button selector (0,1,0) and blank out dark-pill labels. */
+
+.nv-btn--primary,
+.marketing-root .nv-btn--primary {
+  background: var(--nv-ink);
+  color: #fff;
+}
+.nv-btn--primary:hover {
+  background: #2f3034;
+}
+
+/* light pill on dark surfaces */
+.nv-btn--primary-inverse,
+.marketing-root .nv-btn--primary-inverse {
+  background: #fff;
+  color: var(--nv-ink);
+}
+.nv-btn--primary-inverse:hover {
+  background: var(--nv-container-high);
+}
+
+.nv-btn--tonal,
+.marketing-root .nv-btn--tonal {
+  background: var(--nv-container);
+  color: var(--nv-ink);
+  border-color: var(--nv-outline-var);
+}
+.nv-btn--tonal:hover {
+  background: var(--nv-container-high);
+}
+
+/* compact nav pill (reference .nav-button / .call-to-action--nav) */
+.nv-btn--nav {
+  background: var(--nv-nav-pill);
+  color: var(--nv-ink);
+  font-size: var(--nv-cta-sm-size);
+  line-height: 21px;
+  letter-spacing: 0.11px;
+  font-weight: 430;
+  font-variation-settings: "wdth" 100, "opsz" 14.5;
+  padding: 8px 16px;
+  transition: background-color 0.15s ease-out, color 0.15s ease-out;
+}
+.nv-btn--nav:hover {
+  background: var(--nv-nav-pill-hover);
+}
+
+.nv-btn--nav-primary,
+.marketing-root .nv-btn--nav-primary {
+  background: var(--nv-ink);
+  color: #fff;
+  font-size: var(--nv-cta-sm-size);
+  line-height: 21px;
+  letter-spacing: 0.11px;
+  font-weight: 450;
+  padding: 8px 16px;
+}
+.nv-btn--nav-primary:hover {
+  background: #2f3034;
+}
+
+/* legacy .btn-primary (marketing.css) as it appears on nova surfaces — the
+   docs closer and use-case CTAs. Keep the brand-purple pill, drop the purple
+   glow shadow + hover lift, which don't exist in this system. */
+.marketing-root.nv-root .btn-primary {
+  box-shadow: none;
+}
+.marketing-root.nv-root .btn-primary:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* arrow link — chevron slides right on hover */
+.nv-arrow-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nv-s-xs);
+  color: var(--nv-ink);
+  font-family: var(--nv-font-display);
+  font-size: var(--nv-cta-size);
+  font-weight: 450;
+  letter-spacing: 0.18px;
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+.nv-arrow-link svg {
+  transition: transform 0.3s var(--nv-ease-out-cubic);
+}
+.nv-arrow-link:hover svg,
+.nv-arrow-link:focus-visible svg {
+  transform: translateX(50%);
+}
+.nv-arrow-link:focus-visible {
+  outline: none;
+  opacity: 0.7;
+}
+
+/* ── 6. Reveal utility (IntersectionObserver adds .is-in) ───────────────── */
+
+.nv-reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 1s var(--nv-ease-out-expo),
+    transform 1s var(--nv-ease-out-expo);
+  transition-delay: var(--nv-delay, 0ms);
+  will-change: opacity, transform;
+}
+.nv-reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* visually hidden (a11y) */
+.nv-sr {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+/* typed caret — a thin text cursor that blinks while typing and gets out of
+   the way once the line is complete */
+.nv-caret {
+  display: inline-block;
+  width: 0.055em;
+  min-width: 2.5px;
+  height: 0.82em;
+  margin-left: 0.06em;
+  border-radius: 2px;
+  background: currentColor;
+  vertical-align: baseline;
+  transform: translateY(0.05em);
+  animation: nv-blink 0.5s infinite;
+}
+.nv-caret.is-done {
+  animation: nv-blink 1s infinite;
+}
+.nv-caret.is-hidden {
+  opacity: 0;
+  animation: none;
+  transition: opacity 0.4s ease-out;
+}
+
+/* TypedText v2 — every character pre-reserves its final position (visibility
+   toggles only), so the block never re-wraps or jumps while typing. */
+.nv-tt-ch {
+  position: relative;
+  visibility: visible;
+}
+.nv-tt-ch.is-pending {
+  visibility: hidden;
+}
+/* the caret lives INSIDE character spans, absolutely positioned → zero layout
+   impact. While typing it sits at the left edge of the next (hidden) char
+   (visible even though its parent is visibility:hidden). */
+.nv-caret--abs {
+  position: absolute;
+  left: -0.03em;
+  bottom: 0.06em;
+  visibility: visible;
+}
+.nv-caret--abs.nv-caret--end {
+  left: auto;
+  right: -0.14em;
+}
+@keyframes nv-blink {
+  0% {
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ── 7. Header ──────────────────────────────────────────────────────────── */
+
+.nv-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 120;
+  background: rgba(255, 255, 255, 0.85);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  transition: transform 0.3s ease-in-out, background-color 0.4s ease;
+}
+.nv-header.is-hidden {
+  transform: translateY(-100%);
+}
+.nv-header.is-scrolled,
+.nv-header.is-dd-open,
+.nv-header.is-menu-open {
+  background: #fff;
+}
+
+
+.nv-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-s-lg);
+  min-height: var(--nv-nav-h);
+  padding-block: var(--nv-s-sm);
+}
+
+.nv-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--nv-ink);
+}
+.nv-logo-word {
+  font-family: var(--nv-font-display);
+  font-size: 19px;
+  font-weight: 450;
+  letter-spacing: -0.2px;
+}
+
+.nv-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-s-xs);
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.nv-nav-item {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: var(--nv-r-full);
+  color: var(--nv-ink);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px;
+  text-decoration: none;
+  font-family: var(--nv-font-display);
+  font-size: var(--nv-cta-sm-size);
+  line-height: 21px;
+  letter-spacing: 0.11px;
+  font-weight: 430;
+  font-variation-settings: "wdth" 100, "opsz" 14.5;
+  transition: background-color 0.15s ease-out;
+}
+.nv-nav-item:hover,
+.nv-nav-item:focus-visible,
+.nv-nav-item.is-open {
+  background: var(--nv-nav-pill);
+  outline: none;
+}
+.nv-nav-item .nv-nav-chevron {
+  transition: transform 0.25s var(--nv-ease-out-cubic);
+  color: var(--nv-ink-2);
+}
+.nv-nav-item.is-open .nv-nav-chevron {
+  transform: rotate(180deg);
+}
+
+.nv-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-s-sm);
+}
+
+/* burger — mobile only */
+.nv-burger {
+  display: none;
+  appearance: none;
+  border: 0;
+  background: var(--nv-nav-pill);
+  border-radius: var(--nv-r-full);
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  color: var(--nv-ink);
+}
+
+/* ── 7b. Desktop dropdown panel ─────────────────────────────────────────── */
+
+.nv-dd {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-radius: 0 0 var(--nv-r-lg) var(--nv-r-lg);
+  overflow: hidden;
+  height: 0;
+  transition: height 0.3s var(--nv-ease-in-out-quart);
+  box-shadow: 0 24px 48px -24px rgba(18, 19, 23, 0.18);
+}
+.nv-header.is-dd-open .nv-dd {
+  border-top: 1px solid var(--nv-outline-var);
+}
+
+.nv-dd-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 4fr);
+  gap: var(--nv-gutter);
+  padding-block: var(--nv-s-2xl) var(--nv-s-3xl);
+}
+
+.nv-dd-title {
+  max-width: 480px;
+}
+.nv-dd-overview {
+  margin-top: var(--nv-s-lg);
+  font-size: var(--nv-cta-sm-size);
+}
+
+.nv-dd-links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  border-left: 1px solid var(--nv-outline-var);
+  padding-left: var(--nv-s-lg);
+}
+
+.nv-dd-link {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-s-sm);
+  width: 100%;
+  padding: 10px var(--nv-s-md);
+  border-radius: var(--nv-r-sm);
+  color: var(--nv-ink);
+  text-decoration: none;
+  font-size: var(--nv-body-size);
+  font-weight: 430;
+  letter-spacing: 0.1px;
+  transition: background-color 0.2s, color 0.2s;
+  /* stagger-in choreography, driven by .is-dd-open + per-item --nv-i */
+  opacity: 0;
+  transform: translateY(0.6em);
+}
+.nv-header.is-dd-open .nv-dd-link {
+  opacity: 1;
+  transform: none;
+  transition: background-color 0.2s, color 0.2s,
+    opacity 0.45s var(--nv-ease-out-quad)
+      calc(0.08s + var(--nv-i, 0) * 0.045s),
+    transform 0.45s var(--nv-ease-out-quad)
+      calc(0.08s + var(--nv-i, 0) * 0.045s);
+}
+.nv-dd-link .nv-dd-link-ico {
+  display: inline-flex;
+  color: var(--nv-ink-2);
+}
+.nv-dd-link .nv-dd-link-arrow {
+  display: inline-flex;
+  margin-left: 2px;
+  opacity: 0;
+  transition: transform 0.3s var(--nv-ease-out-cubic), opacity 0.2s;
+}
+.nv-dd-link:hover,
+.nv-dd-link:focus-visible {
+  outline: none;
+  background: var(--nv-container-high);
+  color: var(--nv-blue-bright);
+}
+.nv-dd-link:hover .nv-dd-link-ico,
+.nv-dd-link:focus-visible .nv-dd-link-ico {
+  color: inherit;
+}
+.nv-dd-link:hover .nv-dd-link-arrow,
+.nv-dd-link:focus-visible .nv-dd-link-arrow {
+  opacity: 1;
+  transform: translateX(4px);
+}
+
+/* dim page behind an open dropdown */
+.nv-dd-scrim {
+  position: fixed;
+  inset: 0;
+  top: var(--nv-nav-h);
+  background: rgba(18, 19, 23, 0.24);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease-out;
+  z-index: 110;
+}
+.nv-dd-scrim.is-visible {
+  opacity: 1;
+}
+
+/* ── 7c. Mobile menu ────────────────────────────────────────────────────── */
+
+.nv-mobile {
+  display: none;
+  position: fixed;
+  inset: 0;
+  top: var(--nv-nav-h);
+  z-index: 115;
+  background: #fff;
+  overflow-y: auto;
+  padding: var(--nv-s-lg) var(--nv-page-margin) var(--nv-s-2xl);
+  flex-direction: column;
+  gap: var(--nv-s-xs);
+}
+.nv-mobile.is-open {
+  display: flex;
+}
+
+.nv-mobile-item {
+  appearance: none;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--nv-outline-var);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--nv-s-md) 0;
+  cursor: pointer;
+  color: var(--nv-ink);
+  text-decoration: none;
+  font-family: var(--nv-font-display);
+  font-size: var(--nv-h6-size);
+  line-height: var(--nv-h6-lh);
+  letter-spacing: var(--nv-h6-ls);
+  font-weight: 450;
+  text-align: left;
+}
+.nv-mobile-item .nv-nav-chevron {
+  transition: transform 0.25s var(--nv-ease-out-cubic);
+  color: var(--nv-ink-2);
+}
+.nv-mobile-item.is-open .nv-nav-chevron {
+  transform: rotate(180deg);
+}
+
+.nv-mobile-sub {
+  display: none;
+  flex-direction: column;
+  padding: var(--nv-s-sm) 0 var(--nv-s-md);
+  border-bottom: 1px solid var(--nv-outline-var);
+}
+.nv-mobile-sub.is-open {
+  display: flex;
+}
+.nv-mobile-sub .nv-dd-link {
+  opacity: 1;
+  transform: none;
+  padding-inline: 0 var(--nv-s-md);
+}
+
+.nv-mobile-foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-s-md);
+  padding-top: var(--nv-s-xl);
+}
+.nv-mobile-foot .nv-btn {
+  justify-content: center;
+}
+
+@media (max-width: 1099px) {
+  .nv-nav,
+  .nv-header-actions .nv-btn--nav {
+    display: none;
+  }
+  .nv-burger {
+    display: inline-flex;
+  }
+  .nv-dd,
+  .nv-dd-scrim {
+    display: none;
+  }
+}
+
+/* push the page below the fixed header */
+.nv-page-offset {
+  height: var(--nv-nav-h);
+}
+
+/* ── 8. Hero ────────────────────────────────────────────────────────────── */
+
+/* full-viewport hero: fits completely above the fold, content centered */
+.nv-hero {
+  position: relative;
+  min-height: calc(100svh - var(--nv-nav-h));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-block: var(--nv-s-md) var(--nv-s-4xl);
+  text-align: center;
+  overflow: hidden;
+}
+.nv-hero-content {
+  position: relative;
+  z-index: 2;
+}
+
+/* ── the spark (Gemini-grade point-cloud hero animation) ────────────────── */
+.nv-spark-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  pointer-events: none;
+}
+/* soft white radial veil: quiets the spark's core behind the copy while its
+   arms glow around it */
+.nv-hero-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(
+    42% 36% at 50% 52%,
+    rgba(255, 255, 255, 0.6) 0%,
+    rgba(255, 255, 255, 0.32) 50%,
+    rgba(255, 255, 255, 0) 78%
+  );
+}
+
+
+
+/* "New" announcement pill above the headline */
+.nv-hero-pill-row {
+  margin: 0 0 var(--nv-s-lg);
+}
+.nv-hero-pill,
+.marketing-root .nv-hero-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px 7px 7px;
+  border: 1px solid var(--nv-outline-var);
+  border-radius: var(--nv-r-full);
+  background: var(--nv-container);
+  color: var(--nv-ink);
+  text-decoration: none;
+  font-size: var(--nv-caption-size);
+  letter-spacing: 0.11px;
+  font-weight: 450;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+.nv-hero-pill:hover {
+  background: var(--nv-container-high);
+  border-color: var(--nv-outline);
+}
+.nv-hero-pill-badge {
+  background: var(--nv-ink);
+  color: #fff;
+  border-radius: var(--nv-r-full);
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  padding: 3px 9px;
+}
+.nv-hero-pill-arrow {
+  color: var(--nv-ink-3);
+  transition: transform 0.3s var(--nv-ease-out-cubic);
+}
+.nv-hero-pill:hover .nv-hero-pill-arrow {
+  transform: translateX(3px);
+}
+
+/* Hero headline — wider measure, slightly relaxed tracking (per feedback),
+   two lines with a dimmed second line. TypedText v2 pre-reserves the layout,
+   so the block never jumps while typing. */
+.nv-hero-title {
+  margin: 0 auto;
+  /* wide measure — "The fastest way to report a bug" holds a single line */
+  max-width: 29ch;
+  font-family: var(--nv-font-display);
+  font-weight: 450;
+  font-optical-sizing: auto;
+  font-variation-settings: "wdth" 100, "opsz" 144;
+  font-size: clamp(38px, 5.6vw, 84px);
+  line-height: 1.06;
+  letter-spacing: -0.018em;
+  color: var(--nv-ink);
+}
+
+/* wide measure so the sub holds two lines on desktop */
+.nv-hero-sub {
+  margin: var(--nv-s-lg) auto 0;
+  max-width: 900px;
+}
+
+.nv-hero-ctas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nv-s-md);
+  margin-top: var(--nv-s-xl);
+  flex-wrap: wrap;
+}
+
+
+/* ── 9. Showcase — an INSET near-black rounded panel that zooms in ──────── */
+
+.nv-showcase {
+  padding-block: var(--nv-s-2xl) var(--nv-s-4xl);
+}
+
+/* the whole band scales/fades in on scroll (--nv-band-* scrubbed in JS) */
+.nv-showcase-band {
+  position: relative;
+  width: calc(100% - var(--nv-page-margin) * 2);
+  max-width: var(--nv-max);
+  margin-inline: auto;
+  border-radius: var(--nv-r-2xl);
+  overflow: hidden;
+  padding: var(--nv-s-5xl) var(--nv-s-2xl) var(--nv-s-4xl);
+  background: radial-gradient(
+    130% 100% at 50% 0%,
+    #17181d 0%,
+    #101116 45%,
+    #0c0d10 100%
+  );
+  box-shadow: inset 0 1px 0 rgba(230, 234, 240, 0.06);
+  opacity: calc(0.2 + var(--nv-band-in, 1) * 0.8);
+  transform: translateY(calc((1 - var(--nv-band-in, 1)) * 40px))
+    scale(var(--nv-band-scale, 1));
+  transform-origin: 50% 12%;
+  will-change: transform, opacity;
+}
+.nv-showcase-inner {
+  position: relative;
+  z-index: 2;
+  max-width: calc(var(--nv-max) - var(--nv-s-2xl) * 2);
+  margin-inline: auto;
+}
+/* the diagnosis band's fine technical grid, fading radially */
+.nv-showcase-grid {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+      to right,
+      rgba(199, 210, 254, 0.05) 1px,
+      transparent 1px
+    ),
+    linear-gradient(to bottom, rgba(199, 210, 254, 0.05) 1px, transparent 1px);
+  background-size: 64px 64px;
+  -webkit-mask-image: radial-gradient(
+    96% 100% at 50% 40%,
+    #000 6%,
+    transparent 74%
+  );
+  mask-image: radial-gradient(96% 100% at 50% 40%, #000 6%, transparent 74%);
+}
+/* log rain tinted like the diagnosis band's dx-code (cool indigo) */
+.nv-showcase .nv-coderain-col {
+  color: rgba(199, 210, 254, 0.075);
+}
+.nv-showcase .nv-coderain-col .hi {
+  color: rgba(199, 210, 254, 0.15);
+}
+.nv-showcase .nv-coderain-col .lo {
+  color: rgba(199, 210, 254, 0.045);
+}
+@media (max-width: 767px) {
+  .nv-showcase-band {
+    padding: var(--nv-s-3xl) var(--nv-s-md);
+    border-radius: var(--nv-r-xl);
+  }
+}
+/* the band's code rain reads at the top/edges; the dashboard covers the rest */
+.nv-showcase .nv-coderain {
+  -webkit-mask-image: linear-gradient(
+    180deg,
+    #000 0%,
+    #000 30%,
+    transparent 62%
+  );
+  mask-image: linear-gradient(180deg, #000 0%, #000 30%, transparent 62%);
+}
+
+/* centered header stack above the dashboard */
+.nv-showcase-head {
+  max-width: 760px;
+  margin: 0 auto var(--nv-s-3xl);
+  text-align: center;
+}
+.nv-showcase-title {
+  color: var(--nv-inverse-ink);
+}
+.nv-showcase-sub {
+  margin: var(--nv-s-md) auto 0;
+  max-width: 520px;
+  color: var(--nv-inverse-ink-2);
+}
+.nv-dim-inverse {
+  color: rgba(178, 187, 197, 0.6);
+}
+.nv-eyebrow--center {
+  justify-content: center;
+}
+.nv-eyebrow--inverse {
+  color: var(--nv-inverse-ink-2);
+}
+.nv-eyebrow--inverse::before {
+  background: var(--nv-inverse-ink);
+}
+
+/* the dashboard frame — Linear-style dark-surface elevation: hairline light
+   rim, deep black cast shadow, faint cool ambient glow. Scroll scrubs
+   --nv-showcase-scale / --nv-showcase-in (0.86 → 1, fade in). */
+.nv-showcase-frame {
+  border-radius: var(--nv-r-lg);
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(230, 234, 240, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 30px 60px -20px rgba(0, 0, 0, 0.75),
+    0 80px 160px -40px rgba(0, 0, 0, 0.6),
+    0 0 180px -30px rgba(101, 87, 204, 0.28);
+}
+.nv-showcase-frame .session-demo-stage {
+  height: 790px;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+@media (max-width: 1099px) {
+  .nv-showcase-frame .session-demo-stage {
+    height: 720px;
+  }
+}
+@media (max-width: 900px) {
+  .nv-showcase-frame .session-demo-stage {
+    height: 640px;
+  }
+}
+
+/* ── 11. Workflow — the sticky-stacking deck (ClickToTicket forklift) ────── */
+
+.nv-workflow {
+  padding-block: var(--nv-s-6xl) 0;
+}
+.nv-workflow-head {
+  margin-bottom: 0;
+  text-align: center;
+}
+/* the deck's legacy internal header is replaced by the nova header above */
+.nv-root .ctt-root .ctt-section-eyebrow,
+.nv-root .ctt-root .ctt-headline,
+.nv-root .ctt-root .ctt-sub {
+  display: none;
+}
+.nv-root .ctt-root {
+  padding-top: var(--nv-s-2xl);
+  background: transparent;
+}
+/* card chrome → the system's cool hairlines + radius */
+.nv-root .ctt-card {
+  border-color: var(--nv-outline);
+  border-radius: var(--nv-r-lg);
+}
+/* Demo backdrops — the reference's actual media language: soft PASTEL
+   GRADIENT FIELDS (their product media ships as smooth gradient imagery).
+   Three overlapping color breaths per card — cool periwinkle, lavender,
+   blush — melting into a light base. No texture, no grid: a calm gradient
+   sky each mockup floats on, one hue lean per card. */
+.nv-root .ctt-card-visual--capture,
+.nv-root .ctt-card-visual--voice,
+.nv-root .ctt-card-visual--sessions {
+  background-color: #f4f6fb;
+  box-shadow: inset 0 0 0 1px var(--nv-outline-var);
+}
+/* capture — periwinkle → violet lean */
+.nv-root .ctt-card-visual--capture {
+  background-image: radial-gradient(
+      95% 85% at 12% 8%,
+      rgba(190, 200, 240, 0.6) 0%,
+      rgba(190, 200, 240, 0) 58%
+    ),
+    radial-gradient(
+      85% 75% at 92% 26%,
+      rgba(205, 194, 243, 0.55) 0%,
+      rgba(205, 194, 243, 0) 60%
+    ),
+    radial-gradient(
+      100% 90% at 68% 100%,
+      rgba(223, 214, 246, 0.5) 0%,
+      rgba(223, 214, 246, 0) 62%
+    ),
+    linear-gradient(160deg, #f7f8fc 0%, #ebeef8 100%);
+}
+/* voice — lavender → blush lean */
+.nv-root .ctt-card-visual--voice {
+  background-image: radial-gradient(
+      95% 85% at 88% 8%,
+      rgba(216, 198, 240, 0.55) 0%,
+      rgba(216, 198, 240, 0) 58%
+    ),
+    radial-gradient(
+      85% 75% at 8% 30%,
+      rgba(238, 205, 226, 0.5) 0%,
+      rgba(238, 205, 226, 0) 60%
+    ),
+    radial-gradient(
+      100% 90% at 40% 100%,
+      rgba(226, 213, 244, 0.48) 0%,
+      rgba(226, 213, 244, 0) 62%
+    ),
+    linear-gradient(200deg, #f8f7fc 0%, #efecf7 100%);
+}
+/* sessions — cool blue-grey → periwinkle lean */
+.nv-root .ctt-card-visual--sessions {
+  background-image: radial-gradient(
+      95% 85% at 14% 12%,
+      rgba(198, 214, 242, 0.55) 0%,
+      rgba(198, 214, 242, 0) 58%
+    ),
+    radial-gradient(
+      85% 75% at 90% 80%,
+      rgba(206, 200, 242, 0.5) 0%,
+      rgba(206, 200, 242, 0) 60%
+    ),
+    radial-gradient(
+      100% 90% at 55% 0%,
+      rgba(228, 234, 248, 0.6) 0%,
+      rgba(228, 234, 248, 0) 64%
+    ),
+    linear-gradient(150deg, #f6f8fc 0%, #eaeef7 100%);
+}
+
+/* ── 12. Code rain (shared decorative telemetry columns on dark panels) ─── */
+
+.nv-coderain {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  /* clear a hole in the centre where the content sits */
+  -webkit-mask-image: radial-gradient(
+    62% 78% at 50% 50%,
+    transparent 0%,
+    transparent 34%,
+    #000 78%
+  );
+  mask-image: radial-gradient(
+    62% 78% at 50% 50%,
+    transparent 0%,
+    transparent 34%,
+    #000 78%
+  );
+}
+.nv-coderain-col {
+  position: absolute;
+  top: -8%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-family: var(--nv-font-mono);
+  font-size: 12.5px;
+  line-height: 1.4;
+  white-space: nowrap;
+  color: rgba(230, 234, 240, 0.07);
+  animation: nv-coderain-drift var(--dur, 80s) linear infinite;
+  will-change: transform;
+}
+.nv-coderain-col .hi {
+  color: rgba(230, 234, 240, 0.14);
+}
+.nv-coderain-col .lo {
+  color: rgba(230, 234, 240, 0.045);
+}
+@keyframes nv-coderain-drift {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-50%);
+  }
+}
+
+/* ── 13. Use cases (the dark lifecycle-demo panel) ──────────────────────── */
+
+.nv-cases {
+  padding-block: var(--nv-s-6xl);
+}
+
+.nv-cases-head {
+  max-width: 780px;
+  margin-bottom: var(--nv-s-2xl);
+}
+.nv-cases-head .nv-body {
+  margin-top: var(--nv-s-md);
+  max-width: 520px;
+}
+
+/* The forklifted .ag-root panel, realigned to the nv container and recolored
+   to the system's near-black. Its internal demos (.ag-card, qa-*, team-*,
+   rev-*, ship-*, evidence) keep their marketing.css styling untouched. */
+.marketing-root .ag-root.nv-agency {
+  width: calc(100% - var(--nv-page-margin) * 2);
+  max-width: var(--nv-max);
+  border-radius: var(--nv-r-2xl);
+  background: radial-gradient(
+    120% 110% at 50% 0%,
+    #1b1c21 0%,
+    #141519 42%,
+    #121317 70%,
+    #0e0f12 100%
+  );
+}
+
+/* arrow-links into the use-case pages, under the panel */
+.nv-cases-links {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--nv-s-md) var(--nv-s-xl);
+  padding-top: var(--nv-s-2xl);
+}
+
+@media (max-width: 767px) {
+  .marketing-root .ag-root.nv-agency {
+    width: calc(100% - var(--nv-page-margin) * 2);
+  }
+}
+
+/* ── 13b. The "already diagnosed" section — converted to WHITE ──────────── */
+
+.marketing-root .nv-root .dxband-gutter,
+.nv-root .dxband-gutter {
+  background: transparent;
+  padding-block: var(--nv-s-2xl) 0;
+}
+/* plain light section: full width, no dark canvas, no radius */
+.nv-root .dxflag {
+  width: 100%;
+  max-width: none;
+  border-radius: 0;
+  background: #ffffff;
+}
+/* kill every dark-band decoration: hairlines, grid, log rain, bloom */
+.nv-root .dxflag::before,
+.nv-root .dxflag::after,
+.nv-root .dxflag .dx-grid,
+.nv-root .dxflag .dx-code,
+.nv-root .dxflag .dx-bloom {
+  display: none;
+}
+/* band header → nova typography, flipped to ink-on-white */
+.nv-root .dxflag .dx-eyebrow {
+  font-family: var(--nv-font-mono);
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 400;
+  color: var(--nv-ink-2);
+}
+.nv-root .dxflag .dx-eyebrow .spk {
+  display: none;
+}
+.nv-root .dxflag .dx-h {
+  font-family: var(--nv-font-display);
+  font-weight: 450;
+  letter-spacing: var(--nv-h3-ls);
+  font-variation-settings: "wdth" 100, "opsz" 54;
+  color: var(--nv-ink);
+}
+.nv-root .dxflag .dx-h .dim {
+  color: var(--nv-ink-3);
+}
+.nv-root .dxflag .dx-sub {
+  font-family: var(--nv-font-display);
+  color: var(--nv-ink-2);
+}
+/* the diagnosis card on a light page: hairline + soft cool elevation instead
+   of the dark-band glow stack */
+.nv-root .dxflag .dx-diag {
+  box-shadow: 0 0 0 1px var(--nv-outline-var),
+    0 24px 64px -28px rgba(18, 19, 23, 0.18),
+    0 60px 120px -48px rgba(18, 19, 23, 0.12);
+}
+/* two-column layout: copy left, live demo right (was centered/stacked) */
+.nv-root .dxflag .dx-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: var(--nv-gutter);
+  align-items: center;
+  max-width: var(--nv-max);
+  padding-inline: var(--nv-page-margin);
+}
+.nv-root .dxflag .dx-head {
+  text-align: left;
+  margin: 0;
+  max-width: 540px;
+}
+.nv-root .dxflag .dx-h,
+.nv-root .dxflag .dx-sub,
+.nv-root .dxflag .dx-eyebrow,
+.nv-root .dxflag .dx-eyebrow .spk {
+  text-shadow: none;
+}
+.nv-root .dxflag .dx-sub {
+  margin: 22px 0 0;
+}
+.nv-root .dxflag .dx-stage {
+  margin: 0;
+  width: auto;
+  justify-content: center;
+}
+@media (max-width: 1024px) {
+  .nv-root .dxflag .dx-wrap {
+    grid-template-columns: 1fr;
+    gap: var(--nv-s-2xl);
+  }
+}
+
+/* ── 14. Solutions (two panels) ─────────────────────────────────────────── */
+
+.nv-solutions {
+  padding-block: 0 var(--nv-s-6xl);
+}
+
+.nv-solutions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--nv-s-lg);
+}
+
+/* white panels, copy dead-center — the reference's "try solutions" layout */
+.nv-solution {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--nv-r-xl);
+  padding: var(--nv-s-2xl);
+  min-height: 560px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: #ffffff;
+  border: 1px solid var(--nv-outline-var);
+}
+/* the particle field fills the panel; the glyph condenses AROUND the copy */
+.nv-morph-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  pointer-events: none;
+}
+.nv-solution-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nv-s-md);
+}
+/* small bordered badge pill above the heading (reference: "Now Available!") */
+.nv-solution-badge {
+  display: inline-flex;
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--nv-outline-var);
+  border-radius: var(--nv-r-sm);
+  padding: 5px 12px;
+  font-size: 12.5px;
+  letter-spacing: 0.11px;
+  font-weight: 450;
+  color: var(--nv-ink-2);
+  box-shadow: 0 4px 14px -8px rgba(18, 19, 23, 0.18);
+}
+.nv-solution-body .nv-btn {
+  margin-top: var(--nv-s-md);
+}
+.nv-solution-body .nv-btn--tonal {
+  background: #fff;
+  box-shadow: 0 6px 18px -10px rgba(18, 19, 23, 0.2);
+}
+
+@media (max-width: 1024px) {
+  .nv-solutions-grid {
+    grid-template-columns: 1fr;
+  }
+  .nv-solution {
+    min-height: 300px;
+  }
+}
+
+/* ── 15. Pricing ────────────────────────────────────────────────────────── */
+
+.nv-pricing {
+  padding-block: var(--nv-s-6xl);
+}
+
+/* wide enough that "Pay when it matters." holds a single line (2-line head) */
+.nv-pricing-head {
+  text-align: center;
+  max-width: 960px;
+  margin: 0 auto var(--nv-s-2xl);
+}
+.nv-pricing-head .nv-body {
+  margin-top: var(--nv-s-md);
+}
+
+.nv-billing-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: var(--nv-s-lg);
+  background: var(--nv-container);
+  border: 1px solid var(--nv-outline-var);
+  border-radius: var(--nv-r-full);
+  padding: 4px;
+}
+.nv-billing-toggle button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  border-radius: var(--nv-r-full);
+  padding: 8px 20px;
+  cursor: pointer;
+  font-family: var(--nv-font-display);
+  font-size: var(--nv-cta-sm-size);
+  font-weight: 450;
+  color: var(--nv-ink-2);
+  transition: background-color 0.2s, color 0.2s;
+}
+.nv-billing-toggle button.is-active {
+  background: var(--nv-ink);
+  color: #fff;
+}
+
+.nv-pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--nv-s-lg);
+  align-items: stretch;
+}
+
+.nv-tier {
+  position: relative;
+  background: var(--nv-container);
+  border: 1px solid var(--nv-outline-var);
+  border-radius: var(--nv-r-lg);
+  padding: var(--nv-s-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-s-lg);
+}
+/* the featured tier stands slightly proud of its neighbours — taller and
+   with a deeper cast, the reference's quiet way of saying "this one" */
+.nv-tier--featured {
+  background: var(--nv-inverse-surface);
+  border-color: transparent;
+  margin-block: -14px;
+  padding-block: calc(var(--nv-s-xl) + 14px);
+  box-shadow: 0 34px 80px -32px rgba(18, 19, 23, 0.45);
+}
+.nv-tier--featured .nv-tier-name,
+.nv-tier--featured .nv-tier-price {
+  color: var(--nv-inverse-ink);
+}
+.nv-tier--featured .nv-tier-tagline,
+.nv-tier--featured .nv-tier-period,
+.nv-tier--featured .nv-tier-feature,
+.nv-tier--featured .nv-tier-features-head {
+  color: var(--nv-inverse-ink-2);
+}
+
+.nv-tier-badge {
+  position: absolute;
+  top: var(--nv-s-lg);
+  right: var(--nv-s-lg);
+  font-family: var(--nv-font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--nv-inverse-ink);
+  border: 1px solid var(--nv-inverse-outline);
+  border-radius: var(--nv-r-full);
+  padding: 5px 12px;
+}
+
+.nv-tier-name {
+  font-size: var(--nv-h7-size);
+  font-weight: 450;
+  color: var(--nv-ink);
+}
+.nv-tier-tagline {
+  margin-top: var(--nv-s-xs);
+  font-size: var(--nv-caption-size);
+  line-height: var(--nv-caption-lh);
+  color: var(--nv-ink-2);
+  max-width: 30ch;
+}
+
+.nv-tier-price {
+  font-family: var(--nv-font-display);
+  font-size: var(--nv-h3-size);
+  line-height: 1;
+  letter-spacing: var(--nv-h3-ls);
+  font-weight: 450;
+  color: var(--nv-ink);
+  font-variation-settings: "wdth" 100, "opsz" 54;
+}
+.nv-tier-price sup {
+  font-size: 0.45em;
+  vertical-align: super;
+  margin-right: 2px;
+}
+.nv-tier-period {
+  margin-top: var(--nv-s-xs);
+  font-size: var(--nv-caption-size);
+  color: var(--nv-ink-2);
+}
+.nv-tier-strike {
+  text-decoration: line-through;
+  opacity: 0.65;
+  margin-right: 6px;
+}
+
+.nv-tier .nv-btn {
+  width: 100%;
+}
+
+.nv-tier-features-head {
+  font-family: var(--nv-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--nv-ink-3);
+  margin-bottom: var(--nv-s-sm);
+}
+.nv-tier-features {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-s-sm);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.nv-tier-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nv-s-sm);
+  font-size: var(--nv-caption-size);
+  line-height: var(--nv-caption-lh);
+  color: var(--nv-ink-2);
+}
+.nv-tier-feature svg {
+  flex: none;
+  margin-top: 3px;
+  color: currentColor;
+  opacity: 0.7;
+}
+
+@media (max-width: 1024px) {
+  .nv-pricing-grid {
+    grid-template-columns: 1fr;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  .nv-tier--featured {
+    margin-block: 0;
+    padding-block: var(--nv-s-xl);
+  }
+}
+
+/* ── 16. FAQ ────────────────────────────────────────────────────────────── */
+
+.nv-faq {
+  padding-block: 0 var(--nv-s-6xl);
+}
+
+.nv-faq-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+  gap: var(--nv-gutter);
+}
+
+.nv-faq-item {
+  border-bottom: 1px solid var(--nv-outline-var);
+}
+.nv-faq-item:first-child {
+  border-top: 1px solid var(--nv-outline-var);
+}
+
+.nv-faq-q {
+  appearance: none;
+  background: none;
+  border: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-s-lg);
+  padding: var(--nv-s-lg) 0;
+  cursor: pointer;
+  text-align: left;
+  color: var(--nv-ink);
+  font-family: var(--nv-font-display);
+  font-size: var(--nv-h9-size);
+  line-height: var(--nv-h9-lh);
+  font-weight: 450;
+  transition: color 0.2s;
+}
+.nv-faq-q:hover {
+  color: var(--nv-ink-2);
+}
+.nv-faq-q-icon {
+  flex: none;
+  display: inline-flex;
+  color: var(--nv-ink-2);
+  transition: transform 0.35s var(--nv-ease-out-quart);
+}
+.nv-faq-item.is-open .nv-faq-q-icon {
+  transform: rotate(45deg);
+}
+
+.nv-faq-a-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.4s var(--nv-ease-in-out-quart);
+}
+.nv-faq-item.is-open .nv-faq-a-wrap {
+  grid-template-rows: 1fr;
+}
+.nv-faq-a {
+  overflow: hidden;
+}
+.nv-faq-a p {
+  margin: 0;
+  padding: 0 0 var(--nv-s-lg);
+  max-width: 62ch;
+}
+
+@media (max-width: 1024px) {
+  .nv-faq-grid {
+    grid-template-columns: 1fr;
+    gap: var(--nv-s-xl);
+  }
+}
+
+/* ── 17. Final CTA — inverse near-black panel ───────────────────────────── */
+
+.nv-cta {
+  padding-block: var(--nv-s-2xl) var(--nv-s-6xl);
+  text-align: center;
+}
+.nv-cta-panel {
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(
+    120% 130% at 50% 0%,
+    #1b1c21 0%,
+    #141519 45%,
+    #121317 75%,
+    #0e0f12 100%
+  );
+  border-radius: var(--nv-r-2xl);
+  padding: var(--nv-s-6xl) var(--nv-s-2xl);
+}
+.nv-cta-content {
+  position: relative;
+  z-index: 1;
+}
+/* two lines, deliberately smaller than the hero (per feedback) */
+.nv-cta-title {
+  max-width: 13ch;
+  margin: 0 auto;
+  color: var(--nv-inverse-ink);
+}
+.nv-cta-title .nv-caret {
+  background: currentColor;
+}
+.nv-cta-sub {
+  margin: var(--nv-s-lg) auto 0;
+  max-width: 460px;
+  color: var(--nv-inverse-ink-2);
+}
+.nv-cta-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nv-s-md);
+  margin-top: var(--nv-s-xl);
+  flex-wrap: wrap;
+}
+
+/* outline pill for dark surfaces */
+.nv-btn--ghost-inverse,
+.marketing-root .nv-btn--ghost-inverse {
+  background: transparent;
+  color: var(--nv-inverse-ink);
+  border-color: var(--nv-inverse-outline);
+}
+.nv-btn--ghost-inverse:hover {
+  background: rgba(230, 234, 240, 0.08);
+  border-color: rgba(230, 234, 240, 0.24);
+}
+
+@media (max-width: 1024px) {
+  .nv-cta-panel {
+    padding: var(--nv-s-4xl) var(--nv-s-lg);
+  }
+}
+
+/* ── 18. Footer ─────────────────────────────────────────────────────────── */
+
+.nv-footer {
+  padding-block-start: var(--nv-s-2xl);
+  border-top: 1px solid var(--nv-outline-var);
+  overflow: hidden;
+}
+
+.nv-footer-main {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) repeat(3, minmax(0, 2.66fr));
+  gap: var(--nv-gutter);
+  padding-block: var(--nv-s-2xl) var(--nv-s-4xl);
+}
+
+.nv-footer-slogan {
+  max-width: 300px;
+}
+
+.nv-footer-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.nv-footer-col-head {
+  font-size: var(--nv-caption-size);
+  color: var(--nv-ink-2);
+  margin: 0 0 var(--nv-s-md);
+}
+.nv-footer-col a {
+  display: block;
+  padding: var(--nv-s-xs) 0;
+  color: var(--nv-ink);
+  text-decoration: none;
+  font-size: var(--nv-caption-size);
+  letter-spacing: 0.11px;
+  font-weight: 500;
+}
+.nv-footer-col a:hover {
+  text-decoration: underline;
+}
+
+/* giant wordmark — per-letter rise-in */
+.nv-footer-wordmark {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-block: 0 var(--nv-s-md);
+  line-height: 0.78;
+  pointer-events: none;
+  user-select: none;
+}
+.nv-footer-letter {
+  display: inline-block;
+  font-family: var(--nv-font-display);
+  font-weight: 450;
+  font-size: clamp(64px, 15.5vw, 300px);
+  letter-spacing: -0.02em;
+  color: var(--nv-ink);
+  font-variation-settings: "wdth" 100, "opsz" 144;
+  transform: translateY(112%);
+  transition: transform 1.1s var(--nv-ease-out-expo);
+  transition-delay: calc(var(--nv-i, 0) * 70ms);
+  will-change: transform;
+}
+.nv-footer-wordmark.is-in .nv-footer-letter {
+  transform: translateY(0);
+}
+
+.nv-footer-utility {
+  border-top: 1px solid var(--nv-outline-var);
+  padding-block: var(--nv-s-lg) var(--nv-s-xl);
+}
+.nv-footer-utility-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-s-lg);
+  flex-wrap: wrap;
+}
+.nv-footer-utility-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-s-md);
+}
+.nv-footer-utility a,
+.nv-footer-copy {
+  color: var(--nv-ink-2);
+  text-decoration: none;
+  font-size: var(--nv-caption-size);
+  letter-spacing: 0.11px;
+}
+.nv-footer-utility a:hover {
+  text-decoration: underline;
+  color: var(--nv-ink);
+}
+
+@media (max-width: 1024px) {
+  .nv-footer-main {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: var(--nv-s-2xl);
+  }
+  .nv-footer-slogan {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 767px) {
+  .nv-footer-main {
+    grid-template-columns: 1fr;
+    row-gap: var(--nv-s-xl);
+  }
+  .nv-footer-utility-inner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* ── 19. Motion safety ──────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .nv-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .nv-caret {
+    animation: none;
+    opacity: 1;
+  }
+  .nv-footer-letter {
+    transform: none;
+    transition: none;
+  }
+  .nv-coderain-col {
+    animation: none;
+  }
+  .nv-showcase-band {
+    opacity: 1;
+    transform: none;
+  }
+}
