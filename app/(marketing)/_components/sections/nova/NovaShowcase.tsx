@@ -16,7 +16,6 @@
 
 import { useEffect, useRef } from "react";
 import { SessionDemoStage } from "../../demos/session/SessionDemoStage";
-import { CodeRain } from "../../nova/CodeRain";
 
 export function NovaShowcase() {
   const bandRef = useRef<HTMLDivElement>(null);
@@ -64,11 +63,6 @@ export function NovaShowcase() {
   return (
     <section id="teams" className="nv-showcase">
       <div className="nv-showcase-band" ref={bandRef}>
-        {/* the diagnosis band's visual language: fine technical grid +
-            ghosted indigo log columns */}
-        <div className="nv-showcase-grid" aria-hidden="true" />
-        <CodeRain cols={7} rows={24} />
-
         <div className="nv-showcase-inner">
           <div className="nv-showcase-head">
             <p className="nv-eyebrow nv-eyebrow--center nv-eyebrow--inverse">
