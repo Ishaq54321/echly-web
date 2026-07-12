@@ -11,6 +11,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Sharing & Collaboration — Annote",
+  alternates: { canonical: "/docs/sharing" },
   description:
     "Share a session with anyone — no signup — and keep your team in sync as work happens.",
 };

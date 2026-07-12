@@ -5,16 +5,17 @@ import {
   UseCaseHero,
   FeatureRow,
   ClosingCTA,
+  RelatedUseCases,
   LockGlyph,
   CaptureWave,
   ShareGlyph,
 } from "../../_components/usecases/UseCaseScaffold";
 
 export const metadata: Metadata = {
-  title:
-    "Annote for Product Teams — From “it’s broken” to a ticket engineers can act on.",
+  title: "Annote for Product Teams — Bugs Devs Can Act On",
+  alternates: { canonical: "/use-cases/teams" },
   description:
-    "Your PMs, designers, and support spot issues all day. Annote turns each one into a structured ticket — console, network, and exact steps attached — so engineers fix instead of reproduce.",
+    "Every bug your team reports in one shared session — with console, network, and an AI that flags the likely cause before a dev opens it.",
 };
 
 export default function TeamsPage() {
@@ -242,6 +243,7 @@ export default function TeamsPage() {
       {/* 04 — Dev-ready (shared flagship AI band) */}
       <AiDiagnosisCard />
 
+      <RelatedUseCases current="teams" />
       <ClosingCTA title="Turn your next bug into a ticket, not a thread." />
     </UseCaseScaffold>
   );

@@ -31,6 +31,7 @@ export type PostDetail = {
   slug: string | null;
   excerpt: string | null;
   publishedAt: string | null;
+  _updatedAt: string | null;
   coverImage: SanityImageWithAlt | null;
   body: PortableTextBlock[] | null;
   author: {

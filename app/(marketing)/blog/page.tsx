@@ -7,14 +7,17 @@ import type { PostListItem } from "@/sanity/lib/types";
 import { BlogIndexList } from "./_components/BlogIndexList";
 import { SubscribeBand } from "./_components/SubscribeBand";
 
+const TITLE = "Annote Blog — Bug Reporting, QA & Team Workflow";
+const DESCRIPTION =
+  "Guides and insights on bug reporting, QA testing, and building a workflow where your whole team can fix bugs together.";
+
 export const metadata: Metadata = {
-  title: "Blog — Annote",
-  description:
-    "Product updates, engineering notes, and guides from the Annote team on shipping web software without the bug-report guesswork.",
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: { canonical: "/blog" },
   openGraph: {
-    title: "The Annote blog",
-    description:
-      "Product updates, engineering notes, and guides from the Annote team.",
+    title: TITLE,
+    description: DESCRIPTION,
     type: "website",
   },
 };

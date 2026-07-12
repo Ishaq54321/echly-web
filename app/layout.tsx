@@ -31,14 +31,14 @@ const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? DEFAULT_BASE_URL;
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
   title: {
-    default: "Annote — Feedback at the speed of seeing it",
+    default: "Annote — Report Bugs Fast, Fix Them Faster",
     template: "%s · Annote",
   },
   description:
     "Click anywhere on any site. Speak in your own words. Annote turns it into a structured ticket inside a session you can share with one link.",
   openGraph: {
     title: "Annote",
-    description: "Feedback at the speed of seeing it.",
+    description: "Report Bugs Fast, Fix Them Faster",
     url: "/",
     siteName: "Annote",
     locale: "en_US",
@@ -47,8 +47,28 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Annote",
-    description: "Feedback at the speed of seeing it.",
+    description: "Report Bugs Fast, Fix Them Faster",
   },
+  // TODO(manual): paste the Google Search Console HTML-tag verification code
+  // here (search.google.com/search-console → Add property → annote.ai →
+  // "HTML tag" method → copy just the `content="..."` value, not the whole
+  // tag). Next injects it as <meta name="google-site-verification">.
+  verification: {
+    google: "PASTE_GOOGLE_SEARCH_CONSOLE_VERIFICATION_CODE_HERE",
+  },
+};
+
+// Organization schema — site-wide brand identity for Google's knowledge
+// graph. Kept to fields we can state as fact; no invented ratings/reviews.
+const organizationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "Annote",
+  url: baseUrl,
+  logo: `${baseUrl}/annote-logo-full.svg`,
+  description:
+    "Annote turns in-context feedback — a click and a voice note — into a structured, AI-diagnosed ticket your team can act on.",
+  sameAs: ["https://www.linkedin.com/company/annoteai"],
 };
 
 export const viewport: Viewport = {
@@ -68,6 +88,10 @@ export default function RootLayout({
     <html lang="en" className="h-full" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://firebasestorage.googleapis.com" crossOrigin="anonymous" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+        />
       </head>
       <body
         className={`${dmSans.className} font-sans antialiased h-full overflow-y-auto`}

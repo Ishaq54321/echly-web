@@ -5,15 +5,17 @@ import {
   UseCaseHero,
   FeatureRow,
   ClosingCTA,
+  RelatedUseCases,
   LockGlyph,
   CaptureWave,
   ShareGlyph,
 } from "../../_components/usecases/UseCaseScaffold";
 
 export const metadata: Metadata = {
-  title: "Annote for QA Testing — Bug reports that don’t need a follow-up.",
+  title: "QA Testing Tool — Capture Bugs With Full Context",
+  alternates: { canonical: "/use-cases/qa-testing" },
   description:
-    "Stop writing “steps to reproduce” by hand. Walk the build, speak each defect, and Annote files a ticket with the console, network calls, and your exact actions already captured.",
+    "File a bug the moment you see it. Annote captures the console, network, and your steps automatically, so repro steps write themselves.",
 };
 
 export default function QaTestingPage() {
@@ -250,6 +252,7 @@ export default function QaTestingPage() {
       {/* 04 — Dev-ready (shared flagship AI band) */}
       <AiDiagnosisCard />
 
+      <RelatedUseCases current="qa-testing" />
       <ClosingCTA title="Run your next regression pass with the evidence attached." />
     </UseCaseScaffold>
   );

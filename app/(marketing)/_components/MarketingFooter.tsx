@@ -29,7 +29,7 @@ const COLUMNS: ReadonlyArray<FooterColumn> = [
       { label: "Capture extension", href: "/docs/capturing" },
       { label: "Voice tickets", href: "/docs/tickets" },
       { label: "Sessions", href: "/docs/sharing" },
-      { label: "Pricing", href: "/#pricing" },
+      { label: "Pricing", href: "/pricing" },
     ],
   },
   {
@@ -97,7 +97,7 @@ export function MarketingFooter() {
         <div className="nv-footer-main">
           <div>
             <p className="nv-h5 nv-footer-slogan">
-              Feedback at the speed of seeing it.
+              Report Bugs Fast, Fix Them Faster
             </p>
           </div>
           {COLUMNS.map((col) => (

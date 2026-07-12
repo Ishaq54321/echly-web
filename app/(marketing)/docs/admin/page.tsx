@@ -12,6 +12,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Admin & Workspace — Annote",
+  alternates: { canonical: "/docs/admin" },
   description:
     "Set up your workspace and team, manage plans and billing, and control your personal settings.",
 };

@@ -5,16 +5,17 @@ import {
   UseCaseHero,
   FeatureRow,
   ClosingCTA,
+  RelatedUseCases,
   LockGlyph,
   ShareGlyph,
   SendGlyph,
 } from "../../_components/usecases/UseCaseScaffold";
 
 export const metadata: Metadata = {
-  title:
-    "Annote for Client Feedback — One link your client opens. No account, no install.",
+  title: "Client Feedback Tool — One Link, No Signup",
+  alternates: { canonical: "/use-cases/client-feedback" },
   description:
-    "Share a session and your client reviews in the browser, follows each item’s status, and leaves comments like a doc. The extension is only for the people doing the capturing.",
+    "Your client opens a link and comments — no account, no install. Your team gets dev-ready tickets from every piece of feedback.",
 };
 
 export default function ClientFeedbackPage() {
@@ -242,6 +243,7 @@ export default function ClientFeedbackPage() {
 
       <AiDiagnosisCard />
 
+      <RelatedUseCases current="client-feedback" />
       <ClosingCTA title="Share your next round with a link your client actually opens." />
     </UseCaseScaffold>
   );

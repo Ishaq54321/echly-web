@@ -1,6 +1,7 @@
 import "../../_styles";
 
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { MarketingHeader } from "../MarketingHeader";
 import { MarketingFooter } from "../MarketingFooter";
 
@@ -82,6 +83,36 @@ export function FeatureRow({
         <div className="uc-feat-media">
           <div className="uc-stage">{media}</div>
         </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── Related use cases (internal links between the 5 use-case pages) ──────── */
+const ALL_USE_CASES = [
+  { id: "agencies", label: "Agencies", href: "/use-cases/agencies" },
+  { id: "teams", label: "Product teams", href: "/use-cases/teams" },
+  { id: "qa-testing", label: "QA testing", href: "/use-cases/qa-testing" },
+  { id: "design-review", label: "Design review", href: "/use-cases/design-review" },
+  { id: "client-feedback", label: "Client feedback", href: "/use-cases/client-feedback" },
+] as const;
+
+export type UseCaseId = (typeof ALL_USE_CASES)[number]["id"];
+
+export function RelatedUseCases({ current }: { current: UseCaseId }) {
+  const others = ALL_USE_CASES.filter((uc) => uc.id !== current);
+  return (
+    <section className="uc-related">
+      <div className="uc-wrap">
+        <p className="uc-related-head">Explore other use cases</p>
+        <nav className="uc-related-links" aria-label="Related use cases">
+          {others.map((uc) => (
+            <Link key={uc.id} href={uc.href} className="nv-arrow-link">
+              {uc.label}
+              <ChevronRight size={16} strokeWidth={2} aria-hidden="true" />
+            </Link>
+          ))}
+        </nav>
       </div>
     </section>
   );

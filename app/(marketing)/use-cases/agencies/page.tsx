@@ -5,6 +5,7 @@ import {
   UseCaseHero,
   FeatureRow,
   ClosingCTA,
+  RelatedUseCases,
   LockGlyph,
   CaptureWave,
   ShareGlyph,
@@ -12,9 +13,10 @@ import {
 } from "../../_components/usecases/UseCaseScaffold";
 
 export const metadata: Metadata = {
-  title: "Annote for Agencies — From client QA to dev handoff, in one place.",
+  title: "Annote for Agencies — Client QA to Dev Handoff",
+  alternates: { canonical: "/use-cases/agencies" },
   description:
-    "Walk the build, capture every issue by voice, and hand your developers tickets that are already complete — screenshot, technical evidence, and AI diagnosis attached. One session, one link, your logo on it.",
+    "Walk the build, capture every issue by voice, and hand developers complete tickets. One shared session, one link, your branding.",
 };
 
 export default function AgenciesPage() {
@@ -309,6 +311,7 @@ export default function AgenciesPage() {
       {/* 05 — Dev-ready (shared flagship AI band) */}
       <AiDiagnosisCard />
 
+      <RelatedUseCases current="agencies" />
       <ClosingCTA title="Try Annote on your next client QA pass." />
     </UseCaseScaffold>
   );

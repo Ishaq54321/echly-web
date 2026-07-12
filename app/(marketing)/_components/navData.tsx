@@ -121,7 +121,7 @@ export const NAV_ITEMS: ReadonlyArray<NavItem> = [
       ],
     },
   },
-  { label: "Pricing", href: "/#pricing" },
+  { label: "Pricing", href: "/pricing" },
   { label: "Blog", href: "/blog" },
   {
     label: "Resources",

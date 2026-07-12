@@ -202,11 +202,6 @@
   min-height: 100vh;
 }
 
-.marketing-root.nv-root ::selection {
-  background: var(--nv-ink);
-  color: var(--nv-surface);
-}
-
 /* ── 3. Type utilities ──────────────────────────────────────────────────── */
 
 .nv-display,

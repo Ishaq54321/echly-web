@@ -5,7 +5,7 @@ import { ImageResponse } from "next/og";
 // regenerated cheaply.
 
 export const runtime = "edge";
-export const alt = "Annote — Feedback at the speed of seeing it";
+export const alt = "Annote — Report Bugs Fast, Fix Them Faster";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -45,7 +45,7 @@ export default function OpengraphImage() {
               maxWidth: 980,
             }}
           >
-            Feedback at the speed of seeing it.
+            Report Bugs Fast, Fix Them Faster
           </div>
           <div
             style={{

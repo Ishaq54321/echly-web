@@ -13,6 +13,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Capturing Feedback — Annote",
+  alternates: { canonical: "/docs/capturing" },
   description:
     "Start a session, choose how you capture, and see exactly what Annote attaches to every piece of feedback.",
 };

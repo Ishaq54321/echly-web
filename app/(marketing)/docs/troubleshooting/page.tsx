@@ -11,6 +11,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Troubleshooting — Annote",
+  alternates: { canonical: "/docs/troubleshooting" },
   description:
     "The messages you might run into — what each one means, and the quickest way past it.",
 };

@@ -33,6 +33,7 @@ export const POST_QUERY = defineQuery(`
     "slug": slug.current,
     excerpt,
     publishedAt,
+    _updatedAt,
     coverImage,
     body,
     "author": author->{ name, role, avatar },
@@ -63,4 +64,14 @@ export const RELATED_POSTS_QUERY = defineQuery(`
 // All published slugs — used to pre-generate the static post pages.
 export const POST_SLUGS_QUERY = defineQuery(`
   *[_type == "post" && defined(slug.current) && publishedAt <= now()].slug.current
+`);
+
+// Slug + timestamps for every published post — used by app/sitemap.ts so new
+// and edited posts get an accurate <lastmod> without hand-listing routes.
+export const SITEMAP_POSTS_QUERY = defineQuery(`
+  *[_type == "post" && defined(slug.current) && publishedAt <= now()] {
+    "slug": slug.current,
+    publishedAt,
+    _updatedAt
+  }
 `);

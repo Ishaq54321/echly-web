@@ -4,23 +4,54 @@ import { redirect } from "next/navigation";
 import { verifySessionToken, SESSION_COOKIE_NAME } from "@/lib/server/session";
 import { MarketingHome } from "./(marketing)/_components/MarketingHome";
 
+const TITLE = "Annote — Report Bugs Fast, Fix Them Faster";
+const DESCRIPTION =
+  "Click the element, say what's wrong. Annote writes a diagnosed ticket with console and network evidence — in one shared session your team fixes together.";
+
 export const metadata: Metadata = {
-  title: "Annote — Feedback at the speed of seeing it.",
-  description:
-    "Click. Speak. Send the link. AI turns rough notes into polished tickets your team can ship.",
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: { canonical: "/" },
   openGraph: {
-    title: "Annote — Feedback at the speed of seeing it.",
-    description:
-      "Click. Speak. Send the link. AI turns rough notes into polished tickets your team can ship.",
+    title: TITLE,
+    description: DESCRIPTION,
     url: "/",
     siteName: "Annote",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Annote — Feedback at the speed of seeing it.",
-    description: "Click. Speak. Send the link.",
+    title: TITLE,
+    description: DESCRIPTION,
   },
+};
+
+// SoftwareApplication schema — factual fields only (no fabricated ratings).
+const softwareApplicationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Annote",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Chrome",
+  description: DESCRIPTION,
+  url: "https://annote.ai",
+  offers: [
+    {
+      "@type": "Offer",
+      name: "Starter",
+      price: "0",
+      priceCurrency: "USD",
+      description: "1 member, 50 tickets total, voice-to-ticket AI.",
+    },
+    {
+      "@type": "Offer",
+      name: "Business",
+      price: "19",
+      priceCurrency: "USD",
+      description:
+        "Unlimited members, sessions, and tickets, billed per user per month.",
+    },
+  ],
 };
 
 export default async function Home() {
@@ -39,5 +70,15 @@ export default async function Home() {
   // redirect for unverified-but-authed users rather than duplicating the
   // gate logic here.
   if (session) redirect("/dashboard");
-  return <MarketingHome />;
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(softwareApplicationJsonLd),
+        }}
+      />
+      <MarketingHome />
+    </>
+  );
 }

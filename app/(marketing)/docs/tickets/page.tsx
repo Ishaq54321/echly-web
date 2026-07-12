@@ -12,6 +12,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Working with Tickets — Annote",
+  alternates: { canonical: "/docs/tickets" },
   description:
     "Read the AI diagnosis, dig into the raw evidence, and move tickets through your team's workflow.",
 };

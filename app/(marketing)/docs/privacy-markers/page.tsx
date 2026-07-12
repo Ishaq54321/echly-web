@@ -11,6 +11,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Privacy markers reference — Annote",
+  alternates: { canonical: "/docs/privacy-markers" },
   description:
     "Attributes and classes you add to your own pages to control what Annote captures.",
 };

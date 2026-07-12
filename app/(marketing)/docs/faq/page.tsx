@@ -11,6 +11,59 @@ export const metadata: Metadata = {
   title: "FAQ — Annote",
   description:
     "Short, straight answers to the things people ask most before they get started.",
+  alternates: { canonical: "/docs/faq" },
+};
+
+// Plain-text mirror of the ITEMS below, for the FAQPage schema (JSON-LD can't
+// carry JSX). Keep in sync if a question/answer changes.
+const FAQ_JSONLD_ITEMS: ReadonlyArray<{ question: string; answer: string }> = [
+  {
+    question: "Does Annote record my browsing in the background?",
+    answer:
+      "No. Annote captures nothing until you start a session, and stops the moment you end it.",
+  },
+  {
+    question: "Is my data redacted before it's sent anywhere?",
+    answer:
+      "Yes. Sensitive patterns — tokens, emails, card numbers, API keys, auth and cookie headers — are replaced in your browser before any data leaves it. Passwords and card fields are never captured.",
+  },
+  {
+    question: "Does Annote integrate with Jira, Linear, or Slack?",
+    answer:
+      "Not yet. Integrations are on the roadmap. Today, feedback lives in the Annote dashboard where your team triages, assigns, and resolves it.",
+  },
+  {
+    question: "Do I log in through the extension?",
+    answer:
+      "No — you sign in on the Annote website, and the extension connects automatically as long as you're logged in there in the same browser.",
+  },
+  {
+    question: "What does the screenshot include?",
+    answer:
+      "Only the visible part of the current browser tab at the moment you capture — not the full page, not other tabs, and not your desktop.",
+  },
+  {
+    question: "How long can a voice note be?",
+    answer: "Up to three minutes, with a warning as you approach the limit.",
+  },
+  {
+    question: "Can I control what gets captured on my own pages?",
+    answer:
+      "Yes — add privacy markers to your HTML to mask or exclude specific elements.",
+  },
+];
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQ_JSONLD_ITEMS.map((item) => ({
+    "@type": "Question",
+    name: item.question,
+    acceptedAnswer: {
+      "@type": "Answer",
+      text: item.answer,
+    },
+  })),
 };
 
 const ITEMS: FaqItem[] = [
@@ -101,6 +154,10 @@ const ArrIcon = (
 export default function FaqPage() {
   return (
     <DocsScaffold>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       <DocHero
         eyebrow="Documentation"
         title="Frequently asked questions"

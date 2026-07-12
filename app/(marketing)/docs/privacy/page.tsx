@@ -11,6 +11,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Privacy & data protection — Annote",
+  alternates: { canonical: "/docs/privacy" },
   description:
     "What Annote captures, what it redacts before anything leaves your browser, and exactly what you can control yourself.",
 };

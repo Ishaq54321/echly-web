@@ -8,6 +8,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Documentation — Annote",
+  alternates: { canonical: "/docs" },
   description:
     "Everything you need to capture feedback, read the AI diagnosis, and run Annote for your team.",
 };

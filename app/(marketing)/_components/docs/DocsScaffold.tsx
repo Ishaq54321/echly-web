@@ -1,6 +1,7 @@
 import "../../_styles";
 
 import { Fragment } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { MarketingHeader } from "../MarketingHeader";
 import { MarketingFooter } from "../MarketingFooter";
@@ -167,8 +168,7 @@ export function DocFigure({
     <figure className="shot">
       <div className="frame">
         {src ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={src} alt={caption} />
+          <Image src={src} alt={caption} width={1600} height={800} />
         ) : (
           <div className="slot">{caption}</div>
         )}

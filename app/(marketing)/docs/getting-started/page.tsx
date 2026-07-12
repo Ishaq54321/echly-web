@@ -12,6 +12,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Getting Started — Annote",
+  alternates: { canonical: "/docs/getting-started" },
   description:
     "Install Annote, connect your account, and file your first bug in under five minutes.",
 };

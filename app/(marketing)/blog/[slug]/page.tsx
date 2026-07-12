@@ -51,30 +51,36 @@ export async function generateMetadata({
 
   const title = post.metaTitle || post.title || undefined;
   const description = post.metaDescription || post.excerpt || undefined;
+  const coverImageUrl = post.coverImage?.asset
+    ? urlForImage(post.coverImage).width(1200).height(630).fit("crop").url()
+    : undefined;
 
   return {
     title,
     description,
+    alternates: { canonical: `/blog/${slug}` },
     openGraph: {
       title,
       description,
       type: "article",
       publishedTime: post.publishedAt || undefined,
       authors: post.author?.name ? [post.author.name] : undefined,
-      images: post.coverImage?.asset
+      images: coverImageUrl
         ? [
             {
-              url: urlForImage(post.coverImage)
-                .width(1200)
-                .height(630)
-                .fit("crop")
-                .url(),
+              url: coverImageUrl,
               width: 1200,
               height: 630,
-              alt: post.coverImage.alt || post.title || "",
+              alt: post.coverImage?.alt || post.title || "",
             },
           ]
         : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: coverImageUrl ? [coverImageUrl] : undefined,
     },
   };
 }
@@ -93,8 +99,51 @@ export default async function BlogPostPage({ params }: PageProps) {
   const category = post.categories?.find((c) => c.title)?.title ?? null;
   const minutes = readingTimeMinutes(post.body);
 
+  const baseUrl = "https://annote.ai";
+  const postUrl = `${baseUrl}/blog/${slug}`;
+  const coverImageUrl = post.coverImage?.asset
+    ? urlForImage(post.coverImage).width(1200).height(630).fit("crop").url()
+    : undefined;
+
+  // BlogPosting — only fields we actually have data for; no invented values.
+  const blogPostingJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: post.title,
+    description: post.excerpt || undefined,
+    image: coverImageUrl ? [coverImageUrl] : undefined,
+    datePublished: post.publishedAt || undefined,
+    dateModified: post._updatedAt || post.publishedAt || undefined,
+    author: post.author?.name
+      ? { "@type": "Person", name: post.author.name }
+      : { "@type": "Organization", name: "Annote" },
+    publisher: {
+      "@type": "Organization",
+      name: "Annote",
+      logo: { "@type": "ImageObject", url: `${baseUrl}/annote-logo-full.svg` },
+    },
+    mainEntityOfPage: { "@type": "WebPage", "@id": postUrl },
+  };
+
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Blog", item: `${baseUrl}/blog` },
+      { "@type": "ListItem", position: 2, name: post.title, item: postUrl },
+    ],
+  };
+
   return (
     <main>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(blogPostingJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
       <article className="blg-article">
         <div className="blg-container">
           <header className="blg-article-col">

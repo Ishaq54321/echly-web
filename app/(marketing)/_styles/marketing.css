@@ -1697,10 +1697,10 @@
    gradient as-is (no broken-image icon, because url() simply fails). */
 
 .marketing-root .ctt-card-visual--capture {
-  /* Replace with your own art at: public/marketing/backdrops/capture-bg.jpg
+  /* Replace with your own art at: public/marketing/backdrops/capture-bg.webp
      (recommended ~1200×900, will be cover-cropped) */
   background:
-    url("/marketing/backdrops/capture-bg.jpg") center/cover no-repeat,
+    url("/marketing/backdrops/capture-bg.webp") center/cover no-repeat,
     radial-gradient(
       ellipse 80% 60% at 50% 0%,
       rgba(220, 232, 250, 0.7) 0%,
@@ -1709,9 +1709,9 @@
     linear-gradient(135deg, #F0F4FA 0%, #E8EEF7 50%, #F4F0E8 100%);
 }
 .marketing-root .ctt-card-visual--voice {
-  /* Replace with your own art at: public/marketing/backdrops/voice-bg.jpg */
+  /* Replace with your own art at: public/marketing/backdrops/voice-bg.webp */
   background:
-    url("/marketing/backdrops/voice-bg.jpg") center/cover no-repeat,
+    url("/marketing/backdrops/voice-bg.webp") center/cover no-repeat,
     radial-gradient(
       ellipse 70% 50% at 30% 30%,
       rgba(240, 220, 250, 0.6) 0%,
@@ -1720,9 +1720,9 @@
     linear-gradient(135deg, #F5EEF8 0%, #F8E8E8 50%, #FFF4E8 100%);
 }
 .marketing-root .ctt-card-visual--sessions {
-  /* Replace with your own art at: public/marketing/backdrops/sessions-bg.jpg */
+  /* Replace with your own art at: public/marketing/backdrops/sessions-bg.webp */
   background:
-    url("/marketing/backdrops/sessions-bg.jpg") center/cover no-repeat,
+    url("/marketing/backdrops/sessions-bg.webp") center/cover no-repeat,
     radial-gradient(
       ellipse 75% 55% at 70% 40%,
       rgba(220, 240, 245, 0.7) 0%,

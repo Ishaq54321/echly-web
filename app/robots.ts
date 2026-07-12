@@ -28,6 +28,9 @@ export default function robots(): MetadataRoute.Robots {
           "/workspace-suspended/",
           // Guest session viewers — unique URLs, not crawl targets.
           "/session/",
+          // Sanity Studio — already noindexed (app/studio/[[...tool]]/layout.tsx),
+          // disallowed too so crawlers don't waste budget on it.
+          "/studio/",
         ],
       },
     ],

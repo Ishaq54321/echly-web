@@ -5,6 +5,7 @@ import {
   UseCaseHero,
   FeatureRow,
   ClosingCTA,
+  RelatedUseCases,
   LockGlyph,
   CaptureWave,
   ShareGlyph,
@@ -12,9 +13,10 @@ import {
 } from "../../_components/usecases/UseCaseScaffold";
 
 export const metadata: Metadata = {
-  title: "Annote for Design Review — Design feedback pinned to the pixel.",
+  title: "Design Review Tool — Feedback On the Exact Element",
+  alternates: { canonical: "/use-cases/design-review" },
   description:
-    "Point at the exact element, say what’s off, and Annote captures it on the live page — spacing, state, the component itself — so the fix is obvious and nothing gets lost in a thread.",
+    "Point at the pixel, say what's off. Annote pins design feedback to the exact component with a screenshot, in one shared review session.",
 };
 
 export default function DesignReviewPage() {
@@ -221,6 +223,7 @@ export default function DesignReviewPage() {
       {/* 04 — Dev-ready (shared flagship AI band) */}
       <AiDiagnosisCard />
 
+      <RelatedUseCases current="design-review" />
       <ClosingCTA title="Make your next design review pixel-exact." />
     </UseCaseScaffold>
   );
