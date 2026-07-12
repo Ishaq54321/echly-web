@@ -923,6 +923,18 @@
     rgba(255, 255, 255, 0) 78%
   );
 }
+/* on phones the spark's arms sit much closer to the headline/pill/sub, so
+   widen and strengthen the veil to keep the copy clean where dots cross it */
+@media (max-width: 767px) {
+  .nv-hero-veil {
+    background: radial-gradient(
+      62% 58% at 50% 48%,
+      rgba(255, 255, 255, 0.82) 0%,
+      rgba(255, 255, 255, 0.55) 55%,
+      rgba(255, 255, 255, 0) 82%
+    );
+  }
+}
 
 
 

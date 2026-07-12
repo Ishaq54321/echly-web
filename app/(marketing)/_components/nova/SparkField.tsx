@@ -126,7 +126,10 @@ export function SparkField() {
       // more elegant read on a small screen) — while R above keeps it big.
       const calm = isMobile ? 0.55 : 1;
       const stride = isMobile ? 2 : 1;
-      const alpha = isMobile ? 0.82 : 0.96;
+      // much softer on mobile: the hero text sits closer to the spark's arms
+      // on a narrow viewport, so dots need to read as an ambient wash rather
+      // than compete with the copy where they cross behind it
+      const alpha = isMobile ? 0.4 : 0.96;
 
       // morph the superellipse exponent (lingers near the spiky pose)
       const n =
