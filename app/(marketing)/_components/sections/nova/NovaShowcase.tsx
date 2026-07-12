@@ -16,6 +16,7 @@
 
 import { useEffect, useRef } from "react";
 import { SessionDemoStage } from "../../demos/session/SessionDemoStage";
+import { CursorTip } from "../../nova/CursorTip";
 
 export function NovaShowcase() {
   const bandRef = useRef<HTMLDivElement>(null);
@@ -81,6 +82,7 @@ export function NovaShowcase() {
 
           <div className="nv-showcase-frame">
             <SessionDemoStage />
+            <CursorTip label="Click to interact" />
           </div>
         </div>
       </div>

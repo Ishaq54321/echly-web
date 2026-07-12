@@ -17,11 +17,14 @@
  */
 
 // Full axis tuple for Google Sans Flex (optical size, slant, width, weight,
-// roundness) — copied verbatim from antigravity.google's preload, which is the
-// known-working css2 request for this family. Keep in sync with
-// app/(marketing)/layout.tsx.
+// roundness) — based on antigravity.google's preload, but with the weight
+// range widened from 400..500 to 400..700: nova.css uses font-weight:600 in
+// ~16 places (tickets, headings, badges), and a variable font only fake-bolds
+// (synthesizes) weights outside its declared axis range — the browser
+// doubles/smears strokes rather than rendering the real 600 glyph. Requesting
+// 600 in the axis fixes the "doubled letter" artifact in demo-card text.
 const GOOGLE_SANS_FLEX_URL =
-  "https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,slnt,wdth,wght,ROND@8..144,-10..0,25..150,400..500,0..100&display=swap";
+  "https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,slnt,wdth,wght,ROND@8..144,-10..0,25..150,400..700,0..100&display=swap";
 const GOOGLE_SANS_CODE_URL =
   "https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500&display=swap";
 

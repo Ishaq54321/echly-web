@@ -103,13 +103,17 @@ export function useMicPermission({
         const inputs = devices.filter((d) => d.kind === "audioinput");
         setAvailableMics(inputs);
 
+        // Only resolve to a concrete deviceId if the user previously made an
+        // explicit choice that's still plugged in. Do NOT fall back to
+        // inputs[0]/"default" here and pin it — enumerateDevices() order
+        // isn't spec-guaranteed to match the OS/browser default, so auto-
+        // pinning on first enumeration can lock in the wrong device. Leaving
+        // this null keeps getUserMedia({ audio: true }) in play, which
+        // always tracks the live system default until the user picks a mic
+        // from the selector.
         let resolved: string | null = null;
         if (storedDeviceId && inputs.some((d) => d.deviceId === storedDeviceId)) {
           resolved = storedDeviceId;
-        } else {
-          const fallback =
-            inputs.find((d) => d.deviceId === "default") ?? inputs[0] ?? null;
-          resolved = fallback?.deviceId ?? null;
         }
 
         setValidatedDeviceId(resolved);

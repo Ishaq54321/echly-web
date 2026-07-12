@@ -82,6 +82,7 @@ export function SparkField() {
     let width = 0;
     let height = 0;
     let R = 200;
+    let isMobile = false;
     let raf = 0;
     let running = false;
     let last = 0;
@@ -106,30 +107,44 @@ export function SparkField() {
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      // the spark spans the full hero
-      R = Math.min(height * 0.47, width * 0.42);
+      isMobile = width < 640;
+      // the spark spans the full hero. On phones the width-driven desktop
+      // formula (width * 0.42) makes the spark read as tiny against a much
+      // taller viewport — lean harder on height, and cap it more generously,
+      // so it fills the section as a real centerpiece instead of a speck.
+      R = isMobile
+        ? Math.min(height * 0.5, width * 0.62)
+        : Math.min(height * 0.47, width * 0.42);
       if (reduced) draw(0.016);
     };
 
     const draw = (dt: number) => {
       ctx.clearRect(0, 0, width, height);
 
+      // on phones, calm the whole thing down: slower turn, gentler swing,
+      // softer color flashes, and a thinner point cloud (perf + a quieter,
+      // more elegant read on a small screen) — while R above keeps it big.
+      const calm = isMobile ? 0.55 : 1;
+      const stride = isMobile ? 2 : 1;
+      const alpha = isMobile ? 0.82 : 0.96;
+
       // morph the superellipse exponent (lingers near the spiky pose)
       const n =
         (CURVE_MAX + CURVE_N0) / 2 +
         ((CURVE_MAX - CURVE_N0) / 2) * Math.sin(ie);
       if (!reduced) {
-        ie += dt * (0.15 + (n - (CURVE_N0 - 0.1)) ** 2 * 0.15) * 1.2;
-        I += dt;
+        ie += dt * (0.15 + (n - (CURVE_N0 - 0.1)) ** 2 * 0.15) * 1.2 * calm;
+        I += dt * calm;
       }
       press += (pressT - press) * 0.1;
       grow += (1 - grow) * dt * 2.2;
 
-      // sin³ three-axis rotation — eases, lingers, swings
+      // sin³ three-axis rotation — eases, lingers, swings (amplitude tamed
+      // on mobile so the turn feels calmer, not just slower)
       const rr = I * 0.22;
-      const rx = Math.sin(rr * 2) ** 3 * 0.85;
-      const ry = Math.sin(rr) ** 3 * 1.15;
-      const rz = Math.sin(rr) ** 3 * -0.65;
+      const rx = Math.sin(rr * 2) ** 3 * 0.85 * calm;
+      const ry = Math.sin(rr) ** 3 * 1.15 * calm;
+      const rz = Math.sin(rr) ** 3 * -0.65 * calm;
       const cX = Math.cos(rx);
       const sX = Math.sin(rx);
       const cY = Math.cos(ry);
@@ -148,8 +163,10 @@ export function SparkField() {
       const cam = R * 2.6;
       const preview = (baseState + waves.length + 1) % STATES.length;
       const exp = 2 / n;
+      const waveBoostCap = isMobile ? 1 : 1.5;
+      const lensBoostCap = isMobile ? 0.45 : 0.8;
 
-      for (let i = 0; i < COUNT; i++) {
+      for (let i = 0; i < COUNT; i += stride) {
         const t = angle[i];
         const ci = Math.cos(t);
         const si = Math.sin(t);
@@ -175,7 +192,8 @@ export function SparkField() {
         for (const w of waves) {
           if (S < w.r) st = w.s;
           const d = Math.abs(S - w.r);
-          if (d < w.width) boost = Math.max(boost, 1 + (1 - d / w.width) * 1.5);
+          if (d < w.width)
+            boost = Math.max(boost, 1 + (1 - d / w.width) * waveBoostCap);
         }
         state[i] = st;
 
@@ -197,7 +215,7 @@ export function SparkField() {
         const md = Math.sqrt(mdx * mdx + mdy * mdy);
         if (md < 80 && md > 0.01) {
           lens = 1 - smooth(0, 1, md / 80);
-          boost = Math.max(boost, 1 + lens * 0.8);
+          boost = Math.max(boost, 1 + lens * lensBoostCap);
           const push = (1 - md / 80) * 1.5;
           ox[i] += (mdx / md) * push;
           oy[i] += (mdy / md) * push;
@@ -229,7 +247,7 @@ export function SparkField() {
         const size = baseSize[i] * (0.25 + k * 1.9) * persp * grow;
         if (size <= 0.05) continue;
 
-        ctx.fillStyle = `rgba(${r | 0},${g | 0},${b | 0},0.96)`;
+        ctx.fillStyle = `rgba(${r | 0},${g | 0},${b | 0},${alpha})`;
         ctx.fillRect(px - size / 2, py - size / 2, size, size);
       }
     };

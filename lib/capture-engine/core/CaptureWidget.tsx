@@ -197,16 +197,16 @@ export default function CaptureWidget({
     onDevicesEnumerated: extensionMode
       ? (devices) => {
           setMicrophones(devices);
+          // Only clear a previously-chosen device if it disappeared (e.g.
+          // unplugged). Never auto-pin a "preferred" device here —
+          // enumerateDevices() order isn't guaranteed to match the OS
+          // default, so leaving selection empty keeps
+          // getUserMedia({ audio: true }) tracking the live system default
+          // until the user explicitly picks a mic via the selector.
           const stillValid = selectedMicrophone && devices.some((d) => d.deviceId === selectedMicrophone);
-          if (devices.length && !stillValid) {
-            const preferred =
-              devices.find((d) => d.deviceId === "default")?.deviceId ??
-              devices[0].deviceId ??
-              "";
-            if (preferred) {
-              setSelectedMicrophone(preferred);
-              try { localStorage.setItem("annote:selectedMic", preferred); } catch {}
-            }
+          if (selectedMicrophone && !stillValid) {
+            setSelectedMicrophone("");
+            try { localStorage.removeItem("annote:selectedMic"); } catch {}
           }
         }
       : undefined,
@@ -784,7 +784,17 @@ export default function CaptureWidget({
             {extensionMode && captureMode === "voice" && micDropdownOpen && (
               <MicrophonePanel
                 devices={microphones}
-                selectedDeviceId={selectedMicrophone}
+                // Display-only fallback: when the user hasn't explicitly
+                // picked a mic, show the system-default entry as checked so
+                // the panel doesn't look empty. This never gets persisted —
+                // recording keeps using getUserMedia({ audio: true }) until
+                // onSelect below actually fires.
+                selectedDeviceId={
+                  selectedMicrophone ||
+                  microphones.find((d) => d.deviceId === "default")?.deviceId ||
+                  microphones[0]?.deviceId ||
+                  ""
+                }
                 onSelect={(id) => {
                   setSelectedMicrophone(id);
                   try { localStorage.setItem("annote:selectedMic", id); } catch {}

@@ -966,6 +966,23 @@
   transform: translateX(3px);
 }
 
+/* keep the pill on one line on phones — it never had a mobile font-size
+   override and lacked white-space:nowrap, so "Voice-to-ticket with full
+   page context" wrapped to a second line inside the flex row */
+@media (max-width: 767px) {
+  .nv-hero-pill,
+  .marketing-root .nv-hero-pill {
+    gap: 6px;
+    padding: 5px 11px 5px 5px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .nv-hero-pill-badge {
+    font-size: 9.5px;
+    padding: 2px 7px;
+  }
+}
+
 /* Hero headline — wider measure, slightly relaxed tracking (per feedback),
    two lines with a dimmed second line. TypedText v2 pre-reserves the layout,
    so the block never jumps while typing. */
@@ -1081,6 +1098,7 @@
    rim, deep black cast shadow, faint cool ambient glow. Scroll scrubs
    --nv-showcase-scale / --nv-showcase-in (0.86 → 1, fade in). */
 .nv-showcase-frame {
+  position: relative;
   border-radius: var(--nv-r-lg);
   overflow: hidden;
   box-shadow: 0 0 0 1px rgba(230, 234, 240, 0.14),
@@ -1088,6 +1106,53 @@
     0 30px 60px -20px rgba(0, 0, 0, 0.75),
     0 80px 160px -40px rgba(0, 0, 0, 0.6),
     0 0 180px -30px rgba(101, 87, 204, 0.28);
+}
+
+/* cursor-follow hint pill — tells visitors the dashboard demo is clickable */
+.nv-cursor-tip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transform: translate3d(-9999px, -9999px, 0);
+  translate: 18px 18px;
+  background: rgba(18, 19, 23, 0.92);
+  color: #f8f9fc;
+  border: 1px solid rgba(230, 234, 240, 0.14);
+  border-radius: 999px;
+  padding: 7px 14px 7px 10px;
+  font-family: var(--nv-font-display);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  box-shadow: 0 10px 28px -10px rgba(0, 0, 0, 0.5);
+  transition: opacity 0.2s ease-out, scale 0.2s ease-out;
+  scale: 0.92;
+  will-change: transform, opacity;
+}
+.nv-cursor-tip.is-visible {
+  opacity: 1;
+  scale: 1;
+}
+.nv-cursor-tip svg {
+  color: var(--nv-inverse-ink-2);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .nv-cursor-tip {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nv-cursor-tip {
+    transition: none;
+  }
 }
 .nv-showcase-frame .session-demo-stage {
   height: 790px;
